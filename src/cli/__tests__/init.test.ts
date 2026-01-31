@@ -1,0 +1,30 @@
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import { runInit } from '../commands/init.js';
+
+describe('tic init', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-cli-test-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true });
+  });
+
+  it('creates .tic directory with config.yml', () => {
+    const result = runInit(tmpDir);
+    expect(result.success).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, '.tic', 'config.yml'))).toBe(true);
+  });
+
+  it('returns already-initialized message if .tic exists', () => {
+    fs.mkdirSync(path.join(tmpDir, '.tic'), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, '.tic', 'config.yml'), 'next_id: 1\n');
+    const result = runInit(tmpDir);
+    expect(result.alreadyExists).toBe(true);
+  });
+});
