@@ -31,8 +31,8 @@ export function Settings() {
 
     if (key.return) {
       const selected = VALID_BACKENDS[cursor]!;
-      if (selected !== 'local') {
-        // Non-local backends not yet available
+      if (selected !== 'local' && selected !== 'github') {
+        // Non-local/github backends not yet available
         return;
       }
       config.backend = selected;
@@ -52,7 +52,7 @@ export function Settings() {
       {VALID_BACKENDS.map((b, idx) => {
         const selected = idx === cursor;
         const isCurrent = b === config.backend;
-        const available = b === 'local';
+        const available = b === 'local' || b === 'github';
         return (
           <Box key={b}>
             <Text color={selected ? 'cyan' : undefined}>

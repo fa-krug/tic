@@ -37,8 +37,14 @@ describe('createBackend', () => {
     expect(backend.getStatuses()).toEqual(defaultConfig.statuses);
   });
 
-  it('throws for unimplemented backends', () => {
+  it('attempts to create GitHubBackend when backend is github', () => {
     writeConfig(tmpDir, { ...defaultConfig, backend: 'github' });
+    // Throws because gh auth will fail in test env, but NOT "not yet implemented"
+    expect(() => createBackend(tmpDir)).not.toThrow('not yet implemented');
+  });
+
+  it('throws for unimplemented backends', () => {
+    writeConfig(tmpDir, { ...defaultConfig, backend: 'gitlab' });
     expect(() => createBackend(tmpDir)).toThrow('not yet implemented');
   });
 

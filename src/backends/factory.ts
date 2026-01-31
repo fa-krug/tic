@@ -1,6 +1,7 @@
 import { execSync } from 'node:child_process';
 import type { Backend } from './types.js';
 import { LocalBackend } from './local/index.js';
+import { GitHubBackend } from './github/index.js';
 import { readConfig } from './local/config.js';
 
 export const VALID_BACKENDS = ['local', 'github', 'gitlab', 'azure'] as const;
@@ -30,6 +31,7 @@ export function createBackend(root: string): Backend {
     case 'local':
       return new LocalBackend(root);
     case 'github':
+      return new GitHubBackend(root);
     case 'gitlab':
     case 'azure':
       throw new Error(
