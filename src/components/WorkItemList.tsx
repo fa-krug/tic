@@ -53,6 +53,7 @@ export function WorkItemList() {
   const [settingParent, setSettingParent] = useState(false);
   const [parentInput, setParentInput] = useState('');
 
+  const capabilities = useMemo(() => backend.getCapabilities(), [backend]);
   const types = useMemo(() => backend.getWorkItemTypes(), [backend]);
 
   useEffect(() => {
@@ -112,7 +113,7 @@ export function WorkItemList() {
     }
 
     if (input === 'q') exit();
-    if (input === 'i') navigate('iteration-picker');
+    if (input === 'i' && capabilities.iterations) navigate('iteration-picker');
     if (input === ',') navigate('settings');
 
     if (input === 'c') {
@@ -136,7 +137,10 @@ export function WorkItemList() {
       backend.updateWorkItem(item.id, { status: nextStatus });
 
       // Show warning if cycling to final status with open children or deps
-      if (nextStatus === statuses[statuses.length - 1]) {
+      if (
+        capabilities.relationships &&
+        nextStatus === statuses[statuses.length - 1]
+      ) {
         const children = backend.getChildren(item.id);
         const openChildren = children.filter(
           (c) => c.status !== statuses[statuses.length - 1],
@@ -171,13 +175,18 @@ export function WorkItemList() {
       setRefresh((r) => r + 1);
     }
 
-    if (input === 'p' && treeItems.length > 0 && !settingParent) {
+    if (
+      input === 'p' &&
+      capabilities.fields.parent &&
+      treeItems.length > 0 &&
+      !settingParent
+    ) {
       setSettingParent(true);
       const currentParent = treeItems[cursor]!.item.parent;
       setParentInput(currentParent !== null ? String(currentParent) : '');
     }
 
-    if (key.tab && types.length > 0) {
+    if (key.tab && capabilities.customTypes && types.length > 0) {
       const currentIdx = types.indexOf(activeType ?? '');
       const nextType = types[(currentIdx + 1) % types.length]!;
       setActiveType(nextType);
@@ -189,6 +198,20 @@ export function WorkItemList() {
   const typeLabel = activeType
     ? activeType.charAt(0).toUpperCase() + activeType.slice(1) + 's'
     : '';
+
+  const helpParts = [
+    'up/down: navigate',
+    'enter: edit',
+    'o: open',
+    'c: create',
+    'd: delete',
+    's: cycle status',
+  ];
+  if (capabilities.fields.parent) helpParts.push('p: set parent');
+  if (capabilities.customTypes) helpParts.push('tab: type');
+  if (capabilities.iterations) helpParts.push('i: iteration');
+  helpParts.push(',: settings', 'q: quit');
+  const helpText = helpParts.join('  ');
 
   const colId = 5;
   const colStatus = 14;
@@ -223,16 +246,20 @@ export function WorkItemList() {
             Status
           </Text>
         </Box>
-        <Box width={colPriority}>
-          <Text bold underline>
-            Priority
-          </Text>
-        </Box>
-        <Box width={colAssignee}>
-          <Text bold underline>
-            Assignee
-          </Text>
-        </Box>
+        {capabilities.fields.priority && (
+          <Box width={colPriority}>
+            <Text bold underline>
+              Priority
+            </Text>
+          </Box>
+        )}
+        {capabilities.fields.assignee && (
+          <Box width={colAssignee}>
+            <Text bold underline>
+              Assignee
+            </Text>
+          </Box>
+        )}
       </Box>
 
       {treeItems.length === 0 && (
@@ -254,28 +281,36 @@ export function WorkItemList() {
             </Box>
             <Box flexGrow={1}>
               <Text color={selected ? 'cyan' : undefined} bold={selected}>
-                {prefix}
+                {capabilities.relationships ? prefix : ''}
                 {item.title}
               </Text>
             </Box>
             <Box width={colStatus}>
               <Text color={selected ? 'cyan' : undefined}>
-                {hasUnresolvedDeps ? '⧗ ' : ''}
+                {capabilities.fields.dependsOn && hasUnresolvedDeps ? '⧗ ' : ''}
                 {item.status}
               </Text>
             </Box>
-            <Box width={colPriority}>
-              <Text color={selected ? 'cyan' : undefined}>{item.priority}</Text>
-            </Box>
-            <Box width={colAssignee}>
-              <Text color={selected ? 'cyan' : undefined}>{item.assignee}</Text>
-            </Box>
+            {capabilities.fields.priority && (
+              <Box width={colPriority}>
+                <Text color={selected ? 'cyan' : undefined}>
+                  {item.priority}
+                </Text>
+              </Box>
+            )}
+            {capabilities.fields.assignee && (
+              <Box width={colAssignee}>
+                <Text color={selected ? 'cyan' : undefined}>
+                  {item.assignee}
+                </Text>
+              </Box>
+            )}
           </Box>
         );
       })}
 
       <Box marginTop={1}>
-        {settingParent ? (
+        {capabilities.fields.parent && settingParent ? (
           <Box>
             <Text color="cyan">Set parent ID (empty to clear): </Text>
             <TextInput
@@ -303,10 +338,7 @@ export function WorkItemList() {
             Delete item #{treeItems[cursor]?.item.id}? (y/n)
           </Text>
         ) : (
-          <Text dimColor>
-            up/down: navigate enter: edit o: open c: create d: delete s: cycle
-            status p: set parent tab: type i: iteration ,: settings q: quit
-          </Text>
+          <Text dimColor>{helpText}</Text>
         )}
       </Box>
       {warning && (
