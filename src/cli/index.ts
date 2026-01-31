@@ -15,6 +15,7 @@ import {
   type ItemCommentOptions,
 } from './commands/item.js';
 import { runIterationList, runIterationSet } from './commands/iteration.js';
+import { startMcpServer } from './commands/mcp.js';
 import type { WorkItem } from '../types.js';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -331,6 +332,16 @@ export function createProgram(): Command {
       } catch (err) {
         handleError(err, parentOpts.json);
       }
+    });
+
+  // tic mcp ...
+  const mcp = program.command('mcp').description('MCP server');
+
+  mcp
+    .command('serve')
+    .description('Start MCP server on stdio')
+    .action(async () => {
+      await startMcpServer();
     });
 
   // Global options
