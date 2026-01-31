@@ -14,6 +14,8 @@ type FieldName =
   | 'assignee'
   | 'labels'
   | 'description'
+  | 'parent'
+  | 'dependsOn'
   | 'comments';
 
 const FIELDS: FieldName[] = [
@@ -25,6 +27,8 @@ const FIELDS: FieldName[] = [
   'assignee',
   'labels',
   'description',
+  'parent',
+  'dependsOn',
   'comments',
 ];
 const SELECT_FIELDS: FieldName[] = ['type', 'status', 'iteration', 'priority'];
@@ -61,6 +65,14 @@ export function WorkItemForm() {
   const [description, setDescription] = useState(
     existingItem?.description ?? '',
   );
+  const [parentId, setParentId] = useState(
+    existingItem?.parent !== null && existingItem?.parent !== undefined
+      ? String(existingItem.parent)
+      : '',
+  );
+  const [dependsOn, setDependsOn] = useState(
+    existingItem?.dependsOn?.join(', ') ?? '',
+  );
   const [newComment, setNewComment] = useState('');
   const [comments, setComments] = useState<Comment[]>(
     existingItem?.comments ?? [],
@@ -78,6 +90,14 @@ export function WorkItemForm() {
       .map((l) => l.trim())
       .filter((l) => l.length > 0);
 
+    const parsedParent =
+      parentId.trim() === '' ? null : parseInt(parentId.trim(), 10);
+    const parsedDependsOn = dependsOn
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0)
+      .map((s) => parseInt(s, 10));
+
     if (selectedWorkItemId !== null) {
       backend.updateWorkItem(selectedWorkItemId, {
         title,
@@ -88,6 +108,8 @@ export function WorkItemForm() {
         assignee,
         labels: parsedLabels,
         description,
+        parent: parsedParent,
+        dependsOn: parsedDependsOn,
       });
 
       if (newComment.trim().length > 0) {
@@ -108,8 +130,8 @@ export function WorkItemForm() {
         assignee,
         labels: parsedLabels,
         description,
-        parent: null,
-        dependsOn: [],
+        parent: parsedParent,
+        dependsOn: parsedDependsOn,
       });
 
       if (newComment.trim().length > 0) {
@@ -321,7 +343,7 @@ export function WorkItemForm() {
       );
     }
 
-    // Text fields: title, assignee, labels, description
+    // Text fields: title, assignee, labels, description, parent, dependsOn
     const textValue =
       field === 'title'
         ? title
@@ -329,7 +351,11 @@ export function WorkItemForm() {
           ? assignee
           : field === 'labels'
             ? labels
-            : description;
+            : field === 'parent'
+              ? parentId
+              : field === 'dependsOn'
+                ? dependsOn
+                : description;
 
     const textSetter =
       field === 'title'
@@ -338,7 +364,11 @@ export function WorkItemForm() {
           ? setAssignee
           : field === 'labels'
             ? setLabels
-            : setDescription;
+            : field === 'parent'
+              ? setParentId
+              : field === 'dependsOn'
+                ? setDependsOn
+                : setDescription;
 
     if (isEditing) {
       return (
@@ -383,6 +413,32 @@ export function WorkItemForm() {
       </Box>
 
       {FIELDS.map((field, index) => renderField(field, index))}
+
+      {selectedWorkItemId !== null && (
+        <Box flexDirection="column" marginTop={1}>
+          <Text bold dimColor>
+            Relationships:
+          </Text>
+          <Box marginLeft={2}>
+            <Text dimColor>
+              Children:{' '}
+              {backend
+                .getChildren(selectedWorkItemId)
+                .map((c) => `#${c.id} (${c.title})`)
+                .join(', ') || 'none'}
+            </Text>
+          </Box>
+          <Box marginLeft={2}>
+            <Text dimColor>
+              Depended on by:{' '}
+              {backend
+                .getDependents(selectedWorkItemId)
+                .map((d) => `#${d.id} (${d.title})`)
+                .join(', ') || 'none'}
+            </Text>
+          </Box>
+        </Box>
+      )}
 
       <Box marginTop={1}>
         <Text dimColor>
