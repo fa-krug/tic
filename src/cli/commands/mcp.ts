@@ -249,3 +249,77 @@ export function handleSearchItems(
   );
   return success(filtered);
 }
+
+export function handleGetChildren(
+  backend: Backend,
+  args: { id: number },
+): ToolResult {
+  try {
+    const children = backend.getChildren(args.id);
+    return success(children);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return error(message);
+  }
+}
+
+export function handleGetDependents(
+  backend: Backend,
+  args: { id: number },
+): ToolResult {
+  try {
+    const dependents = backend.getDependents(args.id);
+    return success(dependents);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return error(message);
+  }
+}
+
+export interface TreeNode {
+  id: number;
+  title: string;
+  type: string;
+  status: string;
+  priority: string;
+  iteration: string;
+  children: TreeNode[];
+}
+
+export function handleGetItemTree(
+  backend: Backend,
+  args: { id: number },
+): ToolResult {
+  try {
+    const rootItem = backend.getWorkItem(args.id);
+    const allItems = backend.listWorkItems();
+
+    // Build a map of parent ID -> children
+    const childrenMap = new Map<number, typeof allItems>();
+    for (const item of allItems) {
+      if (item.parent !== null) {
+        const existing = childrenMap.get(item.parent) ?? [];
+        existing.push(item);
+        childrenMap.set(item.parent, existing);
+      }
+    }
+
+    function buildNode(item: (typeof allItems)[number]): TreeNode {
+      const children = childrenMap.get(item.id) ?? [];
+      return {
+        id: item.id,
+        title: item.title,
+        type: item.type,
+        status: item.status,
+        priority: item.priority,
+        iteration: item.iteration,
+        children: children.map(buildNode),
+      };
+    }
+
+    return success(buildNode(rootItem));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return error(message);
+  }
+}

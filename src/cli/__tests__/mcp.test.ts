@@ -17,7 +17,11 @@ import {
   handleAddComment,
   handleSetIteration,
   handleSearchItems,
+  handleGetChildren,
+  handleGetDependents,
+  handleGetItemTree,
 } from '../commands/mcp.js';
+import type { TreeNode } from '../commands/mcp.js';
 
 describe('MCP handlers', () => {
   let tmpDir: string;
@@ -593,6 +597,197 @@ describe('MCP handlers', () => {
       const data = JSON.parse(result.content[0]!.text) as WorkItem[];
       expect(data).toHaveLength(1);
       expect(data[0]!.title).toBe('Fix login bug');
+    });
+  });
+
+  describe('handleGetChildren', () => {
+    beforeEach(() => {
+      handleInitProject(tmpDir);
+      backend = new LocalBackend(tmpDir);
+    });
+
+    it('returns children', () => {
+      backend.createWorkItem({
+        title: 'Parent',
+        type: 'epic',
+        status: 'backlog',
+        priority: 'medium',
+        assignee: '',
+        labels: [],
+        iteration: 'default',
+        parent: null,
+        dependsOn: [],
+        description: '',
+      });
+      backend.createWorkItem({
+        title: 'Child 1',
+        type: 'task',
+        status: 'backlog',
+        priority: 'medium',
+        assignee: '',
+        labels: [],
+        iteration: 'default',
+        parent: 1,
+        dependsOn: [],
+        description: '',
+      });
+      backend.createWorkItem({
+        title: 'Child 2',
+        type: 'task',
+        status: 'backlog',
+        priority: 'medium',
+        assignee: '',
+        labels: [],
+        iteration: 'default',
+        parent: 1,
+        dependsOn: [],
+        description: '',
+      });
+      const result = handleGetChildren(backend, { id: 1 });
+      expect(result.isError).toBeUndefined();
+      const data = JSON.parse(result.content[0]!.text) as WorkItem[];
+      expect(data).toHaveLength(2);
+      expect(data.map((i) => i.title)).toContain('Child 1');
+      expect(data.map((i) => i.title)).toContain('Child 2');
+    });
+  });
+
+  describe('handleGetDependents', () => {
+    beforeEach(() => {
+      handleInitProject(tmpDir);
+      backend = new LocalBackend(tmpDir);
+    });
+
+    it('returns dependents', () => {
+      backend.createWorkItem({
+        title: 'Dependency',
+        type: 'task',
+        status: 'backlog',
+        priority: 'medium',
+        assignee: '',
+        labels: [],
+        iteration: 'default',
+        parent: null,
+        dependsOn: [],
+        description: '',
+      });
+      backend.createWorkItem({
+        title: 'Dependent',
+        type: 'task',
+        status: 'backlog',
+        priority: 'medium',
+        assignee: '',
+        labels: [],
+        iteration: 'default',
+        parent: null,
+        dependsOn: [1],
+        description: '',
+      });
+      const result = handleGetDependents(backend, { id: 1 });
+      expect(result.isError).toBeUndefined();
+      const data = JSON.parse(result.content[0]!.text) as WorkItem[];
+      expect(data).toHaveLength(1);
+      expect(data[0]!.title).toBe('Dependent');
+    });
+  });
+
+  describe('handleGetItemTree', () => {
+    beforeEach(() => {
+      handleInitProject(tmpDir);
+      backend = new LocalBackend(tmpDir);
+    });
+
+    it('builds nested tree structure', () => {
+      backend.createWorkItem({
+        title: 'Root',
+        type: 'epic',
+        status: 'backlog',
+        priority: 'medium',
+        assignee: '',
+        labels: [],
+        iteration: 'default',
+        parent: null,
+        dependsOn: [],
+        description: '',
+      });
+      backend.createWorkItem({
+        title: 'Child A',
+        type: 'task',
+        status: 'todo',
+        priority: 'medium',
+        assignee: '',
+        labels: [],
+        iteration: 'default',
+        parent: 1,
+        dependsOn: [],
+        description: '',
+      });
+      backend.createWorkItem({
+        title: 'Child B',
+        type: 'task',
+        status: 'backlog',
+        priority: 'medium',
+        assignee: '',
+        labels: [],
+        iteration: 'default',
+        parent: 1,
+        dependsOn: [],
+        description: '',
+      });
+      const result = handleGetItemTree(backend, { id: 1 });
+      expect(result.isError).toBeUndefined();
+      const data = JSON.parse(result.content[0]!.text) as TreeNode;
+      expect(data.title).toBe('Root');
+      expect(data.children).toHaveLength(2);
+      expect(data.children.map((c) => c.title)).toContain('Child A');
+      expect(data.children.map((c) => c.title)).toContain('Child B');
+    });
+
+    it('builds deeply nested tree', () => {
+      backend.createWorkItem({
+        title: 'Root',
+        type: 'epic',
+        status: 'backlog',
+        priority: 'medium',
+        assignee: '',
+        labels: [],
+        iteration: 'default',
+        parent: null,
+        dependsOn: [],
+        description: '',
+      });
+      backend.createWorkItem({
+        title: 'Level 1',
+        type: 'issue',
+        status: 'backlog',
+        priority: 'medium',
+        assignee: '',
+        labels: [],
+        iteration: 'default',
+        parent: 1,
+        dependsOn: [],
+        description: '',
+      });
+      backend.createWorkItem({
+        title: 'Level 2',
+        type: 'task',
+        status: 'backlog',
+        priority: 'medium',
+        assignee: '',
+        labels: [],
+        iteration: 'default',
+        parent: 2,
+        dependsOn: [],
+        description: '',
+      });
+      const result = handleGetItemTree(backend, { id: 1 });
+      expect(result.isError).toBeUndefined();
+      const data = JSON.parse(result.content[0]!.text) as TreeNode;
+      expect(data.title).toBe('Root');
+      expect(data.children).toHaveLength(1);
+      expect(data.children[0]!.title).toBe('Level 1');
+      expect(data.children[0]!.children).toHaveLength(1);
+      expect(data.children[0]!.children[0]!.title).toBe('Level 2');
     });
   });
 });
