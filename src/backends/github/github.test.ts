@@ -33,6 +33,23 @@ describe('GitHubBackend', () => {
     });
   });
 
+  describe('getCapabilities', () => {
+    it('returns GitHub-specific capabilities', () => {
+      const backend = new GitHubBackend('/repo');
+      const caps = backend.getCapabilities();
+      expect(caps.relationships).toBe(false);
+      expect(caps.customTypes).toBe(false);
+      expect(caps.customStatuses).toBe(false);
+      expect(caps.iterations).toBe(true);
+      expect(caps.comments).toBe(true);
+      expect(caps.fields.priority).toBe(false);
+      expect(caps.fields.assignee).toBe(true);
+      expect(caps.fields.labels).toBe(true);
+      expect(caps.fields.parent).toBe(false);
+      expect(caps.fields.dependsOn).toBe(false);
+    });
+  });
+
   describe('getStatuses', () => {
     it('returns open and closed', () => {
       const backend = new GitHubBackend('/repo');
@@ -360,16 +377,20 @@ describe('GitHubBackend', () => {
   });
 
   describe('getChildren', () => {
-    it('returns empty array', () => {
+    it('throws UnsupportedOperationError', () => {
       const backend = new GitHubBackend('/repo');
-      expect(backend.getChildren(1)).toEqual([]);
+      expect(() => backend.getChildren(1)).toThrow(
+        'relationships is not supported by the GitHubBackend backend',
+      );
     });
   });
 
   describe('getDependents', () => {
-    it('returns empty array', () => {
+    it('throws UnsupportedOperationError', () => {
       const backend = new GitHubBackend('/repo');
-      expect(backend.getDependents(1)).toEqual([]);
+      expect(() => backend.getDependents(1)).toThrow(
+        'relationships is not supported by the GitHubBackend backend',
+      );
     });
   });
 });

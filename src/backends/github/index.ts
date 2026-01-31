@@ -1,4 +1,5 @@
-import type { Backend } from '../types.js';
+import { BaseBackend } from '../types.js';
+import type { BackendCapabilities } from '../types.js';
 import type {
   WorkItem,
   NewWorkItem,
@@ -12,12 +13,30 @@ import type { GhIssue, GhMilestone } from './mappers.js';
 const ISSUE_FIELDS =
   'number,title,body,state,assignees,labels,milestone,createdAt,updatedAt,comments';
 
-export class GitHubBackend implements Backend {
+export class GitHubBackend extends BaseBackend {
   private cwd: string;
 
   constructor(cwd: string) {
+    super();
     this.cwd = cwd;
     ghExec(['auth', 'status'], cwd);
+  }
+
+  getCapabilities(): BackendCapabilities {
+    return {
+      relationships: false,
+      customTypes: false,
+      customStatuses: false,
+      iterations: true,
+      comments: true,
+      fields: {
+        priority: false,
+        assignee: true,
+        labels: true,
+        parent: false,
+        dependsOn: false,
+      },
+    };
   }
 
   getStatuses(): string[] {
@@ -71,6 +90,7 @@ export class GitHubBackend implements Backend {
   }
 
   createWorkItem(data: NewWorkItem): WorkItem {
+    this.validateFields(data);
     const args = ['issue', 'create', '--title', data.title];
 
     if (data.description) {
@@ -97,6 +117,7 @@ export class GitHubBackend implements Backend {
   }
 
   updateWorkItem(id: number, data: Partial<WorkItem>): WorkItem {
+    this.validateFields(data);
     const idStr = String(id);
 
     // Handle status changes via close/reopen
@@ -162,14 +183,14 @@ export class GitHubBackend implements Backend {
     };
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  getChildren(_id: number): WorkItem[] {
-    return [];
+  getChildren(id: number): WorkItem[] {
+    this.assertSupported(this.getCapabilities().relationships, 'relationships');
+    return this.listWorkItems().filter((item) => item.parent === id);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  getDependents(_id: number): WorkItem[] {
-    return [];
+  getDependents(id: number): WorkItem[] {
+    this.assertSupported(this.getCapabilities().relationships, 'relationships');
+    return this.listWorkItems().filter((item) => item.dependsOn.includes(id));
   }
 
   getItemUrl(id: number): string {
