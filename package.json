@@ -10,7 +10,7 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "start": "node dist/index.js",
-    "test": "vitest run"
+    "test": "vitest run --exclude 'dist/**'"
   },
   "license": "MIT",
   "dependencies": {
