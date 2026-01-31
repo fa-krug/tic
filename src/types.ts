@@ -17,6 +17,8 @@ export interface WorkItem {
   updated: string;
   description: string;
   comments: Comment[];
+  parent: number | null;
+  dependsOn: number[];
 }
 
 export type NewWorkItem = Pick<
@@ -29,6 +31,8 @@ export type NewWorkItem = Pick<
   | 'assignee'
   | 'labels'
   | 'description'
+  | 'parent'
+  | 'dependsOn'
 >;
 
 export interface NewComment {

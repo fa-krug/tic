@@ -12,4 +12,6 @@ export interface Backend {
   updateWorkItem(id: number, data: Partial<WorkItem>): WorkItem;
   deleteWorkItem(id: number): void;
   addComment(workItemId: number, comment: NewComment): Comment;
+  getChildren(id: number): WorkItem[];
+  getDependents(id: number): WorkItem[];
 }

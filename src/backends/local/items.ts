@@ -88,6 +88,8 @@ export function parseWorkItemFile(raw: string): WorkItem {
     labels: (data['labels'] as string[]) || [],
     created: data['created'] as string,
     updated: data['updated'] as string,
+    parent: (data['parent'] as number) ?? null,
+    dependsOn: (data['depends_on'] as number[]) ?? [],
     description,
     comments,
   };
@@ -97,7 +99,7 @@ export function writeWorkItem(root: string, item: WorkItem): void {
   const dir = itemsDir(root);
   fs.mkdirSync(dir, { recursive: true });
 
-  const frontmatter = {
+  const frontmatter: Record<string, unknown> = {
     id: item.id,
     title: item.title,
     type: item.type,
@@ -109,6 +111,14 @@ export function writeWorkItem(root: string, item: WorkItem): void {
     created: item.created,
     updated: item.updated,
   };
+
+  if (item.parent !== null) {
+    frontmatter['parent'] = item.parent;
+  }
+
+  if (item.dependsOn.length > 0) {
+    frontmatter['depends_on'] = item.dependsOn;
+  }
 
   const body = item.description + serializeComments(item.comments);
   const content = matter.stringify(body, frontmatter);

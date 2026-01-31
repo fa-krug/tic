@@ -41,6 +41,8 @@ describe('LocalBackend', () => {
       assignee: '',
       labels: [],
       description: 'A test.',
+      parent: null,
+      dependsOn: [],
     });
     const items = backend.listWorkItems();
     expect(items).toHaveLength(1);
@@ -59,6 +61,8 @@ describe('LocalBackend', () => {
       assignee: '',
       labels: [],
       description: '',
+      parent: null,
+      dependsOn: [],
     });
     backend.createWorkItem({
       title: 'B',
@@ -69,6 +73,8 @@ describe('LocalBackend', () => {
       assignee: '',
       labels: [],
       description: '',
+      parent: null,
+      dependsOn: [],
     });
     expect(backend.listWorkItems('v1')).toHaveLength(1);
     expect(backend.listWorkItems('v2')).toHaveLength(1);
@@ -84,6 +90,8 @@ describe('LocalBackend', () => {
       assignee: '',
       labels: [],
       description: '',
+      parent: null,
+      dependsOn: [],
     });
     backend.updateWorkItem(1, { title: 'Updated', status: 'in-progress' });
     const item = backend.getWorkItem(1);
@@ -101,6 +109,8 @@ describe('LocalBackend', () => {
       assignee: '',
       labels: [],
       description: '',
+      parent: null,
+      dependsOn: [],
     });
     expect(backend.listWorkItems()).toHaveLength(1);
     backend.deleteWorkItem(1);
@@ -117,6 +127,8 @@ describe('LocalBackend', () => {
       assignee: '',
       labels: [],
       description: '',
+      parent: null,
+      dependsOn: [],
     });
     backend.addComment(1, { author: 'dev', body: 'A comment.' });
     const item = backend.getWorkItem(1);

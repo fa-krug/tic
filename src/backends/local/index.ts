@@ -112,4 +112,14 @@ export class LocalBackend implements Backend {
     writeWorkItem(this.root, item);
     return newComment;
   }
+
+  getChildren(id: number): WorkItem[] {
+    const all = this.listWorkItems();
+    return all.filter((item) => item.parent === id);
+  }
+
+  getDependents(id: number): WorkItem[] {
+    const all = this.listWorkItems();
+    return all.filter((item) => item.dependsOn.includes(id));
+  }
 }

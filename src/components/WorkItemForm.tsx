@@ -108,6 +108,8 @@ export function WorkItemForm() {
         assignee,
         labels: parsedLabels,
         description,
+        parent: null,
+        dependsOn: [],
       });
 
       if (newComment.trim().length > 0) {

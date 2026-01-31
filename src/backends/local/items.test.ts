@@ -38,6 +38,8 @@ describe('items', () => {
       updated: '2026-01-31T00:00:00Z',
       description: 'A test item.',
       comments: [],
+      parent: null,
+      dependsOn: [],
     };
     writeWorkItem(tmpDir, item);
     const read = readWorkItem(tmpDir, 1);
@@ -68,6 +70,8 @@ describe('items', () => {
           body: 'Second comment.',
         },
       ],
+      parent: null,
+      dependsOn: [],
     };
     writeWorkItem(tmpDir, item);
     const read = readWorkItem(tmpDir, 2);
@@ -89,6 +93,8 @@ describe('items', () => {
       updated: '2026-01-31T00:00:00Z',
       description: '',
       comments: [],
+      parent: null,
+      dependsOn: [],
     };
     writeWorkItem(tmpDir, item);
     expect(fs.existsSync(path.join(itemsDirPath, '3.md'))).toBe(true);
@@ -110,6 +116,8 @@ describe('items', () => {
       updated: '',
       description: '',
       comments: [],
+      parent: null,
+      dependsOn: [],
     });
     writeWorkItem(tmpDir, {
       id: 2,
@@ -124,8 +132,56 @@ describe('items', () => {
       updated: '',
       description: '',
       comments: [],
+      parent: null,
+      dependsOn: [],
     });
     const files = listItemFiles(tmpDir);
     expect(files).toHaveLength(2);
+  });
+
+  it('writes and reads a work item with parent and dependsOn', () => {
+    const item: WorkItem = {
+      id: 1,
+      title: 'Child item',
+      type: 'task',
+      status: 'todo',
+      iteration: 'v1',
+      priority: 'high',
+      assignee: 'dev',
+      labels: [],
+      created: '2026-01-31T00:00:00Z',
+      updated: '2026-01-31T00:00:00Z',
+      description: 'A child.',
+      comments: [],
+      parent: 5,
+      dependsOn: [3, 4],
+    };
+    writeWorkItem(tmpDir, item);
+    const read = readWorkItem(tmpDir, 1);
+    expect(read.parent).toBe(5);
+    expect(read.dependsOn).toEqual([3, 4]);
+  });
+
+  it('reads items without parent/dependsOn as defaults', () => {
+    const item: WorkItem = {
+      id: 2,
+      title: 'Legacy item',
+      type: 'issue',
+      status: 'todo',
+      iteration: 'v1',
+      priority: 'low',
+      assignee: '',
+      labels: [],
+      created: '2026-01-31T00:00:00Z',
+      updated: '2026-01-31T00:00:00Z',
+      description: '',
+      comments: [],
+      parent: null,
+      dependsOn: [],
+    };
+    writeWorkItem(tmpDir, item);
+    const read = readWorkItem(tmpDir, 2);
+    expect(read.parent).toBeNull();
+    expect(read.dependsOn).toEqual([]);
   });
 });
