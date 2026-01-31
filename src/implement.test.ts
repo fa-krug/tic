@@ -259,13 +259,7 @@ describe('beginImplementation', () => {
         skipClipboard: true,
       });
 
-      // Go back to main/master to simulate a fresh start
-      const defaultBranch = execFileSync(
-        'git',
-        ['rev-parse', '--abbrev-ref', 'HEAD'],
-        { cwd: tmpDir, encoding: 'utf-8' },
-      ).trim();
-      // We're currently on the tic branch, so go back
+      // Go back to original branch to simulate returning to TUI
       execFileSync('git', ['checkout', '-'], { cwd: tmpDir });
 
       // Second call should resume

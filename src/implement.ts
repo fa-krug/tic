@@ -160,7 +160,7 @@ export function beginImplementation(
 
   // Spawn shell
   if (!options?.skipShell) {
-    const shell = process.env.SHELL || '/bin/sh';
+    const shell = process.env['SHELL'] || '/bin/sh';
     spawnSync(shell, [], {
       cwd: targetDir,
       stdio: 'inherit',
