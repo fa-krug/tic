@@ -101,7 +101,9 @@ describe('git operations', () => {
 
   describe('branchExists', () => {
     it('returns true for an existing branch', () => {
-      expect(branchExists('main', tmpDir) || branchExists('master', tmpDir)).toBe(true);
+      expect(
+        branchExists('main', tmpDir) || branchExists('master', tmpDir),
+      ).toBe(true);
     });
 
     it('returns false for a non-existing branch', () => {
@@ -182,20 +184,17 @@ describe('git operations', () => {
       createWorktree(worktreePath, 'existing-branch', tmpDir);
       expect(fs.existsSync(worktreePath)).toBe(true);
       // Verify the worktree is on the correct branch
-      const head = execFileSync(
-        'git',
-        ['rev-parse', '--abbrev-ref', 'HEAD'],
-        { cwd: worktreePath, encoding: 'utf-8' },
-      ).trim();
+      const head = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+        cwd: worktreePath,
+        encoding: 'utf-8',
+      }).trim();
       expect(head).toBe('existing-branch');
     });
   });
 
   describe('worktreeExists', () => {
     it('returns false for non-existing path', () => {
-      expect(worktreeExists(path.join(tmpDir, 'no-such-worktree'))).toBe(
-        false,
-      );
+      expect(worktreeExists(path.join(tmpDir, 'no-such-worktree'))).toBe(false);
     });
 
     it('returns false for a regular directory', () => {

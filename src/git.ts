@@ -42,7 +42,7 @@ export function isGitRepo(root: string): boolean {
  */
 export function branchExists(name: string, cwd: string): boolean {
   try {
-    execFileSync('git', ['rev-parse', '--verify', name], {
+    execFileSync('git', ['rev-parse', '--verify', `refs/heads/${name}`], {
       cwd,
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -104,15 +104,11 @@ export function createWorktree(
       stdio: ['pipe', 'pipe', 'pipe'],
     });
   } else {
-    execFileSync(
-      'git',
-      ['worktree', 'add', worktreePath, '-b', branch],
-      {
-        cwd,
-        encoding: 'utf-8',
-        stdio: ['pipe', 'pipe', 'pipe'],
-      },
-    );
+    execFileSync('git', ['worktree', 'add', worktreePath, '-b', branch], {
+      cwd,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
   }
 }
 
