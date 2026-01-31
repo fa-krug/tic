@@ -50,4 +50,20 @@ describe('config', () => {
     );
     expect(raw).toContain('next_id: 10');
   });
+
+  it('returns default config with types', () => {
+    const config = readConfig(tmpDir);
+    expect(config.types).toEqual(['epic', 'issue', 'task']);
+  });
+
+  it('reads config with custom types', () => {
+    const ticDir = path.join(tmpDir, '.tic');
+    fs.mkdirSync(ticDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(ticDir, 'config.yml'),
+      'types:\n  - story\n  - bug\nstatuses:\n  - open\ncurrent_iteration: v1\niterations:\n  - v1\nnext_id: 1\n',
+    );
+    const config = readConfig(tmpDir);
+    expect(config.types).toEqual(['story', 'bug']);
+  });
 });
