@@ -1,7 +1,7 @@
 import { useState, createContext, useContext } from 'react';
 import { Box } from 'ink';
-import { IssueList } from './components/IssueList.js';
-import { IssueForm } from './components/IssueForm.js';
+import { WorkItemList } from './components/WorkItemList.js';
+import { WorkItemForm } from './components/WorkItemForm.js';
 import { IterationPicker } from './components/IterationPicker.js';
 import type { Backend } from './backends/types.js';
 
@@ -9,10 +9,12 @@ type Screen = 'list' | 'form' | 'iteration-picker';
 
 interface AppState {
   screen: Screen;
-  selectedIssueId: number | null;
+  selectedWorkItemId: number | null;
+  activeType: string | null;
   backend: Backend;
   navigate: (screen: Screen) => void;
-  selectIssue: (id: number | null) => void;
+  selectWorkItem: (id: number | null) => void;
+  setActiveType: (type: string | null) => void;
 }
 
 export const AppContext = createContext<AppState>(null!);
@@ -23,21 +25,26 @@ export function useAppState() {
 
 export function App({ backend }: { backend: Backend }) {
   const [screen, setScreen] = useState<Screen>('list');
-  const [selectedIssueId, setSelectedIssueId] = useState<number | null>(null);
+  const [selectedWorkItemId, setSelectedWorkItemId] = useState<number | null>(
+    null,
+  );
+  const [activeType, setActiveType] = useState<string | null>(null);
 
   const state: AppState = {
     screen,
-    selectedIssueId,
+    selectedWorkItemId,
+    activeType,
     backend,
     navigate: setScreen,
-    selectIssue: setSelectedIssueId,
+    selectWorkItem: setSelectedWorkItemId,
+    setActiveType,
   };
 
   return (
     <AppContext.Provider value={state}>
       <Box flexDirection="column">
-        {screen === 'list' && <IssueList />}
-        {screen === 'form' && <IssueForm />}
+        {screen === 'list' && <WorkItemList />}
+        {screen === 'form' && <WorkItemForm />}
         {screen === 'iteration-picker' && <IterationPicker />}
       </Box>
     </AppContext.Provider>
