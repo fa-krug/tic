@@ -142,7 +142,7 @@ export function WorkItemList() {
         const result = beginImplementation(
           item,
           comments,
-          { branchMode: config.branchMode },
+          { branchMode: config.branchMode ?? 'worktree' },
           process.cwd(),
         );
         setWarning(
