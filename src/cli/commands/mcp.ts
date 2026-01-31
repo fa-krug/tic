@@ -1,4 +1,10 @@
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { z } from 'zod';
+import { LocalBackend } from '../../backends/local/index.js';
 import type { Backend } from '../../backends/types.js';
+import fs from 'node:fs';
+import path from 'node:path';
 import { runInit } from './init.js';
 import {
   runItemComment,
@@ -16,19 +22,20 @@ import type {
 import { runIterationSet } from './iteration.js';
 
 export interface ToolResult {
-  content: { type: string; text: string }[];
+  [key: string]: unknown;
+  content: { type: 'text'; text: string }[];
   isError?: boolean;
 }
 
 function success(data: unknown): ToolResult {
   return {
-    content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
+    content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }],
   };
 }
 
 function error(message: string): ToolResult {
   return {
-    content: [{ type: 'text', text: message }],
+    content: [{ type: 'text' as const, text: message }],
     isError: true,
   };
 }
@@ -363,4 +370,222 @@ export function handleGetItemTree(
   } catch (err) {
     return error(err instanceof Error ? err.message : String(err));
   }
+}
+
+export function registerTools(
+  server: McpServer,
+  backend: Backend,
+  pendingDeletes: DeleteTracker,
+  root: string,
+): void {
+  server.tool('init_project', 'Initialize a new tic project', () => {
+    return handleInitProject(root);
+  });
+
+  server.tool('get_config', 'Get project configuration', () => {
+    return handleGetConfig(backend);
+  });
+
+  server.tool(
+    'list_items',
+    'List work items with optional filters',
+    {
+      type: z.string().optional().describe('Filter by work item type'),
+      status: z.string().optional().describe('Filter by status'),
+      iteration: z.string().optional().describe('Filter by iteration'),
+      all: z.boolean().optional().describe('Show all iterations'),
+    },
+    (args) => {
+      return handleListItems(backend, args);
+    },
+  );
+
+  server.tool(
+    'show_item',
+    'Show work item details',
+    {
+      id: z.number().describe('Work item ID'),
+    },
+    (args) => {
+      return handleShowItem(backend, args);
+    },
+  );
+
+  server.tool(
+    'create_item',
+    'Create a new work item',
+    {
+      title: z.string().describe('Work item title'),
+      type: z.string().optional().describe('Work item type'),
+      status: z.string().optional().describe('Initial status'),
+      priority: z.string().optional().describe('Priority level'),
+      assignee: z.string().optional().describe('Assignee'),
+      labels: z.string().optional().describe('Comma-separated labels'),
+      iteration: z.string().optional().describe('Iteration'),
+      parent: z.number().optional().describe('Parent item ID'),
+      depends_on: z
+        .array(z.number())
+        .optional()
+        .describe('Dependency item IDs'),
+      description: z.string().optional().describe('Work item description'),
+    },
+    (args) => {
+      return handleCreateItem(backend, args);
+    },
+  );
+
+  server.tool(
+    'update_item',
+    'Update an existing work item',
+    {
+      id: z.number().describe('Work item ID'),
+      title: z.string().optional().describe('New title'),
+      type: z.string().optional().describe('Work item type'),
+      status: z.string().optional().describe('Status'),
+      priority: z.string().optional().describe('Priority level'),
+      assignee: z.string().optional().describe('Assignee'),
+      labels: z.string().optional().describe('Comma-separated labels'),
+      iteration: z.string().optional().describe('Iteration'),
+      parent: z
+        .number()
+        .nullable()
+        .optional()
+        .describe('Parent item ID (null to clear)'),
+      depends_on: z
+        .array(z.number())
+        .optional()
+        .describe('Dependency item IDs'),
+      description: z.string().optional().describe('Work item description'),
+    },
+    (args) => {
+      return handleUpdateItem(backend, args);
+    },
+  );
+
+  server.tool(
+    'delete_item',
+    'Preview deleting a work item (requires confirm_delete to finalize)',
+    {
+      id: z.number().describe('Work item ID'),
+    },
+    (args) => {
+      return handleDeleteItem(backend, args, pendingDeletes);
+    },
+  );
+
+  server.tool(
+    'confirm_delete',
+    'Confirm and execute a pending item deletion',
+    {
+      id: z.number().describe('Work item ID'),
+    },
+    (args) => {
+      return handleConfirmDelete(backend, args, pendingDeletes);
+    },
+  );
+
+  server.tool(
+    'add_comment',
+    'Add a comment to a work item',
+    {
+      id: z.number().describe('Work item ID'),
+      text: z.string().describe('Comment text'),
+      author: z.string().optional().describe('Comment author'),
+    },
+    (args) => {
+      return handleAddComment(backend, args);
+    },
+  );
+
+  server.tool(
+    'set_iteration',
+    'Set the current iteration',
+    {
+      name: z.string().describe('Iteration name'),
+    },
+    (args) => {
+      return handleSetIteration(backend, args);
+    },
+  );
+
+  server.tool(
+    'search_items',
+    'Search work items by text query',
+    {
+      query: z.string().describe('Search query'),
+      type: z.string().optional().describe('Filter by work item type'),
+      status: z.string().optional().describe('Filter by status'),
+      iteration: z.string().optional().describe('Filter by iteration'),
+      all: z.boolean().optional().describe('Show all iterations'),
+    },
+    (args) => {
+      return handleSearchItems(backend, args);
+    },
+  );
+
+  server.tool(
+    'get_children',
+    'Get child items of a work item',
+    {
+      id: z.number().describe('Work item ID'),
+    },
+    (args) => {
+      return handleGetChildren(backend, args);
+    },
+  );
+
+  server.tool(
+    'get_dependents',
+    'Get items that depend on a work item',
+    {
+      id: z.number().describe('Work item ID'),
+    },
+    (args) => {
+      return handleGetDependents(backend, args);
+    },
+  );
+
+  server.tool(
+    'get_item_tree',
+    'Get work items as a hierarchical tree',
+    {
+      type: z.string().optional().describe('Filter by work item type'),
+      status: z.string().optional().describe('Filter by status'),
+      iteration: z.string().optional().describe('Filter by iteration'),
+      all: z.boolean().optional().describe('Show all iterations'),
+    },
+    (args) => {
+      return handleGetItemTree(backend, args);
+    },
+  );
+}
+
+function isTicProject(root: string): boolean {
+  return fs.existsSync(path.join(root, '.tic'));
+}
+
+export async function startMcpServer(): Promise<void> {
+  const root = process.cwd();
+  const server = new McpServer({
+    name: 'tic',
+    version: '0.1.0',
+  });
+
+  const backend = isTicProject(root) ? new LocalBackend(root) : null;
+  const pendingDeletes = createDeleteTracker();
+
+  const guardedBackend = new Proxy({} as Backend, {
+    get(_target, prop: string | symbol) {
+      if (!backend) {
+        throw new Error('Not a tic project. Use the init_project tool first.');
+      }
+      return (backend as unknown as Record<string | symbol, unknown>)[prop];
+    },
+  });
+
+  registerTools(server, guardedBackend, pendingDeletes, root);
+
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  console.error('tic MCP server running on stdio');
 }
