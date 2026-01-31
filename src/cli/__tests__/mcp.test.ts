@@ -9,6 +9,8 @@ import {
   handleGetConfig,
   handleListItems,
   handleShowItem,
+  handleCreateItem,
+  handleUpdateItem,
 } from '../commands/mcp.js';
 
 describe('MCP handlers', () => {
@@ -199,6 +201,86 @@ describe('MCP handlers', () => {
 
     it('returns error for non-existent item', () => {
       const result = handleShowItem(backend, { id: 999 });
+      expect(result.isError).toBe(true);
+    });
+  });
+
+  describe('handleCreateItem', () => {
+    beforeEach(() => {
+      handleInitProject(tmpDir);
+      backend = new LocalBackend(tmpDir);
+    });
+
+    it('creates with defaults', () => {
+      const result = handleCreateItem(backend, { title: 'New task' });
+      expect(result.isError).toBeUndefined();
+      const data = JSON.parse(result.content[0]!.text) as WorkItem;
+      expect(data.title).toBe('New task');
+      expect(data.type).toBe('task');
+      expect(data.status).toBe('backlog');
+      expect(data.priority).toBe('medium');
+      expect(data.id).toBe(1);
+    });
+
+    it('creates with all options', () => {
+      const result = handleCreateItem(backend, {
+        title: 'Full item',
+        type: 'epic',
+        status: 'todo',
+        priority: 'high',
+        assignee: 'bob',
+        labels: 'ui,frontend',
+        iteration: 'sprint-1',
+        description: 'A full item',
+      });
+      expect(result.isError).toBeUndefined();
+      const data = JSON.parse(result.content[0]!.text) as WorkItem;
+      expect(data.type).toBe('epic');
+      expect(data.status).toBe('todo');
+      expect(data.priority).toBe('high');
+      expect(data.assignee).toBe('bob');
+      expect(data.labels).toEqual(['ui', 'frontend']);
+      expect(data.iteration).toBe('sprint-1');
+      expect(data.description).toBe('A full item');
+    });
+  });
+
+  describe('handleUpdateItem', () => {
+    beforeEach(() => {
+      handleInitProject(tmpDir);
+      backend = new LocalBackend(tmpDir);
+    });
+
+    it('updates fields', () => {
+      backend.createWorkItem({
+        title: 'Original',
+        type: 'task',
+        status: 'backlog',
+        priority: 'medium',
+        assignee: '',
+        labels: [],
+        iteration: 'default',
+        parent: null,
+        dependsOn: [],
+        description: '',
+      });
+      const result = handleUpdateItem(backend, {
+        id: 1,
+        title: 'Updated',
+        status: 'done',
+      });
+      expect(result.isError).toBeUndefined();
+      const data = JSON.parse(result.content[0]!.text) as WorkItem;
+      expect(data.title).toBe('Updated');
+      expect(data.status).toBe('done');
+      expect(data.type).toBe('task');
+    });
+
+    it('returns error for non-existent item', () => {
+      const result = handleUpdateItem(backend, {
+        id: 999,
+        title: 'Nope',
+      });
       expect(result.isError).toBe(true);
     });
   });
