@@ -28,21 +28,21 @@ npm run format:check # Check formatting without writing
 
 ### Backend Abstraction
 
-`src/backends/types.ts` defines the `Backend` interface (CRUD for issues, iteration management, status/iteration lists). All UI components interact with backends only through this interface.
+`src/backends/types.ts` defines the `Backend` interface (CRUD for work items, iteration management, status/iteration/type lists). All UI components interact with backends only through this interface.
 
-The only implementation so far is `LocalBackend` (`src/backends/local/index.ts`), which stores issues as markdown files with YAML frontmatter in a `.tic/` directory:
-- `.tic/config.yml` — statuses, iterations, current iteration, next issue ID
-- `.tic/issues/{id}.md` — individual issue files (frontmatter metadata + markdown body + comments section)
+The only implementation so far is `LocalBackend` (`src/backends/local/index.ts`), which stores work items as markdown files with YAML frontmatter in a `.tic/` directory:
+- `.tic/config.yml` — types, statuses, iterations, current iteration, next item ID
+- `.tic/items/{id}.md` — individual work item files (frontmatter metadata + markdown body + comments section)
 
 ### Components
 
-- `IssueList` — table view with keyboard navigation (arrows, `c` create, `d` delete, `s` cycle status, `i` switch iteration, `q` quit)
-- `IssueForm` — multi-field form for create/edit (field navigation with arrows, Enter to edit, Esc to save and return)
+- `WorkItemList` — table view with keyboard navigation (arrows, `c` create, `d` delete, `s` cycle status, `Tab` switch work item type, `i` switch iteration, `q` quit)
+- `WorkItemForm` — multi-field form for create/edit with type dropdown (field navigation with arrows, Enter to edit, Esc to save and return)
 - `IterationPicker` — select from configured iterations
 
 ### Shared Types
 
-`src/types.ts` defines `Issue`, `Comment`, `NewIssue`, and `NewComment` interfaces used across backends and components.
+`src/types.ts` defines `WorkItem`, `Comment`, `NewWorkItem`, and `NewComment` interfaces used across backends and components.
 
 ## Tech Stack
 
@@ -50,7 +50,7 @@ The only implementation so far is `LocalBackend` (`src/backends/local/index.ts`)
 - **Language**: TypeScript 5.9 (strict, via `@sindresorhus/tsconfig`)
 - **Module system**: ESM (`"type": "module"` in package.json)
 - **Testing**: Vitest 4 (tests use temp directories for isolation)
-- **Issue storage**: gray-matter (YAML frontmatter) + yaml (serialization)
+- **Work item storage**: gray-matter (YAML frontmatter) + yaml (serialization)
 
 ## Conventions
 
