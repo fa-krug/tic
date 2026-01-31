@@ -18,24 +18,28 @@ type FieldName =
   | 'dependsOn'
   | 'comments';
 
-const FIELDS: FieldName[] = [
-  'title',
-  'type',
-  'status',
-  'iteration',
-  'priority',
-  'assignee',
-  'labels',
-  'description',
-  'parent',
-  'dependsOn',
-  'comments',
-];
 const SELECT_FIELDS: FieldName[] = ['type', 'status', 'iteration', 'priority'];
 const PRIORITIES = ['low', 'medium', 'high', 'critical'];
 
 export function WorkItemForm() {
   const { backend, navigate, selectedWorkItemId, activeType } = useAppState();
+
+  const capabilities = useMemo(() => backend.getCapabilities(), [backend]);
+
+  const fields = useMemo(() => {
+    const all: FieldName[] = ['title'];
+    if (capabilities.customTypes) all.push('type');
+    all.push('status'); // always shown
+    if (capabilities.iterations) all.push('iteration');
+    if (capabilities.fields.priority) all.push('priority');
+    if (capabilities.fields.assignee) all.push('assignee');
+    if (capabilities.fields.labels) all.push('labels');
+    all.push('description'); // always shown
+    if (capabilities.fields.parent) all.push('parent');
+    if (capabilities.fields.dependsOn) all.push('dependsOn');
+    if (capabilities.comments) all.push('comments');
+    return all;
+  }, [capabilities]);
 
   const statuses = useMemo(() => backend.getStatuses(), [backend]);
   const iterations = useMemo(() => backend.getIterations(), [backend]);
@@ -81,7 +85,7 @@ export function WorkItemForm() {
   const [focusedField, setFocusedField] = useState(0);
   const [editing, setEditing] = useState(false);
 
-  const currentField = FIELDS[focusedField]!;
+  const currentField = fields[focusedField]!;
   const isSelectField = SELECT_FIELDS.includes(currentField);
 
   function save() {
@@ -112,7 +116,7 @@ export function WorkItemForm() {
         dependsOn: parsedDependsOn,
       });
 
-      if (newComment.trim().length > 0) {
+      if (capabilities.comments && newComment.trim().length > 0) {
         const added = backend.addComment(selectedWorkItemId, {
           author: 'me',
           body: newComment.trim(),
@@ -134,7 +138,7 @@ export function WorkItemForm() {
         dependsOn: parsedDependsOn,
       });
 
-      if (newComment.trim().length > 0) {
+      if (capabilities.comments && newComment.trim().length > 0) {
         backend.addComment(created.id, {
           author: 'me',
           body: newComment.trim(),
@@ -151,7 +155,7 @@ export function WorkItemForm() {
         }
 
         if (key.downArrow) {
-          setFocusedField((f) => Math.min(FIELDS.length - 1, f + 1));
+          setFocusedField((f) => Math.min(fields.length - 1, f + 1));
         }
 
         if (key.return) {
@@ -412,9 +416,9 @@ export function WorkItemForm() {
         </Text>
       </Box>
 
-      {FIELDS.map((field, index) => renderField(field, index))}
+      {fields.map((field, index) => renderField(field, index))}
 
-      {selectedWorkItemId !== null && (
+      {selectedWorkItemId !== null && capabilities.relationships && (
         <Box flexDirection="column" marginTop={1}>
           <Text bold dimColor>
             Relationships:
