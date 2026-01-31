@@ -8,7 +8,11 @@ import {
   runItemShow,
   runItemUpdate,
 } from './item.js';
-import type { ItemCreateOptions, ItemUpdateOptions } from './item.js';
+import type {
+  ItemCreateOptions,
+  ItemListOptions,
+  ItemUpdateOptions,
+} from './item.js';
 import { runIterationSet } from './iteration.js';
 
 export interface ToolResult {
@@ -16,22 +20,29 @@ export interface ToolResult {
   isError?: boolean;
 }
 
-export function success(data: unknown): ToolResult {
+function success(data: unknown): ToolResult {
   return {
     content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
   };
 }
 
-export function error(message: string): ToolResult {
+function error(message: string): ToolResult {
   return {
-    content: [{ type: 'text', text: JSON.stringify({ error: message }) }],
+    content: [{ type: 'text', text: message }],
     isError: true,
   };
 }
 
 export function handleInitProject(root: string): ToolResult {
-  const result = runInit(root);
-  return success(result);
+  try {
+    const result = runInit(root);
+    if (result.alreadyExists) {
+      return success({ alreadyExists: true });
+    }
+    return success({ initialized: true });
+  } catch (err) {
+    return error(err instanceof Error ? err.message : String(err));
+  }
 }
 
 export interface ListItemsArgs {
@@ -42,25 +53,33 @@ export interface ListItemsArgs {
 }
 
 export function handleGetConfig(backend: Backend): ToolResult {
-  return success({
-    statuses: backend.getStatuses(),
-    types: backend.getWorkItemTypes(),
-    iterations: backend.getIterations(),
-    currentIteration: backend.getCurrentIteration(),
-  });
+  try {
+    return success({
+      statuses: backend.getStatuses(),
+      types: backend.getWorkItemTypes(),
+      iterations: backend.getIterations(),
+      currentIteration: backend.getCurrentIteration(),
+    });
+  } catch (err) {
+    return error(err instanceof Error ? err.message : String(err));
+  }
 }
 
 export function handleListItems(
   backend: Backend,
   args: ListItemsArgs,
 ): ToolResult {
-  const items = runItemList(backend, {
-    status: args.status,
-    type: args.type,
-    iteration: args.iteration,
-    all: args.all,
-  });
-  return success(items);
+  try {
+    const items = runItemList(backend, {
+      status: args.status,
+      type: args.type,
+      iteration: args.iteration,
+      all: args.all,
+    });
+    return success(items);
+  } catch (err) {
+    return error(err instanceof Error ? err.message : String(err));
+  }
 }
 
 export function handleShowItem(
@@ -98,7 +117,7 @@ export interface UpdateItemArgs {
   assignee?: string;
   labels?: string;
   iteration?: string;
-  parent?: number;
+  parent?: number | null;
   depends_on?: number[];
   description?: string;
 }
@@ -168,7 +187,21 @@ export function handleDeleteItem(
     const children = backend.getChildren(args.id);
     const dependents = backend.getDependents(args.id);
     pendingDeletes.add(args.id);
-    return success({ item, children, dependents });
+    return success({
+      preview: true,
+      item: {
+        id: item.id,
+        title: item.title,
+        type: item.type,
+        status: item.status,
+      },
+      affectedChildren: children.map((c) => ({ id: c.id, title: c.title })),
+      affectedDependents: dependents.map((d) => ({
+        id: d.id,
+        title: d.title,
+      })),
+      message: 'Use confirm_delete to proceed with deletion.',
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return error(message);
@@ -182,7 +215,7 @@ export function handleConfirmDelete(
 ): ToolResult {
   if (!pendingDeletes.has(args.id)) {
     return error(
-      `Item #${args.id} has not been previewed for deletion. Call delete_item first.`,
+      `No pending delete for item ${args.id}. Call delete_item first to preview.`,
     );
   }
   try {
@@ -235,19 +268,23 @@ export function handleSearchItems(
   backend: Backend,
   args: SearchItemsArgs,
 ): ToolResult {
-  const items = runItemList(backend, {
-    status: args.status,
-    type: args.type,
-    iteration: args.iteration,
-    all: args.all,
-  });
-  const query = args.query.toLowerCase();
-  const filtered = items.filter(
-    (item) =>
-      item.title.toLowerCase().includes(query) ||
-      item.description.toLowerCase().includes(query),
-  );
-  return success(filtered);
+  try {
+    const items = runItemList(backend, {
+      status: args.status,
+      type: args.type,
+      iteration: args.iteration,
+      all: args.all,
+    });
+    const query = args.query.toLowerCase();
+    const filtered = items.filter(
+      (item) =>
+        item.title.toLowerCase().includes(query) ||
+        item.description.toLowerCase().includes(query),
+    );
+    return success(filtered);
+  } catch (err) {
+    return error(err instanceof Error ? err.message : String(err));
+  }
 }
 
 export function handleGetChildren(
@@ -276,7 +313,7 @@ export function handleGetDependents(
   }
 }
 
-export interface TreeNode {
+interface TreeNode {
   id: number;
   title: string;
   type: string;
@@ -288,38 +325,41 @@ export interface TreeNode {
 
 export function handleGetItemTree(
   backend: Backend,
-  args: { id: number },
+  args: ListItemsArgs,
 ): ToolResult {
   try {
-    const rootItem = backend.getWorkItem(args.id);
-    const allItems = backend.listWorkItems();
+    const opts: ItemListOptions = {};
+    if (args.type) opts.type = args.type;
+    if (args.status) opts.status = args.status;
+    if (args.iteration) opts.iteration = args.iteration;
+    if (args.all) opts.all = args.all;
+    const items = runItemList(backend, opts);
 
-    // Build a map of parent ID -> children
-    const childrenMap = new Map<number, typeof allItems>();
-    for (const item of allItems) {
-      if (item.parent !== null) {
-        const existing = childrenMap.get(item.parent) ?? [];
-        existing.push(item);
-        childrenMap.set(item.parent, existing);
-      }
-    }
-
-    function buildNode(item: (typeof allItems)[number]): TreeNode {
-      const children = childrenMap.get(item.id) ?? [];
-      return {
+    const nodeMap = new Map<number, TreeNode>();
+    for (const item of items) {
+      nodeMap.set(item.id, {
         id: item.id,
         title: item.title,
         type: item.type,
         status: item.status,
         priority: item.priority,
         iteration: item.iteration,
-        children: children.map(buildNode),
-      };
+        children: [],
+      });
     }
 
-    return success(buildNode(rootItem));
+    const roots: TreeNode[] = [];
+    for (const item of items) {
+      const node = nodeMap.get(item.id)!;
+      if (item.parent !== null && nodeMap.has(item.parent)) {
+        nodeMap.get(item.parent)!.children.push(node);
+      } else {
+        roots.push(node);
+      }
+    }
+
+    return success(roots);
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return error(message);
+    return error(err instanceof Error ? err.message : String(err));
   }
 }

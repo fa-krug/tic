@@ -21,7 +21,6 @@ import {
   handleGetDependents,
   handleGetItemTree,
 } from '../commands/mcp.js';
-import type { TreeNode } from '../commands/mcp.js';
 
 describe('MCP handlers', () => {
   let tmpDir: string;
@@ -41,9 +40,10 @@ describe('MCP handlers', () => {
       const result = handleInitProject(tmpDir);
       expect(result.isError).toBeUndefined();
       const data = JSON.parse(result.content[0]!.text) as {
-        alreadyExists: boolean;
+        initialized?: boolean;
+        alreadyExists?: boolean;
       };
-      expect(data.alreadyExists).toBe(false);
+      expect(data.initialized).toBe(true);
       expect(fs.existsSync(path.join(tmpDir, '.tic', 'config.yml'))).toBe(true);
     });
 
@@ -320,10 +320,13 @@ describe('MCP handlers', () => {
       const result = handleDeleteItem(backend, { id: 1 }, pendingDeletes);
       expect(result.isError).toBeUndefined();
       const data = JSON.parse(result.content[0]!.text) as {
-        item: WorkItem;
-        children: WorkItem[];
-        dependents: WorkItem[];
+        preview: boolean;
+        item: { id: number; title: string; type: string; status: string };
+        affectedChildren: { id: number; title: string }[];
+        affectedDependents: { id: number; title: string }[];
+        message: string;
       };
+      expect(data.preview).toBe(true);
       expect(data.item.title).toBe('Delete me');
       // Item should still exist
       expect(backend.getWorkItem(1).title).toBe('Delete me');
@@ -368,14 +371,20 @@ describe('MCP handlers', () => {
       });
       const result = handleDeleteItem(backend, { id: 1 }, pendingDeletes);
       const data = JSON.parse(result.content[0]!.text) as {
-        item: WorkItem;
-        children: WorkItem[];
-        dependents: WorkItem[];
+        preview: boolean;
+        item: { id: number; title: string; type: string; status: string };
+        affectedChildren: { id: number; title: string }[];
+        affectedDependents: { id: number; title: string }[];
+        message: string;
       };
-      expect(data.children).toHaveLength(1);
-      expect(data.children[0]!.title).toBe('Child');
-      expect(data.dependents).toHaveLength(1);
-      expect(data.dependents[0]!.title).toBe('Dependent');
+      expect(data.preview).toBe(true);
+      expect(data.affectedChildren).toHaveLength(1);
+      expect(data.affectedChildren[0]!).toEqual({ id: 2, title: 'Child' });
+      expect(data.affectedDependents).toHaveLength(1);
+      expect(data.affectedDependents[0]!).toEqual({
+        id: 3,
+        title: 'Dependent',
+      });
     });
   });
 
@@ -692,14 +701,24 @@ describe('MCP handlers', () => {
   });
 
   describe('handleGetItemTree', () => {
+    interface TreeNode {
+      id: number;
+      title: string;
+      type: string;
+      status: string;
+      priority: string;
+      iteration: string;
+      children: TreeNode[];
+    }
+
     beforeEach(() => {
       handleInitProject(tmpDir);
       backend = new LocalBackend(tmpDir);
     });
 
-    it('builds nested tree structure', () => {
+    it('returns items nested under parents', () => {
       backend.createWorkItem({
-        title: 'Root',
+        title: 'Epic',
         type: 'epic',
         status: 'backlog',
         priority: 'medium',
@@ -723,24 +742,26 @@ describe('MCP handlers', () => {
         description: '',
       });
       backend.createWorkItem({
-        title: 'Child B',
+        title: 'Standalone',
         type: 'task',
         status: 'backlog',
         priority: 'medium',
         assignee: '',
         labels: [],
         iteration: 'default',
-        parent: 1,
+        parent: null,
         dependsOn: [],
         description: '',
       });
-      const result = handleGetItemTree(backend, { id: 1 });
+      const result = handleGetItemTree(backend, {});
       expect(result.isError).toBeUndefined();
-      const data = JSON.parse(result.content[0]!.text) as TreeNode;
-      expect(data.title).toBe('Root');
-      expect(data.children).toHaveLength(2);
-      expect(data.children.map((c) => c.title)).toContain('Child A');
-      expect(data.children.map((c) => c.title)).toContain('Child B');
+      const data = JSON.parse(result.content[0]!.text) as TreeNode[];
+      expect(data).toHaveLength(2);
+      const epic = data.find((n) => n.title === 'Epic')!;
+      expect(epic.children).toHaveLength(1);
+      expect(epic.children[0]!.title).toBe('Child A');
+      const standalone = data.find((n) => n.title === 'Standalone')!;
+      expect(standalone.children).toHaveLength(0);
     });
 
     it('builds deeply nested tree', () => {
@@ -780,14 +801,15 @@ describe('MCP handlers', () => {
         dependsOn: [],
         description: '',
       });
-      const result = handleGetItemTree(backend, { id: 1 });
+      const result = handleGetItemTree(backend, {});
       expect(result.isError).toBeUndefined();
-      const data = JSON.parse(result.content[0]!.text) as TreeNode;
-      expect(data.title).toBe('Root');
-      expect(data.children).toHaveLength(1);
-      expect(data.children[0]!.title).toBe('Level 1');
-      expect(data.children[0]!.children).toHaveLength(1);
-      expect(data.children[0]!.children[0]!.title).toBe('Level 2');
+      const data = JSON.parse(result.content[0]!.text) as TreeNode[];
+      expect(data).toHaveLength(1);
+      expect(data[0]!.title).toBe('Root');
+      expect(data[0]!.children).toHaveLength(1);
+      expect(data[0]!.children[0]!.title).toBe('Level 1');
+      expect(data[0]!.children[0]!.children).toHaveLength(1);
+      expect(data[0]!.children[0]!.children[0]!.title).toBe('Level 2');
     });
   });
 });
