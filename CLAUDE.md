@@ -20,6 +20,28 @@ npm run format       # Format src/ with Prettier
 npm run format:check # Check formatting without writing
 ```
 
+### MCP Server
+
+`tic mcp serve` starts an MCP server on stdio, exposing 14 tools for work item management. Connect it to Claude Code with:
+
+```bash
+claude mcp add --scope project --transport stdio tic -- npx tic mcp serve
+```
+
+Or add `.mcp.json` to the project root:
+
+```json
+{
+  "mcpServers": {
+    "tic": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["tic", "mcp", "serve"]
+    }
+  }
+}
+```
+
 ## Architecture
 
 ### Entry Point & Rendering
