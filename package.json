@@ -1,0 +1,30 @@
+{
+  "name": "tic",
+  "version": "0.1.0",
+  "description": "Terminal UI for issue tracking",
+  "type": "module",
+  "bin": {
+    "tic": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "test": "vitest run"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "gray-matter": "^4.0.3",
+    "ink": "^6.6.0",
+    "ink-select-input": "^6.2.0",
+    "ink-text-input": "^6.0.0",
+    "react": "^19.2.4",
+    "yaml": "^2.8.2"
+  },
+  "devDependencies": {
+    "@sindresorhus/tsconfig": "^8.1.0",
+    "@types/react": "^19.2.10",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  }
+}
