@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { LocalBackend } from '../../backends/local/index.js';
-import type { WorkItem } from '../../types.js';
+import type { WorkItem, Comment } from '../../types.js';
 import {
   handleInitProject,
   handleGetConfig,
@@ -14,6 +14,8 @@ import {
   handleDeleteItem,
   handleConfirmDelete,
   createDeleteTracker,
+  handleAddComment,
+  handleSetIteration,
 } from '../commands/mcp.js';
 
 describe('MCP handlers', () => {
@@ -436,6 +438,80 @@ describe('MCP handlers', () => {
       handleConfirmDelete(backend, { id: 1 }, pendingDeletes);
       const result = handleConfirmDelete(backend, { id: 1 }, pendingDeletes);
       expect(result.isError).toBe(true);
+    });
+  });
+
+  describe('handleAddComment', () => {
+    beforeEach(() => {
+      handleInitProject(tmpDir);
+      backend = new LocalBackend(tmpDir);
+    });
+
+    it('adds comment to item', () => {
+      backend.createWorkItem({
+        title: 'Commentable',
+        type: 'task',
+        status: 'backlog',
+        priority: 'medium',
+        assignee: '',
+        labels: [],
+        iteration: 'default',
+        parent: null,
+        dependsOn: [],
+        description: '',
+      });
+      const result = handleAddComment(backend, {
+        id: 1,
+        text: 'Great work',
+        author: 'alice',
+      });
+      expect(result.isError).toBeUndefined();
+      const data = JSON.parse(result.content[0]!.text) as Comment;
+      expect(data.body).toBe('Great work');
+      expect(data.author).toBe('alice');
+    });
+
+    it('defaults author to anonymous', () => {
+      backend.createWorkItem({
+        title: 'Commentable',
+        type: 'task',
+        status: 'backlog',
+        priority: 'medium',
+        assignee: '',
+        labels: [],
+        iteration: 'default',
+        parent: null,
+        dependsOn: [],
+        description: '',
+      });
+      const result = handleAddComment(backend, {
+        id: 1,
+        text: 'Anonymous note',
+      });
+      expect(result.isError).toBeUndefined();
+      const data = JSON.parse(result.content[0]!.text) as Comment;
+      expect(data.author).toBe('anonymous');
+    });
+
+    it('returns error for non-existent item', () => {
+      const result = handleAddComment(backend, {
+        id: 999,
+        text: 'Nope',
+      });
+      expect(result.isError).toBe(true);
+    });
+  });
+
+  describe('handleSetIteration', () => {
+    beforeEach(() => {
+      handleInitProject(tmpDir);
+      backend = new LocalBackend(tmpDir);
+    });
+
+    it('sets current iteration', () => {
+      const result = handleSetIteration(backend, { name: 'sprint-2' });
+      expect(result.isError).toBeUndefined();
+      expect(backend.getCurrentIteration()).toBe('sprint-2');
     });
   });
 });

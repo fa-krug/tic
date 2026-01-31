@@ -1,6 +1,7 @@
 import type { Backend } from '../../backends/types.js';
 import { runInit } from './init.js';
 import {
+  runItemComment,
   runItemCreate,
   runItemDelete,
   runItemList,
@@ -8,6 +9,7 @@ import {
   runItemUpdate,
 } from './item.js';
 import type { ItemCreateOptions, ItemUpdateOptions } from './item.js';
+import { runIterationSet } from './iteration.js';
 
 export interface ToolResult {
   content: { type: string; text: string }[];
@@ -187,6 +189,34 @@ export function handleConfirmDelete(
     runItemDelete(backend, args.id);
     pendingDeletes.delete(args.id);
     return success({ deleted: args.id });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return error(message);
+  }
+}
+
+export function handleAddComment(
+  backend: Backend,
+  args: { id: number; text: string; author?: string },
+): ToolResult {
+  try {
+    const comment = runItemComment(backend, args.id, args.text, {
+      author: args.author,
+    });
+    return success(comment);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return error(message);
+  }
+}
+
+export function handleSetIteration(
+  backend: Backend,
+  args: { name: string },
+): ToolResult {
+  try {
+    runIterationSet(backend, args.name);
+    return success({ currentIteration: args.name });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return error(message);
