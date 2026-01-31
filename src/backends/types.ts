@@ -63,7 +63,11 @@ export abstract class BaseBackend implements Backend {
     const caps = this.getCapabilities();
     const backendName = this.constructor.name;
 
-    if (!caps.fields.priority && data.priority && data.priority !== 'medium') {
+    if (
+      !caps.fields.priority &&
+      data.priority !== undefined &&
+      data.priority !== 'medium'
+    ) {
       throw new UnsupportedOperationError('priority', backendName);
     }
     if (!caps.fields.assignee && data.assignee && data.assignee !== '') {
