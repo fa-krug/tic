@@ -9,6 +9,7 @@ export interface Config {
   current_iteration: string;
   iterations: string[];
   next_id: number;
+  branchMode: 'worktree' | 'branch';
 }
 
 export const defaultConfig: Config = {
@@ -18,6 +19,7 @@ export const defaultConfig: Config = {
   current_iteration: 'default',
   iterations: ['default'],
   next_id: 1,
+  branchMode: 'worktree',
 };
 
 function configPath(root: string): string {

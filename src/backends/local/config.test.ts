@@ -82,4 +82,20 @@ describe('config', () => {
     const config = readConfig(tmpDir);
     expect(config.backend).toBe('github');
   });
+
+  it('returns default config with branchMode', () => {
+    const config = readConfig(tmpDir);
+    expect(config.branchMode).toBe('worktree');
+  });
+
+  it('reads config with branchMode set to branch', () => {
+    const ticDir = path.join(tmpDir, '.tic');
+    fs.mkdirSync(ticDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(ticDir, 'config.yml'),
+      'branchMode: branch\nstatuses:\n  - open\ncurrent_iteration: v1\niterations:\n  - v1\nnext_id: 1\n',
+    );
+    const config = readConfig(tmpDir);
+    expect(config.branchMode).toBe('branch');
+  });
 });

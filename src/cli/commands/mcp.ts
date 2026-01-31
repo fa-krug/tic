@@ -221,9 +221,7 @@ export function handleDeleteItem(
     const item = backend.getWorkItem(args.id);
     const caps = backend.getCapabilities();
     const children = caps.relationships ? backend.getChildren(args.id) : [];
-    const dependents = caps.relationships
-      ? backend.getDependents(args.id)
-      : [];
+    const dependents = caps.relationships ? backend.getDependents(args.id) : [];
     pendingDeletes.add(args.id);
     return success({
       preview: true,
