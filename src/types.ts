@@ -4,9 +4,10 @@ export interface Comment {
   body: string;
 }
 
-export interface Issue {
+export interface WorkItem {
   id: number;
   title: string;
+  type: string;
   status: string;
   iteration: string;
   priority: 'low' | 'medium' | 'high' | 'critical';
@@ -18,9 +19,10 @@ export interface Issue {
   comments: Comment[];
 }
 
-export type NewIssue = Pick<
-  Issue,
+export type NewWorkItem = Pick<
+  WorkItem,
   | 'title'
+  | 'type'
   | 'status'
   | 'iteration'
   | 'priority'
