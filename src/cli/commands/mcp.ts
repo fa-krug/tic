@@ -72,6 +72,7 @@ export function handleGetConfig(backend: Backend, root: string): ToolResult {
       types: backend.getWorkItemTypes(),
       iterations: backend.getIterations(),
       currentIteration: backend.getCurrentIteration(),
+      capabilities: backend.getCapabilities(),
     });
   } catch (err) {
     return error(err instanceof Error ? err.message : String(err));
@@ -218,8 +219,11 @@ export function handleDeleteItem(
 ): ToolResult {
   try {
     const item = backend.getWorkItem(args.id);
-    const children = backend.getChildren(args.id);
-    const dependents = backend.getDependents(args.id);
+    const caps = backend.getCapabilities();
+    const children = caps.relationships ? backend.getChildren(args.id) : [];
+    const dependents = caps.relationships
+      ? backend.getDependents(args.id)
+      : [];
     pendingDeletes.add(args.id);
     return success({
       preview: true,
@@ -404,6 +408,8 @@ export function registerTools(
   pendingDeletes: DeleteTracker,
   root: string,
 ): void {
+  const caps = backend.getCapabilities();
+
   server.tool('init_project', 'Initialize a new tic project', () => {
     return handleInitProject(root);
   });
@@ -511,30 +517,6 @@ export function registerTools(
   );
 
   server.tool(
-    'add_comment',
-    'Add a comment to a work item',
-    {
-      id: z.number().describe('Work item ID'),
-      text: z.string().describe('Comment text'),
-      author: z.string().optional().describe('Comment author'),
-    },
-    (args) => {
-      return handleAddComment(backend, args);
-    },
-  );
-
-  server.tool(
-    'set_iteration',
-    'Set the current iteration',
-    {
-      name: z.string().describe('Iteration name'),
-    },
-    (args) => {
-      return handleSetIteration(backend, args);
-    },
-  );
-
-  server.tool(
     'search_items',
     'Search work items by text query',
     {
@@ -550,42 +532,6 @@ export function registerTools(
   );
 
   server.tool(
-    'get_children',
-    'Get child items of a work item',
-    {
-      id: z.number().describe('Work item ID'),
-    },
-    (args) => {
-      return handleGetChildren(backend, args);
-    },
-  );
-
-  server.tool(
-    'get_dependents',
-    'Get items that depend on a work item',
-    {
-      id: z.number().describe('Work item ID'),
-    },
-    (args) => {
-      return handleGetDependents(backend, args);
-    },
-  );
-
-  server.tool(
-    'get_item_tree',
-    'Get work items as a hierarchical tree',
-    {
-      type: z.string().optional().describe('Filter by work item type'),
-      status: z.string().optional().describe('Filter by status'),
-      iteration: z.string().optional().describe('Filter by iteration'),
-      all: z.boolean().optional().describe('Show all iterations'),
-    },
-    (args) => {
-      return handleGetItemTree(backend, args);
-    },
-  );
-
-  server.tool(
     'set_backend',
     'Set the backend type for this project',
     {
@@ -597,6 +543,72 @@ export function registerTools(
       return handleSetBackend(root, args);
     },
   );
+
+  if (caps.comments) {
+    server.tool(
+      'add_comment',
+      'Add a comment to a work item',
+      {
+        id: z.number().describe('Work item ID'),
+        text: z.string().describe('Comment text'),
+        author: z.string().optional().describe('Comment author'),
+      },
+      (args) => {
+        return handleAddComment(backend, args);
+      },
+    );
+  }
+
+  if (caps.iterations) {
+    server.tool(
+      'set_iteration',
+      'Set the current iteration',
+      {
+        name: z.string().describe('Iteration name'),
+      },
+      (args) => {
+        return handleSetIteration(backend, args);
+      },
+    );
+  }
+
+  if (caps.relationships) {
+    server.tool(
+      'get_children',
+      'Get child items of a work item',
+      {
+        id: z.number().describe('Work item ID'),
+      },
+      (args) => {
+        return handleGetChildren(backend, args);
+      },
+    );
+
+    server.tool(
+      'get_dependents',
+      'Get items that depend on a work item',
+      {
+        id: z.number().describe('Work item ID'),
+      },
+      (args) => {
+        return handleGetDependents(backend, args);
+      },
+    );
+
+    server.tool(
+      'get_item_tree',
+      'Get work items as a hierarchical tree',
+      {
+        type: z.string().optional().describe('Filter by work item type'),
+        status: z.string().optional().describe('Filter by status'),
+        iteration: z.string().optional().describe('Filter by iteration'),
+        all: z.boolean().optional().describe('Show all iterations'),
+      },
+      (args) => {
+        return handleGetItemTree(backend, args);
+      },
+    );
+  }
 }
 
 function isTicProject(root: string): boolean {
