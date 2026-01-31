@@ -1,18 +1,18 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import matter from 'gray-matter';
-import type { Issue, Comment } from '../../types.js';
+import type { WorkItem, Comment } from '../../types.js';
 
-function issuesDir(root: string): string {
-  return path.join(root, '.tic', 'issues');
+function itemsDir(root: string): string {
+  return path.join(root, '.tic', 'items');
 }
 
-function issuePath(root: string, id: number): string {
-  return path.join(issuesDir(root), `${id}.md`);
+function itemPath(root: string, id: number): string {
+  return path.join(itemsDir(root), `${id}.md`);
 }
 
-export function listIssueFiles(root: string): string[] {
-  const dir = issuesDir(root);
+export function listItemFiles(root: string): string[] {
+  const dir = itemsDir(root);
   if (!fs.existsSync(dir)) return [];
   return fs
     .readdirSync(dir)
@@ -47,7 +47,6 @@ function parseComments(content: string): {
     const bodyLines: string[] = [];
     let pastMeta = false;
     for (const line of lines) {
-      // Skip leading --- delimiter line (present on first block)
       if (!pastMeta && line === '---') {
         continue;
       }
@@ -68,12 +67,12 @@ function parseComments(content: string): {
   return { description, comments };
 }
 
-export function readIssue(root: string, id: number): Issue {
-  const raw = fs.readFileSync(issuePath(root, id), 'utf-8');
-  return parseIssueFile(raw);
+export function readWorkItem(root: string, id: number): WorkItem {
+  const raw = fs.readFileSync(itemPath(root, id), 'utf-8');
+  return parseWorkItemFile(raw);
 }
 
-export function parseIssueFile(raw: string): Issue {
+export function parseWorkItemFile(raw: string): WorkItem {
   const parsed = matter(raw);
   const data = parsed.data as Record<string, unknown>;
   const { description, comments } = parseComments(parsed.content);
@@ -81,9 +80,10 @@ export function parseIssueFile(raw: string): Issue {
   return {
     id: data['id'] as number,
     title: data['title'] as string,
+    type: (data['type'] as string) || 'issue',
     status: data['status'] as string,
     iteration: data['iteration'] as string,
-    priority: data['priority'] as Issue['priority'],
+    priority: data['priority'] as WorkItem['priority'],
     assignee: (data['assignee'] as string) || '',
     labels: (data['labels'] as string[]) || [],
     created: data['created'] as string,
@@ -93,28 +93,29 @@ export function parseIssueFile(raw: string): Issue {
   };
 }
 
-export function writeIssue(root: string, issue: Issue): void {
-  const dir = issuesDir(root);
+export function writeWorkItem(root: string, item: WorkItem): void {
+  const dir = itemsDir(root);
   fs.mkdirSync(dir, { recursive: true });
 
   const frontmatter = {
-    id: issue.id,
-    title: issue.title,
-    status: issue.status,
-    iteration: issue.iteration,
-    priority: issue.priority,
-    assignee: issue.assignee,
-    labels: issue.labels,
-    created: issue.created,
-    updated: issue.updated,
+    id: item.id,
+    title: item.title,
+    type: item.type,
+    status: item.status,
+    iteration: item.iteration,
+    priority: item.priority,
+    assignee: item.assignee,
+    labels: item.labels,
+    created: item.created,
+    updated: item.updated,
   };
 
-  const body = issue.description + serializeComments(issue.comments);
+  const body = item.description + serializeComments(item.comments);
   const content = matter.stringify(body, frontmatter);
-  fs.writeFileSync(issuePath(root, issue.id), content);
+  fs.writeFileSync(itemPath(root, item.id), content);
 }
 
-export function deleteIssue(root: string, id: number): void {
-  const p = issuePath(root, id);
+export function deleteWorkItem(root: string, id: number): void {
+  const p = itemPath(root, id);
   if (fs.existsSync(p)) fs.unlinkSync(p);
 }

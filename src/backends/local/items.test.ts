@@ -3,31 +3,32 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import {
-  readIssue,
-  writeIssue,
-  deleteIssue,
-  listIssueFiles,
-} from './issues.js';
-import type { Issue } from '../../types.js';
+  readWorkItem,
+  writeWorkItem,
+  deleteWorkItem,
+  listItemFiles,
+} from './items.js';
+import type { WorkItem } from '../../types.js';
 
-describe('issues', () => {
+describe('items', () => {
   let tmpDir: string;
-  let issuesDir: string;
+  let itemsDirPath: string;
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-test-'));
-    issuesDir = path.join(tmpDir, '.tic', 'issues');
-    fs.mkdirSync(issuesDir, { recursive: true });
+    itemsDirPath = path.join(tmpDir, '.tic', 'items');
+    fs.mkdirSync(itemsDirPath, { recursive: true });
   });
 
   afterEach(() => {
     fs.rmSync(tmpDir, { recursive: true });
   });
 
-  it('writes and reads an issue', () => {
-    const issue: Issue = {
+  it('writes and reads a work item', () => {
+    const item: WorkItem = {
       id: 1,
-      title: 'Test issue',
+      title: 'Test item',
+      type: 'task',
       status: 'todo',
       iteration: 'v1',
       priority: 'high',
@@ -35,20 +36,22 @@ describe('issues', () => {
       labels: ['bug'],
       created: '2026-01-31T00:00:00Z',
       updated: '2026-01-31T00:00:00Z',
-      description: 'A test issue.',
+      description: 'A test item.',
       comments: [],
     };
-    writeIssue(tmpDir, issue);
-    const read = readIssue(tmpDir, 1);
-    expect(read.title).toBe('Test issue');
+    writeWorkItem(tmpDir, item);
+    const read = readWorkItem(tmpDir, 1);
+    expect(read.title).toBe('Test item');
+    expect(read.type).toBe('task');
     expect(read.labels).toEqual(['bug']);
-    expect(read.description).toBe('A test issue.');
+    expect(read.description).toBe('A test item.');
   });
 
-  it('writes and reads an issue with comments', () => {
-    const issue: Issue = {
+  it('writes and reads a work item with comments', () => {
+    const item: WorkItem = {
       id: 2,
       title: 'With comments',
+      type: 'epic',
       status: 'todo',
       iteration: 'v1',
       priority: 'medium',
@@ -66,16 +69,17 @@ describe('issues', () => {
         },
       ],
     };
-    writeIssue(tmpDir, issue);
-    const read = readIssue(tmpDir, 2);
+    writeWorkItem(tmpDir, item);
+    const read = readWorkItem(tmpDir, 2);
     expect(read.comments).toHaveLength(2);
     expect(read.comments[0]!.body).toBe('First comment.');
   });
 
-  it('deletes an issue file', () => {
-    const issue: Issue = {
+  it('deletes a work item file', () => {
+    const item: WorkItem = {
       id: 3,
       title: 'To delete',
+      type: 'issue',
       status: 'todo',
       iteration: 'v1',
       priority: 'low',
@@ -86,16 +90,17 @@ describe('issues', () => {
       description: '',
       comments: [],
     };
-    writeIssue(tmpDir, issue);
-    expect(fs.existsSync(path.join(issuesDir, '3.md'))).toBe(true);
-    deleteIssue(tmpDir, 3);
-    expect(fs.existsSync(path.join(issuesDir, '3.md'))).toBe(false);
+    writeWorkItem(tmpDir, item);
+    expect(fs.existsSync(path.join(itemsDirPath, '3.md'))).toBe(true);
+    deleteWorkItem(tmpDir, 3);
+    expect(fs.existsSync(path.join(itemsDirPath, '3.md'))).toBe(false);
   });
 
-  it('lists all issue files', () => {
-    writeIssue(tmpDir, {
+  it('lists all item files', () => {
+    writeWorkItem(tmpDir, {
       id: 1,
       title: 'A',
+      type: 'task',
       status: 'todo',
       iteration: 'v1',
       priority: 'low',
@@ -106,9 +111,10 @@ describe('issues', () => {
       description: '',
       comments: [],
     });
-    writeIssue(tmpDir, {
+    writeWorkItem(tmpDir, {
       id: 2,
       title: 'B',
+      type: 'epic',
       status: 'todo',
       iteration: 'v1',
       priority: 'low',
@@ -119,7 +125,7 @@ describe('issues', () => {
       description: '',
       comments: [],
     });
-    const files = listIssueFiles(tmpDir);
+    const files = listItemFiles(tmpDir);
     expect(files).toHaveLength(2);
   });
 });
