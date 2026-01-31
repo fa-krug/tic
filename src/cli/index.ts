@@ -4,7 +4,7 @@ import {
   detectBackend,
   VALID_BACKENDS,
 } from '../backends/factory.js';
-import type { Backend } from '../backends/types.js';
+import type { Backend, BackendCapabilities } from '../backends/types.js';
 import { formatTsvRow, formatTsvKeyValue, formatJson } from './format.js';
 import { runInit } from './commands/init.js';
 import { runConfigGet, runConfigSet } from './commands/config.js';
@@ -84,6 +84,16 @@ function createBackend(): Backend {
   return createBackendFromConfig(process.cwd());
 }
 
+function tryGetCapabilities(): BackendCapabilities | null {
+  try {
+    requireTicProject(process.cwd());
+    const backend = createBackendFromConfig(process.cwd());
+    return backend.getCapabilities();
+  } catch {
+    return null; // no project — show all options
+  }
+}
+
 function output(
   data: unknown,
   tsvFn: () => string,
@@ -110,6 +120,8 @@ function handleError(err: unknown, json?: boolean): never {
 export function createProgram(): Command {
   const program = new Command();
   program.name('tic').version('0.1.0').description('Terminal issue tracker');
+
+  const caps = tryGetCapabilities();
 
   // tic init
   program
@@ -226,65 +238,79 @@ export function createProgram(): Command {
       }
     });
 
-  item
+  const create = item
     .command('create')
     .description('Create a new work item')
     .argument('<title>', 'Work item title')
-    .option('--type <type>', 'Work item type')
-    .option('--status <status>', 'Initial status')
-    .option('--priority <priority>', 'Priority level')
-    .option('--assignee <name>', 'Assignee')
-    .option('--labels <labels>', 'Comma-separated labels')
-    .option('--iteration <name>', 'Iteration')
-    .option('--parent <id>', 'Parent item ID')
-    .option('--depends-on <ids>', 'Comma-separated dependency IDs')
-    .action((title: string, opts: ItemCreateOptions) => {
-      const parentOpts = program.opts<GlobalOpts>();
-      try {
-        const backend = createBackend();
-        const description = readStdin();
-        const wi = runItemCreate(backend, title, {
-          ...opts,
-          dependsOn: opts.dependsOn,
-          description,
-        });
-        output(wi, () => itemToTsvRow(wi), parentOpts);
-      } catch (err) {
-        handleError(err, parentOpts.json);
-      }
-    });
+    .option('--status <status>', 'Initial status');
+  if (!caps || caps.customTypes)
+    create.option('--type <type>', 'Work item type');
+  if (!caps || caps.fields.priority)
+    create.option('--priority <priority>', 'Priority level');
+  if (!caps || caps.fields.assignee)
+    create.option('--assignee <name>', 'Assignee');
+  if (!caps || caps.fields.labels)
+    create.option('--labels <labels>', 'Comma-separated labels');
+  if (!caps || caps.iterations)
+    create.option('--iteration <name>', 'Iteration');
+  if (!caps || caps.fields.parent)
+    create.option('--parent <id>', 'Parent item ID');
+  if (!caps || caps.fields.dependsOn)
+    create.option('--depends-on <ids>', 'Comma-separated dependency IDs');
+  create.action((title: string, opts: ItemCreateOptions) => {
+    const parentOpts = program.opts<GlobalOpts>();
+    try {
+      const backend = createBackend();
+      const description = readStdin();
+      const wi = runItemCreate(backend, title, {
+        ...opts,
+        dependsOn: opts.dependsOn,
+        description,
+      });
+      output(wi, () => itemToTsvRow(wi), parentOpts);
+    } catch (err) {
+      handleError(err, parentOpts.json);
+    }
+  });
 
-  item
+  const update = item
     .command('update')
     .description('Update a work item')
     .argument('<id>', 'Work item ID')
     .option('--title <title>', 'New title')
-    .option('--type <type>', 'Work item type')
-    .option('--status <status>', 'Status')
-    .option('--priority <priority>', 'Priority level')
-    .option('--assignee <name>', 'Assignee')
-    .option('--labels <labels>', 'Comma-separated labels')
-    .option('--iteration <name>', 'Iteration')
-    .option('--parent <id>', 'Parent item ID')
-    .option('--depends-on <ids>', 'Comma-separated dependency IDs')
-    .action((idStr: string, opts: ItemUpdateOptions) => {
-      const parentOpts = program.opts<GlobalOpts>();
-      try {
-        const backend = createBackend();
-        const id = Number(idStr);
-        if (Number.isNaN(id)) throw new Error(`Invalid ID: ${idStr}`);
-        const description = readStdin();
-        const updateOpts: ItemUpdateOptions = {
-          ...opts,
-          dependsOn: opts.dependsOn,
-          ...(description ? { description } : {}),
-        };
-        const wi = runItemUpdate(backend, id, updateOpts);
-        output(wi, () => itemToTsvRow(wi), parentOpts);
-      } catch (err) {
-        handleError(err, parentOpts.json);
-      }
-    });
+    .option('--status <status>', 'Status');
+  if (!caps || caps.customTypes)
+    update.option('--type <type>', 'Work item type');
+  if (!caps || caps.fields.priority)
+    update.option('--priority <priority>', 'Priority level');
+  if (!caps || caps.fields.assignee)
+    update.option('--assignee <name>', 'Assignee');
+  if (!caps || caps.fields.labels)
+    update.option('--labels <labels>', 'Comma-separated labels');
+  if (!caps || caps.iterations)
+    update.option('--iteration <name>', 'Iteration');
+  if (!caps || caps.fields.parent)
+    update.option('--parent <id>', 'Parent item ID');
+  if (!caps || caps.fields.dependsOn)
+    update.option('--depends-on <ids>', 'Comma-separated dependency IDs');
+  update.action((idStr: string, opts: ItemUpdateOptions) => {
+    const parentOpts = program.opts<GlobalOpts>();
+    try {
+      const backend = createBackend();
+      const id = Number(idStr);
+      if (Number.isNaN(id)) throw new Error(`Invalid ID: ${idStr}`);
+      const description = readStdin();
+      const updateOpts: ItemUpdateOptions = {
+        ...opts,
+        dependsOn: opts.dependsOn,
+        ...(description ? { description } : {}),
+      };
+      const wi = runItemUpdate(backend, id, updateOpts);
+      output(wi, () => itemToTsvRow(wi), parentOpts);
+    } catch (err) {
+      handleError(err, parentOpts.json);
+    }
+  });
 
   item
     .command('delete')
@@ -309,76 +335,80 @@ export function createProgram(): Command {
       }
     });
 
-  item
-    .command('comment')
-    .description('Add a comment to a work item')
-    .argument('<id>', 'Work item ID')
-    .argument('<text>', 'Comment text')
-    .option('--author <name>', 'Comment author')
-    .action((idStr: string, text: string, opts: ItemCommentOptions) => {
-      const parentOpts = program.opts<GlobalOpts>();
-      try {
-        const backend = createBackend();
-        const id = Number(idStr);
-        if (Number.isNaN(id)) throw new Error(`Invalid ID: ${idStr}`);
-        const comment = runItemComment(backend, id, text, opts);
-        output(
-          comment,
-          () => formatTsvRow([comment.author, comment.date, comment.body]),
-          parentOpts,
-        );
-      } catch (err) {
-        handleError(err, parentOpts.json);
-      }
-    });
+  if (!caps || caps.comments) {
+    item
+      .command('comment')
+      .description('Add a comment to a work item')
+      .argument('<id>', 'Work item ID')
+      .argument('<text>', 'Comment text')
+      .option('--author <name>', 'Comment author')
+      .action((idStr: string, text: string, opts: ItemCommentOptions) => {
+        const parentOpts = program.opts<GlobalOpts>();
+        try {
+          const backend = createBackend();
+          const id = Number(idStr);
+          if (Number.isNaN(id)) throw new Error(`Invalid ID: ${idStr}`);
+          const comment = runItemComment(backend, id, text, opts);
+          output(
+            comment,
+            () => formatTsvRow([comment.author, comment.date, comment.body]),
+            parentOpts,
+          );
+        } catch (err) {
+          handleError(err, parentOpts.json);
+        }
+      });
+  }
 
   // tic iteration ...
-  const iteration = program
-    .command('iteration')
-    .description('Manage iterations');
+  if (!caps || caps.iterations) {
+    const iteration = program
+      .command('iteration')
+      .description('Manage iterations');
 
-  iteration
-    .command('list')
-    .description('List iterations')
-    .action(() => {
-      const parentOpts = program.opts<GlobalOpts>();
-      try {
-        const backend = createBackend();
-        const result = runIterationList(backend);
-        if (parentOpts.quiet) return;
-        if (parentOpts.json) {
-          console.log(formatJson(result));
-        } else {
-          for (const iter of result.iterations) {
-            const marker = iter === result.current ? '*' : ' ';
-            console.log(`${marker}\t${iter}`);
-          }
-        }
-      } catch (err) {
-        handleError(err, parentOpts.json);
-      }
-    });
-
-  iteration
-    .command('set')
-    .description('Set current iteration')
-    .argument('<name>', 'Iteration name')
-    .action((name: string) => {
-      const parentOpts = program.opts<GlobalOpts>();
-      try {
-        const backend = createBackend();
-        runIterationSet(backend, name);
-        if (!parentOpts.quiet) {
+    iteration
+      .command('list')
+      .description('List iterations')
+      .action(() => {
+        const parentOpts = program.opts<GlobalOpts>();
+        try {
+          const backend = createBackend();
+          const result = runIterationList(backend);
+          if (parentOpts.quiet) return;
           if (parentOpts.json) {
-            console.log(formatJson({ current_iteration: name }));
+            console.log(formatJson(result));
           } else {
-            console.log(`Current iteration set to ${name}`);
+            for (const iter of result.iterations) {
+              const marker = iter === result.current ? '*' : ' ';
+              console.log(`${marker}\t${iter}`);
+            }
           }
+        } catch (err) {
+          handleError(err, parentOpts.json);
         }
-      } catch (err) {
-        handleError(err, parentOpts.json);
-      }
-    });
+      });
+
+    iteration
+      .command('set')
+      .description('Set current iteration')
+      .argument('<name>', 'Iteration name')
+      .action((name: string) => {
+        const parentOpts = program.opts<GlobalOpts>();
+        try {
+          const backend = createBackend();
+          runIterationSet(backend, name);
+          if (!parentOpts.quiet) {
+            if (parentOpts.json) {
+              console.log(formatJson({ current_iteration: name }));
+            } else {
+              console.log(`Current iteration set to ${name}`);
+            }
+          }
+        } catch (err) {
+          handleError(err, parentOpts.json);
+        }
+      });
+  }
 
   // tic config ...
   const config = program
