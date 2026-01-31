@@ -73,15 +73,15 @@ export function parseIssueFile(raw: string): Issue {
   const { description, comments } = parseComments(parsed.content);
 
   return {
-    id: data.id as number,
-    title: data.title as string,
-    status: data.status as string,
-    iteration: data.iteration as string,
-    priority: data.priority as Issue['priority'],
-    assignee: (data.assignee as string) || '',
-    labels: (data.labels as string[]) || [],
-    created: data.created as string,
-    updated: data.updated as string,
+    id: data['id'] as number,
+    title: data['title'] as string,
+    status: data['status'] as string,
+    iteration: data['iteration'] as string,
+    priority: data['priority'] as Issue['priority'],
+    assignee: (data['assignee'] as string) || '',
+    labels: (data['labels'] as string[]) || [],
+    created: data['created'] as string,
+    updated: data['updated'] as string,
     description,
     comments,
   };

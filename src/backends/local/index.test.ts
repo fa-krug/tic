@@ -28,8 +28,8 @@ describe('LocalBackend', () => {
     });
     const issues = backend.listIssues();
     expect(issues).toHaveLength(1);
-    expect(issues[0].title).toBe('Test');
-    expect(issues[0].id).toBe(1);
+    expect(issues[0]!.title).toBe('Test');
+    expect(issues[0]!.id).toBe(1);
   });
 
   it('filters issues by iteration', () => {
@@ -59,7 +59,7 @@ describe('LocalBackend', () => {
     backend.addComment(1, { author: 'dev', body: 'A comment.' });
     const issue = backend.getIssue(1);
     expect(issue.comments).toHaveLength(1);
-    expect(issue.comments[0].body).toBe('A comment.');
+    expect(issue.comments[0]!.body).toBe('A comment.');
   });
 
   it('manages iterations', () => {

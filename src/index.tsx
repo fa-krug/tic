@@ -1,8 +1,7 @@
 #!/usr/bin/env node
-import { render, Text } from 'ink';
+import { render } from 'ink';
+import { App } from './app.js';
+import { LocalBackend } from './backends/local/index.js';
 
-function App() {
-  return <Text>tic - issue tracker</Text>;
-}
-
-render(<App />);
+const backend = new LocalBackend(process.cwd());
+render(<App backend={backend} />);

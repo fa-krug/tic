@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { readIssue, writeIssue, deleteIssue, listIssueFiles, parseIssueFile } from './issues.js';
+import { readIssue, writeIssue, deleteIssue, listIssueFiles } from './issues.js';
 import type { Issue } from '../../types.js';
 
 describe('issues', () => {
@@ -47,7 +47,7 @@ describe('issues', () => {
     writeIssue(tmpDir, issue);
     const read = readIssue(tmpDir, 2);
     expect(read.comments).toHaveLength(2);
-    expect(read.comments[0].body).toBe('First comment.');
+    expect(read.comments[0]!.body).toBe('First comment.');
   });
 
   it('deletes an issue file', () => {
