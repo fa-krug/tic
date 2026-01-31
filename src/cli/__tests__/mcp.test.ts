@@ -16,6 +16,7 @@ import {
   createDeleteTracker,
   handleAddComment,
   handleSetIteration,
+  handleSearchItems,
 } from '../commands/mcp.js';
 
 describe('MCP handlers', () => {
@@ -512,6 +513,86 @@ describe('MCP handlers', () => {
       const result = handleSetIteration(backend, { name: 'sprint-2' });
       expect(result.isError).toBeUndefined();
       expect(backend.getCurrentIteration()).toBe('sprint-2');
+    });
+  });
+
+  describe('handleSearchItems', () => {
+    beforeEach(() => {
+      handleInitProject(tmpDir);
+      backend = new LocalBackend(tmpDir);
+      backend.createWorkItem({
+        title: 'Fix login bug',
+        type: 'issue',
+        status: 'todo',
+        priority: 'high',
+        assignee: '',
+        labels: [],
+        iteration: 'default',
+        parent: null,
+        dependsOn: [],
+        description: 'The login page crashes on submit',
+      });
+      backend.createWorkItem({
+        title: 'Add dashboard',
+        type: 'task',
+        status: 'backlog',
+        priority: 'medium',
+        assignee: '',
+        labels: [],
+        iteration: 'default',
+        parent: null,
+        dependsOn: [],
+        description: 'Create a new dashboard view',
+      });
+      backend.createWorkItem({
+        title: 'Update login styles',
+        type: 'task',
+        status: 'done',
+        priority: 'low',
+        assignee: '',
+        labels: [],
+        iteration: 'default',
+        parent: null,
+        dependsOn: [],
+        description: 'Modernize the CSS',
+      });
+    });
+
+    it('finds by title', () => {
+      const result = handleSearchItems(backend, { query: 'login' });
+      const data = JSON.parse(result.content[0]!.text) as WorkItem[];
+      expect(data).toHaveLength(2);
+      expect(data.map((i) => i.title)).toContain('Fix login bug');
+      expect(data.map((i) => i.title)).toContain('Update login styles');
+    });
+
+    it('finds by description', () => {
+      const result = handleSearchItems(backend, { query: 'dashboard' });
+      const data = JSON.parse(result.content[0]!.text) as WorkItem[];
+      expect(data).toHaveLength(1);
+      expect(data[0]!.title).toBe('Add dashboard');
+    });
+
+    it('is case-insensitive', () => {
+      const result = handleSearchItems(backend, { query: 'LOGIN' });
+      const data = JSON.parse(result.content[0]!.text) as WorkItem[];
+      expect(data).toHaveLength(2);
+    });
+
+    it('returns empty array for no results', () => {
+      const result = handleSearchItems(backend, { query: 'nonexistent' });
+      const data = JSON.parse(result.content[0]!.text) as WorkItem[];
+      expect(data).toHaveLength(0);
+    });
+
+    it('combines with filters', () => {
+      const result = handleSearchItems(backend, {
+        query: 'login',
+        status: 'todo',
+      });
+      const data = JSON.parse(result.content[0]!.text) as WorkItem[];
+      expect(data).toHaveLength(1);
+      expect(data[0]!.title).toBe('Fix login bug');
     });
   });
 });

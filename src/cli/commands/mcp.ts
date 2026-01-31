@@ -222,3 +222,30 @@ export function handleSetIteration(
     return error(message);
   }
 }
+
+export interface SearchItemsArgs {
+  query: string;
+  status?: string;
+  type?: string;
+  iteration?: string;
+  all?: boolean;
+}
+
+export function handleSearchItems(
+  backend: Backend,
+  args: SearchItemsArgs,
+): ToolResult {
+  const items = runItemList(backend, {
+    status: args.status,
+    type: args.type,
+    iteration: args.iteration,
+    all: args.all,
+  });
+  const query = args.query.toLowerCase();
+  const filtered = items.filter(
+    (item) =>
+      item.title.toLowerCase().includes(query) ||
+      item.description.toLowerCase().includes(query),
+  );
+  return success(filtered);
+}
