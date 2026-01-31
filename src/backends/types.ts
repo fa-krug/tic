@@ -14,4 +14,6 @@ export interface Backend {
   addComment(workItemId: number, comment: NewComment): Comment;
   getChildren(id: number): WorkItem[];
   getDependents(id: number): WorkItem[];
+  getItemUrl(id: number): string;
+  openItem(id: number): void;
 }

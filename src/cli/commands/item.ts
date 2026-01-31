@@ -111,6 +111,10 @@ export function runItemDelete(backend: Backend, id: number): void {
   backend.deleteWorkItem(id);
 }
 
+export function runItemOpen(backend: Backend, id: number): void {
+  backend.openItem(id);
+}
+
 export function runItemComment(
   backend: Backend,
   id: number,

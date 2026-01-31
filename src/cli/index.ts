@@ -1,13 +1,20 @@
 import { Command } from 'commander';
-import { LocalBackend } from '../backends/local/index.js';
+import {
+  createBackend as createBackendFromConfig,
+  detectBackend,
+  VALID_BACKENDS,
+} from '../backends/factory.js';
+import type { Backend } from '../backends/types.js';
 import { formatTsvRow, formatTsvKeyValue, formatJson } from './format.js';
 import { runInit } from './commands/init.js';
+import { runConfigGet, runConfigSet } from './commands/config.js';
 import {
   runItemList,
   runItemShow,
   runItemCreate,
   runItemUpdate,
   runItemDelete,
+  runItemOpen,
   runItemComment,
   type ItemListOptions,
   type ItemCreateOptions,
@@ -72,9 +79,9 @@ export function requireTicProject(root: string): void {
   }
 }
 
-function createBackend(): LocalBackend {
+function createBackend(): Backend {
   requireTicProject(process.cwd());
-  return new LocalBackend(process.cwd());
+  return createBackendFromConfig(process.cwd());
 }
 
 function output(
@@ -108,14 +115,43 @@ export function createProgram(): Command {
   program
     .command('init')
     .description('Initialize a new .tic project')
-    .action(() => {
+    .option(
+      '--backend <backend>',
+      'Backend type (local, github, gitlab, azure)',
+    )
+    .action((opts: { backend?: string }) => {
       const parentOpts = program.opts<GlobalOpts>();
       try {
-        const result = runInit(process.cwd());
+        let backend = opts.backend;
+        if (!backend) {
+          const detected = detectBackend(process.cwd());
+          if (process.stdin.isTTY) {
+            console.log(`Detected backend: ${detected}`);
+            console.log(
+              `Available backends: ${VALID_BACKENDS.join(', ')}`,
+            );
+            console.log(
+              `Using: ${detected} (pass --backend to override)`,
+            );
+          }
+          backend = detected;
+        }
+        if (
+          !(VALID_BACKENDS as readonly string[]).includes(backend)
+        ) {
+          throw new Error(
+            `Invalid backend "${backend}". Valid: ${VALID_BACKENDS.join(', ')}`,
+          );
+        }
+        const result = runInit(process.cwd(), backend);
         if (result.alreadyExists) {
           console.log('Already initialized in .tic/');
         } else {
-          output({ initialized: true }, () => 'Initialized .tic/', parentOpts);
+          output(
+            { initialized: true, backend },
+            () => `Initialized .tic/ with backend: ${backend}`,
+            parentOpts,
+          );
         }
       } catch (err) {
         handleError(err, parentOpts.json);
@@ -175,6 +211,22 @@ export function createProgram(): Command {
         if (Number.isNaN(id)) throw new Error(`Invalid ID: ${idStr}`);
         const wi = runItemShow(backend, id);
         output(wi, () => itemToTsvDetail(wi), parentOpts);
+      } catch (err) {
+        handleError(err, parentOpts.json);
+      }
+    });
+
+  item
+    .command('open')
+    .description('Open a work item in an external editor or browser')
+    .argument('<id>', 'Work item ID')
+    .action((idStr: string) => {
+      const parentOpts = program.opts<GlobalOpts>();
+      try {
+        const backend = createBackend();
+        const id = Number(idStr);
+        if (Number.isNaN(id)) throw new Error(`Invalid ID: ${idStr}`);
+        runItemOpen(backend, id);
       } catch (err) {
         handleError(err, parentOpts.json);
       }
@@ -327,6 +379,55 @@ export function createProgram(): Command {
             console.log(formatJson({ current_iteration: name }));
           } else {
             console.log(`Current iteration set to ${name}`);
+          }
+        }
+      } catch (err) {
+        handleError(err, parentOpts.json);
+      }
+    });
+
+  // tic config ...
+  const config = program
+    .command('config')
+    .description('Manage project configuration');
+
+  config
+    .command('get')
+    .description('Get a configuration value')
+    .argument('<key>', 'Config key')
+    .action((key: string) => {
+      const parentOpts = program.opts<GlobalOpts>();
+      try {
+        requireTicProject(process.cwd());
+        const value = runConfigGet(process.cwd(), key);
+        if (parentOpts.quiet) return;
+        if (parentOpts.json) {
+          console.log(formatJson({ [key]: value }));
+        } else {
+          console.log(
+            Array.isArray(value) ? value.join('\n') : String(value),
+          );
+        }
+      } catch (err) {
+        handleError(err, parentOpts.json);
+      }
+    });
+
+  config
+    .command('set')
+    .description('Set a configuration value')
+    .argument('<key>', 'Config key')
+    .argument('<value>', 'Config value')
+    .action((key: string, value: string) => {
+      const parentOpts = program.opts<GlobalOpts>();
+      try {
+        requireTicProject(process.cwd());
+        runConfigSet(process.cwd(), key, value);
+        if (!parentOpts.quiet) {
+          if (parentOpts.json) {
+            console.log(formatJson({ [key]: value }));
+          } else {
+            console.log(`Set ${key} = ${value}`);
           }
         }
       } catch (err) {

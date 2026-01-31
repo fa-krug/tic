@@ -13,7 +13,9 @@ import {
   listItemFiles,
   parseWorkItemFile,
 } from './items.js';
+import { execSync } from 'node:child_process';
 import fs from 'node:fs';
+import path from 'node:path';
 
 export class LocalBackend implements Backend {
   private root: string;
@@ -206,5 +208,18 @@ export class LocalBackend implements Backend {
   getDependents(id: number): WorkItem[] {
     const all = this.listWorkItems();
     return all.filter((item) => item.dependsOn.includes(id));
+  }
+
+  getItemUrl(id: number): string {
+    return path.resolve(this.root, '.tic', 'items', `${id}.md`);
+  }
+
+  openItem(id: number): void {
+    const filePath = this.getItemUrl(id);
+    if (!fs.existsSync(filePath)) {
+      throw new Error(`Work item #${id} does not exist`);
+    }
+    const editor = process.env['VISUAL'] || process.env['EDITOR'] || 'vi';
+    execSync(`${editor} ${filePath}`, { stdio: 'inherit' });
   }
 }

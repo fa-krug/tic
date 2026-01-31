@@ -66,4 +66,20 @@ describe('config', () => {
     const config = readConfig(tmpDir);
     expect(config.types).toEqual(['story', 'bug']);
   });
+
+  it('returns default config with backend field', () => {
+    const config = readConfig(tmpDir);
+    expect(config.backend).toBe('local');
+  });
+
+  it('reads config with custom backend', () => {
+    const ticDir = path.join(tmpDir, '.tic');
+    fs.mkdirSync(ticDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(ticDir, 'config.yml'),
+      'backend: github\ntypes:\n  - task\nstatuses:\n  - open\ncurrent_iteration: v1\niterations:\n  - v1\nnext_id: 1\n',
+    );
+    const config = readConfig(tmpDir);
+    expect(config.backend).toBe('github');
+  });
 });

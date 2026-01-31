@@ -1,7 +1,11 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { LocalBackend } from '../../backends/local/index.js';
+import {
+  createBackend as createBackendFromConfig,
+  VALID_BACKENDS,
+} from '../../backends/factory.js';
+import { readConfig, writeConfig } from '../../backends/local/config.js';
 import type { Backend } from '../../backends/types.js';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -59,14 +63,35 @@ export interface ListItemsArgs {
   all?: boolean;
 }
 
-export function handleGetConfig(backend: Backend): ToolResult {
+export function handleGetConfig(backend: Backend, root: string): ToolResult {
   try {
+    const config = readConfig(root);
     return success({
+      backend: config.backend,
       statuses: backend.getStatuses(),
       types: backend.getWorkItemTypes(),
       iterations: backend.getIterations(),
       currentIteration: backend.getCurrentIteration(),
     });
+  } catch (err) {
+    return error(err instanceof Error ? err.message : String(err));
+  }
+}
+
+export function handleSetBackend(
+  root: string,
+  args: { backend: string },
+): ToolResult {
+  try {
+    if (!(VALID_BACKENDS as readonly string[]).includes(args.backend)) {
+      return error(
+        `Invalid backend "${args.backend}". Valid backends: ${VALID_BACKENDS.join(', ')}`,
+      );
+    }
+    const config = readConfig(root);
+    config.backend = args.backend;
+    writeConfig(root, config);
+    return success({ backend: args.backend });
   } catch (err) {
     return error(err instanceof Error ? err.message : String(err));
   }
@@ -95,7 +120,8 @@ export function handleShowItem(
 ): ToolResult {
   try {
     const item = runItemShow(backend, args.id);
-    return success(item);
+    const url = backend.getItemUrl(args.id);
+    return success({ ...item, url });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return error(message);
@@ -383,7 +409,7 @@ export function registerTools(
   });
 
   server.tool('get_config', 'Get project configuration', () => {
-    return handleGetConfig(backend);
+    return handleGetConfig(backend, root);
   });
 
   server.tool(

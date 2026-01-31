@@ -123,6 +123,11 @@ export function WorkItemList() {
       setConfirmDelete(true);
     }
 
+    if (input === 'o' && treeItems.length > 0) {
+      backend.openItem(treeItems[cursor]!.item.id);
+      setRefresh((r) => r + 1);
+    }
+
     if (input === 's' && treeItems.length > 0) {
       const item = treeItems[cursor]!.item;
       const idx = statuses.indexOf(item.status);
@@ -298,8 +303,8 @@ export function WorkItemList() {
           </Text>
         ) : (
           <Text dimColor>
-            up/down: navigate enter: open c: create d: delete s: cycle status p:
-            set parent tab: type i: iteration q: quit
+            up/down: navigate enter: edit o: open c: create d: delete s: cycle
+            status p: set parent tab: type i: iteration q: quit
           </Text>
         )}
       </Box>
