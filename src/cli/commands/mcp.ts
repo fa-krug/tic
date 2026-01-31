@@ -2,6 +2,7 @@ import type { Backend } from '../../backends/types.js';
 import { runInit } from './init.js';
 import {
   runItemCreate,
+  runItemDelete,
   runItemList,
   runItemShow,
   runItemUpdate,
@@ -143,6 +144,49 @@ export function handleUpdateItem(
     if (args.description !== undefined) opts.description = args.description;
     const item = runItemUpdate(backend, args.id, opts);
     return success(item);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return error(message);
+  }
+}
+
+export type DeleteTracker = Set<number>;
+
+export function createDeleteTracker(): DeleteTracker {
+  return new Set<number>();
+}
+
+export function handleDeleteItem(
+  backend: Backend,
+  args: { id: number },
+  pendingDeletes: DeleteTracker,
+): ToolResult {
+  try {
+    const item = backend.getWorkItem(args.id);
+    const children = backend.getChildren(args.id);
+    const dependents = backend.getDependents(args.id);
+    pendingDeletes.add(args.id);
+    return success({ item, children, dependents });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return error(message);
+  }
+}
+
+export function handleConfirmDelete(
+  backend: Backend,
+  args: { id: number },
+  pendingDeletes: DeleteTracker,
+): ToolResult {
+  if (!pendingDeletes.has(args.id)) {
+    return error(
+      `Item #${args.id} has not been previewed for deletion. Call delete_item first.`,
+    );
+  }
+  try {
+    runItemDelete(backend, args.id);
+    pendingDeletes.delete(args.id);
+    return success({ deleted: args.id });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return error(message);

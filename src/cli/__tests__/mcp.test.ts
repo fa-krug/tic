@@ -11,6 +11,9 @@ import {
   handleShowItem,
   handleCreateItem,
   handleUpdateItem,
+  handleDeleteItem,
+  handleConfirmDelete,
+  createDeleteTracker,
 } from '../commands/mcp.js';
 
 describe('MCP handlers', () => {
@@ -281,6 +284,157 @@ describe('MCP handlers', () => {
         id: 999,
         title: 'Nope',
       });
+      expect(result.isError).toBe(true);
+    });
+  });
+
+  describe('handleDeleteItem', () => {
+    let pendingDeletes: Set<number>;
+
+    beforeEach(() => {
+      handleInitProject(tmpDir);
+      backend = new LocalBackend(tmpDir);
+      pendingDeletes = createDeleteTracker();
+    });
+
+    it('returns preview without deleting', () => {
+      backend.createWorkItem({
+        title: 'Delete me',
+        type: 'task',
+        status: 'backlog',
+        priority: 'medium',
+        assignee: '',
+        labels: [],
+        iteration: 'default',
+        parent: null,
+        dependsOn: [],
+        description: '',
+      });
+      const result = handleDeleteItem(backend, { id: 1 }, pendingDeletes);
+      expect(result.isError).toBeUndefined();
+      const data = JSON.parse(result.content[0]!.text) as {
+        item: WorkItem;
+        children: WorkItem[];
+        dependents: WorkItem[];
+      };
+      expect(data.item.title).toBe('Delete me');
+      // Item should still exist
+      expect(backend.getWorkItem(1).title).toBe('Delete me');
+    });
+
+    it('shows affected children and dependents', () => {
+      backend.createWorkItem({
+        title: 'Parent',
+        type: 'task',
+        status: 'backlog',
+        priority: 'medium',
+        assignee: '',
+        labels: [],
+        iteration: 'default',
+        parent: null,
+        dependsOn: [],
+        description: '',
+      });
+      backend.createWorkItem({
+        title: 'Child',
+        type: 'task',
+        status: 'backlog',
+        priority: 'medium',
+        assignee: '',
+        labels: [],
+        iteration: 'default',
+        parent: 1,
+        dependsOn: [],
+        description: '',
+      });
+      backend.createWorkItem({
+        title: 'Dependent',
+        type: 'task',
+        status: 'backlog',
+        priority: 'medium',
+        assignee: '',
+        labels: [],
+        iteration: 'default',
+        parent: null,
+        dependsOn: [1],
+        description: '',
+      });
+      const result = handleDeleteItem(backend, { id: 1 }, pendingDeletes);
+      const data = JSON.parse(result.content[0]!.text) as {
+        item: WorkItem;
+        children: WorkItem[];
+        dependents: WorkItem[];
+      };
+      expect(data.children).toHaveLength(1);
+      expect(data.children[0]!.title).toBe('Child');
+      expect(data.dependents).toHaveLength(1);
+      expect(data.dependents[0]!.title).toBe('Dependent');
+    });
+  });
+
+  describe('handleConfirmDelete', () => {
+    let pendingDeletes: Set<number>;
+
+    beforeEach(() => {
+      handleInitProject(tmpDir);
+      backend = new LocalBackend(tmpDir);
+      pendingDeletes = createDeleteTracker();
+    });
+
+    it('works after preview', () => {
+      backend.createWorkItem({
+        title: 'Delete me',
+        type: 'task',
+        status: 'backlog',
+        priority: 'medium',
+        assignee: '',
+        labels: [],
+        iteration: 'default',
+        parent: null,
+        dependsOn: [],
+        description: '',
+      });
+      handleDeleteItem(backend, { id: 1 }, pendingDeletes);
+      const result = handleConfirmDelete(backend, { id: 1 }, pendingDeletes);
+      expect(result.isError).toBeUndefined();
+      expect(() => backend.getWorkItem(1)).toThrow();
+    });
+
+    it('rejects without preview', () => {
+      backend.createWorkItem({
+        title: 'No preview',
+        type: 'task',
+        status: 'backlog',
+        priority: 'medium',
+        assignee: '',
+        labels: [],
+        iteration: 'default',
+        parent: null,
+        dependsOn: [],
+        description: '',
+      });
+      const result = handleConfirmDelete(backend, { id: 1 }, pendingDeletes);
+      expect(result.isError).toBe(true);
+      // Item should still exist
+      expect(backend.getWorkItem(1).title).toBe('No preview');
+    });
+
+    it('rejects second call', () => {
+      backend.createWorkItem({
+        title: 'Once only',
+        type: 'task',
+        status: 'backlog',
+        priority: 'medium',
+        assignee: '',
+        labels: [],
+        iteration: 'default',
+        parent: null,
+        dependsOn: [],
+        description: '',
+      });
+      handleDeleteItem(backend, { id: 1 }, pendingDeletes);
+      handleConfirmDelete(backend, { id: 1 }, pendingDeletes);
+      const result = handleConfirmDelete(backend, { id: 1 }, pendingDeletes);
       expect(result.isError).toBe(true);
     });
   });
