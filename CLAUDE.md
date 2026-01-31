@@ -52,7 +52,9 @@ Or add `.mcp.json` to the project root:
 
 `src/backends/types.ts` defines the `Backend` interface (CRUD for work items, iteration management, status/iteration/type lists, relationship queries via `getChildren(id)` and `getDependents(id)`). All UI components interact with backends only through this interface.
 
-The only implementation so far is `LocalBackend` (`src/backends/local/index.ts`), which stores work items as markdown files with YAML frontmatter in a `.tic/` directory:
+`BaseBackend` (`src/backends/types.ts`) is the abstract base class all backends extend. It provides `validateFields()` to throw `UnsupportedOperationError` for fields the backend doesn't support, and `assertSupported()` for gating entire operations. Each backend implements `getCapabilities()` returning a `BackendCapabilities` object that declares supported feature groups (`relationships`, `customTypes`, `customStatuses`, `iterations`, `comments`) and individual fields (`priority`, `assignee`, `labels`, `parent`, `dependsOn`). TUI components, CLI commands, and MCP tools use capabilities to hide unsupported features.
+
+`LocalBackend` (`src/backends/local/index.ts`) stores work items as markdown files with YAML frontmatter in a `.tic/` directory:
 - `.tic/config.yml` — types, statuses, iterations, current iteration, next item ID
 - `.tic/items/{id}.md` — individual work item files (frontmatter metadata + markdown body + comments section)
 
