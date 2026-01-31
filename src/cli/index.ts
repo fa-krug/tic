@@ -335,11 +335,15 @@ export function createProgram(): Command {
     });
 
   // tic mcp ...
-  const mcp = program.command('mcp').description('MCP server');
+  const mcp = program
+    .command('mcp')
+    .description('Model Context Protocol (MCP) server for AI assistants');
 
   mcp
     .command('serve')
-    .description('Start MCP server on stdio')
+    .description(
+      'Start the MCP server on stdio, exposing 14 tools for work item management',
+    )
     .action(async () => {
       await startMcpServer();
     });
