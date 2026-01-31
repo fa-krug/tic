@@ -7,6 +7,7 @@ import type { Comment } from '../types.js';
 
 type FieldName =
   | 'title'
+  | 'type'
   | 'status'
   | 'iteration'
   | 'priority'
@@ -17,6 +18,7 @@ type FieldName =
 
 const FIELDS: FieldName[] = [
   'title',
+  'type',
   'status',
   'iteration',
   'priority',
@@ -25,36 +27,43 @@ const FIELDS: FieldName[] = [
   'description',
   'comments',
 ];
-const SELECT_FIELDS: FieldName[] = ['status', 'iteration', 'priority'];
+const SELECT_FIELDS: FieldName[] = ['type', 'status', 'iteration', 'priority'];
 const PRIORITIES = ['low', 'medium', 'high', 'critical'];
 
-export function IssueForm() {
-  const { backend, navigate, selectedIssueId } = useAppState();
+export function WorkItemForm() {
+  const { backend, navigate, selectedWorkItemId, activeType } = useAppState();
 
   const statuses = useMemo(() => backend.getStatuses(), [backend]);
   const iterations = useMemo(() => backend.getIterations(), [backend]);
+  const types = useMemo(() => backend.getWorkItemTypes(), [backend]);
 
-  const existingIssue = useMemo(
-    () => (selectedIssueId !== null ? backend.getIssue(selectedIssueId) : null),
-    [selectedIssueId, backend],
+  const existingItem = useMemo(
+    () =>
+      selectedWorkItemId !== null
+        ? backend.getWorkItem(selectedWorkItemId)
+        : null,
+    [selectedWorkItemId, backend],
   );
 
-  const [title, setTitle] = useState(existingIssue?.title ?? '');
+  const [title, setTitle] = useState(existingItem?.title ?? '');
+  const [type, setType] = useState(
+    existingItem?.type ?? activeType ?? types[0] ?? '',
+  );
   const [status, setStatus] = useState(
-    existingIssue?.status ?? statuses[0] ?? '',
+    existingItem?.status ?? statuses[0] ?? '',
   );
   const [iteration, setIteration] = useState(
-    existingIssue?.iteration ?? backend.getCurrentIteration(),
+    existingItem?.iteration ?? backend.getCurrentIteration(),
   );
-  const [priority, setPriority] = useState(existingIssue?.priority ?? 'medium');
-  const [assignee, setAssignee] = useState(existingIssue?.assignee ?? '');
-  const [labels, setLabels] = useState(existingIssue?.labels.join(', ') ?? '');
+  const [priority, setPriority] = useState(existingItem?.priority ?? 'medium');
+  const [assignee, setAssignee] = useState(existingItem?.assignee ?? '');
+  const [labels, setLabels] = useState(existingItem?.labels.join(', ') ?? '');
   const [description, setDescription] = useState(
-    existingIssue?.description ?? '',
+    existingItem?.description ?? '',
   );
   const [newComment, setNewComment] = useState('');
   const [comments, setComments] = useState<Comment[]>(
-    existingIssue?.comments ?? [],
+    existingItem?.comments ?? [],
   );
 
   const [focusedField, setFocusedField] = useState(0);
@@ -69,9 +78,10 @@ export function IssueForm() {
       .map((l) => l.trim())
       .filter((l) => l.length > 0);
 
-    if (selectedIssueId !== null) {
-      backend.updateIssue(selectedIssueId, {
+    if (selectedWorkItemId !== null) {
+      backend.updateWorkItem(selectedWorkItemId, {
         title,
+        type,
         status,
         iteration,
         priority: priority,
@@ -81,7 +91,7 @@ export function IssueForm() {
       });
 
       if (newComment.trim().length > 0) {
-        const added = backend.addComment(selectedIssueId, {
+        const added = backend.addComment(selectedWorkItemId, {
           author: 'me',
           body: newComment.trim(),
         });
@@ -89,8 +99,9 @@ export function IssueForm() {
         setNewComment('');
       }
     } else {
-      const created = backend.createIssue({
+      const created = backend.createWorkItem({
         title: title || 'Untitled',
+        type,
         status,
         iteration,
         priority: priority,
@@ -128,7 +139,6 @@ export function IssueForm() {
           navigate('list');
         }
       } else {
-        // Editing a text field — Esc confirms the edit
         if (key.escape) {
           setEditing(false);
         }
@@ -139,6 +149,10 @@ export function IssueForm() {
 
   function getSelectItems(field: FieldName) {
     switch (field) {
+      case 'type': {
+        return types.map((t) => ({ label: t, value: t }));
+      }
+
       case 'status': {
         return statuses.map((s) => ({ label: s, value: s }));
       }
@@ -159,6 +173,11 @@ export function IssueForm() {
 
   function getSelectInitialIndex(field: FieldName): number {
     switch (field) {
+      case 'type': {
+        const idx = types.indexOf(type);
+        return idx >= 0 ? idx : 0;
+      }
+
       case 'status': {
         const idx = statuses.indexOf(status);
         return idx >= 0 ? idx : 0;
@@ -182,6 +201,11 @@ export function IssueForm() {
 
   function handleSelectItem(field: FieldName, value: string) {
     switch (field) {
+      case 'type': {
+        setType(value);
+        break;
+      }
+
       case 'status': {
         setStatus(value);
         break;
@@ -254,11 +278,13 @@ export function IssueForm() {
 
     if (SELECT_FIELDS.includes(field)) {
       const currentValue =
-        field === 'status'
-          ? status
-          : field === 'iteration'
-            ? iteration
-            : priority;
+        field === 'type'
+          ? type
+          : field === 'status'
+            ? status
+            : field === 'iteration'
+              ? iteration
+              : priority;
 
       if (isEditing) {
         return (
@@ -342,13 +368,15 @@ export function IssueForm() {
     );
   }
 
-  const mode = selectedIssueId !== null ? 'Edit' : 'Create';
+  const mode = selectedWorkItemId !== null ? 'Edit' : 'Create';
+  const typeLabel = type.charAt(0).toUpperCase() + type.slice(1);
 
   return (
     <Box flexDirection="column">
       <Box marginBottom={1}>
         <Text bold color="cyan">
-          {mode} Issue{selectedIssueId !== null ? ` #${selectedIssueId}` : ''}
+          {mode} {typeLabel}
+          {selectedWorkItemId !== null ? ` #${selectedWorkItemId}` : ''}
         </Text>
       </Box>
 

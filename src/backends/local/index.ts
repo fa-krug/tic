@@ -1,5 +1,10 @@
 import type { Backend } from '../types.js';
-import type { WorkItem, NewWorkItem, NewComment, Comment } from '../../types.js';
+import type {
+  WorkItem,
+  NewWorkItem,
+  NewComment,
+  Comment,
+} from '../../types.js';
 import { readConfig, writeConfig, type Config } from './config.js';
 import {
   readWorkItem,

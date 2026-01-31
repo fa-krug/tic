@@ -155,14 +155,10 @@ export function WorkItemList() {
               <Text color={selected ? 'cyan' : undefined}>{item.status}</Text>
             </Box>
             <Box width={colPriority}>
-              <Text color={selected ? 'cyan' : undefined}>
-                {item.priority}
-              </Text>
+              <Text color={selected ? 'cyan' : undefined}>{item.priority}</Text>
             </Box>
             <Box width={colAssignee}>
-              <Text color={selected ? 'cyan' : undefined}>
-                {item.assignee}
-              </Text>
+              <Text color={selected ? 'cyan' : undefined}>{item.assignee}</Text>
             </Box>
           </Box>
         );
