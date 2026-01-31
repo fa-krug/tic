@@ -30,15 +30,15 @@ export interface Backend {
   getCurrentIteration(): string;
   setCurrentIteration(name: string): void;
   listWorkItems(iteration?: string): WorkItem[];
-  getWorkItem(id: number): WorkItem;
+  getWorkItem(id: string): WorkItem;
   createWorkItem(data: NewWorkItem): WorkItem;
-  updateWorkItem(id: number, data: Partial<WorkItem>): WorkItem;
-  deleteWorkItem(id: number): void;
-  addComment(workItemId: number, comment: NewComment): Comment;
-  getChildren(id: number): WorkItem[];
-  getDependents(id: number): WorkItem[];
-  getItemUrl(id: number): string;
-  openItem(id: number): void;
+  updateWorkItem(id: string, data: Partial<WorkItem>): WorkItem;
+  deleteWorkItem(id: string): void;
+  addComment(workItemId: string, comment: NewComment): Comment;
+  getChildren(id: string): WorkItem[];
+  getDependents(id: string): WorkItem[];
+  getItemUrl(id: string): string;
+  openItem(id: string): void;
 }
 
 export abstract class BaseBackend implements Backend {
@@ -49,15 +49,15 @@ export abstract class BaseBackend implements Backend {
   abstract getCurrentIteration(): string;
   abstract setCurrentIteration(name: string): void;
   abstract listWorkItems(iteration?: string): WorkItem[];
-  abstract getWorkItem(id: number): WorkItem;
+  abstract getWorkItem(id: string): WorkItem;
   abstract createWorkItem(data: NewWorkItem): WorkItem;
-  abstract updateWorkItem(id: number, data: Partial<WorkItem>): WorkItem;
-  abstract deleteWorkItem(id: number): void;
-  abstract addComment(workItemId: number, comment: NewComment): Comment;
-  abstract getChildren(id: number): WorkItem[];
-  abstract getDependents(id: number): WorkItem[];
-  abstract getItemUrl(id: number): string;
-  abstract openItem(id: number): void;
+  abstract updateWorkItem(id: string, data: Partial<WorkItem>): WorkItem;
+  abstract deleteWorkItem(id: string): void;
+  abstract addComment(workItemId: string, comment: NewComment): Comment;
+  abstract getChildren(id: string): WorkItem[];
+  abstract getDependents(id: string): WorkItem[];
+  abstract getItemUrl(id: string): string;
+  abstract openItem(id: string): void;
 
   protected validateFields(data: Partial<NewWorkItem>): void {
     const caps = this.getCapabilities();

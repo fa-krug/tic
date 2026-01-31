@@ -10,11 +10,11 @@ type Screen = 'list' | 'form' | 'iteration-picker' | 'settings';
 
 interface AppState {
   screen: Screen;
-  selectedWorkItemId: number | null;
+  selectedWorkItemId: string | null;
   activeType: string | null;
   backend: Backend;
   navigate: (screen: Screen) => void;
-  selectWorkItem: (id: number | null) => void;
+  selectWorkItem: (id: string | null) => void;
   setActiveType: (type: string | null) => void;
 }
 
@@ -26,7 +26,7 @@ export function useAppState() {
 
 export function App({ backend }: { backend: Backend }) {
   const [screen, setScreen] = useState<Screen>('list');
-  const [selectedWorkItemId, setSelectedWorkItemId] = useState<number | null>(
+  const [selectedWorkItemId, setSelectedWorkItemId] = useState<string | null>(
     null,
   );
   const [activeType, setActiveType] = useState<string | null>(null);

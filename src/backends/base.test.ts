@@ -75,29 +75,29 @@ class TestBackend extends BaseBackend {
   listWorkItems(_iteration?: string): WorkItem[] {
     return [];
   }
-  getWorkItem(_id: number): WorkItem {
+  getWorkItem(_id: string): WorkItem {
     throw new Error('not implemented');
   }
   createWorkItem(_data: NewWorkItem): WorkItem {
     throw new Error('not implemented');
   }
-  updateWorkItem(_id: number, _data: Partial<WorkItem>): WorkItem {
+  updateWorkItem(_id: string, _data: Partial<WorkItem>): WorkItem {
     throw new Error('not implemented');
   }
-  deleteWorkItem(_id: number): void {}
-  addComment(_workItemId: number, _comment: NewComment): Comment {
+  deleteWorkItem(_id: string): void {}
+  addComment(_workItemId: string, _comment: NewComment): Comment {
     throw new Error('not implemented');
   }
-  getChildren(_id: number): WorkItem[] {
+  getChildren(_id: string): WorkItem[] {
     return [];
   }
-  getDependents(_id: number): WorkItem[] {
+  getDependents(_id: string): WorkItem[] {
     return [];
   }
-  getItemUrl(_id: number): string {
+  getItemUrl(_id: string): string {
     return '';
   }
-  openItem(_id: number): void {}
+  openItem(_id: string): void {}
 }
 /* eslint-enable @typescript-eslint/no-unused-vars */
 
@@ -119,20 +119,20 @@ describe('BaseBackend', () => {
       });
 
       it('throws for unsupported parent with non-null value', () => {
-        expect(() => backend.testValidateFields({ parent: 1 })).toThrow(
+        expect(() => backend.testValidateFields({ parent: '1' })).toThrow(
           UnsupportedOperationError,
         );
-        expect(() => backend.testValidateFields({ parent: 42 })).toThrow(
+        expect(() => backend.testValidateFields({ parent: '42' })).toThrow(
           UnsupportedOperationError,
         );
       });
 
       it('throws for unsupported dependsOn with non-empty array', () => {
-        expect(() => backend.testValidateFields({ dependsOn: [1] })).toThrow(
+        expect(() => backend.testValidateFields({ dependsOn: ['1'] })).toThrow(
           UnsupportedOperationError,
         );
         expect(() =>
-          backend.testValidateFields({ dependsOn: [1, 2, 3] }),
+          backend.testValidateFields({ dependsOn: ['1', '2', '3'] }),
         ).toThrow(UnsupportedOperationError);
       });
 
@@ -184,8 +184,8 @@ describe('BaseBackend', () => {
             priority: 'critical',
             assignee: 'alice',
             labels: ['bug', 'feature'],
-            parent: 5,
-            dependsOn: [1, 2],
+            parent: '5',
+            dependsOn: ['1', '2'],
           }),
         ).not.toThrow();
       });

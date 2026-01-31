@@ -213,9 +213,7 @@ export function createProgram(): Command {
       const parentOpts = program.opts<GlobalOpts>();
       try {
         const backend = createBackend();
-        const id = Number(idStr);
-        if (Number.isNaN(id)) throw new Error(`Invalid ID: ${idStr}`);
-        const wi = runItemShow(backend, id);
+        const wi = runItemShow(backend, idStr);
         output(wi, () => itemToTsvDetail(wi), parentOpts);
       } catch (err) {
         handleError(err, parentOpts.json);
@@ -230,9 +228,7 @@ export function createProgram(): Command {
       const parentOpts = program.opts<GlobalOpts>();
       try {
         const backend = createBackend();
-        const id = Number(idStr);
-        if (Number.isNaN(id)) throw new Error(`Invalid ID: ${idStr}`);
-        runItemOpen(backend, id);
+        runItemOpen(backend, idStr);
       } catch (err) {
         handleError(err, parentOpts.json);
       }
@@ -297,15 +293,13 @@ export function createProgram(): Command {
     const parentOpts = program.opts<GlobalOpts>();
     try {
       const backend = createBackend();
-      const id = Number(idStr);
-      if (Number.isNaN(id)) throw new Error(`Invalid ID: ${idStr}`);
       const description = readStdin();
       const updateOpts: ItemUpdateOptions = {
         ...opts,
         dependsOn: opts.dependsOn,
         ...(description ? { description } : {}),
       };
-      const wi = runItemUpdate(backend, id, updateOpts);
+      const wi = runItemUpdate(backend, idStr, updateOpts);
       output(wi, () => itemToTsvRow(wi), parentOpts);
     } catch (err) {
       handleError(err, parentOpts.json);
@@ -320,14 +314,12 @@ export function createProgram(): Command {
       const parentOpts = program.opts<GlobalOpts>();
       try {
         const backend = createBackend();
-        const id = Number(idStr);
-        if (Number.isNaN(id)) throw new Error(`Invalid ID: ${idStr}`);
-        runItemDelete(backend, id);
+        runItemDelete(backend, idStr);
         if (!parentOpts.quiet) {
           if (parentOpts.json) {
-            console.log(formatJson({ deleted: id }));
+            console.log(formatJson({ deleted: idStr }));
           } else {
-            console.log(`Deleted item ${id}`);
+            console.log(`Deleted item ${idStr}`);
           }
         }
       } catch (err) {
@@ -346,9 +338,7 @@ export function createProgram(): Command {
         const parentOpts = program.opts<GlobalOpts>();
         try {
           const backend = createBackend();
-          const id = Number(idStr);
-          if (Number.isNaN(id)) throw new Error(`Invalid ID: ${idStr}`);
-          const comment = runItemComment(backend, id, text, opts);
+          const comment = runItemComment(backend, idStr, text, opts);
           output(
             comment,
             () => formatTsvRow([comment.author, comment.date, comment.body]),

@@ -31,7 +31,7 @@ describe('item commands', () => {
       expect(item.title).toBe('Fix bug');
       expect(item.type).toBe('task');
       expect(item.status).toBe('backlog');
-      expect(item.id).toBe(1);
+      expect(item.id).toBe('1');
     });
 
     it('creates an item with all options', () => {
@@ -94,20 +94,20 @@ describe('item commands', () => {
   describe('runItemShow', () => {
     it('returns a single item by id', () => {
       runItemCreate(backend, 'Bug', {});
-      const item = runItemShow(backend, 1);
+      const item = runItemShow(backend, '1');
       expect(item.title).toBe('Bug');
-      expect(item.id).toBe(1);
+      expect(item.id).toBe('1');
     });
 
     it('throws for non-existent id', () => {
-      expect(() => runItemShow(backend, 999)).toThrow();
+      expect(() => runItemShow(backend, '999')).toThrow();
     });
   });
 
   describe('runItemUpdate', () => {
     it('updates specified fields only', () => {
       runItemCreate(backend, 'Original', {});
-      const item = runItemUpdate(backend, 1, {
+      const item = runItemUpdate(backend, '1', {
         title: 'Updated',
         status: 'done',
       });
@@ -120,7 +120,7 @@ describe('item commands', () => {
   describe('runItemDelete', () => {
     it('deletes an item', () => {
       runItemCreate(backend, 'Delete me', {});
-      runItemDelete(backend, 1);
+      runItemDelete(backend, '1');
       const items = runItemList(backend, { all: true });
       expect(items).toHaveLength(0);
     });
@@ -129,7 +129,7 @@ describe('item commands', () => {
   describe('runItemComment', () => {
     it('adds a comment to an item', () => {
       runItemCreate(backend, 'Commentable', {});
-      const comment = runItemComment(backend, 1, 'Looks good', {
+      const comment = runItemComment(backend, '1', 'Looks good', {
         author: 'alice',
       });
       expect(comment.body).toBe('Looks good');
@@ -138,7 +138,7 @@ describe('item commands', () => {
 
     it('defaults author to anonymous', () => {
       runItemCreate(backend, 'Commentable', {});
-      const comment = runItemComment(backend, 1, 'Note', {});
+      const comment = runItemComment(backend, '1', 'Note', {});
       expect(comment.author).toBe('anonymous');
     });
   });
@@ -150,23 +150,23 @@ describe('item commands', () => {
         status: 'todo',
         priority: 'high',
       });
-      expect(created.id).toBe(1);
+      expect(created.id).toBe('1');
 
       const listed = runItemList(backend, { all: true });
       expect(listed).toHaveLength(1);
 
-      const shown = runItemShow(backend, 1);
+      const shown = runItemShow(backend, '1');
       expect(shown.title).toBe('Workflow test');
 
-      const updated = runItemUpdate(backend, 1, { status: 'in-progress' });
+      const updated = runItemUpdate(backend, '1', { status: 'in-progress' });
       expect(updated.status).toBe('in-progress');
 
-      const comment = runItemComment(backend, 1, 'Working on it', {
+      const comment = runItemComment(backend, '1', 'Working on it', {
         author: 'dev',
       });
       expect(comment.body).toBe('Working on it');
 
-      runItemDelete(backend, 1);
+      runItemDelete(backend, '1');
       const afterDelete = runItemList(backend, { all: true });
       expect(afterDelete).toHaveLength(0);
     });

@@ -81,9 +81,9 @@ export class GitHubBackend extends BaseBackend {
     return issues.map(mapIssueToWorkItem);
   }
 
-  getWorkItem(id: number): WorkItem {
+  getWorkItem(id: string): WorkItem {
     const issue = gh<GhIssue>(
-      ['issue', 'view', String(id), '--json', ISSUE_FIELDS],
+      ['issue', 'view', id, '--json', ISSUE_FIELDS],
       this.cwd,
     );
     return mapIssueToWorkItem(issue);
@@ -112,23 +112,22 @@ export class GitHubBackend extends BaseBackend {
     if (!match) {
       throw new Error('Failed to parse issue number from gh output');
     }
-    const id = parseInt(match[1]!, 10);
+    const id = match[1]!;
     return this.getWorkItem(id);
   }
 
-  updateWorkItem(id: number, data: Partial<WorkItem>): WorkItem {
+  updateWorkItem(id: string, data: Partial<WorkItem>): WorkItem {
     this.validateFields(data);
-    const idStr = String(id);
 
     // Handle status changes via close/reopen
     if (data.status === 'closed') {
-      ghExec(['issue', 'close', idStr], this.cwd);
+      ghExec(['issue', 'close', id], this.cwd);
     } else if (data.status === 'open') {
-      ghExec(['issue', 'reopen', idStr], this.cwd);
+      ghExec(['issue', 'reopen', id], this.cwd);
     }
 
     // Handle field edits
-    const editArgs = ['issue', 'edit', idStr];
+    const editArgs = ['issue', 'edit', id];
     let hasEdits = false;
 
     if (data.title !== undefined) {
@@ -167,15 +166,12 @@ export class GitHubBackend extends BaseBackend {
     return this.getWorkItem(id);
   }
 
-  deleteWorkItem(id: number): void {
-    ghExec(['issue', 'delete', String(id), '--yes'], this.cwd);
+  deleteWorkItem(id: string): void {
+    ghExec(['issue', 'delete', id, '--yes'], this.cwd);
   }
 
-  addComment(workItemId: number, comment: NewComment): Comment {
-    ghExec(
-      ['issue', 'comment', String(workItemId), '--body', comment.body],
-      this.cwd,
-    );
+  addComment(workItemId: string, comment: NewComment): Comment {
+    ghExec(['issue', 'comment', workItemId, '--body', comment.body], this.cwd);
     return {
       author: comment.author,
       date: new Date().toISOString(),
@@ -183,26 +179,26 @@ export class GitHubBackend extends BaseBackend {
     };
   }
 
-  getChildren(id: number): WorkItem[] {
+  getChildren(id: string): WorkItem[] {
     this.assertSupported(this.getCapabilities().relationships, 'relationships');
     return this.listWorkItems().filter((item) => item.parent === id);
   }
 
-  getDependents(id: number): WorkItem[] {
+  getDependents(id: string): WorkItem[] {
     this.assertSupported(this.getCapabilities().relationships, 'relationships');
     return this.listWorkItems().filter((item) => item.dependsOn.includes(id));
   }
 
-  getItemUrl(id: number): string {
+  getItemUrl(id: string): string {
     const result = gh<{ url: string }>(
-      ['issue', 'view', String(id), '--json', 'url'],
+      ['issue', 'view', id, '--json', 'url'],
       this.cwd,
     );
     return result.url;
   }
 
-  openItem(id: number): void {
-    ghExec(['issue', 'view', String(id), '--web'], this.cwd);
+  openItem(id: string): void {
+    ghExec(['issue', 'view', id, '--web'], this.cwd);
   }
 
   private fetchMilestones(): GhMilestone[] {

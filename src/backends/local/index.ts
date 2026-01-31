@@ -74,9 +74,9 @@ export class LocalBackend extends BaseBackend {
   }
 
   private validateRelationships(
-    id: number,
-    parent: number | null | undefined,
-    dependsOn: number[] | undefined,
+    id: string,
+    parent: string | null | undefined,
+    dependsOn: string[] | undefined,
   ): void {
     const all = this.listWorkItems();
     const allIds = new Set(all.map((item) => item.id));
@@ -90,8 +90,8 @@ export class LocalBackend extends BaseBackend {
         throw new Error(`Parent #${parent} does not exist`);
       }
       // Check for circular parent chain: walk up from proposed parent
-      let current: number | null = parent;
-      const visited = new Set<number>();
+      let current: string | null = parent;
+      const visited = new Set<string>();
       while (current !== null) {
         if (current === id) {
           throw new Error(`Circular parent chain detected for #${id}`);
@@ -114,8 +114,8 @@ export class LocalBackend extends BaseBackend {
         }
       }
       // Check for circular dependency chain: DFS from each dependency
-      const hasCycle = (startId: number, targetId: number): boolean => {
-        const visited = new Set<number>();
+      const hasCycle = (startId: string, targetId: string): boolean => {
+        const visited = new Set<string>();
         const stack = [startId];
         while (stack.length > 0) {
           const current = stack.pop()!;
@@ -149,14 +149,14 @@ export class LocalBackend extends BaseBackend {
     return items;
   }
 
-  getWorkItem(id: number): WorkItem {
+  getWorkItem(id: string): WorkItem {
     return readWorkItem(this.root, id);
   }
 
   createWorkItem(data: NewWorkItem): WorkItem {
     this.validateFields(data);
     const now = new Date().toISOString();
-    const id = this.config.next_id;
+    const id = String(this.config.next_id);
     this.validateRelationships(id, data.parent, data.dependsOn);
     const item: WorkItem = {
       ...data,
@@ -165,7 +165,7 @@ export class LocalBackend extends BaseBackend {
       updated: now,
       comments: [],
     };
-    this.config.next_id = id + 1;
+    this.config.next_id = this.config.next_id + 1;
     if (data.iteration && !this.config.iterations.includes(data.iteration)) {
       this.config.iterations.push(data.iteration);
     }
@@ -174,7 +174,7 @@ export class LocalBackend extends BaseBackend {
     return item;
   }
 
-  updateWorkItem(id: number, data: Partial<WorkItem>): WorkItem {
+  updateWorkItem(id: string, data: Partial<WorkItem>): WorkItem {
     this.validateFields(data);
     const item = this.getWorkItem(id);
     this.validateRelationships(id, data.parent, data.dependsOn);
@@ -188,7 +188,7 @@ export class LocalBackend extends BaseBackend {
     return updated;
   }
 
-  deleteWorkItem(id: number): void {
+  deleteWorkItem(id: string): void {
     removeWorkItemFile(this.root, id);
     // Clean up references in other items
     const all = this.listWorkItems();
@@ -208,7 +208,7 @@ export class LocalBackend extends BaseBackend {
     }
   }
 
-  addComment(workItemId: number, comment: NewComment): Comment {
+  addComment(workItemId: string, comment: NewComment): Comment {
     const item = this.getWorkItem(workItemId);
     const newComment: Comment = {
       author: comment.author,
@@ -221,21 +221,21 @@ export class LocalBackend extends BaseBackend {
     return newComment;
   }
 
-  getChildren(id: number): WorkItem[] {
+  getChildren(id: string): WorkItem[] {
     const all = this.listWorkItems();
     return all.filter((item) => item.parent === id);
   }
 
-  getDependents(id: number): WorkItem[] {
+  getDependents(id: string): WorkItem[] {
     const all = this.listWorkItems();
     return all.filter((item) => item.dependsOn.includes(id));
   }
 
-  getItemUrl(id: number): string {
+  getItemUrl(id: string): string {
     return path.resolve(this.root, '.tic', 'items', `${id}.md`);
   }
 
-  openItem(id: number): void {
+  openItem(id: string): void {
     const filePath = this.getItemUrl(id);
     if (!fs.existsSync(filePath)) {
       throw new Error(`Work item #${id} does not exist`);

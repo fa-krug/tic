@@ -94,13 +94,11 @@ export function WorkItemForm() {
       .map((l) => l.trim())
       .filter((l) => l.length > 0);
 
-    const parsedParent =
-      parentId.trim() === '' ? null : parseInt(parentId.trim(), 10);
+    const parsedParent = parentId.trim() === '' ? null : parentId.trim();
     const parsedDependsOn = dependsOn
       .split(',')
       .map((s) => s.trim())
-      .filter((s) => s.length > 0)
-      .map((s) => parseInt(s, 10));
+      .filter((s) => s.length > 0);
 
     if (selectedWorkItemId !== null) {
       backend.updateWorkItem(selectedWorkItemId, {

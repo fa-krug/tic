@@ -203,7 +203,7 @@ describe('MCP handlers', () => {
         dependsOn: [],
         description: 'Details here',
       });
-      const result = handleShowItem(backend, { id: 1 });
+      const result = handleShowItem(backend, { id: '1' });
       expect(result.isError).toBeUndefined();
       const data = JSON.parse(result.content[0]!.text) as WorkItem;
       expect(data.title).toBe('Show me');
@@ -212,7 +212,7 @@ describe('MCP handlers', () => {
     });
 
     it('returns error for non-existent item', () => {
-      const result = handleShowItem(backend, { id: 999 });
+      const result = handleShowItem(backend, { id: '999' });
       expect(result.isError).toBe(true);
     });
   });
@@ -231,7 +231,7 @@ describe('MCP handlers', () => {
       expect(data.type).toBe('task');
       expect(data.status).toBe('backlog');
       expect(data.priority).toBe('medium');
-      expect(data.id).toBe(1);
+      expect(data.id).toBe('1');
     });
 
     it('creates with all options', () => {
@@ -277,7 +277,7 @@ describe('MCP handlers', () => {
         description: '',
       });
       const result = handleUpdateItem(backend, {
-        id: 1,
+        id: '1',
         title: 'Updated',
         status: 'done',
       });
@@ -290,7 +290,7 @@ describe('MCP handlers', () => {
 
     it('returns error for non-existent item', () => {
       const result = handleUpdateItem(backend, {
-        id: 999,
+        id: '999',
         title: 'Nope',
       });
       expect(result.isError).toBe(true);
@@ -298,7 +298,7 @@ describe('MCP handlers', () => {
   });
 
   describe('handleDeleteItem', () => {
-    let pendingDeletes: Set<number>;
+    let pendingDeletes: Set<string>;
 
     beforeEach(() => {
       handleInitProject(tmpDir);
@@ -319,19 +319,19 @@ describe('MCP handlers', () => {
         dependsOn: [],
         description: '',
       });
-      const result = handleDeleteItem(backend, { id: 1 }, pendingDeletes);
+      const result = handleDeleteItem(backend, { id: '1' }, pendingDeletes);
       expect(result.isError).toBeUndefined();
       const data = JSON.parse(result.content[0]!.text) as {
         preview: boolean;
-        item: { id: number; title: string; type: string; status: string };
-        affectedChildren: { id: number; title: string }[];
-        affectedDependents: { id: number; title: string }[];
+        item: { id: string; title: string; type: string; status: string };
+        affectedChildren: { id: string; title: string }[];
+        affectedDependents: { id: string; title: string }[];
         message: string;
       };
       expect(data.preview).toBe(true);
       expect(data.item.title).toBe('Delete me');
       // Item should still exist
-      expect(backend.getWorkItem(1).title).toBe('Delete me');
+      expect(backend.getWorkItem('1').title).toBe('Delete me');
     });
 
     it('shows affected children and dependents', () => {
@@ -355,7 +355,7 @@ describe('MCP handlers', () => {
         assignee: '',
         labels: [],
         iteration: 'default',
-        parent: 1,
+        parent: '1',
         dependsOn: [],
         description: '',
       });
@@ -368,30 +368,30 @@ describe('MCP handlers', () => {
         labels: [],
         iteration: 'default',
         parent: null,
-        dependsOn: [1],
+        dependsOn: ['1'],
         description: '',
       });
-      const result = handleDeleteItem(backend, { id: 1 }, pendingDeletes);
+      const result = handleDeleteItem(backend, { id: '1' }, pendingDeletes);
       const data = JSON.parse(result.content[0]!.text) as {
         preview: boolean;
-        item: { id: number; title: string; type: string; status: string };
-        affectedChildren: { id: number; title: string }[];
-        affectedDependents: { id: number; title: string }[];
+        item: { id: string; title: string; type: string; status: string };
+        affectedChildren: { id: string; title: string }[];
+        affectedDependents: { id: string; title: string }[];
         message: string;
       };
       expect(data.preview).toBe(true);
       expect(data.affectedChildren).toHaveLength(1);
-      expect(data.affectedChildren[0]!).toEqual({ id: 2, title: 'Child' });
+      expect(data.affectedChildren[0]!).toEqual({ id: '2', title: 'Child' });
       expect(data.affectedDependents).toHaveLength(1);
       expect(data.affectedDependents[0]!).toEqual({
-        id: 3,
+        id: '3',
         title: 'Dependent',
       });
     });
   });
 
   describe('handleConfirmDelete', () => {
-    let pendingDeletes: Set<number>;
+    let pendingDeletes: Set<string>;
 
     beforeEach(() => {
       handleInitProject(tmpDir);
@@ -412,10 +412,10 @@ describe('MCP handlers', () => {
         dependsOn: [],
         description: '',
       });
-      handleDeleteItem(backend, { id: 1 }, pendingDeletes);
-      const result = handleConfirmDelete(backend, { id: 1 }, pendingDeletes);
+      handleDeleteItem(backend, { id: '1' }, pendingDeletes);
+      const result = handleConfirmDelete(backend, { id: '1' }, pendingDeletes);
       expect(result.isError).toBeUndefined();
-      expect(() => backend.getWorkItem(1)).toThrow();
+      expect(() => backend.getWorkItem('1')).toThrow();
     });
 
     it('rejects without preview', () => {
@@ -431,10 +431,10 @@ describe('MCP handlers', () => {
         dependsOn: [],
         description: '',
       });
-      const result = handleConfirmDelete(backend, { id: 1 }, pendingDeletes);
+      const result = handleConfirmDelete(backend, { id: '1' }, pendingDeletes);
       expect(result.isError).toBe(true);
       // Item should still exist
-      expect(backend.getWorkItem(1).title).toBe('No preview');
+      expect(backend.getWorkItem('1').title).toBe('No preview');
     });
 
     it('rejects second call', () => {
@@ -450,9 +450,9 @@ describe('MCP handlers', () => {
         dependsOn: [],
         description: '',
       });
-      handleDeleteItem(backend, { id: 1 }, pendingDeletes);
-      handleConfirmDelete(backend, { id: 1 }, pendingDeletes);
-      const result = handleConfirmDelete(backend, { id: 1 }, pendingDeletes);
+      handleDeleteItem(backend, { id: '1' }, pendingDeletes);
+      handleConfirmDelete(backend, { id: '1' }, pendingDeletes);
+      const result = handleConfirmDelete(backend, { id: '1' }, pendingDeletes);
       expect(result.isError).toBe(true);
     });
   });
@@ -477,7 +477,7 @@ describe('MCP handlers', () => {
         description: '',
       });
       const result = handleAddComment(backend, {
-        id: 1,
+        id: '1',
         text: 'Great work',
         author: 'alice',
       });
@@ -501,7 +501,7 @@ describe('MCP handlers', () => {
         description: '',
       });
       const result = handleAddComment(backend, {
-        id: 1,
+        id: '1',
         text: 'Anonymous note',
       });
       expect(result.isError).toBeUndefined();
@@ -511,7 +511,7 @@ describe('MCP handlers', () => {
 
     it('returns error for non-existent item', () => {
       const result = handleAddComment(backend, {
-        id: 999,
+        id: '999',
         text: 'Nope',
       });
       expect(result.isError).toBe(true);
@@ -638,7 +638,7 @@ describe('MCP handlers', () => {
         assignee: '',
         labels: [],
         iteration: 'default',
-        parent: 1,
+        parent: '1',
         dependsOn: [],
         description: '',
       });
@@ -650,11 +650,11 @@ describe('MCP handlers', () => {
         assignee: '',
         labels: [],
         iteration: 'default',
-        parent: 1,
+        parent: '1',
         dependsOn: [],
         description: '',
       });
-      const result = handleGetChildren(backend, { id: 1 });
+      const result = handleGetChildren(backend, { id: '1' });
       expect(result.isError).toBeUndefined();
       const data = JSON.parse(result.content[0]!.text) as WorkItem[];
       expect(data).toHaveLength(2);
@@ -691,10 +691,10 @@ describe('MCP handlers', () => {
         labels: [],
         iteration: 'default',
         parent: null,
-        dependsOn: [1],
+        dependsOn: ['1'],
         description: '',
       });
-      const result = handleGetDependents(backend, { id: 1 });
+      const result = handleGetDependents(backend, { id: '1' });
       expect(result.isError).toBeUndefined();
       const data = JSON.parse(result.content[0]!.text) as WorkItem[];
       expect(data).toHaveLength(1);
@@ -704,7 +704,7 @@ describe('MCP handlers', () => {
 
   describe('handleGetItemTree', () => {
     interface TreeNode {
-      id: number;
+      id: string;
       title: string;
       type: string;
       status: string;
@@ -739,7 +739,7 @@ describe('MCP handlers', () => {
         assignee: '',
         labels: [],
         iteration: 'default',
-        parent: 1,
+        parent: '1',
         dependsOn: [],
         description: '',
       });
@@ -787,7 +787,7 @@ describe('MCP handlers', () => {
         assignee: '',
         labels: [],
         iteration: 'default',
-        parent: 1,
+        parent: '1',
         dependsOn: [],
         description: '',
       });
@@ -799,7 +799,7 @@ describe('MCP handlers', () => {
         assignee: '',
         labels: [],
         iteration: 'default',
-        parent: 2,
+        parent: '2',
         dependsOn: [],
         description: '',
       });

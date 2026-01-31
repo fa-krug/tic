@@ -12,7 +12,7 @@ interface TreeItem {
 
 function buildTree(items: WorkItem[]): TreeItem[] {
   const itemMap = new Map(items.map((i) => [i.id, i]));
-  const childrenMap = new Map<number | null, WorkItem[]>();
+  const childrenMap = new Map<string | null, WorkItem[]>();
 
   for (const item of items) {
     const parentId =
@@ -23,7 +23,7 @@ function buildTree(items: WorkItem[]): TreeItem[] {
 
   const result: TreeItem[] = [];
 
-  function walk(parentId: number | null, depth: number, parentPrefix: string) {
+  function walk(parentId: string | null, depth: number, parentPrefix: string) {
     const children = childrenMap.get(parentId) ?? [];
     children.forEach((child, idx) => {
       const isLast = idx === children.length - 1;
@@ -319,8 +319,7 @@ export function WorkItemList() {
               focus={true}
               onSubmit={(value) => {
                 const item = treeItems[cursor]!.item;
-                const newParent =
-                  value.trim() === '' ? null : parseInt(value.trim(), 10);
+                const newParent = value.trim() === '' ? null : value.trim();
                 try {
                   backend.updateWorkItem(item.id, { parent: newParent });
                   setWarning('');

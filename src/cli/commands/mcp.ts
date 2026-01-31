@@ -117,7 +117,7 @@ export function handleListItems(
 
 export function handleShowItem(
   backend: Backend,
-  args: { id: number },
+  args: { id: string },
 ): ToolResult {
   try {
     const item = runItemShow(backend, args.id);
@@ -137,13 +137,13 @@ export interface CreateItemArgs {
   assignee?: string;
   labels?: string;
   iteration?: string;
-  parent?: number;
-  depends_on?: number[];
+  parent?: string;
+  depends_on?: string[];
   description?: string;
 }
 
 export interface UpdateItemArgs {
-  id: number;
+  id: string;
   title?: string;
   type?: string;
   status?: string;
@@ -151,8 +151,8 @@ export interface UpdateItemArgs {
   assignee?: string;
   labels?: string;
   iteration?: string;
-  parent?: number | null;
-  depends_on?: number[];
+  parent?: string | null;
+  depends_on?: string[];
   description?: string;
 }
 
@@ -168,7 +168,7 @@ export function handleCreateItem(
     if (args.assignee !== undefined) opts.assignee = args.assignee;
     if (args.labels !== undefined) opts.labels = args.labels;
     if (args.iteration !== undefined) opts.iteration = args.iteration;
-    if (args.parent !== undefined) opts.parent = String(args.parent);
+    if (args.parent !== undefined) opts.parent = args.parent;
     if (args.depends_on !== undefined)
       opts.dependsOn = args.depends_on.join(',');
     if (args.description !== undefined) opts.description = args.description;
@@ -194,7 +194,7 @@ export function handleUpdateItem(
     if (args.labels !== undefined) opts.labels = args.labels;
     if (args.iteration !== undefined) opts.iteration = args.iteration;
     if (args.parent !== undefined)
-      opts.parent = args.parent === null ? '' : String(args.parent);
+      opts.parent = args.parent === null ? '' : args.parent;
     if (args.depends_on !== undefined)
       opts.dependsOn = args.depends_on.join(',');
     if (args.description !== undefined) opts.description = args.description;
@@ -206,15 +206,15 @@ export function handleUpdateItem(
   }
 }
 
-export type DeleteTracker = Set<number>;
+export type DeleteTracker = Set<string>;
 
 export function createDeleteTracker(): DeleteTracker {
-  return new Set<number>();
+  return new Set<string>();
 }
 
 export function handleDeleteItem(
   backend: Backend,
-  args: { id: number },
+  args: { id: string },
   pendingDeletes: DeleteTracker,
 ): ToolResult {
   try {
@@ -246,7 +246,7 @@ export function handleDeleteItem(
 
 export function handleConfirmDelete(
   backend: Backend,
-  args: { id: number },
+  args: { id: string },
   pendingDeletes: DeleteTracker,
 ): ToolResult {
   if (!pendingDeletes.has(args.id)) {
@@ -266,7 +266,7 @@ export function handleConfirmDelete(
 
 export function handleAddComment(
   backend: Backend,
-  args: { id: number; text: string; author?: string },
+  args: { id: string; text: string; author?: string },
 ): ToolResult {
   try {
     const comment = runItemComment(backend, args.id, args.text, {
@@ -325,7 +325,7 @@ export function handleSearchItems(
 
 export function handleGetChildren(
   backend: Backend,
-  args: { id: number },
+  args: { id: string },
 ): ToolResult {
   try {
     const children = backend.getChildren(args.id);
@@ -338,7 +338,7 @@ export function handleGetChildren(
 
 export function handleGetDependents(
   backend: Backend,
-  args: { id: number },
+  args: { id: string },
 ): ToolResult {
   try {
     const dependents = backend.getDependents(args.id);
@@ -350,7 +350,7 @@ export function handleGetDependents(
 }
 
 interface TreeNode {
-  id: number;
+  id: string;
   title: string;
   type: string;
   status: string;
@@ -371,7 +371,7 @@ export function handleGetItemTree(
     if (args.all) opts.all = args.all;
     const items = runItemList(backend, opts);
 
-    const nodeMap = new Map<number, TreeNode>();
+    const nodeMap = new Map<string, TreeNode>();
     for (const item of items) {
       nodeMap.set(item.id, {
         id: item.id,
@@ -434,7 +434,7 @@ export function registerTools(
     'show_item',
     'Show work item details',
     {
-      id: z.number().describe('Work item ID'),
+      id: z.string().describe('Work item ID'),
     },
     (args) => {
       return handleShowItem(backend, args);
@@ -452,9 +452,9 @@ export function registerTools(
       assignee: z.string().optional().describe('Assignee'),
       labels: z.string().optional().describe('Comma-separated labels'),
       iteration: z.string().optional().describe('Iteration'),
-      parent: z.number().optional().describe('Parent item ID'),
+      parent: z.string().optional().describe('Parent item ID'),
       depends_on: z
-        .array(z.number())
+        .array(z.string())
         .optional()
         .describe('Dependency item IDs'),
       description: z.string().optional().describe('Work item description'),
@@ -468,7 +468,7 @@ export function registerTools(
     'update_item',
     'Update an existing work item',
     {
-      id: z.number().describe('Work item ID'),
+      id: z.string().describe('Work item ID'),
       title: z.string().optional().describe('New title'),
       type: z.string().optional().describe('Work item type'),
       status: z.string().optional().describe('Status'),
@@ -477,12 +477,12 @@ export function registerTools(
       labels: z.string().optional().describe('Comma-separated labels'),
       iteration: z.string().optional().describe('Iteration'),
       parent: z
-        .number()
+        .string()
         .nullable()
         .optional()
         .describe('Parent item ID (null to clear)'),
       depends_on: z
-        .array(z.number())
+        .array(z.string())
         .optional()
         .describe('Dependency item IDs'),
       description: z.string().optional().describe('Work item description'),
@@ -496,7 +496,7 @@ export function registerTools(
     'delete_item',
     'Preview deleting a work item (requires confirm_delete to finalize)',
     {
-      id: z.number().describe('Work item ID'),
+      id: z.string().describe('Work item ID'),
     },
     (args) => {
       return handleDeleteItem(backend, args, pendingDeletes);
@@ -507,7 +507,7 @@ export function registerTools(
     'confirm_delete',
     'Confirm and execute a pending item deletion',
     {
-      id: z.number().describe('Work item ID'),
+      id: z.string().describe('Work item ID'),
     },
     (args) => {
       return handleConfirmDelete(backend, args, pendingDeletes);
@@ -547,7 +547,7 @@ export function registerTools(
       'add_comment',
       'Add a comment to a work item',
       {
-        id: z.number().describe('Work item ID'),
+        id: z.string().describe('Work item ID'),
         text: z.string().describe('Comment text'),
         author: z.string().optional().describe('Comment author'),
       },
@@ -575,7 +575,7 @@ export function registerTools(
       'get_children',
       'Get child items of a work item',
       {
-        id: z.number().describe('Work item ID'),
+        id: z.string().describe('Work item ID'),
       },
       (args) => {
         return handleGetChildren(backend, args);
@@ -586,7 +586,7 @@ export function registerTools(
       'get_dependents',
       'Get items that depend on a work item',
       {
-        id: z.number().describe('Work item ID'),
+        id: z.string().describe('Work item ID'),
       },
       (args) => {
         return handleGetDependents(backend, args);

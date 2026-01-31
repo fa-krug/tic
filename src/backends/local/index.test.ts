@@ -66,7 +66,7 @@ describe('LocalBackend', () => {
     expect(items).toHaveLength(1);
     expect(items[0]!.title).toBe('Test');
     expect(items[0]!.type).toBe('task');
-    expect(items[0]!.id).toBe(1);
+    expect(items[0]!.id).toBe('1');
   });
 
   it('filters work items by iteration', () => {
@@ -111,8 +111,8 @@ describe('LocalBackend', () => {
       parent: null,
       dependsOn: [],
     });
-    backend.updateWorkItem(1, { title: 'Updated', status: 'in-progress' });
-    const item = backend.getWorkItem(1);
+    backend.updateWorkItem('1', { title: 'Updated', status: 'in-progress' });
+    const item = backend.getWorkItem('1');
     expect(item.title).toBe('Updated');
     expect(item.status).toBe('in-progress');
   });
@@ -131,7 +131,7 @@ describe('LocalBackend', () => {
       dependsOn: [],
     });
     expect(backend.listWorkItems()).toHaveLength(1);
-    backend.deleteWorkItem(1);
+    backend.deleteWorkItem('1');
     expect(backend.listWorkItems()).toHaveLength(0);
   });
 
@@ -148,8 +148,8 @@ describe('LocalBackend', () => {
       parent: null,
       dependsOn: [],
     });
-    backend.addComment(1, { author: 'dev', body: 'A comment.' });
-    const item = backend.getWorkItem(1);
+    backend.addComment('1', { author: 'dev', body: 'A comment.' });
+    const item = backend.getWorkItem('1');
     expect(item.comments).toHaveLength(1);
     expect(item.comments[0]!.body).toBe('A comment.');
   });
@@ -337,7 +337,7 @@ describe('LocalBackend', () => {
       assignee: '',
       labels: [],
       description: '',
-      parent: 2,
+      parent: '2',
       dependsOn: [],
     });
     // Try to make A a child of C — creates cycle A -> B -> C -> A
@@ -384,7 +384,7 @@ describe('LocalBackend', () => {
         assignee: '',
         labels: [],
         description: '',
-        parent: 999,
+        parent: '999',
         dependsOn: [],
       }),
     ).toThrow();
@@ -402,7 +402,7 @@ describe('LocalBackend', () => {
         labels: [],
         description: '',
         parent: null,
-        dependsOn: [999],
+        dependsOn: ['999'],
       }),
     ).toThrow();
   });

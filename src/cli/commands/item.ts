@@ -52,9 +52,12 @@ export function runItemCreate(
     assignee: opts.assignee ?? '',
     labels: opts.labels ? opts.labels.split(',').map((l) => l.trim()) : [],
     iteration: opts.iteration ?? backend.getCurrentIteration(),
-    parent: opts.parent ? Number(opts.parent) : null,
+    parent: opts.parent ? opts.parent : null,
     dependsOn: opts.dependsOn
-      ? opts.dependsOn.split(',').map((d) => Number(d.trim()))
+      ? opts.dependsOn
+          .split(',')
+          .map((d) => d.trim())
+          .filter((d) => d.length > 0)
       : [],
     description: opts.description ?? '',
   });
@@ -77,13 +80,13 @@ export function runItemList(
   return items;
 }
 
-export function runItemShow(backend: Backend, id: number): WorkItem {
+export function runItemShow(backend: Backend, id: string): WorkItem {
   return backend.getWorkItem(id);
 }
 
 export function runItemUpdate(
   backend: Backend,
-  id: number,
+  id: string,
   opts: ItemUpdateOptions,
 ): WorkItem {
   const data: Partial<WorkItem> = {};
@@ -97,27 +100,30 @@ export function runItemUpdate(
     data.labels = opts.labels.split(',').map((l) => l.trim());
   if (opts.iteration !== undefined) data.iteration = opts.iteration;
   if (opts.parent !== undefined)
-    data.parent = opts.parent === '' ? null : Number(opts.parent);
+    data.parent = opts.parent === '' ? null : opts.parent;
   if (opts.dependsOn !== undefined)
     data.dependsOn =
       opts.dependsOn === ''
         ? []
-        : opts.dependsOn.split(',').map((d) => Number(d.trim()));
+        : opts.dependsOn
+            .split(',')
+            .map((d) => d.trim())
+            .filter((d) => d.length > 0);
   if (opts.description !== undefined) data.description = opts.description;
   return backend.updateWorkItem(id, data);
 }
 
-export function runItemDelete(backend: Backend, id: number): void {
+export function runItemDelete(backend: Backend, id: string): void {
   backend.deleteWorkItem(id);
 }
 
-export function runItemOpen(backend: Backend, id: number): void {
+export function runItemOpen(backend: Backend, id: string): void {
   backend.openItem(id);
 }
 
 export function runItemComment(
   backend: Backend,
-  id: number,
+  id: string,
   text: string,
   opts: ItemCommentOptions,
 ): Comment {

@@ -7,7 +7,7 @@ function itemsDir(root: string): string {
   return path.join(root, '.tic', 'items');
 }
 
-function itemPath(root: string, id: number): string {
+function itemPath(root: string, id: string): string {
   return path.join(itemsDir(root), `${id}.md`);
 }
 
@@ -67,7 +67,7 @@ function parseComments(content: string): {
   return { description, comments };
 }
 
-export function readWorkItem(root: string, id: number): WorkItem {
+export function readWorkItem(root: string, id: string): WorkItem {
   const raw = fs.readFileSync(itemPath(root, id), 'utf-8');
   return parseWorkItemFile(raw);
 }
@@ -78,7 +78,7 @@ export function parseWorkItemFile(raw: string): WorkItem {
   const { description, comments } = parseComments(parsed.content);
 
   return {
-    id: data['id'] as number,
+    id: String(data['id']),
     title: data['title'] as string,
     type: (data['type'] as string) || 'issue',
     status: data['status'] as string,
@@ -88,8 +88,11 @@ export function parseWorkItemFile(raw: string): WorkItem {
     labels: (data['labels'] as string[]) || [],
     created: data['created'] as string,
     updated: data['updated'] as string,
-    parent: (data['parent'] as number) ?? null,
-    dependsOn: (data['depends_on'] as number[]) ?? [],
+    parent:
+      data['parent'] != null ? String(data['parent'] as string | number) : null,
+    dependsOn: Array.isArray(data['depends_on'])
+      ? (data['depends_on'] as unknown[]).map(String)
+      : [],
     description,
     comments,
   };
@@ -125,7 +128,7 @@ export function writeWorkItem(root: string, item: WorkItem): void {
   fs.writeFileSync(itemPath(root, item.id), content);
 }
 
-export function deleteWorkItem(root: string, id: number): void {
+export function deleteWorkItem(root: string, id: string): void {
   const p = itemPath(root, id);
   if (fs.existsSync(p)) fs.unlinkSync(p);
 }

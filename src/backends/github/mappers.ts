@@ -35,7 +35,7 @@ export function mapCommentToComment(ghComment: GhComment): Comment {
 
 export function mapIssueToWorkItem(ghIssue: GhIssue): WorkItem {
   return {
-    id: ghIssue.number,
+    id: String(ghIssue.number),
     title: ghIssue.title,
     description: ghIssue.body ?? '',
     status: ghIssue.state === 'OPEN' ? 'open' : 'closed',

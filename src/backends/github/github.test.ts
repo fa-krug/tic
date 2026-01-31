@@ -145,9 +145,9 @@ describe('GitHubBackend', () => {
 
       const items = backend.listWorkItems();
       expect(items).toHaveLength(2);
-      expect(items[0]!.id).toBe(1);
+      expect(items[0]!.id).toBe('1');
       expect(items[0]!.status).toBe('open');
-      expect(items[1]!.id).toBe(2);
+      expect(items[1]!.id).toBe('2');
       expect(items[1]!.status).toBe('closed');
     });
 
@@ -200,8 +200,8 @@ describe('GitHubBackend', () => {
         ],
       });
 
-      const item = backend.getWorkItem(42);
-      expect(item.id).toBe(42);
+      const item = backend.getWorkItem('42');
+      expect(item.id).toBe('42');
       expect(item.title).toBe('The issue');
       expect(item.assignee).toBe('bob');
       expect(item.comments).toHaveLength(1);
@@ -241,7 +241,7 @@ describe('GitHubBackend', () => {
         dependsOn: [],
       });
 
-      expect(item.id).toBe(10);
+      expect(item.id).toBe('10');
       expect(item.title).toBe('New issue');
     });
   });
@@ -264,7 +264,7 @@ describe('GitHubBackend', () => {
         comments: [],
       });
 
-      const item = backend.updateWorkItem(5, {
+      const item = backend.updateWorkItem('5', {
         title: 'Updated title',
         description: 'Updated body',
       });
@@ -289,7 +289,7 @@ describe('GitHubBackend', () => {
         comments: [],
       });
 
-      const item = backend.updateWorkItem(5, { status: 'closed' });
+      const item = backend.updateWorkItem('5', { status: 'closed' });
       expect(item.status).toBe('closed');
       expect(mockGhExec).toHaveBeenCalledWith(['issue', 'close', '5'], '/repo');
     });
@@ -310,7 +310,7 @@ describe('GitHubBackend', () => {
         comments: [],
       });
 
-      const item = backend.updateWorkItem(5, { status: 'open' });
+      const item = backend.updateWorkItem('5', { status: 'open' });
       expect(item.status).toBe('open');
       expect(mockGhExec).toHaveBeenCalledWith(
         ['issue', 'reopen', '5'],
@@ -323,7 +323,7 @@ describe('GitHubBackend', () => {
     it('deletes an issue', () => {
       const backend = new GitHubBackend('/repo');
       mockGhExec.mockReturnValue('');
-      backend.deleteWorkItem(7);
+      backend.deleteWorkItem('7');
       expect(mockGhExec).toHaveBeenCalledWith(
         ['issue', 'delete', '7', '--yes'],
         '/repo',
@@ -336,7 +336,7 @@ describe('GitHubBackend', () => {
       const backend = new GitHubBackend('/repo');
       mockGhExec.mockReturnValue('');
 
-      const comment = backend.addComment(3, {
+      const comment = backend.addComment('3', {
         author: 'alice',
         body: 'This is a comment.',
       });
@@ -358,7 +358,7 @@ describe('GitHubBackend', () => {
         url: 'https://github.com/owner/repo/issues/5',
       });
 
-      const url = backend.getItemUrl(5);
+      const url = backend.getItemUrl('5');
       expect(url).toBe('https://github.com/owner/repo/issues/5');
     });
   });
@@ -368,7 +368,7 @@ describe('GitHubBackend', () => {
       const backend = new GitHubBackend('/repo');
       mockGhExec.mockReturnValue('');
 
-      backend.openItem(5);
+      backend.openItem('5');
       expect(mockGhExec).toHaveBeenCalledWith(
         ['issue', 'view', '5', '--web'],
         '/repo',
@@ -379,7 +379,7 @@ describe('GitHubBackend', () => {
   describe('getChildren', () => {
     it('throws UnsupportedOperationError', () => {
       const backend = new GitHubBackend('/repo');
-      expect(() => backend.getChildren(1)).toThrow(
+      expect(() => backend.getChildren('1')).toThrow(
         'relationships is not supported by the GitHubBackend backend',
       );
     });
@@ -388,7 +388,7 @@ describe('GitHubBackend', () => {
   describe('getDependents', () => {
     it('throws UnsupportedOperationError', () => {
       const backend = new GitHubBackend('/repo');
-      expect(() => backend.getDependents(1)).toThrow(
+      expect(() => backend.getDependents('1')).toThrow(
         'relationships is not supported by the GitHubBackend backend',
       );
     });

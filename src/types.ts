@@ -5,7 +5,7 @@ export interface Comment {
 }
 
 export interface WorkItem {
-  id: number;
+  id: string;
   title: string;
   type: string;
   status: string;
@@ -17,8 +17,8 @@ export interface WorkItem {
   updated: string;
   description: string;
   comments: Comment[];
-  parent: number | null;
-  dependsOn: number[];
+  parent: string | null;
+  dependsOn: string[];
 }
 
 export type NewWorkItem = Pick<
