@@ -52,6 +52,72 @@ export class LocalBackend implements Backend {
     this.save();
   }
 
+  private validateRelationships(
+    id: number,
+    parent: number | null | undefined,
+    dependsOn: number[] | undefined,
+  ): void {
+    const all = this.listWorkItems();
+    const allIds = new Set(all.map((item) => item.id));
+
+    // Validate parent
+    if (parent !== null && parent !== undefined) {
+      if (parent === id) {
+        throw new Error(`Work item #${id} cannot be its own parent`);
+      }
+      if (!allIds.has(parent)) {
+        throw new Error(`Parent #${parent} does not exist`);
+      }
+      // Check for circular parent chain: walk up from proposed parent
+      let current: number | null = parent;
+      const visited = new Set<number>();
+      while (current !== null) {
+        if (current === id) {
+          throw new Error(`Circular parent chain detected for #${id}`);
+        }
+        if (visited.has(current)) break;
+        visited.add(current);
+        const parentItem = all.find((item) => item.id === current);
+        current = parentItem?.parent ?? null;
+      }
+    }
+
+    // Validate dependsOn
+    if (dependsOn !== undefined) {
+      for (const depId of dependsOn) {
+        if (depId === id) {
+          throw new Error(`Work item #${id} cannot depend on itself`);
+        }
+        if (!allIds.has(depId)) {
+          throw new Error(`Dependency #${depId} does not exist`);
+        }
+      }
+      // Check for circular dependency chain: DFS from each dependency
+      const hasCycle = (startId: number, targetId: number): boolean => {
+        const visited = new Set<number>();
+        const stack = [startId];
+        while (stack.length > 0) {
+          const current = stack.pop()!;
+          if (current === targetId) return true;
+          if (visited.has(current)) continue;
+          visited.add(current);
+          const item = all.find((i) => i.id === current);
+          if (item) {
+            for (const dep of item.dependsOn) {
+              stack.push(dep);
+            }
+          }
+        }
+        return false;
+      };
+      for (const depId of dependsOn) {
+        if (hasCycle(depId, id)) {
+          throw new Error(`Circular dependency chain detected for #${id}`);
+        }
+      }
+    }
+  }
+
   listWorkItems(iteration?: string): WorkItem[] {
     const files = listItemFiles(this.root);
     const items = files.map((f) => {
@@ -68,14 +134,16 @@ export class LocalBackend implements Backend {
 
   createWorkItem(data: NewWorkItem): WorkItem {
     const now = new Date().toISOString();
+    const id = this.config.next_id;
+    this.validateRelationships(id, data.parent, data.dependsOn);
     const item: WorkItem = {
       ...data,
-      id: this.config.next_id,
+      id,
       created: now,
       updated: now,
       comments: [],
     };
-    this.config.next_id++;
+    this.config.next_id = id + 1;
     if (data.iteration && !this.config.iterations.includes(data.iteration)) {
       this.config.iterations.push(data.iteration);
     }
@@ -86,6 +154,7 @@ export class LocalBackend implements Backend {
 
   updateWorkItem(id: number, data: Partial<WorkItem>): WorkItem {
     const item = this.getWorkItem(id);
+    this.validateRelationships(id, data.parent, data.dependsOn);
     const updated = {
       ...item,
       ...data,
@@ -98,6 +167,22 @@ export class LocalBackend implements Backend {
 
   deleteWorkItem(id: number): void {
     removeWorkItemFile(this.root, id);
+    // Clean up references in other items
+    const all = this.listWorkItems();
+    for (const item of all) {
+      let changed = false;
+      if (item.parent === id) {
+        item.parent = null;
+        changed = true;
+      }
+      if (item.dependsOn.includes(id)) {
+        item.dependsOn = item.dependsOn.filter((d) => d !== id);
+        changed = true;
+      }
+      if (changed) {
+        writeWorkItem(this.root, item);
+      }
+    }
   }
 
   addComment(workItemId: number, comment: NewComment): Comment {

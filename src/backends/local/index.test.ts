@@ -142,4 +142,322 @@ describe('LocalBackend', () => {
     expect(backend.getCurrentIteration()).toBe('v1');
     expect(backend.getIterations()).toContain('v1');
   });
+
+  it('returns children of a work item', () => {
+    const parent = backend.createWorkItem({
+      title: 'Parent',
+      type: 'epic',
+      status: 'todo',
+      iteration: 'default',
+      priority: 'medium',
+      assignee: '',
+      labels: [],
+      description: '',
+      parent: null,
+      dependsOn: [],
+    });
+    backend.createWorkItem({
+      title: 'Child 1',
+      type: 'task',
+      status: 'todo',
+      iteration: 'default',
+      priority: 'low',
+      assignee: '',
+      labels: [],
+      description: '',
+      parent: parent.id,
+      dependsOn: [],
+    });
+    backend.createWorkItem({
+      title: 'Child 2',
+      type: 'task',
+      status: 'todo',
+      iteration: 'default',
+      priority: 'low',
+      assignee: '',
+      labels: [],
+      description: '',
+      parent: parent.id,
+      dependsOn: [],
+    });
+    const children = backend.getChildren(parent.id);
+    expect(children).toHaveLength(2);
+    expect(children.map((c) => c.title)).toEqual(
+      expect.arrayContaining(['Child 1', 'Child 2']),
+    );
+  });
+
+  it('returns empty array when item has no children', () => {
+    const item = backend.createWorkItem({
+      title: 'Lonely',
+      type: 'task',
+      status: 'todo',
+      iteration: 'default',
+      priority: 'low',
+      assignee: '',
+      labels: [],
+      description: '',
+      parent: null,
+      dependsOn: [],
+    });
+    expect(backend.getChildren(item.id)).toEqual([]);
+  });
+
+  it('returns dependents of a work item', () => {
+    const dep = backend.createWorkItem({
+      title: 'Dependency',
+      type: 'task',
+      status: 'todo',
+      iteration: 'default',
+      priority: 'medium',
+      assignee: '',
+      labels: [],
+      description: '',
+      parent: null,
+      dependsOn: [],
+    });
+    backend.createWorkItem({
+      title: 'Dependent',
+      type: 'task',
+      status: 'todo',
+      iteration: 'default',
+      priority: 'low',
+      assignee: '',
+      labels: [],
+      description: '',
+      parent: null,
+      dependsOn: [dep.id],
+    });
+    const dependents = backend.getDependents(dep.id);
+    expect(dependents).toHaveLength(1);
+    expect(dependents[0]!.title).toBe('Dependent');
+  });
+
+  it('returns empty array when item has no dependents', () => {
+    const item = backend.createWorkItem({
+      title: 'Independent',
+      type: 'task',
+      status: 'todo',
+      iteration: 'default',
+      priority: 'low',
+      assignee: '',
+      labels: [],
+      description: '',
+      parent: null,
+      dependsOn: [],
+    });
+    expect(backend.getDependents(item.id)).toEqual([]);
+  });
+
+  it('rejects self-reference as parent', () => {
+    const item = backend.createWorkItem({
+      title: 'Self',
+      type: 'task',
+      status: 'todo',
+      iteration: 'default',
+      priority: 'low',
+      assignee: '',
+      labels: [],
+      description: '',
+      parent: null,
+      dependsOn: [],
+    });
+    expect(() =>
+      backend.updateWorkItem(item.id, { parent: item.id }),
+    ).toThrow();
+  });
+
+  it('rejects self-reference in dependsOn', () => {
+    const item = backend.createWorkItem({
+      title: 'Self',
+      type: 'task',
+      status: 'todo',
+      iteration: 'default',
+      priority: 'low',
+      assignee: '',
+      labels: [],
+      description: '',
+      parent: null,
+      dependsOn: [],
+    });
+    expect(() =>
+      backend.updateWorkItem(item.id, { dependsOn: [item.id] }),
+    ).toThrow();
+  });
+
+  it('rejects circular parent chain', () => {
+    const a = backend.createWorkItem({
+      title: 'A',
+      type: 'task',
+      status: 'todo',
+      iteration: 'default',
+      priority: 'low',
+      assignee: '',
+      labels: [],
+      description: '',
+      parent: null,
+      dependsOn: [],
+    });
+    backend.createWorkItem({
+      title: 'B',
+      type: 'task',
+      status: 'todo',
+      iteration: 'default',
+      priority: 'low',
+      assignee: '',
+      labels: [],
+      description: '',
+      parent: a.id,
+      dependsOn: [],
+    });
+    const c = backend.createWorkItem({
+      title: 'C',
+      type: 'task',
+      status: 'todo',
+      iteration: 'default',
+      priority: 'low',
+      assignee: '',
+      labels: [],
+      description: '',
+      parent: 2,
+      dependsOn: [],
+    });
+    // Try to make A a child of C — creates cycle A -> B -> C -> A
+    expect(() => backend.updateWorkItem(a.id, { parent: c.id })).toThrow();
+  });
+
+  it('rejects circular dependency chain', () => {
+    const a = backend.createWorkItem({
+      title: 'A',
+      type: 'task',
+      status: 'todo',
+      iteration: 'default',
+      priority: 'low',
+      assignee: '',
+      labels: [],
+      description: '',
+      parent: null,
+      dependsOn: [],
+    });
+    const b = backend.createWorkItem({
+      title: 'B',
+      type: 'task',
+      status: 'todo',
+      iteration: 'default',
+      priority: 'low',
+      assignee: '',
+      labels: [],
+      description: '',
+      parent: null,
+      dependsOn: [a.id],
+    });
+    // Try to make A depend on B — creates cycle A -> B -> A
+    expect(() => backend.updateWorkItem(a.id, { dependsOn: [b.id] })).toThrow();
+  });
+
+  it('rejects reference to non-existent parent', () => {
+    expect(() =>
+      backend.createWorkItem({
+        title: 'Orphan',
+        type: 'task',
+        status: 'todo',
+        iteration: 'default',
+        priority: 'low',
+        assignee: '',
+        labels: [],
+        description: '',
+        parent: 999,
+        dependsOn: [],
+      }),
+    ).toThrow();
+  });
+
+  it('rejects reference to non-existent dependency', () => {
+    expect(() =>
+      backend.createWorkItem({
+        title: 'Bad dep',
+        type: 'task',
+        status: 'todo',
+        iteration: 'default',
+        priority: 'low',
+        assignee: '',
+        labels: [],
+        description: '',
+        parent: null,
+        dependsOn: [999],
+      }),
+    ).toThrow();
+  });
+
+  it('clears parent reference when parent is deleted', () => {
+    const parent = backend.createWorkItem({
+      title: 'Parent',
+      type: 'epic',
+      status: 'todo',
+      iteration: 'default',
+      priority: 'medium',
+      assignee: '',
+      labels: [],
+      description: '',
+      parent: null,
+      dependsOn: [],
+    });
+    const child = backend.createWorkItem({
+      title: 'Child',
+      type: 'task',
+      status: 'todo',
+      iteration: 'default',
+      priority: 'low',
+      assignee: '',
+      labels: [],
+      description: '',
+      parent: parent.id,
+      dependsOn: [],
+    });
+    backend.deleteWorkItem(parent.id);
+    const updated = backend.getWorkItem(child.id);
+    expect(updated.parent).toBeNull();
+  });
+
+  it('removes deleted item from dependsOn lists', () => {
+    const dep = backend.createWorkItem({
+      title: 'Dependency',
+      type: 'task',
+      status: 'todo',
+      iteration: 'default',
+      priority: 'medium',
+      assignee: '',
+      labels: [],
+      description: '',
+      parent: null,
+      dependsOn: [],
+    });
+    const other = backend.createWorkItem({
+      title: 'Other dep',
+      type: 'task',
+      status: 'todo',
+      iteration: 'default',
+      priority: 'medium',
+      assignee: '',
+      labels: [],
+      description: '',
+      parent: null,
+      dependsOn: [],
+    });
+    const dependent = backend.createWorkItem({
+      title: 'Dependent',
+      type: 'task',
+      status: 'todo',
+      iteration: 'default',
+      priority: 'low',
+      assignee: '',
+      labels: [],
+      description: '',
+      parent: null,
+      dependsOn: [dep.id, other.id],
+    });
+    backend.deleteWorkItem(dep.id);
+    const updated = backend.getWorkItem(dependent.id);
+    expect(updated.dependsOn).toEqual([other.id]);
+  });
 });
