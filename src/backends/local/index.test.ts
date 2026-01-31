@@ -17,6 +17,24 @@ describe('LocalBackend', () => {
     fs.rmSync(tmpDir, { recursive: true });
   });
 
+  it('returns capabilities with all features enabled', () => {
+    const caps = backend.getCapabilities();
+    expect(caps).toEqual({
+      relationships: true,
+      customTypes: true,
+      customStatuses: true,
+      iterations: true,
+      comments: true,
+      fields: {
+        priority: true,
+        assignee: true,
+        labels: true,
+        parent: true,
+        dependsOn: true,
+      },
+    });
+  });
+
   it('returns default statuses', () => {
     expect(backend.getStatuses()).toEqual([
       'backlog',

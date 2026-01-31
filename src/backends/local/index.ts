@@ -1,4 +1,5 @@
-import type { Backend } from '../types.js';
+import { BaseBackend } from '../types.js';
+import type { BackendCapabilities } from '../types.js';
 import type {
   WorkItem,
   NewWorkItem,
@@ -17,13 +18,31 @@ import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
-export class LocalBackend implements Backend {
+export class LocalBackend extends BaseBackend {
   private root: string;
   private config: Config;
 
   constructor(root: string) {
+    super();
     this.root = root;
     this.config = readConfig(root);
+  }
+
+  getCapabilities(): BackendCapabilities {
+    return {
+      relationships: true,
+      customTypes: true,
+      customStatuses: true,
+      iterations: true,
+      comments: true,
+      fields: {
+        priority: true,
+        assignee: true,
+        labels: true,
+        parent: true,
+        dependsOn: true,
+      },
+    };
   }
 
   private save(): void {
@@ -135,6 +154,7 @@ export class LocalBackend implements Backend {
   }
 
   createWorkItem(data: NewWorkItem): WorkItem {
+    this.validateFields(data);
     const now = new Date().toISOString();
     const id = this.config.next_id;
     this.validateRelationships(id, data.parent, data.dependsOn);
@@ -155,6 +175,7 @@ export class LocalBackend implements Backend {
   }
 
   updateWorkItem(id: number, data: Partial<WorkItem>): WorkItem {
+    this.validateFields(data);
     const item = this.getWorkItem(id);
     this.validateRelationships(id, data.parent, data.dependsOn);
     const updated = {
