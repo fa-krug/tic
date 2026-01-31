@@ -159,7 +159,8 @@ export function handleUpdateItem(
     if (args.assignee !== undefined) opts.assignee = args.assignee;
     if (args.labels !== undefined) opts.labels = args.labels;
     if (args.iteration !== undefined) opts.iteration = args.iteration;
-    if (args.parent !== undefined) opts.parent = String(args.parent);
+    if (args.parent !== undefined)
+      opts.parent = args.parent === null ? '' : String(args.parent);
     if (args.depends_on !== undefined)
       opts.dependsOn = args.depends_on.join(',');
     if (args.description !== undefined) opts.description = args.description;
