@@ -113,6 +113,7 @@ export function WorkItemList() {
 
     if (input === 'q') exit();
     if (input === 'i') navigate('iteration-picker');
+    if (input === ',') navigate('settings');
 
     if (input === 'c') {
       selectWorkItem(null);
@@ -304,7 +305,7 @@ export function WorkItemList() {
         ) : (
           <Text dimColor>
             up/down: navigate enter: edit o: open c: create d: delete s: cycle
-            status p: set parent tab: type i: iteration q: quit
+            status p: set parent tab: type i: iteration ,: settings q: quit
           </Text>
         )}
       </Box>

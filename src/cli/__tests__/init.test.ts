@@ -4,6 +4,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { runInit } from '../commands/init.js';
 import { requireTicProject } from '../index.js';
+import { readConfig } from '../../backends/local/config.js';
 
 describe('tic init', () => {
   let tmpDir: string;
@@ -20,6 +21,24 @@ describe('tic init', () => {
     const result = runInit(tmpDir);
     expect(result.success).toBe(true);
     expect(fs.existsSync(path.join(tmpDir, '.tic', 'config.yml'))).toBe(true);
+  });
+
+  it('writes backend field to config on init', () => {
+    runInit(tmpDir, 'local');
+    const config = readConfig(tmpDir);
+    expect(config.backend).toBe('local');
+  });
+
+  it('writes chosen backend to config', () => {
+    runInit(tmpDir, 'github');
+    const config = readConfig(tmpDir);
+    expect(config.backend).toBe('github');
+  });
+
+  it('defaults to local when no backend specified', () => {
+    runInit(tmpDir);
+    const config = readConfig(tmpDir);
+    expect(config.backend).toBe('local');
   });
 
   it('returns already-initialized message if .tic exists', () => {

@@ -3,9 +3,10 @@ import { Box } from 'ink';
 import { WorkItemList } from './components/WorkItemList.js';
 import { WorkItemForm } from './components/WorkItemForm.js';
 import { IterationPicker } from './components/IterationPicker.js';
+import { Settings } from './components/Settings.js';
 import type { Backend } from './backends/types.js';
 
-type Screen = 'list' | 'form' | 'iteration-picker';
+type Screen = 'list' | 'form' | 'iteration-picker' | 'settings';
 
 interface AppState {
   screen: Screen;
@@ -46,6 +47,7 @@ export function App({ backend }: { backend: Backend }) {
         {screen === 'list' && <WorkItemList />}
         {screen === 'form' && <WorkItemForm />}
         {screen === 'iteration-picker' && <IterationPicker />}
+        {screen === 'settings' && <Settings />}
       </Box>
     </AppContext.Provider>
   );

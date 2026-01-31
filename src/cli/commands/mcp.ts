@@ -584,6 +584,19 @@ export function registerTools(
       return handleGetItemTree(backend, args);
     },
   );
+
+  server.tool(
+    'set_backend',
+    'Set the backend type for this project',
+    {
+      backend: z
+        .string()
+        .describe(`Backend type: ${VALID_BACKENDS.join(', ')}`),
+    },
+    (args) => {
+      return handleSetBackend(root, args);
+    },
+  );
 }
 
 function isTicProject(root: string): boolean {
@@ -597,8 +610,8 @@ export async function startMcpServer(): Promise<void> {
     version: '0.1.0',
   });
 
-  let backend: LocalBackend | null = isTicProject(root)
-    ? new LocalBackend(root)
+  let backend: Backend | null = isTicProject(root)
+    ? createBackendFromConfig(root)
     : null;
   const pendingDeletes = createDeleteTracker();
 
@@ -607,7 +620,7 @@ export async function startMcpServer(): Promise<void> {
       if (!backend) {
         // Re-check after init_project may have created the project
         if (isTicProject(root)) {
-          backend = new LocalBackend(root);
+          backend = createBackendFromConfig(root);
         } else {
           throw new Error(
             'Not a tic project. Use the init_project tool first.',

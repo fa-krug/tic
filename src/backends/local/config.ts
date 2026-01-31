@@ -3,6 +3,7 @@ import path from 'node:path';
 import yaml from 'yaml';
 
 export interface Config {
+  backend: string;
   types: string[];
   statuses: string[];
   current_iteration: string;
@@ -11,6 +12,7 @@ export interface Config {
 }
 
 export const defaultConfig: Config = {
+  backend: 'local',
   types: ['epic', 'issue', 'task'],
   statuses: ['backlog', 'todo', 'in-progress', 'review', 'done'],
   current_iteration: 'default',

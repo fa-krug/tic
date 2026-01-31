@@ -7,11 +7,11 @@ interface InitResult {
   alreadyExists: boolean;
 }
 
-export function runInit(root: string): InitResult {
+export function runInit(root: string, backend?: string): InitResult {
   const configPath = path.join(root, '.tic', 'config.yml');
   if (fs.existsSync(configPath)) {
     return { success: true, alreadyExists: true };
   }
-  writeConfig(root, { ...defaultConfig });
+  writeConfig(root, { ...defaultConfig, backend: backend ?? 'local' });
   return { success: true, alreadyExists: false };
 }

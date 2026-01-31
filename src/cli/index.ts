@@ -127,18 +127,12 @@ export function createProgram(): Command {
           const detected = detectBackend(process.cwd());
           if (process.stdin.isTTY) {
             console.log(`Detected backend: ${detected}`);
-            console.log(
-              `Available backends: ${VALID_BACKENDS.join(', ')}`,
-            );
-            console.log(
-              `Using: ${detected} (pass --backend to override)`,
-            );
+            console.log(`Available backends: ${VALID_BACKENDS.join(', ')}`);
+            console.log(`Using: ${detected} (pass --backend to override)`);
           }
           backend = detected;
         }
-        if (
-          !(VALID_BACKENDS as readonly string[]).includes(backend)
-        ) {
+        if (!(VALID_BACKENDS as readonly string[]).includes(backend)) {
           throw new Error(
             `Invalid backend "${backend}". Valid: ${VALID_BACKENDS.join(', ')}`,
           );
@@ -404,9 +398,7 @@ export function createProgram(): Command {
         if (parentOpts.json) {
           console.log(formatJson({ [key]: value }));
         } else {
-          console.log(
-            Array.isArray(value) ? value.join('\n') : String(value),
-          );
+          console.log(Array.isArray(value) ? value.join('\n') : String(value));
         }
       } catch (err) {
         handleError(err, parentOpts.json);

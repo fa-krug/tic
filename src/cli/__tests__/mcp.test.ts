@@ -62,14 +62,16 @@ describe('MCP handlers', () => {
     it('returns config from backend', () => {
       handleInitProject(tmpDir);
       backend = new LocalBackend(tmpDir);
-      const result = handleGetConfig(backend);
+      const result = handleGetConfig(backend, tmpDir);
       expect(result.isError).toBeUndefined();
       const data = JSON.parse(result.content[0]!.text) as {
+        backend: string;
         statuses: string[];
         types: string[];
         iterations: string[];
         currentIteration: string;
       };
+      expect(data.backend).toBe('local');
       expect(data.statuses).toEqual([
         'backlog',
         'todo',
