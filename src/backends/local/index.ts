@@ -1,13 +1,13 @@
 import type { Backend } from '../types.js';
-import type { Issue, NewIssue, NewComment, Comment } from '../../types.js';
+import type { WorkItem, NewWorkItem, NewComment, Comment } from '../../types.js';
 import { readConfig, writeConfig, type Config } from './config.js';
 import {
-  readIssue,
-  writeIssue,
-  deleteIssue as removeIssueFile,
-  listIssueFiles,
-  parseIssueFile,
-} from './issues.js';
+  readWorkItem,
+  writeWorkItem,
+  deleteWorkItem as removeWorkItemFile,
+  listItemFiles,
+  parseWorkItemFile,
+} from './items.js';
 import fs from 'node:fs';
 
 export class LocalBackend implements Backend {
@@ -31,6 +31,10 @@ export class LocalBackend implements Backend {
     return this.config.iterations;
   }
 
+  getWorkItemTypes(): string[] {
+    return this.config.types;
+  }
+
   getCurrentIteration(): string {
     return this.config.current_iteration;
   }
@@ -43,23 +47,23 @@ export class LocalBackend implements Backend {
     this.save();
   }
 
-  listIssues(iteration?: string): Issue[] {
-    const files = listIssueFiles(this.root);
-    const issues = files.map((f) => {
+  listWorkItems(iteration?: string): WorkItem[] {
+    const files = listItemFiles(this.root);
+    const items = files.map((f) => {
       const raw = fs.readFileSync(f, 'utf-8');
-      return parseIssueFile(raw);
+      return parseWorkItemFile(raw);
     });
-    if (iteration) return issues.filter((i) => i.iteration === iteration);
-    return issues;
+    if (iteration) return items.filter((i) => i.iteration === iteration);
+    return items;
   }
 
-  getIssue(id: number): Issue {
-    return readIssue(this.root, id);
+  getWorkItem(id: number): WorkItem {
+    return readWorkItem(this.root, id);
   }
 
-  createIssue(data: NewIssue): Issue {
+  createWorkItem(data: NewWorkItem): WorkItem {
     const now = new Date().toISOString();
-    const issue: Issue = {
+    const item: WorkItem = {
       ...data,
       id: this.config.next_id,
       created: now,
@@ -71,36 +75,36 @@ export class LocalBackend implements Backend {
       this.config.iterations.push(data.iteration);
     }
     this.save();
-    writeIssue(this.root, issue);
-    return issue;
+    writeWorkItem(this.root, item);
+    return item;
   }
 
-  updateIssue(id: number, data: Partial<Issue>): Issue {
-    const issue = this.getIssue(id);
+  updateWorkItem(id: number, data: Partial<WorkItem>): WorkItem {
+    const item = this.getWorkItem(id);
     const updated = {
-      ...issue,
+      ...item,
       ...data,
       id,
       updated: new Date().toISOString(),
     };
-    writeIssue(this.root, updated);
+    writeWorkItem(this.root, updated);
     return updated;
   }
 
-  deleteIssue(id: number): void {
-    removeIssueFile(this.root, id);
+  deleteWorkItem(id: number): void {
+    removeWorkItemFile(this.root, id);
   }
 
-  addComment(issueId: number, comment: NewComment): Comment {
-    const issue = this.getIssue(issueId);
+  addComment(workItemId: number, comment: NewComment): Comment {
+    const item = this.getWorkItem(workItemId);
     const newComment: Comment = {
       author: comment.author,
       date: new Date().toISOString(),
       body: comment.body,
     };
-    issue.comments.push(newComment);
-    issue.updated = new Date().toISOString();
-    writeIssue(this.root, issue);
+    item.comments.push(newComment);
+    item.updated = new Date().toISOString();
+    writeWorkItem(this.root, item);
     return newComment;
   }
 }
