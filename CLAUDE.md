@@ -28,7 +28,7 @@ npm run format:check # Check formatting without writing
 
 ### Backend Abstraction
 
-`src/backends/types.ts` defines the `Backend` interface (CRUD for work items, iteration management, status/iteration/type lists). All UI components interact with backends only through this interface.
+`src/backends/types.ts` defines the `Backend` interface (CRUD for work items, iteration management, status/iteration/type lists, relationship queries via `getChildren(id)` and `getDependents(id)`). All UI components interact with backends only through this interface.
 
 The only implementation so far is `LocalBackend` (`src/backends/local/index.ts`), which stores work items as markdown files with YAML frontmatter in a `.tic/` directory:
 - `.tic/config.yml` — types, statuses, iterations, current iteration, next item ID
@@ -36,13 +36,13 @@ The only implementation so far is `LocalBackend` (`src/backends/local/index.ts`)
 
 ### Components
 
-- `WorkItemList` — table view with keyboard navigation (arrows, `c` create, `d` delete, `s` cycle status, `Tab` switch work item type, `i` switch iteration, `q` quit)
-- `WorkItemForm` — multi-field form for create/edit with type dropdown (field navigation with arrows, Enter to edit, Esc to save and return)
+- `WorkItemList` — tree-indented table view with keyboard navigation (arrows, `c` create, `d` delete, `s` cycle status, `p` set parent, `Tab` switch work item type, `i` switch iteration, `q` quit). Shows `⧗` indicator for items with dependencies and warnings when completing items with open children/deps.
+- `WorkItemForm` — multi-field form for create/edit with type dropdown, parent ID field, and comma-separated dependency IDs (field navigation with arrows, Enter to edit, Esc to save and return). Shows read-only relationships section (children, dependents) when editing.
 - `IterationPicker` — select from configured iterations
 
 ### Shared Types
 
-`src/types.ts` defines `WorkItem`, `Comment`, `NewWorkItem`, and `NewComment` interfaces used across backends and components.
+`src/types.ts` defines `WorkItem`, `Comment`, `NewWorkItem`, and `NewComment` interfaces used across backends and components. `WorkItem` includes `parent: number | null` and `dependsOn: number[]` for hierarchical and dependency relationships. Validation (circular references, referential integrity) is enforced at the backend level, and references are cleaned up on delete.
 
 ## Tech Stack
 
