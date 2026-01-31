@@ -27,9 +27,14 @@ describe('LocalBackend', () => {
     ]);
   });
 
-  it('creates and lists issues', () => {
-    backend.createIssue({
+  it('returns default work item types', () => {
+    expect(backend.getWorkItemTypes()).toEqual(['epic', 'issue', 'task']);
+  });
+
+  it('creates and lists work items', () => {
+    backend.createWorkItem({
       title: 'Test',
+      type: 'task',
       status: 'todo',
       iteration: 'default',
       priority: 'medium',
@@ -37,15 +42,17 @@ describe('LocalBackend', () => {
       labels: [],
       description: 'A test.',
     });
-    const issues = backend.listIssues();
-    expect(issues).toHaveLength(1);
-    expect(issues[0]!.title).toBe('Test');
-    expect(issues[0]!.id).toBe(1);
+    const items = backend.listWorkItems();
+    expect(items).toHaveLength(1);
+    expect(items[0]!.title).toBe('Test');
+    expect(items[0]!.type).toBe('task');
+    expect(items[0]!.id).toBe(1);
   });
 
-  it('filters issues by iteration', () => {
-    backend.createIssue({
+  it('filters work items by iteration', () => {
+    backend.createWorkItem({
       title: 'A',
+      type: 'epic',
       status: 'todo',
       iteration: 'v1',
       priority: 'low',
@@ -53,8 +60,9 @@ describe('LocalBackend', () => {
       labels: [],
       description: '',
     });
-    backend.createIssue({
+    backend.createWorkItem({
       title: 'B',
+      type: 'issue',
       status: 'todo',
       iteration: 'v2',
       priority: 'low',
@@ -62,13 +70,14 @@ describe('LocalBackend', () => {
       labels: [],
       description: '',
     });
-    expect(backend.listIssues('v1')).toHaveLength(1);
-    expect(backend.listIssues('v2')).toHaveLength(1);
+    expect(backend.listWorkItems('v1')).toHaveLength(1);
+    expect(backend.listWorkItems('v2')).toHaveLength(1);
   });
 
-  it('updates an issue', () => {
-    backend.createIssue({
+  it('updates a work item', () => {
+    backend.createWorkItem({
       title: 'Original',
+      type: 'issue',
       status: 'todo',
       iteration: 'default',
       priority: 'low',
@@ -76,15 +85,16 @@ describe('LocalBackend', () => {
       labels: [],
       description: '',
     });
-    backend.updateIssue(1, { title: 'Updated', status: 'in-progress' });
-    const issue = backend.getIssue(1);
-    expect(issue.title).toBe('Updated');
-    expect(issue.status).toBe('in-progress');
+    backend.updateWorkItem(1, { title: 'Updated', status: 'in-progress' });
+    const item = backend.getWorkItem(1);
+    expect(item.title).toBe('Updated');
+    expect(item.status).toBe('in-progress');
   });
 
-  it('deletes an issue', () => {
-    backend.createIssue({
+  it('deletes a work item', () => {
+    backend.createWorkItem({
       title: 'Delete me',
+      type: 'task',
       status: 'todo',
       iteration: 'default',
       priority: 'low',
@@ -92,14 +102,15 @@ describe('LocalBackend', () => {
       labels: [],
       description: '',
     });
-    expect(backend.listIssues()).toHaveLength(1);
-    backend.deleteIssue(1);
-    expect(backend.listIssues()).toHaveLength(0);
+    expect(backend.listWorkItems()).toHaveLength(1);
+    backend.deleteWorkItem(1);
+    expect(backend.listWorkItems()).toHaveLength(0);
   });
 
   it('adds a comment', () => {
-    backend.createIssue({
+    backend.createWorkItem({
       title: 'Commentable',
+      type: 'issue',
       status: 'todo',
       iteration: 'default',
       priority: 'low',
@@ -108,9 +119,9 @@ describe('LocalBackend', () => {
       description: '',
     });
     backend.addComment(1, { author: 'dev', body: 'A comment.' });
-    const issue = backend.getIssue(1);
-    expect(issue.comments).toHaveLength(1);
-    expect(issue.comments[0]!.body).toBe('A comment.');
+    const item = backend.getWorkItem(1);
+    expect(item.comments).toHaveLength(1);
+    expect(item.comments[0]!.body).toBe('A comment.');
   });
 
   it('manages iterations', () => {
