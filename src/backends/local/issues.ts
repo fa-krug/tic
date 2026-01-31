@@ -14,27 +14,33 @@ function issuePath(root: string, id: number): string {
 export function listIssueFiles(root: string): string[] {
   const dir = issuesDir(root);
   if (!fs.existsSync(dir)) return [];
-  return fs.readdirSync(dir).filter(f => f.endsWith('.md')).map(f => path.join(dir, f));
+  return fs
+    .readdirSync(dir)
+    .filter((f) => f.endsWith('.md'))
+    .map((f) => path.join(dir, f));
 }
 
 function serializeComments(comments: Comment[]): string {
   if (comments.length === 0) return '';
-  const parts = comments.map(c =>
-    `---\nauthor: ${c.author}\ndate: ${c.date}\n\n${c.body}`
+  const parts = comments.map(
+    (c) => `---\nauthor: ${c.author}\ndate: ${c.date}\n\n${c.body}`,
   );
   return '\n\n## Comments\n\n' + parts.join('\n\n');
 }
 
-function parseComments(content: string): { description: string; comments: Comment[] } {
+function parseComments(content: string): {
+  description: string;
+  comments: Comment[];
+} {
   const marker = '## Comments';
   const idx = content.indexOf(marker);
   if (idx === -1) return { description: content.trim(), comments: [] };
 
   const description = content.slice(0, idx).trim();
   const commentsRaw = content.slice(idx + marker.length).trim();
-  const blocks = commentsRaw.split(/\n---\n/).filter(b => b.trim());
+  const blocks = commentsRaw.split(/\n---\n/).filter((b) => b.trim());
 
-  const comments: Comment[] = blocks.map(block => {
+  const comments: Comment[] = blocks.map((block) => {
     const lines = block.trim().split('\n');
     let author = '';
     let date = '';

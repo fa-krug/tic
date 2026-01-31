@@ -7,7 +7,7 @@ export function IterationPicker() {
   const iterations = backend.getIterations();
   const current = backend.getCurrentIteration();
 
-  const items = iterations.map(it => ({
+  const items = iterations.map((it) => ({
     label: it === current ? `${it} (current)` : it,
     value: it,
   }));
@@ -26,7 +26,7 @@ export function IterationPicker() {
         }}
       />
       <Box marginTop={1}>
-        <Text dimColor>up/down: navigate  enter: select</Text>
+        <Text dimColor>up/down: navigate enter: select</Text>
       </Box>
     </Box>
   );

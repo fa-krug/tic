@@ -18,13 +18,24 @@ describe('LocalBackend', () => {
   });
 
   it('returns default statuses', () => {
-    expect(backend.getStatuses()).toEqual(['backlog', 'todo', 'in-progress', 'review', 'done']);
+    expect(backend.getStatuses()).toEqual([
+      'backlog',
+      'todo',
+      'in-progress',
+      'review',
+      'done',
+    ]);
   });
 
   it('creates and lists issues', () => {
     backend.createIssue({
-      title: 'Test', status: 'todo', iteration: 'default',
-      priority: 'medium', assignee: '', labels: [], description: 'A test.',
+      title: 'Test',
+      status: 'todo',
+      iteration: 'default',
+      priority: 'medium',
+      assignee: '',
+      labels: [],
+      description: 'A test.',
     });
     const issues = backend.listIssues();
     expect(issues).toHaveLength(1);
@@ -33,14 +44,38 @@ describe('LocalBackend', () => {
   });
 
   it('filters issues by iteration', () => {
-    backend.createIssue({ title: 'A', status: 'todo', iteration: 'v1', priority: 'low', assignee: '', labels: [], description: '' });
-    backend.createIssue({ title: 'B', status: 'todo', iteration: 'v2', priority: 'low', assignee: '', labels: [], description: '' });
+    backend.createIssue({
+      title: 'A',
+      status: 'todo',
+      iteration: 'v1',
+      priority: 'low',
+      assignee: '',
+      labels: [],
+      description: '',
+    });
+    backend.createIssue({
+      title: 'B',
+      status: 'todo',
+      iteration: 'v2',
+      priority: 'low',
+      assignee: '',
+      labels: [],
+      description: '',
+    });
     expect(backend.listIssues('v1')).toHaveLength(1);
     expect(backend.listIssues('v2')).toHaveLength(1);
   });
 
   it('updates an issue', () => {
-    backend.createIssue({ title: 'Original', status: 'todo', iteration: 'default', priority: 'low', assignee: '', labels: [], description: '' });
+    backend.createIssue({
+      title: 'Original',
+      status: 'todo',
+      iteration: 'default',
+      priority: 'low',
+      assignee: '',
+      labels: [],
+      description: '',
+    });
     backend.updateIssue(1, { title: 'Updated', status: 'in-progress' });
     const issue = backend.getIssue(1);
     expect(issue.title).toBe('Updated');
@@ -48,14 +83,30 @@ describe('LocalBackend', () => {
   });
 
   it('deletes an issue', () => {
-    backend.createIssue({ title: 'Delete me', status: 'todo', iteration: 'default', priority: 'low', assignee: '', labels: [], description: '' });
+    backend.createIssue({
+      title: 'Delete me',
+      status: 'todo',
+      iteration: 'default',
+      priority: 'low',
+      assignee: '',
+      labels: [],
+      description: '',
+    });
     expect(backend.listIssues()).toHaveLength(1);
     backend.deleteIssue(1);
     expect(backend.listIssues()).toHaveLength(0);
   });
 
   it('adds a comment', () => {
-    backend.createIssue({ title: 'Commentable', status: 'todo', iteration: 'default', priority: 'low', assignee: '', labels: [], description: '' });
+    backend.createIssue({
+      title: 'Commentable',
+      status: 'todo',
+      iteration: 'default',
+      priority: 'low',
+      assignee: '',
+      labels: [],
+      description: '',
+    });
     backend.addComment(1, { author: 'dev', body: 'A comment.' });
     const issue = backend.getIssue(1);
     expect(issue.comments).toHaveLength(1);

@@ -17,7 +17,13 @@ describe('config', () => {
 
   it('returns default config when no config file exists', () => {
     const config = readConfig(tmpDir);
-    expect(config.statuses).toEqual(['backlog', 'todo', 'in-progress', 'review', 'done']);
+    expect(config.statuses).toEqual([
+      'backlog',
+      'todo',
+      'in-progress',
+      'review',
+      'done',
+    ]);
     expect(config.current_iteration).toBe('default');
     expect(config.iterations).toEqual(['default']);
     expect(config.next_id).toBe(1);
@@ -26,7 +32,10 @@ describe('config', () => {
   it('reads existing config file', () => {
     const ticDir = path.join(tmpDir, '.tic');
     fs.mkdirSync(ticDir, { recursive: true });
-    fs.writeFileSync(path.join(ticDir, 'config.yml'), 'statuses:\n  - open\n  - closed\ncurrent_iteration: v1\niterations:\n  - v1\nnext_id: 5\n');
+    fs.writeFileSync(
+      path.join(ticDir, 'config.yml'),
+      'statuses:\n  - open\n  - closed\ncurrent_iteration: v1\niterations:\n  - v1\nnext_id: 5\n',
+    );
     const config = readConfig(tmpDir);
     expect(config.statuses).toEqual(['open', 'closed']);
     expect(config.current_iteration).toBe('v1');
@@ -35,7 +44,10 @@ describe('config', () => {
 
   it('writes config file and creates .tic dir', () => {
     writeConfig(tmpDir, { ...defaultConfig, next_id: 10 });
-    const raw = fs.readFileSync(path.join(tmpDir, '.tic', 'config.yml'), 'utf-8');
+    const raw = fs.readFileSync(
+      path.join(tmpDir, '.tic', 'config.yml'),
+      'utf-8',
+    );
     expect(raw).toContain('next_id: 10');
   });
 });

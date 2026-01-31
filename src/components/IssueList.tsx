@@ -12,7 +12,7 @@ export function IssueList() {
   const iteration = backend.getCurrentIteration();
   const issues = useMemo(
     () => backend.listIssues(iteration),
-    [iteration, refresh]
+    [iteration, refresh],
   );
   const statuses = backend.getStatuses();
 
@@ -21,16 +21,16 @@ export function IssueList() {
       if (input === 'y' || input === 'Y') {
         backend.deleteIssue(issues[cursor]!.id);
         setConfirmDelete(false);
-        setCursor(c => Math.max(0, c - 1));
-        setRefresh(r => r + 1);
+        setCursor((c) => Math.max(0, c - 1));
+        setRefresh((r) => r + 1);
       } else {
         setConfirmDelete(false);
       }
       return;
     }
 
-    if (key.upArrow) setCursor(c => Math.max(0, c - 1));
-    if (key.downArrow) setCursor(c => Math.min(issues.length - 1, c + 1));
+    if (key.upArrow) setCursor((c) => Math.max(0, c - 1));
+    if (key.downArrow) setCursor((c) => Math.min(issues.length - 1, c + 1));
 
     if (key.return && issues.length > 0) {
       selectIssue(issues[cursor]!.id);
@@ -54,7 +54,7 @@ export function IssueList() {
       const idx = statuses.indexOf(issue.status);
       const nextStatus = statuses[(idx + 1) % statuses.length]!;
       backend.updateIssue(issue.id, { status: nextStatus });
-      setRefresh(r => r + 1);
+      setRefresh((r) => r + 1);
     }
   });
 
@@ -66,32 +66,76 @@ export function IssueList() {
   return (
     <Box flexDirection="column">
       <Box marginBottom={1}>
-        <Text bold color="cyan">Iteration: {iteration}</Text>
-        <Text dimColor>  ({issues.length} issues)</Text>
+        <Text bold color="cyan">
+          Iteration: {iteration}
+        </Text>
+        <Text dimColor> ({issues.length} issues)</Text>
       </Box>
 
       <Box>
-        <Box width={2}><Text> </Text></Box>
-        <Box width={colId}><Text bold underline>ID</Text></Box>
-        <Box flexGrow={1}><Text bold underline>Title</Text></Box>
-        <Box width={colStatus}><Text bold underline>Status</Text></Box>
-        <Box width={colPriority}><Text bold underline>Priority</Text></Box>
-        <Box width={colAssignee}><Text bold underline>Assignee</Text></Box>
+        <Box width={2}>
+          <Text> </Text>
+        </Box>
+        <Box width={colId}>
+          <Text bold underline>
+            ID
+          </Text>
+        </Box>
+        <Box flexGrow={1}>
+          <Text bold underline>
+            Title
+          </Text>
+        </Box>
+        <Box width={colStatus}>
+          <Text bold underline>
+            Status
+          </Text>
+        </Box>
+        <Box width={colPriority}>
+          <Text bold underline>
+            Priority
+          </Text>
+        </Box>
+        <Box width={colAssignee}>
+          <Text bold underline>
+            Assignee
+          </Text>
+        </Box>
       </Box>
 
       {issues.length === 0 && (
-        <Box marginTop={1}><Text dimColor>No issues in this iteration.</Text></Box>
+        <Box marginTop={1}>
+          <Text dimColor>No issues in this iteration.</Text>
+        </Box>
       )}
       {issues.map((issue, idx) => {
         const selected = idx === cursor;
         return (
           <Box key={issue.id}>
-            <Box width={2}><Text color="cyan">{selected ? '>' : ' '}</Text></Box>
-            <Box width={colId}><Text color={selected ? 'cyan' : undefined}>{issue.id}</Text></Box>
-            <Box flexGrow={1}><Text color={selected ? 'cyan' : undefined} bold={selected}>{issue.title}</Text></Box>
-            <Box width={colStatus}><Text color={selected ? 'cyan' : undefined}>{issue.status}</Text></Box>
-            <Box width={colPriority}><Text color={selected ? 'cyan' : undefined}>{issue.priority}</Text></Box>
-            <Box width={colAssignee}><Text color={selected ? 'cyan' : undefined}>{issue.assignee}</Text></Box>
+            <Box width={2}>
+              <Text color="cyan">{selected ? '>' : ' '}</Text>
+            </Box>
+            <Box width={colId}>
+              <Text color={selected ? 'cyan' : undefined}>{issue.id}</Text>
+            </Box>
+            <Box flexGrow={1}>
+              <Text color={selected ? 'cyan' : undefined} bold={selected}>
+                {issue.title}
+              </Text>
+            </Box>
+            <Box width={colStatus}>
+              <Text color={selected ? 'cyan' : undefined}>{issue.status}</Text>
+            </Box>
+            <Box width={colPriority}>
+              <Text color={selected ? 'cyan' : undefined}>
+                {issue.priority}
+              </Text>
+            </Box>
+            <Box width={colAssignee}>
+              <Text color={selected ? 'cyan' : undefined}>
+                {issue.assignee}
+              </Text>
+            </Box>
           </Box>
         );
       })}
@@ -101,7 +145,8 @@ export function IssueList() {
           <Text color="red">Delete issue #{issues[cursor]?.id}? (y/n)</Text>
         ) : (
           <Text dimColor>
-            up/down: navigate  enter: open  c: create  d: delete  s: cycle status  i: iteration  q: quit
+            up/down: navigate enter: open c: create d: delete s: cycle status i:
+            iteration q: quit
           </Text>
         )}
       </Box>

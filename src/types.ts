@@ -18,7 +18,16 @@ export interface Issue {
   comments: Comment[];
 }
 
-export type NewIssue = Pick<Issue, 'title' | 'status' | 'iteration' | 'priority' | 'assignee' | 'labels' | 'description'>;
+export type NewIssue = Pick<
+  Issue,
+  | 'title'
+  | 'status'
+  | 'iteration'
+  | 'priority'
+  | 'assignee'
+  | 'labels'
+  | 'description'
+>;
 
 export interface NewComment {
   author: string;

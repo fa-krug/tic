@@ -1,7 +1,13 @@
 import type { Backend } from '../types.js';
 import type { Issue, NewIssue, NewComment, Comment } from '../../types.js';
 import { readConfig, writeConfig, type Config } from './config.js';
-import { readIssue, writeIssue, deleteIssue as removeIssueFile, listIssueFiles, parseIssueFile } from './issues.js';
+import {
+  readIssue,
+  writeIssue,
+  deleteIssue as removeIssueFile,
+  listIssueFiles,
+  parseIssueFile,
+} from './issues.js';
 import fs from 'node:fs';
 
 export class LocalBackend implements Backend {
@@ -39,11 +45,11 @@ export class LocalBackend implements Backend {
 
   listIssues(iteration?: string): Issue[] {
     const files = listIssueFiles(this.root);
-    const issues = files.map(f => {
+    const issues = files.map((f) => {
       const raw = fs.readFileSync(f, 'utf-8');
       return parseIssueFile(raw);
     });
-    if (iteration) return issues.filter(i => i.iteration === iteration);
+    if (iteration) return issues.filter((i) => i.iteration === iteration);
     return issues;
   }
 
@@ -71,7 +77,12 @@ export class LocalBackend implements Backend {
 
   updateIssue(id: number, data: Partial<Issue>): Issue {
     const issue = this.getIssue(id);
-    const updated = { ...issue, ...data, id, updated: new Date().toISOString() };
+    const updated = {
+      ...issue,
+      ...data,
+      id,
+      updated: new Date().toISOString(),
+    };
     writeIssue(this.root, updated);
     return updated;
   }
