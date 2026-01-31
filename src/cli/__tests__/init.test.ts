@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { runInit } from '../commands/init.js';
+import { requireTicProject } from '../index.js';
 
 describe('tic init', () => {
   let tmpDir: string;
@@ -26,5 +27,24 @@ describe('tic init', () => {
     fs.writeFileSync(path.join(tmpDir, '.tic', 'config.yml'), 'next_id: 1\n');
     const result = runInit(tmpDir);
     expect(result.alreadyExists).toBe(true);
+  });
+});
+
+describe('requireTicProject', () => {
+  it('throws when .tic directory does not exist', () => {
+    const emptyDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'tic-cli-noproject-'),
+    );
+    expect(() => requireTicProject(emptyDir)).toThrow(
+      "Not a tic project (no .tic/ directory found). Run 'tic init' first.",
+    );
+    fs.rmSync(emptyDir, { recursive: true });
+  });
+
+  it('does not throw when .tic directory exists', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-cli-project-'));
+    fs.mkdirSync(path.join(dir, '.tic'), { recursive: true });
+    expect(() => requireTicProject(dir)).not.toThrow();
+    fs.rmSync(dir, { recursive: true });
   });
 });
