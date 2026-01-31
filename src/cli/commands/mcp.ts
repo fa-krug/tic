@@ -571,13 +571,22 @@ export async function startMcpServer(): Promise<void> {
     version: '0.1.0',
   });
 
-  const backend = isTicProject(root) ? new LocalBackend(root) : null;
+  let backend: LocalBackend | null = isTicProject(root)
+    ? new LocalBackend(root)
+    : null;
   const pendingDeletes = createDeleteTracker();
 
   const guardedBackend = new Proxy({} as Backend, {
     get(_target, prop: string | symbol) {
       if (!backend) {
-        throw new Error('Not a tic project. Use the init_project tool first.');
+        // Re-check after init_project may have created the project
+        if (isTicProject(root)) {
+          backend = new LocalBackend(root);
+        } else {
+          throw new Error(
+            'Not a tic project. Use the init_project tool first.',
+          );
+        }
       }
       return (backend as unknown as Record<string | symbol, unknown>)[prop];
     },
