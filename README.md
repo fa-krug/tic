@@ -1,20 +1,19 @@
 # tic
 
-A terminal UI for issue tracking that works across backends. Connect to GitHub, GitLab, Azure DevOps, or use local markdown-based issues — all from one interface. The backend is selected automatically based on your git remote.
+A terminal UI for issue tracking, built for developers who live in the terminal. Track work items as markdown files stored right in your repository.
 
-Built with TypeScript and [Ink](https://github.com/vadimdemedes/ink). Fully controllable via CLI. Exposes an MCP server for AI integration.
+Built with TypeScript and [Ink](https://github.com/vadimdemedes/ink).
 
 ## Features
 
-- **Unified interface** — browse, create, edit, and manage issues without leaving the terminal
-- **Multi-backend support**
-  - **GitHub** via `gh`
-  - **GitLab** via `glab`
-  - **Azure DevOps** via `az`
-  - **Local** markdown file-based issue tracking
-- **Automatic backend detection** — determines the right backend from your current git remote
-- **Full CLI control** — every action available as a command, scriptable and composable
-- **MCP server** — expose your issues as context for AI tools and agents
+- **Keyboard-driven TUI** — browse, create, edit, and manage work items without leaving the terminal
+- **Local markdown storage** — work items stored as markdown files with YAML frontmatter in a `.tic/` directory
+- **Work item types** — organize by epic, issue, and task (configurable)
+- **Iterations** — group work into sprints or milestones
+- **Parent-child relationships** — build hierarchies with tree-indented views
+- **Dependencies** — track which items block others, with warnings on premature completion
+- **Priority & assignee** — track who owns what and what's most important
+- **Comments** — add timestamped comments to any work item
 
 ## Installation
 
@@ -22,54 +21,141 @@ Built with TypeScript and [Ink](https://github.com/vadimdemedes/ink). Fully cont
 npm install -g tic
 ```
 
-## Usage
-
-### TUI
+## Quick Start
 
 ```bash
+cd your-project
 tic
 ```
 
-Opens the interactive terminal UI in your current repository. The backend is detected automatically.
+This launches the TUI. On first run, tic automatically creates a `.tic/` directory to store your work items. No setup or init command needed.
 
-### CLI
+## Usage
 
-```bash
-tic list                  # List issues
-tic view <id>             # View issue details
-tic create                # Create a new issue
-tic edit <id>             # Edit an issue
-tic close <id>            # Close an issue
+### List View
+
+The main screen shows work items filtered by type and iteration, displayed as a tree that reflects parent-child relationships.
+
+| Key | Action |
+|-----|--------|
+| `↑` `↓` | Navigate between items |
+| `Enter` | Edit selected item |
+| `c` | Create new work item |
+| `d` | Delete selected item (with confirmation) |
+| `s` | Cycle status forward |
+| `p` | Set parent for selected item |
+| `Tab` | Switch work item type (epic / issue / task) |
+| `i` | Switch iteration |
+| `q` | Quit |
+
+The list displays ID, title (tree-indented), status, priority, and assignee. Items with dependencies show a `⧗` indicator.
+
+### Editing a Work Item
+
+Press `Enter` on an item or `c` to create one. The form has these fields:
+
+- **Title** — name of the work item
+- **Type** — epic, issue, or task
+- **Status** — backlog, todo, in-progress, review, done
+- **Iteration** — which sprint/milestone this belongs to
+- **Priority** — low, medium, high, critical
+- **Assignee** — who owns this
+- **Labels** — comma-separated tags
+- **Parent** — ID of the parent item
+- **Depends On** — comma-separated IDs of items this depends on
+- **Description** — full details (multi-line)
+- **Comments** — add new comments; existing comments shown as read-only
+
+Navigate fields with `↑` `↓`, press `Enter` to edit a field, and `Esc` to save and return to the list.
+
+### Iterations
+
+Press `i` in the list view to open the iteration picker. The current iteration filters which items you see. New iterations are created automatically when you assign an item to one that doesn't exist yet.
+
+### Relationships
+
+**Parent-child:** Set a parent ID on an item to nest it under another. Children appear indented in the tree view. Circular parent chains are prevented.
+
+**Dependencies:** Add dependency IDs to indicate that an item is blocked by others. When you try to complete an item that has open children or unresolved dependencies, tic shows a warning so you can decide whether to proceed.
+
+Deleting an item automatically cleans up references — children have their parent cleared, and the item is removed from other items' dependency lists.
+
+## Storage
+
+Work items live in `.tic/` at the root of your project:
+
+```
+.tic/
+├── config.yml          # Types, statuses, iterations, settings
+└── items/
+    ├── 1.md            # Work item #1
+    ├── 2.md            # Work item #2
+    └── ...
 ```
 
-### MCP Server
+Each item is a markdown file with YAML frontmatter:
 
-```bash
-tic mcp
+```markdown
+---
+id: 1
+title: Implement user login
+type: task
+status: in-progress
+iteration: sprint-1
+priority: high
+assignee: alice
+labels: auth, backend
+parent: 3
+depends_on:
+  - 2
+created: 2026-01-15T10:00:00.000Z
+updated: 2026-01-20T14:30:00.000Z
+---
+
+Full description of the work item goes here.
+
+## Comments
+
+---
+author: alice
+date: 2026-01-18T09:00:00.000Z
+
+Decided to use JWT tokens for this.
 ```
 
-Starts the MCP server, making your issues available as context for AI tools.
+Configuration in `.tic/config.yml`:
 
-## Backend Detection
+```yaml
+types:
+  - epic
+  - issue
+  - task
+statuses:
+  - backlog
+  - todo
+  - in-progress
+  - review
+  - done
+iterations:
+  - default
+current_iteration: default
+next_id: 1
+```
 
-tic reads your git remotes to determine which backend to use:
+You can edit these files directly — they're plain text. Customize types, statuses, and iterations by editing `config.yml`.
 
-| Remote host          | Backend   |
-|----------------------|-----------|
-| `github.com`         | GitHub    |
-| `gitlab.com` / self-hosted GitLab | GitLab |
-| `dev.azure.com`      | Azure DevOps |
-| No remote / unknown  | Local (markdown) |
+## Roadmap
 
-## Prerequisites
+Planned but not yet implemented:
 
-Backend CLIs must be installed and authenticated for their respective providers:
+- **Multi-backend support** — GitHub (via `gh`), GitLab (via `glab`), Azure DevOps (via `az`)
+- **Automatic backend detection** — select backend based on git remote
+- **CLI commands** — scriptable interface (`tic list`, `tic create`, etc.)
+- **MCP server** — expose issues as context for AI tools
 
-- [gh](https://cli.github.com/) for GitHub
-- [glab](https://gitlab.com/gitlab-org/cli) for GitLab
-- [az](https://learn.microsoft.com/en-us/cli/azure/) with the DevOps extension for Azure DevOps
+## Contributing
 
-No additional tooling is needed for local markdown-based tracking.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, architecture, and conventions.
 
 ## License
 
