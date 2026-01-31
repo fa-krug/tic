@@ -1,7 +1,7 @@
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 
 export function gh<T>(args: string[], cwd: string): T {
-  const result = execSync(`gh ${args.join(' ')}`, {
+  const result = execFileSync('gh', args, {
     cwd,
     encoding: 'utf-8',
     stdio: ['pipe', 'pipe', 'pipe'],
@@ -10,7 +10,7 @@ export function gh<T>(args: string[], cwd: string): T {
 }
 
 export function ghExec(args: string[], cwd: string): string {
-  return execSync(`gh ${args.join(' ')}`, {
+  return execFileSync('gh', args, {
     cwd,
     encoding: 'utf-8',
     stdio: ['pipe', 'pipe', 'pipe'],
