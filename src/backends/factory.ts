@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process';
 import type { Backend } from './types.js';
 import { LocalBackend } from './local/index.js';
 import { GitHubBackend } from './github/index.js';
+import { GitLabBackend } from './gitlab/index.js';
 import { readConfig } from './local/config.js';
 
 export const VALID_BACKENDS = ['local', 'github', 'gitlab', 'azure'] as const;
@@ -33,6 +34,7 @@ export function createBackend(root: string): Backend {
     case 'github':
       return new GitHubBackend(root);
     case 'gitlab':
+      return new GitLabBackend(root);
     case 'azure':
       throw new Error(
         `Backend "${backend}" is not yet implemented. Use "local" for now.`,
