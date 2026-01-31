@@ -1,14 +1,15 @@
-import type { Issue, NewIssue, NewComment, Comment } from '../types.js';
+import type { WorkItem, NewWorkItem, NewComment, Comment } from '../types.js';
 
 export interface Backend {
   getStatuses(): string[];
   getIterations(): string[];
+  getWorkItemTypes(): string[];
   getCurrentIteration(): string;
   setCurrentIteration(name: string): void;
-  listIssues(iteration?: string): Issue[];
-  getIssue(id: number): Issue;
-  createIssue(data: NewIssue): Issue;
-  updateIssue(id: number, data: Partial<Issue>): Issue;
-  deleteIssue(id: number): void;
-  addComment(issueId: number, comment: NewComment): Comment;
+  listWorkItems(iteration?: string): WorkItem[];
+  getWorkItem(id: number): WorkItem;
+  createWorkItem(data: NewWorkItem): WorkItem;
+  updateWorkItem(id: number, data: Partial<WorkItem>): WorkItem;
+  deleteWorkItem(id: number): void;
+  addComment(workItemId: number, comment: NewComment): Comment;
 }
