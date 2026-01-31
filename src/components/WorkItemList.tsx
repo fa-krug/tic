@@ -3,6 +3,9 @@ import { Box, Text, useInput, useApp } from 'ink';
 import TextInput from 'ink-text-input';
 import { useAppState } from '../app.js';
 import type { WorkItem } from '../types.js';
+import { isGitRepo } from '../git.js';
+import { beginImplementation } from '../implement.js';
+import { readConfig } from '../backends/local/config.js';
 
 interface TreeItem {
   item: WorkItem;
@@ -55,6 +58,7 @@ export function WorkItemList() {
 
   const capabilities = useMemo(() => backend.getCapabilities(), [backend]);
   const types = useMemo(() => backend.getWorkItemTypes(), [backend]);
+  const gitAvailable = useMemo(() => isGitRepo(process.cwd()), []);
 
   useEffect(() => {
     if (activeType === null && types.length > 0) {
@@ -127,6 +131,30 @@ export function WorkItemList() {
 
     if (input === 'o' && treeItems.length > 0) {
       backend.openItem(treeItems[cursor]!.item.id);
+      setRefresh((r) => r + 1);
+    }
+
+    if (input === 'b' && gitAvailable && treeItems.length > 0) {
+      const item = treeItems[cursor]!.item;
+      const comments = item.comments;
+      const config = readConfig(process.cwd());
+      try {
+        const result = beginImplementation(
+          item,
+          comments,
+          { branchMode: config.branchMode },
+          process.cwd(),
+        );
+        setWarning(
+          result.resumed
+            ? `Resumed work on #${item.id}`
+            : `Started work on #${item.id}`,
+        );
+      } catch (e) {
+        setWarning(
+          e instanceof Error ? e.message : 'Failed to start implementation',
+        );
+      }
       setRefresh((r) => r + 1);
     }
 
@@ -210,6 +238,7 @@ export function WorkItemList() {
   if (capabilities.fields.parent) helpParts.push('p: set parent');
   if (capabilities.customTypes) helpParts.push('tab: type');
   if (capabilities.iterations) helpParts.push('i: iteration');
+  if (gitAvailable) helpParts.push('b: branch');
   helpParts.push(',: settings', 'q: quit');
   const helpText = helpParts.join('  ');
 
