@@ -28,6 +28,7 @@ describe('az', () => {
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'pipe'],
         timeout: 15_000,
+        maxBuffer: 10 * 1024 * 1024,
       },
     );
   });

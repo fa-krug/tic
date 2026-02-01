@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 const AZ_TIMEOUT_MS = 15_000;
+const AZ_MAX_BUFFER = 10 * 1024 * 1024; // 10 MB
 
 export function az<T>(args: string[], cwd: string): T {
   const result = execFileSync('az', [...args, '-o', 'json'], {
@@ -11,6 +12,7 @@ export function az<T>(args: string[], cwd: string): T {
     encoding: 'utf-8',
     stdio: ['pipe', 'pipe', 'pipe'],
     timeout: AZ_TIMEOUT_MS,
+    maxBuffer: AZ_MAX_BUFFER,
   });
   return JSON.parse(result) as T;
 }
@@ -21,6 +23,7 @@ export function azExec(args: string[], cwd: string): string {
     encoding: 'utf-8',
     stdio: ['pipe', 'pipe', 'pipe'],
     timeout: AZ_TIMEOUT_MS,
+    maxBuffer: AZ_MAX_BUFFER,
   });
 }
 
@@ -66,6 +69,7 @@ export function azInvoke<T>(options: AzInvokeOptions, cwd: string): T {
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
       timeout: AZ_TIMEOUT_MS,
+      maxBuffer: AZ_MAX_BUFFER,
     });
     return JSON.parse(result) as T;
   } finally {
