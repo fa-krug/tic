@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**tic** is a terminal UI for issue tracking across multiple backends (GitHub, GitLab, Azure DevOps, local markdown). Built with TypeScript and Ink (React for the terminal). The local markdown and GitHub backends are implemented.
+**tic** is a terminal UI for issue tracking across multiple backends (GitHub, GitLab, Azure DevOps, local markdown). Built with TypeScript and Ink (React for the terminal). All four backends are implemented.
 
 ## Commands
 
@@ -54,9 +54,14 @@ Or add `.mcp.json` to the project root:
 
 `BaseBackend` (`src/backends/types.ts`) is the abstract base class all backends extend. It provides `validateFields()` to throw `UnsupportedOperationError` for fields the backend doesn't support, and `assertSupported()` for gating entire operations. Each backend implements `getCapabilities()` returning a `BackendCapabilities` object that declares supported feature groups (`relationships`, `customTypes`, `customStatuses`, `iterations`, `comments`) and individual fields (`priority`, `assignee`, `labels`, `parent`, `dependsOn`). TUI components, CLI commands, and MCP tools use capabilities to hide unsupported features.
 
-`LocalBackend` (`src/backends/local/index.ts`) stores work items as markdown files with YAML frontmatter in a `.tic/` directory:
-- `.tic/config.yml` — types, statuses, iterations, current iteration, next item ID
-- `.tic/items/{id}.md` — individual work item files (frontmatter metadata + markdown body + comments section)
+**Implemented backends:**
+
+- `LocalBackend` (`src/backends/local/`) — markdown files with YAML frontmatter in `.tic/` (`.tic/config.yml` for config, `.tic/items/{id}.md` for items)
+- `GitHubBackend` (`src/backends/github/`) — GitHub Issues via `gh` CLI
+- `GitLabBackend` (`src/backends/gitlab/`) — GitLab Issues via `glab` CLI
+- `AzureDevOpsBackend` (`src/backends/ado/`) — Azure DevOps Work Items via `az` CLI
+
+`src/backends/factory.ts` auto-detects the backend from git remotes (github.com → GitHub, gitlab.com → GitLab, dev.azure.com/visualstudio.com → Azure DevOps, fallback → local). Can be overridden via `backend` in `.tic/config.yml`.
 
 ### Components
 
@@ -64,9 +69,13 @@ Or add `.mcp.json` to the project root:
 - `WorkItemForm` — multi-field form for create/edit with type dropdown, parent ID field, and comma-separated dependency IDs (field navigation with arrows, Enter to edit, Esc to save and return). Shows read-only relationships section (children, dependents) when editing.
 - `IterationPicker` — select from configured iterations
 
+### CLI
+
+`src/cli/index.ts` defines CLI commands via Commander: `init` (with `--backend`), `item` (list/show/create/update/delete/open/comment), `iteration` (list/set), `config` (get/set), `mcp serve`. Global options: `--json`, `--quiet`.
+
 ### Shared Types
 
-`src/types.ts` defines `WorkItem`, `Comment`, `NewWorkItem`, and `NewComment` interfaces used across backends and components. `WorkItem` includes `parent: number | null` and `dependsOn: number[]` for hierarchical and dependency relationships. Validation (circular references, referential integrity) is enforced at the backend level, and references are cleaned up on delete.
+`src/types.ts` defines `WorkItem`, `Comment`, `NewWorkItem`, and `NewComment` interfaces used across backends and components. `WorkItem` includes `parent: string | null` and `dependsOn: string[]` for hierarchical and dependency relationships (IDs are strings to support non-numeric IDs from external backends). Validation (circular references, referential integrity) is enforced at the backend level, and references are cleaned up on delete.
 
 ## Tech Stack
 

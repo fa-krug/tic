@@ -1,34 +1,46 @@
 # tic
 
-A terminal UI for issue tracking, built for developers who live in the terminal. Track work items as markdown files stored right in your repository.
+A terminal UI for issue tracking, built for developers who live in the terminal. Track work items across multiple backends — local markdown files, GitHub Issues, GitLab Issues, and Azure DevOps Work Items.
 
 Built with TypeScript and [Ink](https://github.com/vadimdemedes/ink).
 
 ## Features
 
 - **Keyboard-driven TUI** — browse, create, edit, and manage work items without leaving the terminal
+- **Multiple backends** — local markdown, GitHub (via `gh`), GitLab (via `glab`), Azure DevOps (via `az`)
+- **Automatic backend detection** — selects backend based on git remote, or configure manually
 - **Local markdown storage** — work items stored as markdown files with YAML frontmatter in a `.tic/` directory
+- **CLI commands** — scriptable commands for all operations (`tic item list`, `tic item create`, etc.)
 - **Work item types** — organize by epic, issue, and task (configurable)
 - **Iterations** — group work into sprints or milestones
 - **Parent-child relationships** — build hierarchies with tree-indented views
 - **Dependencies** — track which items block others, with warnings on premature completion
 - **Priority & assignee** — track who owns what and what's most important
 - **Comments** — add timestamped comments to any work item
+- **MCP server** — expose work items to AI assistants via the Model Context Protocol
 
 ## Installation
 
 ```bash
-npm install -g tic
+npm install -g @sascha384/tic
 ```
 
 ## Quick Start
 
 ```bash
 cd your-project
-tic
+tic init           # Initialize (auto-detects backend from git remote)
+tic                # Launch the TUI
 ```
 
-This launches the TUI. On first run, tic automatically creates a `.tic/` directory to store your work items. No setup or init command needed.
+For local storage, `tic init` creates a `.tic/` directory to store your work items. For GitHub, GitLab, or Azure DevOps projects, it detects the backend from the git remote automatically. You can also specify a backend explicitly:
+
+```bash
+tic init --backend github
+tic init --backend gitlab
+tic init --backend azure
+tic init --backend local
+```
 
 ## Usage
 
@@ -205,12 +217,38 @@ Deletion is a two-step process: `delete_item` returns a preview of what will be 
 
 If the server is started in a directory without a `.tic/` project, all tools except `init_project` will return an error asking you to initialize first.
 
-## Roadmap
+## CLI Commands
 
-Planned but not yet implemented:
+tic also provides a full CLI for scripting and automation:
 
-- **Multi-backend support** — GitHub (via `gh`), GitLab (via `glab`), Azure DevOps (via `az`)
-- **Automatic backend detection** — select backend based on git remote
+```bash
+tic item list                        # List work items
+tic item list --status in-progress   # Filter by status
+tic item list --type task            # Filter by type
+tic item show 42                     # Show item details
+tic item create --title "Fix bug"    # Create an item
+tic item update 42 --status done     # Update an item
+tic item delete 42                   # Delete an item
+tic item comment 42 --body "Done"    # Add a comment
+tic item open 42                     # Open in editor/browser
+tic iteration list                   # List iterations
+tic iteration set sprint-2           # Set current iteration
+tic config get backend               # Get config value
+tic config set backend github        # Set config value
+```
+
+Add `--json` to any command for machine-readable output, or `--quiet` to suppress non-essential output.
+
+## Backends
+
+| Backend | CLI Tool | Detection |
+|---------|----------|-----------|
+| Local markdown | — | Default fallback |
+| GitHub Issues | [`gh`](https://cli.github.com/) | `github.com` in git remote |
+| GitLab Issues | [`glab`](https://gitlab.com/gitlab-org/cli) | `gitlab.com` in git remote |
+| Azure DevOps Work Items | [`az`](https://learn.microsoft.com/en-us/cli/azure/) | `dev.azure.com` or `visualstudio.com` in git remote |
+
+Each backend supports a different set of capabilities (types, statuses, iterations, relationships, etc.). The TUI and CLI automatically adapt to show only what the active backend supports.
 
 ## Contributing
 

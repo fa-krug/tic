@@ -58,10 +58,16 @@ The app uses screen-based routing via React Context (`AppContext` in `src/app.ts
 
 `src/backends/types.ts` defines the `Backend` interface — CRUD for work items, iteration management, status/iteration/type lists, and relationship queries (`getChildren(id)`, `getDependents(id)`). All UI components interact through this interface only.
 
-**Local backend** (`src/backends/local/index.ts`) is the only implementation so far. It stores work items as markdown files with YAML frontmatter in a `.tic/` directory:
+`BaseBackend` (`src/backends/types.ts`) is the abstract base class all backends extend. It provides `validateFields()` to throw `UnsupportedOperationError` for fields the backend doesn't support, and `assertSupported()` for gating entire operations. Each backend implements `getCapabilities()` returning a `BackendCapabilities` object that declares supported feature groups and fields. TUI components, CLI commands, and MCP tools use capabilities to hide unsupported features.
 
-- `.tic/config.yml` — types, statuses, iterations, current iteration, next item ID
-- `.tic/items/{id}.md` — individual work item files
+`src/backends/factory.ts` handles backend creation and auto-detection from git remotes.
+
+**Implemented backends:**
+
+- **Local** (`src/backends/local/`) — stores work items as markdown files with YAML frontmatter in a `.tic/` directory (`.tic/config.yml` for config, `.tic/items/{id}.md` for items)
+- **GitHub** (`src/backends/github/`) — reads/writes GitHub Issues via the `gh` CLI
+- **GitLab** (`src/backends/gitlab/`) — reads/writes GitLab Issues via the `glab` CLI
+- **Azure DevOps** (`src/backends/ado/`) — reads/writes Azure DevOps Work Items via the `az` CLI
 
 ### Components
 
@@ -69,11 +75,15 @@ The app uses screen-based routing via React Context (`AppContext` in `src/app.ts
 - **WorkItemForm** (`src/components/work-item-form.tsx`) — multi-field form for create/edit. Supports text fields, dropdowns, and read-only relationship display.
 - **IterationPicker** (`src/components/iteration-picker.tsx`) — select from configured iterations.
 
+### CLI
+
+`src/cli/index.ts` defines the CLI commands using Commander. Commands include `init`, `item` (list/show/create/update/delete/open/comment), `iteration` (list/set), `config` (get/set), and `mcp serve`. Global options: `--json`, `--quiet`.
+
 ### Types
 
 `src/types.ts` defines shared interfaces:
 
-- `WorkItem` — includes `parent: number | null` and `dependsOn: number[]`
+- `WorkItem` — includes `parent: string | null` and `dependsOn: string[]`
 - `Comment` — author, date, body
 - `NewWorkItem` / `NewComment` — creation inputs
 
