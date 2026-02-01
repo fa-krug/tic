@@ -58,6 +58,13 @@ export function App({
     return prev;
   };
 
+  const navigateWithStackClear = (newScreen: Screen) => {
+    if (newScreen !== 'form') {
+      setNavigationStack([]);
+    }
+    setScreen(newScreen);
+  };
+
   const state: AppState = {
     screen,
     selectedWorkItemId,
@@ -65,7 +72,7 @@ export function App({
     backend,
     syncManager,
     navigationStack,
-    navigate: setScreen,
+    navigate: navigateWithStackClear,
     selectWorkItem: setSelectedWorkItemId,
     setActiveType,
     pushWorkItem,
