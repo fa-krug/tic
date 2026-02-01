@@ -27,6 +27,7 @@ export interface Backend {
   getStatuses(): string[];
   getIterations(): string[];
   getWorkItemTypes(): string[];
+  getAssignees(): string[];
   getCurrentIteration(): string;
   setCurrentIteration(name: string): void;
   listWorkItems(iteration?: string): WorkItem[];
@@ -46,6 +47,7 @@ export abstract class BaseBackend implements Backend {
   abstract getStatuses(): string[];
   abstract getIterations(): string[];
   abstract getWorkItemTypes(): string[];
+  abstract getAssignees(): string[];
   abstract getCurrentIteration(): string;
   abstract setCurrentIteration(name: string): void;
   abstract listWorkItems(iteration?: string): WorkItem[];

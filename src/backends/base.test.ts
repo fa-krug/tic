@@ -68,6 +68,9 @@ class TestBackend extends BaseBackend {
   getWorkItemTypes(): string[] {
     return [];
   }
+  getAssignees(): string[] {
+    return [];
+  }
   getCurrentIteration(): string {
     return '';
   }
