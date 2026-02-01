@@ -73,7 +73,12 @@ export function WorkItemList() {
 
   useEffect(() => {
     if (!syncManager) return;
-    const cb = (status: SyncStatus) => setSyncStatus(status);
+    const cb = (status: SyncStatus) => {
+      setSyncStatus(status);
+      if (status.state === 'idle') {
+        setRefresh((r) => r + 1);
+      }
+    };
     syncManager.onStatusChange(cb);
   }, [syncManager]);
 
