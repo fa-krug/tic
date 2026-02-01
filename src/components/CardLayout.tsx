@@ -1,18 +1,6 @@
 import { Box, Text } from 'ink';
 import type { BackendCapabilities } from '../backends/types.js';
-
-interface TreeItem {
-  item: {
-    id: string;
-    title: string;
-    status: string;
-    priority?: string;
-    assignee?: string;
-    dependsOn: string[];
-  };
-  depth: number;
-  prefix: string;
-}
+import type { TreeItem } from './WorkItemList.js';
 
 interface CardLayoutProps {
   treeItems: TreeItem[];

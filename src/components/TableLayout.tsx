@@ -1,12 +1,6 @@
 import { Box, Text } from 'ink';
-import type { WorkItem } from '../types.js';
 import type { BackendCapabilities } from '../backends/types.js';
-
-interface TreeItem {
-  item: WorkItem;
-  depth: number;
-  prefix: string;
-}
+import type { TreeItem } from './WorkItemList.js';
 
 interface TableLayoutProps {
   treeItems: TreeItem[];

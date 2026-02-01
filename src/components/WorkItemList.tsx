@@ -10,7 +10,7 @@ import { TableLayout } from './TableLayout.js';
 import { CardLayout } from './CardLayout.js';
 import { useTerminalWidth } from '../hooks/useTerminalWidth.js';
 
-interface TreeItem {
+export interface TreeItem {
   item: WorkItem;
   depth: number;
   prefix: string;
