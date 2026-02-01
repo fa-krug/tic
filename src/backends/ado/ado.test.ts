@@ -203,10 +203,8 @@ describe('AzureDevOpsBackend', () => {
     it('uses WIQL query and batch fetch', () => {
       const backend = makeBackend();
 
-      // WIQL query returns IDs
-      mockAz.mockReturnValueOnce({
-        workItems: [{ id: 42 }, { id: 43 }],
-      });
+      // WIQL query returns flat array of items
+      mockAz.mockReturnValueOnce([{ id: 42 }, { id: 43 }]);
 
       // Batch fetch returns full items
       mockAzInvoke.mockReturnValueOnce({
@@ -237,7 +235,7 @@ describe('AzureDevOpsBackend', () => {
     it('filters by iteration via WIQL', () => {
       const backend = makeBackend();
 
-      mockAz.mockReturnValueOnce({ workItems: [{ id: 42 }] });
+      mockAz.mockReturnValueOnce([{ id: 42 }]);
       mockAzInvoke.mockReturnValueOnce({
         value: [sampleWorkItem],
       });
@@ -256,7 +254,7 @@ describe('AzureDevOpsBackend', () => {
 
     it('returns empty array when no items match', () => {
       const backend = makeBackend();
-      mockAz.mockReturnValueOnce({ workItems: [] });
+      mockAz.mockReturnValueOnce([]);
       expect(backend.listWorkItems()).toEqual([]);
     });
   });
@@ -491,9 +489,8 @@ describe('AzureDevOpsBackend', () => {
     it('returns child work items via WIQL', () => {
       const backend = makeBackend();
 
-      mockAz.mockReturnValueOnce({
-        workItems: [{ id: 50 }, { id: 51 }],
-      });
+      // Link queries include the source item; code filters it out
+      mockAz.mockReturnValueOnce([{ id: 42 }, { id: 50 }, { id: 51 }]);
       mockAzInvoke.mockReturnValueOnce({
         value: [
           { ...sampleWorkItem, id: 50 },
@@ -507,7 +504,7 @@ describe('AzureDevOpsBackend', () => {
 
     it('returns empty array when no children', () => {
       const backend = makeBackend();
-      mockAz.mockReturnValueOnce({ workItems: [] });
+      mockAz.mockReturnValueOnce([]);
       expect(backend.getChildren('42')).toEqual([]);
     });
   });
@@ -516,9 +513,8 @@ describe('AzureDevOpsBackend', () => {
     it('returns dependent work items via WIQL', () => {
       const backend = makeBackend();
 
-      mockAz.mockReturnValueOnce({
-        workItems: [{ id: 60 }],
-      });
+      // Link queries include the source item; code filters it out
+      mockAz.mockReturnValueOnce([{ id: 42 }, { id: 60 }]);
       mockAzInvoke.mockReturnValueOnce({
         value: [{ ...sampleWorkItem, id: 60 }],
       });

@@ -19,20 +19,6 @@ import {
 } from './mappers.js';
 import type { AdoWorkItem, AdoComment, AdoWorkItemType } from './mappers.js';
 
-const BATCH_FIELDS = [
-  'System.Id',
-  'System.Title',
-  'System.WorkItemType',
-  'System.State',
-  'System.IterationPath',
-  'Microsoft.VSTS.Common.Priority',
-  'System.AssignedTo',
-  'System.Tags',
-  'System.Description',
-  'System.CreatedDate',
-  'System.ChangedDate',
-];
-
 export class AzureDevOpsBackend extends BaseBackend {
   private cwd: string;
   private org: string;
@@ -148,7 +134,7 @@ export class AzureDevOpsBackend extends BaseBackend {
           area: 'wit',
           resource: 'workitemsbatch',
           httpMethod: 'POST',
-          body: { ids: chunk, fields: BATCH_FIELDS, $expand: 4 },
+          body: { ids: chunk, $expand: 4 },
           apiVersion: '7.1',
         },
         this.cwd,
@@ -165,7 +151,7 @@ export class AzureDevOpsBackend extends BaseBackend {
       wiql += ` AND [System.IterationPath] = '${this.escapeWiql(iteration)}'`;
     }
 
-    const queryResult = az<{ workItems: { id: number }[] }>(
+    const queryResult = az<{ id: number }[]>(
       [
         'boards',
         'query',
@@ -179,7 +165,7 @@ export class AzureDevOpsBackend extends BaseBackend {
       this.cwd,
     );
 
-    const ids = queryResult.workItems.map((w) => w.id);
+    const ids = queryResult.map((w) => w.id);
     if (ids.length === 0) return [];
 
     const items = this.batchFetchWorkItems(ids);
@@ -518,10 +504,7 @@ export class AzureDevOpsBackend extends BaseBackend {
 
     const wiql = `SELECT [System.Id] FROM WorkItemLinks WHERE [Source].[System.Id] = ${numericId} AND [System.Links.LinkType] = 'System.LinkTypes.Hierarchy-Forward' MODE (MustContain)`;
 
-    const queryResult = az<{
-      workItems?: { id: number }[];
-      workItemRelations?: { target: { id: number } }[];
-    }>(
+    const queryResult = az<{ id: number }[]>(
       [
         'boards',
         'query',
@@ -535,7 +518,8 @@ export class AzureDevOpsBackend extends BaseBackend {
       this.cwd,
     );
 
-    const ids = queryResult.workItems?.map((w) => w.id) ?? [];
+    // Filter out the source item (link queries include it)
+    const ids = queryResult.map((w) => w.id).filter((wid) => wid !== numericId);
     if (ids.length === 0) return [];
 
     return this.batchFetchWorkItems(ids);
@@ -547,10 +531,7 @@ export class AzureDevOpsBackend extends BaseBackend {
 
     const wiql = `SELECT [System.Id] FROM WorkItemLinks WHERE [Source].[System.Id] = ${numericId} AND [System.Links.LinkType] = 'System.LinkTypes.Dependency-Forward' MODE (MustContain)`;
 
-    const queryResult = az<{
-      workItems?: { id: number }[];
-      workItemRelations?: { target: { id: number } }[];
-    }>(
+    const queryResult = az<{ id: number }[]>(
       [
         'boards',
         'query',
@@ -564,7 +545,8 @@ export class AzureDevOpsBackend extends BaseBackend {
       this.cwd,
     );
 
-    const ids = queryResult.workItems?.map((w) => w.id) ?? [];
+    // Filter out the source item (link queries include it)
+    const ids = queryResult.map((w) => w.id).filter((wid) => wid !== numericId);
     if (ids.length === 0) return [];
 
     return this.batchFetchWorkItems(ids);
