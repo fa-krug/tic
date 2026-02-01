@@ -68,26 +68,28 @@ describe('AzureDevOpsBackend', () => {
     vi.clearAllMocks();
     // Constructor calls azExec for auth check
     mockAzExec.mockReturnValue('');
-    // Constructor calls az for work item types
-    mockAz.mockReturnValue([
-      {
-        name: 'Epic',
-        states: [{ name: 'New' }, { name: 'Active' }, { name: 'Closed' }],
-      },
-      {
-        name: 'User Story',
-        states: [
-          { name: 'New' },
-          { name: 'Active' },
-          { name: 'Resolved' },
-          { name: 'Closed' },
-        ],
-      },
-      {
-        name: 'Task',
-        states: [{ name: 'New' }, { name: 'Active' }, { name: 'Closed' }],
-      },
-    ]);
+    // Constructor calls azInvoke for work item types
+    mockAzInvoke.mockReturnValue({
+      value: [
+        {
+          name: 'Epic',
+          states: [{ name: 'New' }, { name: 'Active' }, { name: 'Closed' }],
+        },
+        {
+          name: 'User Story',
+          states: [
+            { name: 'New' },
+            { name: 'Active' },
+            { name: 'Resolved' },
+            { name: 'Closed' },
+          ],
+        },
+        {
+          name: 'Task',
+          states: [{ name: 'New' }, { name: 'Active' }, { name: 'Closed' }],
+        },
+      ],
+    });
   });
 
   describe('constructor', () => {
@@ -226,8 +228,8 @@ describe('AzureDevOpsBackend', () => {
       // Sorted by updated descending
       expect(items[0]!.id).toBe('42');
       expect(items[1]!.id).toBe('43');
-      // Verify batch fetch includes $expand for relations
-      const invokeCall = mockAzInvoke.mock.calls[0]!;
+      // Verify batch fetch includes $expand for relations (call[0] is constructor's workitemtypes)
+      const invokeCall = mockAzInvoke.mock.calls[1]!;
       const invokeOpts = invokeCall[0] as { body: { $expand: number } };
       expect(invokeOpts.body.$expand).toBe(4);
     });

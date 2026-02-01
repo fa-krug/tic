@@ -46,19 +46,15 @@ export class AzureDevOpsBackend extends BaseBackend {
     const remote = parseAdoRemote(cwd);
     this.org = remote.org;
     this.project = remote.project;
-    this.types = az<AdoWorkItemType[]>(
-      [
-        'boards',
-        'work-item',
-        'type',
-        'list',
-        '--org',
-        `https://dev.azure.com/${this.org}`,
-        '--project',
-        this.project,
-      ],
+    this.types = azInvoke<{ value: AdoWorkItemType[] }>(
+      {
+        area: 'wit',
+        resource: 'workitemtypes',
+        routeParameters: `project=${this.project}`,
+        apiVersion: '7.1',
+      },
       cwd,
-    );
+    ).value;
   }
 
   getCapabilities(): BackendCapabilities {
