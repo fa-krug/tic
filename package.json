@@ -14,7 +14,7 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "start": "node dist/index.js",
-    "test": "vitest run --exclude 'dist/**'",
+    "test": "vitest run --exclude 'dist/**' --exclude '.worktrees/**'",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
     "format": "prettier --write 'src/**/*.{ts,tsx}'",
