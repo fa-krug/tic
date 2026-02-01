@@ -1,5 +1,5 @@
 {
-  "name": "tic",
+  "name": "@sascha384/tic",
   "version": "0.1.0",
   "description": "Terminal UI for issue tracking",
   "type": "module",
