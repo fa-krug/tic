@@ -21,6 +21,10 @@
     "format:check": "prettier --check 'src/**/*.{ts,tsx}'",
     "prepare": "husky"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fa-krug/tic.git"
+  },
   "license": "MIT",
   "publishConfig": {
     "access": "public"
