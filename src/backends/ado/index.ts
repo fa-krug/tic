@@ -14,6 +14,8 @@ import {
   mapCommentToComment,
   mapPriorityToAdo,
   formatTags,
+  extractParent,
+  extractPredecessors,
 } from './mappers.js';
 import type { AdoWorkItem, AdoComment, AdoWorkItemType } from './mappers.js';
 
@@ -150,7 +152,7 @@ export class AzureDevOpsBackend extends BaseBackend {
           area: 'wit',
           resource: 'workitemsbatch',
           httpMethod: 'POST',
-          body: { ids: chunk, fields: BATCH_FIELDS },
+          body: { ids: chunk, fields: BATCH_FIELDS, $expand: 4 },
           apiVersion: '7.1',
         },
         this.cwd,
@@ -341,6 +343,136 @@ export class AzureDevOpsBackend extends BaseBackend {
 
     if (fields.length > 0) {
       az(args, this.cwd);
+    }
+
+    // Handle parent relation changes
+    if (data.parent !== undefined) {
+      const current = az<AdoWorkItem>(
+        [
+          'boards',
+          'work-item',
+          'show',
+          '--id',
+          id,
+          '--expand',
+          'relations',
+          '--org',
+          `https://dev.azure.com/${this.org}`,
+          '--project',
+          this.project,
+        ],
+        this.cwd,
+      );
+      const currentParent = extractParent(current.relations);
+
+      if (currentParent && currentParent !== data.parent) {
+        azExec(
+          [
+            'boards',
+            'work-item',
+            'relation',
+            'remove',
+            '--id',
+            id,
+            '--relation-type',
+            'System.LinkTypes.Hierarchy-Reverse',
+            '--target-id',
+            currentParent,
+            '--org',
+            `https://dev.azure.com/${this.org}`,
+            '--yes',
+          ],
+          this.cwd,
+        );
+      }
+      if (data.parent && data.parent !== currentParent) {
+        azExec(
+          [
+            'boards',
+            'work-item',
+            'relation',
+            'add',
+            '--id',
+            id,
+            '--relation-type',
+            'System.LinkTypes.Hierarchy-Reverse',
+            '--target-id',
+            data.parent,
+            '--org',
+            `https://dev.azure.com/${this.org}`,
+          ],
+          this.cwd,
+        );
+      }
+    }
+
+    // Handle dependency relation changes
+    if (data.dependsOn !== undefined) {
+      const current = az<AdoWorkItem>(
+        [
+          'boards',
+          'work-item',
+          'show',
+          '--id',
+          id,
+          '--expand',
+          'relations',
+          '--org',
+          `https://dev.azure.com/${this.org}`,
+          '--project',
+          this.project,
+        ],
+        this.cwd,
+      );
+      const currentDeps = new Set(extractPredecessors(current.relations));
+      const newDeps = new Set(data.dependsOn);
+
+      // Remove deps that are no longer in the list
+      for (const dep of currentDeps) {
+        if (!newDeps.has(dep)) {
+          azExec(
+            [
+              'boards',
+              'work-item',
+              'relation',
+              'remove',
+              '--id',
+              id,
+              '--relation-type',
+              'System.LinkTypes.Dependency-Reverse',
+              '--target-id',
+              dep,
+              '--org',
+              `https://dev.azure.com/${this.org}`,
+              '--yes',
+            ],
+            this.cwd,
+          );
+        }
+      }
+
+      // Add deps that are new
+      for (const dep of newDeps) {
+        if (!currentDeps.has(dep)) {
+          azExec(
+            [
+              'boards',
+              'work-item',
+              'relation',
+              'add',
+              '--id',
+              id,
+              '--relation-type',
+              'System.LinkTypes.Dependency-Reverse',
+              '--target-id',
+              dep,
+              '--org',
+              `https://dev.azure.com/${this.org}`,
+            ],
+            this.cwd,
+          );
+        }
+      }
     }
 
     return this.getWorkItem(id);

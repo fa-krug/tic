@@ -226,6 +226,10 @@ describe('AzureDevOpsBackend', () => {
       // Sorted by updated descending
       expect(items[0]!.id).toBe('42');
       expect(items[1]!.id).toBe('43');
+      // Verify batch fetch includes $expand for relations
+      const invokeCall = mockAzInvoke.mock.calls[0]!;
+      const invokeOpts = invokeCall[0] as { body: { $expand: number } };
+      expect(invokeOpts.body.$expand).toBe(4);
     });
 
     it('filters by iteration via WIQL', () => {
@@ -326,6 +330,120 @@ describe('AzureDevOpsBackend', () => {
 
       expect(mockAz).toHaveBeenCalledWith(
         expect.arrayContaining(['boards', 'work-item', 'update', '--id', '42']),
+        '/repo',
+      );
+    });
+
+    it('updates parent relation', () => {
+      const backend = makeBackend();
+
+      // Fetch current item with relations (for parent diff)
+      mockAz.mockReturnValueOnce({
+        ...sampleWorkItem,
+        relations: [
+          {
+            rel: 'System.LinkTypes.Hierarchy-Reverse',
+            url: 'https://dev.azure.com/contoso/_apis/wit/workItems/10',
+            attributes: {},
+          },
+        ],
+      });
+      mockAzExec.mockReturnValue('');
+      // getWorkItem refetch
+      mockAz.mockReturnValueOnce(sampleWorkItem);
+      mockAzInvoke.mockReturnValueOnce({ comments: [] });
+
+      backend.updateWorkItem('42', { parent: '20' });
+
+      // Should remove old parent (10)
+      expect(mockAzExec).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          'relation',
+          'remove',
+          '--id',
+          '42',
+          '--target-id',
+          '10',
+        ]),
+        '/repo',
+      );
+      // Should add new parent (20)
+      expect(mockAzExec).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          'relation',
+          'add',
+          '--id',
+          '42',
+          '--target-id',
+          '20',
+        ]),
+        '/repo',
+      );
+    });
+
+    it('clears parent relation when set to null', () => {
+      const backend = makeBackend();
+
+      // Fetch current item with existing parent
+      mockAz.mockReturnValueOnce({
+        ...sampleWorkItem,
+        relations: [
+          {
+            rel: 'System.LinkTypes.Hierarchy-Reverse',
+            url: 'https://dev.azure.com/contoso/_apis/wit/workItems/10',
+            attributes: {},
+          },
+        ],
+      });
+      mockAzExec.mockReturnValue('');
+      // getWorkItem refetch
+      mockAz.mockReturnValueOnce({ ...sampleWorkItem, relations: [] });
+      mockAzInvoke.mockReturnValueOnce({ comments: [] });
+
+      backend.updateWorkItem('42', { parent: null });
+
+      // Should remove old parent
+      expect(mockAzExec).toHaveBeenCalledWith(
+        expect.arrayContaining(['relation', 'remove', '--target-id', '10']),
+        '/repo',
+      );
+    });
+
+    it('updates dependency relations', () => {
+      const backend = makeBackend();
+
+      // Fetch current item with existing deps [20, 21]
+      mockAz.mockReturnValueOnce({
+        ...sampleWorkItem,
+        relations: [
+          {
+            rel: 'System.LinkTypes.Dependency-Reverse',
+            url: 'https://dev.azure.com/contoso/_apis/wit/workItems/20',
+            attributes: {},
+          },
+          {
+            rel: 'System.LinkTypes.Dependency-Reverse',
+            url: 'https://dev.azure.com/contoso/_apis/wit/workItems/21',
+            attributes: {},
+          },
+        ],
+      });
+      mockAzExec.mockReturnValue('');
+      // getWorkItem refetch
+      mockAz.mockReturnValueOnce(sampleWorkItem);
+      mockAzInvoke.mockReturnValueOnce({ comments: [] });
+
+      // Change deps to [21, 30] — remove 20, keep 21, add 30
+      backend.updateWorkItem('42', { dependsOn: ['21', '30'] });
+
+      // Should remove 20
+      expect(mockAzExec).toHaveBeenCalledWith(
+        expect.arrayContaining(['relation', 'remove', '--target-id', '20']),
+        '/repo',
+      );
+      // Should add 30
+      expect(mockAzExec).toHaveBeenCalledWith(
+        expect.arrayContaining(['relation', 'add', '--target-id', '30']),
         '/repo',
       );
     });
