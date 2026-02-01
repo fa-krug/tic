@@ -185,8 +185,6 @@ export class AzureDevOpsBackend extends BaseBackend {
         'relations',
         '--org',
         `https://dev.azure.com/${this.org}`,
-        '--project',
-        this.project,
       ],
       this.cwd,
     );
@@ -299,8 +297,6 @@ export class AzureDevOpsBackend extends BaseBackend {
       id,
       '--org',
       `https://dev.azure.com/${this.org}`,
-      '--project',
-      this.project,
     ];
 
     const fields: string[] = [];
@@ -340,8 +336,6 @@ export class AzureDevOpsBackend extends BaseBackend {
           'relations',
           '--org',
           `https://dev.azure.com/${this.org}`,
-          '--project',
-          this.project,
         ],
         this.cwd,
       );
@@ -401,8 +395,6 @@ export class AzureDevOpsBackend extends BaseBackend {
           'relations',
           '--org',
           `https://dev.azure.com/${this.org}`,
-          '--project',
-          this.project,
         ],
         this.cwd,
       );
