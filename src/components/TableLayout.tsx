@@ -65,7 +65,9 @@ export function TableLayout({
               <Text color="cyan">{selected ? '>' : ' '}</Text>
             </Box>
             <Box width={colId}>
-              <Text color={selected ? 'cyan' : undefined}>{item.id}</Text>
+              <Text color={selected ? 'cyan' : undefined} bold={selected}>
+                {item.id}
+              </Text>
             </Box>
             <Box flexGrow={1}>
               <Text color={selected ? 'cyan' : undefined} bold={selected}>
@@ -74,21 +76,21 @@ export function TableLayout({
               </Text>
             </Box>
             <Box width={colStatus}>
-              <Text color={selected ? 'cyan' : undefined}>
+              <Text color={selected ? 'cyan' : undefined} bold={selected}>
                 {capabilities.fields.dependsOn && hasUnresolvedDeps ? '⧗ ' : ''}
                 {item.status}
               </Text>
             </Box>
             {capabilities.fields.priority && (
               <Box width={colPriority}>
-                <Text color={selected ? 'cyan' : undefined}>
+                <Text color={selected ? 'cyan' : undefined} bold={selected}>
                   {item.priority}
                 </Text>
               </Box>
             )}
             {capabilities.fields.assignee && (
               <Box width={colAssignee}>
-                <Text color={selected ? 'cyan' : undefined}>
+                <Text color={selected ? 'cyan' : undefined} bold={selected}>
                   {item.assignee}
                 </Text>
               </Box>

@@ -61,24 +61,16 @@ export function CardLayout({
             marginBottom={idx < treeItems.length - 1 ? 1 : 0}
           >
             <Box>
-              <Text
-                color={selected ? 'cyan' : undefined}
-                bold={selected}
-                inverse={selected}
-              >
+              <Text color={selected ? 'cyan' : undefined} bold={selected}>
                 {marker}
                 {indent}#{item.id} {item.title}
                 {depIndicator}
               </Text>
             </Box>
             <Box>
-              <Text color={selected ? 'cyan' : undefined} inverse={selected}>
-                {metaIndent}
-              </Text>
-              <Text color={statusColor(item.status)} inverse={selected}>
-                ●
-              </Text>
-              <Text color={selected ? 'cyan' : undefined} inverse={selected}>
+              <Text color={selected ? 'cyan' : undefined}>{metaIndent}</Text>
+              <Text color={statusColor(item.status)}>●</Text>
+              <Text color={selected ? 'cyan' : undefined} bold={selected}>
                 {' '}
                 {item.status}
                 {capabilities.fields.priority && formatPriority(item.priority)
