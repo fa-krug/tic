@@ -49,11 +49,15 @@ describe('createBackend', () => {
     expect(() => createBackend(tmpDir)).not.toThrow('not yet implemented');
   });
 
-  it('attempts to create AzureDevOpsBackend when backend is azure', () => {
-    writeConfig(tmpDir, { ...defaultConfig, backend: 'azure' });
-    // Throws because az auth will fail in test env, but NOT "not yet implemented"
-    expect(() => createBackend(tmpDir)).not.toThrow('not yet implemented');
-  });
+  it(
+    'attempts to create AzureDevOpsBackend when backend is azure',
+    { timeout: 20_000 },
+    () => {
+      writeConfig(tmpDir, { ...defaultConfig, backend: 'azure' });
+      // Throws because az auth will fail in test env, but NOT "not yet implemented"
+      expect(() => createBackend(tmpDir)).not.toThrow('not yet implemented');
+    },
+  );
 
   it('throws for unknown backend values', () => {
     writeConfig(tmpDir, { ...defaultConfig, backend: 'jira' });

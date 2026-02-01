@@ -23,7 +23,12 @@ describe('az', () => {
     expect(mockExecFileSync).toHaveBeenCalledWith(
       'az',
       ['boards', 'work-item', 'show', '--id', '1', '-o', 'json'],
-      { cwd: '/tmp', encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] },
+      {
+        cwd: '/tmp',
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+        timeout: 15_000,
+      },
     );
   });
 

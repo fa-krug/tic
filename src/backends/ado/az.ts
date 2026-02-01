@@ -3,11 +3,14 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+const AZ_TIMEOUT_MS = 15_000;
+
 export function az<T>(args: string[], cwd: string): T {
   const result = execFileSync('az', [...args, '-o', 'json'], {
     cwd,
     encoding: 'utf-8',
     stdio: ['pipe', 'pipe', 'pipe'],
+    timeout: AZ_TIMEOUT_MS,
   });
   return JSON.parse(result) as T;
 }
@@ -17,6 +20,7 @@ export function azExec(args: string[], cwd: string): string {
     cwd,
     encoding: 'utf-8',
     stdio: ['pipe', 'pipe', 'pipe'],
+    timeout: AZ_TIMEOUT_MS,
   });
 }
 
@@ -61,6 +65,7 @@ export function azInvoke<T>(options: AzInvokeOptions, cwd: string): T {
       cwd,
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: AZ_TIMEOUT_MS,
     });
     return JSON.parse(result) as T;
   } finally {
