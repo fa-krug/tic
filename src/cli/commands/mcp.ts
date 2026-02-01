@@ -2,9 +2,11 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import {
-  createBackend as createBackendFromConfig,
+  createBackendWithSync,
   VALID_BACKENDS,
 } from '../../backends/factory.js';
+import { SyncQueueStore } from '../../sync/queue.js';
+import type { SyncManager } from '../../sync/SyncManager.js';
 import { readConfig, writeConfig } from '../../backends/local/config.js';
 import type { Backend } from '../../backends/types.js';
 import fs from 'node:fs';
@@ -400,11 +402,17 @@ export function handleGetItemTree(
   }
 }
 
+export interface SyncState {
+  syncManager: SyncManager | null;
+  queueStore: SyncQueueStore | null;
+}
+
 export function registerTools(
   server: McpServer,
   backend: Backend,
   pendingDeletes: DeleteTracker,
   root: string,
+  syncState?: SyncState,
 ): void {
   const caps = backend.getCapabilities();
 
@@ -459,8 +467,18 @@ export function registerTools(
         .describe('Dependency item IDs'),
       description: z.string().optional().describe('Work item description'),
     },
-    (args) => {
-      return handleCreateItem(backend, args);
+    async (args) => {
+      const result = handleCreateItem(backend, args);
+      if (!result.isError && syncState?.queueStore && syncState?.syncManager) {
+        const data = JSON.parse(result.content[0]!.text) as { id: string };
+        syncState.queueStore.append({
+          action: 'create',
+          itemId: data.id,
+          timestamp: new Date().toISOString(),
+        });
+        await syncState.syncManager.pushPending();
+      }
+      return result;
     },
   );
 
@@ -487,8 +505,18 @@ export function registerTools(
         .describe('Dependency item IDs'),
       description: z.string().optional().describe('Work item description'),
     },
-    (args) => {
-      return handleUpdateItem(backend, args);
+    async (args) => {
+      const result = handleUpdateItem(backend, args);
+      if (!result.isError && syncState?.queueStore && syncState?.syncManager) {
+        const data = JSON.parse(result.content[0]!.text) as { id: string };
+        syncState.queueStore.append({
+          action: 'update',
+          itemId: data.id,
+          timestamp: new Date().toISOString(),
+        });
+        await syncState.syncManager.pushPending();
+      }
+      return result;
     },
   );
 
@@ -509,8 +537,17 @@ export function registerTools(
     {
       id: z.string().describe('Work item ID'),
     },
-    (args) => {
-      return handleConfirmDelete(backend, args, pendingDeletes);
+    async (args) => {
+      const result = handleConfirmDelete(backend, args, pendingDeletes);
+      if (!result.isError && syncState?.queueStore && syncState?.syncManager) {
+        syncState.queueStore.append({
+          action: 'delete',
+          itemId: args.id,
+          timestamp: new Date().toISOString(),
+        });
+        await syncState.syncManager.pushPending();
+      }
+      return result;
     },
   );
 
@@ -551,8 +588,26 @@ export function registerTools(
         text: z.string().describe('Comment text'),
         author: z.string().optional().describe('Comment author'),
       },
-      (args) => {
-        return handleAddComment(backend, args);
+      async (args) => {
+        const result = handleAddComment(backend, args);
+        if (
+          !result.isError &&
+          syncState?.queueStore &&
+          syncState?.syncManager
+        ) {
+          const data = JSON.parse(result.content[0]!.text) as {
+            author: string;
+            body: string;
+          };
+          syncState.queueStore.append({
+            action: 'comment',
+            itemId: args.id,
+            timestamp: new Date().toISOString(),
+            commentData: { author: data.author, body: data.body },
+          });
+          await syncState.syncManager.pushPending();
+        }
+        return result;
       },
     );
   }
@@ -620,9 +675,18 @@ export async function startMcpServer(): Promise<void> {
     version: '0.1.0',
   });
 
-  let backend: Backend | null = isTicProject(root)
-    ? createBackendFromConfig(root)
-    : null;
+  let backend: Backend | null = null;
+  const syncState: SyncState = { syncManager: null, queueStore: null };
+
+  if (isTicProject(root)) {
+    const setup = createBackendWithSync(root);
+    backend = setup.backend;
+    syncState.syncManager = setup.syncManager;
+    syncState.queueStore = syncState.syncManager
+      ? new SyncQueueStore(root)
+      : null;
+  }
+
   const pendingDeletes = createDeleteTracker();
 
   const guardedBackend = new Proxy({} as Backend, {
@@ -630,7 +694,12 @@ export async function startMcpServer(): Promise<void> {
       if (!backend) {
         // Re-check after init_project may have created the project
         if (isTicProject(root)) {
-          backend = createBackendFromConfig(root);
+          const setup = createBackendWithSync(root);
+          backend = setup.backend;
+          syncState.syncManager = setup.syncManager;
+          syncState.queueStore = syncState.syncManager
+            ? new SyncQueueStore(root)
+            : null;
         } else {
           throw new Error(
             'Not a tic project. Use the init_project tool first.',
@@ -641,7 +710,7 @@ export async function startMcpServer(): Promise<void> {
     },
   });
 
-  registerTools(server, guardedBackend, pendingDeletes, root);
+  registerTools(server, guardedBackend, pendingDeletes, root, syncState);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
