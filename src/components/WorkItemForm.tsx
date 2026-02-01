@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import SelectInput from 'ink-select-input';
@@ -19,14 +19,24 @@ type FieldName =
   | 'description'
   | 'parent'
   | 'dependsOn'
-  | 'comments';
+  | 'comments'
+  | `rel-parent`
+  | `rel-child-${string}`
+  | `rel-dependent-${string}`;
 
 const SELECT_FIELDS: FieldName[] = ['type', 'status', 'iteration', 'priority'];
 const PRIORITIES = ['low', 'medium', 'high', 'critical'];
 
 export function WorkItemForm() {
-  const { backend, syncManager, navigate, selectedWorkItemId, activeType } =
-    useAppState();
+  const {
+    backend,
+    syncManager,
+    navigate,
+    selectedWorkItemId,
+    activeType,
+    pushWorkItem,
+    popWorkItem,
+  } = useAppState();
 
   const queueStore = useMemo(() => {
     if (!syncManager) return null;
@@ -63,8 +73,24 @@ export function WorkItemForm() {
     if (capabilities.fields.parent) all.push('parent');
     if (capabilities.fields.dependsOn) all.push('dependsOn');
     if (capabilities.comments) all.push('comments');
+
+    if (selectedWorkItemId !== null && capabilities.relationships) {
+      const item = backend.getWorkItem(selectedWorkItemId);
+      if (item.parent) {
+        all.push('rel-parent');
+      }
+      const children = backend.getChildren(selectedWorkItemId);
+      for (const child of children) {
+        all.push(`rel-child-${child.id}`);
+      }
+      const dependents = backend.getDependents(selectedWorkItemId);
+      for (const dep of dependents) {
+        all.push(`rel-dependent-${dep.id}`);
+      }
+    }
+
     return all;
-  }, [capabilities]);
+  }, [capabilities, selectedWorkItemId, backend]);
 
   const statuses = useMemo(() => backend.getStatuses(), [backend]);
   const iterations = useMemo(() => backend.getIterations(), [backend]);
@@ -117,8 +143,17 @@ export function WorkItemForm() {
   const [focusedField, setFocusedField] = useState(0);
   const [editing, setEditing] = useState(false);
 
+  useEffect(() => {
+    setFocusedField(0);
+    setEditing(false);
+  }, [selectedWorkItemId]);
+
   const currentField = fields[focusedField]!;
   const isSelectField = SELECT_FIELDS.includes(currentField);
+  const isRelationshipField =
+    currentField === 'rel-parent' ||
+    currentField.startsWith('rel-child-') ||
+    currentField.startsWith('rel-dependent-');
 
   function save() {
     const parsedLabels = labels
@@ -199,12 +234,30 @@ export function WorkItemForm() {
         }
 
         if (key.return) {
-          setEditing(true);
+          if (isRelationshipField) {
+            let targetId: string | null = null;
+            if (currentField === 'rel-parent' && existingItem?.parent) {
+              targetId = existingItem.parent;
+            } else if (currentField.startsWith('rel-child-')) {
+              targetId = currentField.slice('rel-child-'.length);
+            } else if (currentField.startsWith('rel-dependent-')) {
+              targetId = currentField.slice('rel-dependent-'.length);
+            }
+            if (targetId) {
+              save();
+              pushWorkItem(targetId);
+            }
+          } else {
+            setEditing(true);
+          }
         }
 
         if (key.escape) {
           save();
-          navigate('list');
+          const prev = popWorkItem();
+          if (prev === null) {
+            navigate('list');
+          }
         }
       } else {
         if (key.escape) {
@@ -476,6 +529,36 @@ export function WorkItemForm() {
     );
   }
 
+  function renderRelationshipField(field: FieldName, index: number) {
+    const focused = index === focusedField;
+    const cursor = focused ? '>' : ' ';
+    const id = field.startsWith('rel-child-')
+      ? field.slice('rel-child-'.length)
+      : field.startsWith('rel-dependent-')
+        ? field.slice('rel-dependent-'.length)
+        : null;
+
+    let item: { id: string; title: string };
+    if (field === 'rel-parent' && existingItem?.parent) {
+      const parentItem = backend.getWorkItem(existingItem.parent);
+      item = { id: parentItem.id, title: parentItem.title };
+    } else if (id) {
+      const relItem = backend.getWorkItem(id);
+      item = { id: relItem.id, title: relItem.title };
+    } else {
+      return null;
+    }
+
+    return (
+      <Box key={field}>
+        <Text color={focused ? 'cyan' : undefined}>{cursor} </Text>
+        <Text bold={focused} color={focused ? 'cyan' : undefined}>
+          #{item.id} ({item.title})
+        </Text>
+      </Box>
+    );
+  }
+
   const mode = selectedWorkItemId !== null ? 'Edit' : 'Create';
   const typeLabel = type.charAt(0).toUpperCase() + type.slice(1);
 
@@ -488,33 +571,71 @@ export function WorkItemForm() {
         </Text>
       </Box>
 
-      {fields.map((field, index) => renderField(field, index))}
+      {fields.map((field, index) => {
+        if (
+          field === 'rel-parent' ||
+          field.startsWith('rel-child-') ||
+          field.startsWith('rel-dependent-')
+        ) {
+          return null;
+        }
+        return renderField(field, index);
+      })}
 
-      {selectedWorkItemId !== null && capabilities.relationships && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold dimColor>
-            Relationships:
-          </Text>
-          <Box marginLeft={2}>
-            <Text dimColor>
-              Children:{' '}
-              {backend
-                .getChildren(selectedWorkItemId)
-                .map((c) => `#${c.id} (${c.title})`)
-                .join(', ') || 'none'}
+      {selectedWorkItemId !== null &&
+        capabilities.relationships &&
+        fields.some((f) => f.startsWith('rel-')) && (
+          <Box flexDirection="column" marginTop={1}>
+            <Text bold dimColor>
+              Relationships:
             </Text>
+
+            {existingItem?.parent && (
+              <Box flexDirection="column">
+                <Box marginLeft={2}>
+                  <Text dimColor>Parent:</Text>
+                </Box>
+                {fields.map((field, index) =>
+                  field === 'rel-parent' ? (
+                    <Box key={field} marginLeft={2}>
+                      {renderRelationshipField(field, index)}
+                    </Box>
+                  ) : null,
+                )}
+              </Box>
+            )}
+
+            {fields.some((f) => f.startsWith('rel-child-')) && (
+              <Box flexDirection="column">
+                <Box marginLeft={2}>
+                  <Text dimColor>Children:</Text>
+                </Box>
+                {fields.map((field, index) =>
+                  field.startsWith('rel-child-') ? (
+                    <Box key={field} marginLeft={2}>
+                      {renderRelationshipField(field, index)}
+                    </Box>
+                  ) : null,
+                )}
+              </Box>
+            )}
+
+            {fields.some((f) => f.startsWith('rel-dependent-')) && (
+              <Box flexDirection="column">
+                <Box marginLeft={2}>
+                  <Text dimColor>Depended on by:</Text>
+                </Box>
+                {fields.map((field, index) =>
+                  field.startsWith('rel-dependent-') ? (
+                    <Box key={field} marginLeft={2}>
+                      {renderRelationshipField(field, index)}
+                    </Box>
+                  ) : null,
+                )}
+              </Box>
+            )}
           </Box>
-          <Box marginLeft={2}>
-            <Text dimColor>
-              Depended on by:{' '}
-              {backend
-                .getDependents(selectedWorkItemId)
-                .map((d) => `#${d.id} (${d.title})`)
-                .join(', ') || 'none'}
-            </Text>
-          </Box>
-        </Box>
-      )}
+        )}
 
       <Box marginTop={1}>
         <Text dimColor>
@@ -522,7 +643,9 @@ export function WorkItemForm() {
             ? isSelectField
               ? 'up/down: navigate  enter: select'
               : 'type to edit  enter/esc: confirm'
-            : 'up/down: navigate  enter: edit field  esc: save & back'}
+            : isRelationshipField
+              ? 'up/down: navigate  enter: open item  esc: save & back'
+              : 'up/down: navigate  enter: edit field  esc: save & back'}
         </Text>
       </Box>
     </Box>
