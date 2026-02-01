@@ -15,9 +15,12 @@ interface AppState {
   activeType: string | null;
   backend: Backend;
   syncManager: SyncManager | null;
+  navigationStack: string[];
   navigate: (screen: Screen) => void;
   selectWorkItem: (id: string | null) => void;
   setActiveType: (type: string | null) => void;
+  pushWorkItem: (id: string) => void;
+  popWorkItem: () => string | null;
 }
 
 export const AppContext = createContext<AppState>(null!);
@@ -38,6 +41,22 @@ export function App({
     null,
   );
   const [activeType, setActiveType] = useState<string | null>(null);
+  const [navigationStack, setNavigationStack] = useState<string[]>([]);
+
+  const pushWorkItem = (id: string) => {
+    if (selectedWorkItemId !== null) {
+      setNavigationStack((stack) => [...stack, selectedWorkItemId]);
+    }
+    setSelectedWorkItemId(id);
+  };
+
+  const popWorkItem = (): string | null => {
+    if (navigationStack.length === 0) return null;
+    const prev = navigationStack[navigationStack.length - 1]!;
+    setNavigationStack((stack) => stack.slice(0, -1));
+    setSelectedWorkItemId(prev);
+    return prev;
+  };
 
   const state: AppState = {
     screen,
@@ -45,9 +64,12 @@ export function App({
     activeType,
     backend,
     syncManager,
+    navigationStack,
     navigate: setScreen,
     selectWorkItem: setSelectedWorkItemId,
     setActiveType,
+    pushWorkItem,
+    popWorkItem,
   };
 
   return (
