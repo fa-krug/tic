@@ -201,12 +201,8 @@ export function WorkItemList() {
       setRefresh((r) => r + 1);
     }
 
-    if (input === 's' && capabilities.customTypes && types.length > 0) {
-      const currentIdx = types.indexOf(activeType ?? '');
-      const nextType = types[(currentIdx + 1) % types.length]!;
-      setActiveType(nextType);
-      setCursor(0);
-      setWarning('');
+    if (input === 's') {
+      navigate('status');
     }
 
     if (
@@ -247,14 +243,21 @@ export function WorkItemList() {
     'd: delete',
   ];
   if (capabilities.fields.parent) helpParts.push('p: set parent');
-  if (capabilities.customTypes) helpParts.push('s/tab: type');
+  if (capabilities.customTypes) helpParts.push('tab: type');
   if (capabilities.iterations) helpParts.push('i: iteration');
   if (gitAvailable) helpParts.push('b: branch');
   if (syncManager) helpParts.push('r: sync');
-  helpParts.push(',: settings', 'q: quit');
+  helpParts.push('s: status', ',: settings', 'q: quit');
   const helpText = helpParts.join('  ');
 
-  const compactHelpParts = ['↑↓ Nav', 'c New', '⏎ Edit', '⇥ Type', 'q Quit'];
+  const compactHelpParts = [
+    '↑↓ Nav',
+    'c New',
+    '⏎ Edit',
+    '⇥ Type',
+    's Status',
+    'q Quit',
+  ];
   const compactHelpText = compactHelpParts.join('  ');
 
   return (

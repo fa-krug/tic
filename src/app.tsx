@@ -4,10 +4,11 @@ import { WorkItemList } from './components/WorkItemList.js';
 import { WorkItemForm } from './components/WorkItemForm.js';
 import { IterationPicker } from './components/IterationPicker.js';
 import { Settings } from './components/Settings.js';
+import { StatusScreen } from './components/StatusScreen.js';
 import type { Backend } from './backends/types.js';
 import type { SyncManager } from './sync/SyncManager.js';
 
-type Screen = 'list' | 'form' | 'iteration-picker' | 'settings';
+type Screen = 'list' | 'form' | 'iteration-picker' | 'settings' | 'status';
 
 interface AppState {
   screen: Screen;
@@ -86,6 +87,7 @@ export function App({
         {screen === 'form' && <WorkItemForm />}
         {screen === 'iteration-picker' && <IterationPicker />}
         {screen === 'settings' && <Settings />}
+        {screen === 'status' && <StatusScreen />}
       </Box>
     </AppContext.Provider>
   );
