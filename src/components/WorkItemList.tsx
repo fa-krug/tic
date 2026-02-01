@@ -6,6 +6,9 @@ import type { WorkItem } from '../types.js';
 import { isGitRepo } from '../git.js';
 import { beginImplementation } from '../implement.js';
 import { readConfig } from '../backends/local/config.js';
+import { SyncQueueStore } from '../sync/queue.js';
+import type { SyncStatus } from '../sync/types.js';
+import type { QueueAction } from '../sync/types.js';
 
 interface TreeItem {
   item: WorkItem;
@@ -46,8 +49,14 @@ function buildTree(items: WorkItem[]): TreeItem[] {
 }
 
 export function WorkItemList() {
-  const { backend, navigate, selectWorkItem, activeType, setActiveType } =
-    useAppState();
+  const {
+    backend,
+    syncManager,
+    navigate,
+    selectWorkItem,
+    activeType,
+    setActiveType,
+  } = useAppState();
   const { exit } = useApp();
   const [cursor, setCursor] = useState(0);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -55,6 +64,32 @@ export function WorkItemList() {
   const [warning, setWarning] = useState('');
   const [settingParent, setSettingParent] = useState(false);
   const [parentInput, setParentInput] = useState('');
+
+  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(
+    syncManager?.getStatus() ?? null,
+  );
+
+  useEffect(() => {
+    if (!syncManager) return;
+    const cb = (status: SyncStatus) => setSyncStatus(status);
+    syncManager.onStatusChange(cb);
+  }, [syncManager]);
+
+  const queueStore = useMemo(() => {
+    if (!syncManager) return null;
+    return new SyncQueueStore(process.cwd());
+  }, [syncManager]);
+
+  const queueWrite = (action: QueueAction, itemId: string) => {
+    if (queueStore) {
+      queueStore.append({
+        action,
+        itemId,
+        timestamp: new Date().toISOString(),
+      });
+      void syncManager?.pushPending().then(() => setRefresh((r) => r + 1));
+    }
+  };
 
   const capabilities = useMemo(() => backend.getCapabilities(), [backend]);
   const types = useMemo(() => backend.getWorkItemTypes(), [backend]);
@@ -93,6 +128,7 @@ export function WorkItemList() {
     if (confirmDelete) {
       if (input === 'y' || input === 'Y') {
         backend.deleteWorkItem(treeItems[cursor]!.item.id);
+        queueWrite('delete', treeItems[cursor]!.item.id);
         setConfirmDelete(false);
         setCursor((c) => Math.max(0, c - 1));
         setRefresh((r) => r + 1);
@@ -163,6 +199,7 @@ export function WorkItemList() {
       const idx = statuses.indexOf(item.status);
       const nextStatus = statuses[(idx + 1) % statuses.length]!;
       backend.updateWorkItem(item.id, { status: nextStatus });
+      queueWrite('update', item.id);
 
       // Show warning if cycling to final status with open children or deps
       if (
@@ -221,6 +258,12 @@ export function WorkItemList() {
       setCursor(0);
       setWarning('');
     }
+
+    if (input === 'r' && syncManager) {
+      void syncManager.sync().then(() => {
+        setRefresh((r) => r + 1);
+      });
+    }
   });
 
   const typeLabel = activeType
@@ -239,6 +282,7 @@ export function WorkItemList() {
   if (capabilities.customTypes) helpParts.push('tab: type');
   if (capabilities.iterations) helpParts.push('i: iteration');
   if (gitAvailable) helpParts.push('b: branch');
+  if (syncManager) helpParts.push('r: sync');
   helpParts.push(',: settings', 'q: quit');
   const helpText = helpParts.join('  ');
 
@@ -254,6 +298,19 @@ export function WorkItemList() {
           {typeLabel} — {iteration}
         </Text>
         <Text dimColor> ({items.length} items)</Text>
+        {syncStatus && (
+          <Box>
+            <Text dimColor>
+              {syncStatus.state === 'syncing'
+                ? ' ⟳ Syncing...'
+                : syncStatus.state === 'error'
+                  ? ` ⚠ Sync failed (${syncStatus.errors.length} errors)`
+                  : syncStatus.pendingCount > 0
+                    ? ` ↑ ${syncStatus.pendingCount} pending`
+                    : ' ✓ Synced'}
+            </Text>
+          </Box>
+        )}
       </Box>
 
       <Box>
@@ -351,6 +408,7 @@ export function WorkItemList() {
                 const newParent = value.trim() === '' ? null : value.trim();
                 try {
                   backend.updateWorkItem(item.id, { parent: newParent });
+                  queueWrite('update', item.id);
                   setWarning('');
                 } catch (e) {
                   setWarning(e instanceof Error ? e.message : 'Invalid parent');
