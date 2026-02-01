@@ -5,6 +5,8 @@ import { GitHubBackend } from './github/index.js';
 import { GitLabBackend } from './gitlab/index.js';
 import { AzureDevOpsBackend } from './ado/index.js';
 import { readConfig } from './local/config.js';
+import { SyncManager } from '../sync/SyncManager.js';
+import { SyncQueueStore } from '../sync/queue.js';
 
 export const VALID_BACKENDS = ['local', 'github', 'gitlab', 'azure'] as const;
 export type BackendType = (typeof VALID_BACKENDS)[number];
@@ -48,4 +50,42 @@ export function createBackend(root: string): Backend {
         `Unknown backend "${backend}". Valid backends: ${VALID_BACKENDS.join(', ')}`,
       );
   }
+}
+
+export interface BackendSetup {
+  backend: LocalBackend;
+  syncManager: SyncManager | null;
+}
+
+export function createBackendWithSync(root: string): BackendSetup {
+  const config = readConfig(root);
+  const backendType = config.backend ?? 'local';
+
+  const local = new LocalBackend(root, { tempIds: backendType !== 'local' });
+
+  if (backendType === 'local') {
+    return { backend: local, syncManager: null };
+  }
+
+  let remote: Backend;
+  switch (backendType) {
+    case 'github':
+      remote = new GitHubBackend(root);
+      break;
+    case 'gitlab':
+      remote = new GitLabBackend(root);
+      break;
+    case 'azure':
+      remote = new AzureDevOpsBackend(root);
+      break;
+    default:
+      throw new Error(
+        `Unknown backend "${backendType}". Valid backends: ${VALID_BACKENDS.join(', ')}`,
+      );
+  }
+
+  const queueStore = new SyncQueueStore(root);
+  const syncManager = new SyncManager(local, remote, queueStore);
+
+  return { backend: local, syncManager };
 }

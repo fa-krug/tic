@@ -1,5 +1,5 @@
 import type { Backend } from '../backends/types.js';
-import type { LocalBackend } from '../backends/local/index.js';
+import { LocalBackend } from '../backends/local/index.js';
 import type { SyncQueueStore } from './queue.js';
 import type {
   QueueEntry,
@@ -136,8 +136,7 @@ export class SyncManager {
 
   private renameLocalItem(oldId: string, newId: string): void {
     const item = this.local.getWorkItem(oldId);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
-    const root = (this.local as any).root as string;
+    const root = this.local.getRoot();
     const renamedItem = { ...item, id: newId };
     writeWorkItem(root, renamedItem);
     removeWorkItemFile(root, oldId);
@@ -176,8 +175,7 @@ export class SyncManager {
   // eslint-disable-next-line @typescript-eslint/require-await
   private async pull(): Promise<number> {
     const remoteItems = this.remote.listWorkItems();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
-    const root = (this.local as any).root as string;
+    const root = this.local.getRoot();
     const pendingIds = new Set(this.queue.read().pending.map((e) => e.itemId));
 
     const localItems = this.local.listWorkItems();

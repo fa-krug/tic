@@ -18,14 +18,24 @@ import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
+export interface LocalBackendOptions {
+  tempIds?: boolean;
+}
+
 export class LocalBackend extends BaseBackend {
   private root: string;
   private config: Config;
+  private tempIds: boolean;
 
-  constructor(root: string) {
+  constructor(root: string, options?: LocalBackendOptions) {
     super();
     this.root = root;
     this.config = readConfig(root);
+    this.tempIds = options?.tempIds ?? false;
+  }
+
+  getRoot(): string {
+    return this.root;
   }
 
   getCapabilities(): BackendCapabilities {
@@ -156,7 +166,9 @@ export class LocalBackend extends BaseBackend {
   createWorkItem(data: NewWorkItem): WorkItem {
     this.validateFields(data);
     const now = new Date().toISOString();
-    const id = String(this.config.next_id);
+    const id = this.tempIds
+      ? `local-${this.config.next_id}`
+      : String(this.config.next_id);
     this.validateRelationships(id, data.parent, data.dependsOn);
     const item: WorkItem = {
       ...data,

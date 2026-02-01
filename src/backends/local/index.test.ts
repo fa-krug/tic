@@ -437,6 +437,25 @@ describe('LocalBackend', () => {
     expect(updated.parent).toBeNull();
   });
 
+  describe('LocalBackend temp IDs', () => {
+    it('generates local- prefixed IDs when tempIds option is set', () => {
+      const backend = new LocalBackend(tmpDir, { tempIds: true });
+      const item = backend.createWorkItem({
+        title: 'Temp',
+        type: 'task',
+        status: 'backlog',
+        priority: 'medium',
+        assignee: '',
+        labels: [],
+        iteration: 'default',
+        description: '',
+        parent: null,
+        dependsOn: [],
+      });
+      expect(item.id.startsWith('local-')).toBe(true);
+    });
+  });
+
   it('removes deleted item from dependsOn lists', () => {
     const dep = backend.createWorkItem({
       title: 'Dependency',
