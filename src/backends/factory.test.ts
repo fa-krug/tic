@@ -49,9 +49,10 @@ describe('createBackend', () => {
     expect(() => createBackend(tmpDir)).not.toThrow('not yet implemented');
   });
 
-  it('throws for unimplemented backends', () => {
+  it('attempts to create AzureDevOpsBackend when backend is azure', () => {
     writeConfig(tmpDir, { ...defaultConfig, backend: 'azure' });
-    expect(() => createBackend(tmpDir)).toThrow('not yet implemented');
+    // Throws because az auth will fail in test env, but NOT "not yet implemented"
+    expect(() => createBackend(tmpDir)).not.toThrow('not yet implemented');
   });
 
   it('throws for unknown backend values', () => {

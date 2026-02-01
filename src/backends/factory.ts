@@ -3,6 +3,7 @@ import type { Backend } from './types.js';
 import { LocalBackend } from './local/index.js';
 import { GitHubBackend } from './github/index.js';
 import { GitLabBackend } from './gitlab/index.js';
+import { AzureDevOpsBackend } from './ado/index.js';
 import { readConfig } from './local/config.js';
 
 export const VALID_BACKENDS = ['local', 'github', 'gitlab', 'azure'] as const;
@@ -17,7 +18,12 @@ export function detectBackend(root: string): BackendType {
     });
     if (output.includes('github.com')) return 'github';
     if (output.includes('gitlab.com')) return 'gitlab';
-    if (output.includes('dev.azure.com')) return 'azure';
+    if (
+      output.includes('dev.azure.com') ||
+      output.includes('ssh.dev.azure.com') ||
+      /\w+\.visualstudio\.com/.test(output)
+    )
+      return 'azure';
   } catch {
     // Not a git repo or git not available
   }
@@ -36,9 +42,7 @@ export function createBackend(root: string): Backend {
     case 'gitlab':
       return new GitLabBackend(root);
     case 'azure':
-      throw new Error(
-        `Backend "${backend}" is not yet implemented. Use "local" for now.`,
-      );
+      return new AzureDevOpsBackend(root);
     default:
       throw new Error(
         `Unknown backend "${backend}". Valid backends: ${VALID_BACKENDS.join(', ')}`,
