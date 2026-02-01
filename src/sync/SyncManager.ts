@@ -60,11 +60,20 @@ export class SyncManager {
         this.queue.remove(resolvedId, entry.action);
         pushed++;
       } catch (e) {
-        errors.push({
-          entry,
-          message: e instanceof Error ? e.message : String(e),
-          timestamp: new Date().toISOString(),
-        });
+        const isLocalMissing =
+          e instanceof Error &&
+          'code' in e &&
+          (e as NodeJS.ErrnoException).code === 'ENOENT';
+        if (isLocalMissing) {
+          // Local item was deleted or never synced — drop unrecoverable entry
+          this.queue.remove(entry.itemId, entry.action);
+        } else {
+          errors.push({
+            entry,
+            message: e instanceof Error ? e.message : String(e),
+            timestamp: new Date().toISOString(),
+          });
+        }
       }
     }
 
@@ -174,6 +183,13 @@ export class SyncManager {
 
   // eslint-disable-next-line @typescript-eslint/require-await
   private async pull(): Promise<number> {
+    this.local.syncConfigFromRemote({
+      iterations: this.remote.getIterations(),
+      currentIteration: this.remote.getCurrentIteration(),
+      statuses: this.remote.getStatuses(),
+      types: this.remote.getWorkItemTypes(),
+    });
+
     const remoteItems = this.remote.listWorkItems();
     const root = this.local.getRoot();
     const pendingIds = new Set(this.queue.read().pending.map((e) => e.itemId));

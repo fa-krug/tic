@@ -83,6 +83,19 @@ export class LocalBackend extends BaseBackend {
     this.save();
   }
 
+  syncConfigFromRemote(remote: {
+    iterations: string[];
+    currentIteration: string;
+    statuses: string[];
+    types: string[];
+  }): void {
+    this.config.iterations = remote.iterations;
+    this.config.current_iteration = remote.currentIteration;
+    this.config.statuses = remote.statuses;
+    this.config.types = remote.types;
+    this.save();
+  }
+
   private validateRelationships(
     id: string,
     parent: string | null | undefined,

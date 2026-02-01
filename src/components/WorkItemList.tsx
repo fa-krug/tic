@@ -114,7 +114,6 @@ export function WorkItemList() {
     [allItems, activeType],
   );
   const treeItems = useMemo(() => buildTree(items), [items]);
-  const statuses = backend.getStatuses();
 
   useEffect(() => {
     setCursor((c) => Math.min(c, Math.max(0, treeItems.length - 1)));
@@ -197,50 +196,12 @@ export function WorkItemList() {
       setRefresh((r) => r + 1);
     }
 
-    if (input === 's' && treeItems.length > 0) {
-      const item = treeItems[cursor]!.item;
-      const idx = statuses.indexOf(item.status);
-      const nextStatus = statuses[(idx + 1) % statuses.length]!;
-      backend.updateWorkItem(item.id, { status: nextStatus });
-      queueWrite('update', item.id);
-
-      // Show warning if cycling to final status with open children or deps
-      if (
-        capabilities.relationships &&
-        nextStatus === statuses[statuses.length - 1]
-      ) {
-        const children = backend.getChildren(item.id);
-        const openChildren = children.filter(
-          (c) => c.status !== statuses[statuses.length - 1],
-        );
-        const unresolvedDeps = item.dependsOn
-          .map((depId) => {
-            try {
-              return backend.getWorkItem(depId);
-            } catch {
-              return null;
-            }
-          })
-          .filter(
-            (d): d is WorkItem =>
-              d !== null && d.status !== statuses[statuses.length - 1],
-          );
-
-        const warnings: string[] = [];
-        if (openChildren.length > 0)
-          warnings.push(`${openChildren.length} children still open`);
-        if (unresolvedDeps.length > 0)
-          warnings.push(
-            unresolvedDeps
-              .map((d) => `Depends on #${d.id} (${d.status})`)
-              .join(', '),
-          );
-        if (warnings.length > 0) setWarning(warnings.join(' | '));
-      } else {
-        setWarning('');
-      }
-
-      setRefresh((r) => r + 1);
+    if (input === 's' && capabilities.customTypes && types.length > 0) {
+      const currentIdx = types.indexOf(activeType ?? '');
+      const nextType = types[(currentIdx + 1) % types.length]!;
+      setActiveType(nextType);
+      setCursor(0);
+      setWarning('');
     }
 
     if (
@@ -279,17 +240,16 @@ export function WorkItemList() {
     'o: open',
     'c: create',
     'd: delete',
-    's: cycle status',
   ];
   if (capabilities.fields.parent) helpParts.push('p: set parent');
-  if (capabilities.customTypes) helpParts.push('tab: type');
+  if (capabilities.customTypes) helpParts.push('s/tab: type');
   if (capabilities.iterations) helpParts.push('i: iteration');
   if (gitAvailable) helpParts.push('b: branch');
   if (syncManager) helpParts.push('r: sync');
   helpParts.push(',: settings', 'q: quit');
   const helpText = helpParts.join('  ');
 
-  const compactHelpParts = ['↑↓ Nav', 'c New', '⏎ Edit', 's Status', 'q Quit'];
+  const compactHelpParts = ['↑↓ Nav', 'c New', '⏎ Edit', '⇥ Type', 'q Quit'];
   const compactHelpText = compactHelpParts.join('  ');
 
   return (

@@ -176,9 +176,23 @@ describe('SyncManager push phase', () => {
     };
     const failManager = new SyncManager(local, failingRemote, queueStore);
 
+    // Item must exist locally so the push reaches the remote call
+    local.createWorkItem({
+      title: 'Existing',
+      type: 'task',
+      status: 'backlog',
+      priority: 'medium',
+      assignee: '',
+      labels: [],
+      iteration: 'default',
+      description: '',
+      parent: null,
+      dependsOn: [],
+    });
+
     queueStore.append({
       action: 'update',
-      itemId: '999',
+      itemId: '1',
       timestamp: new Date().toISOString(),
     });
 
@@ -186,6 +200,20 @@ describe('SyncManager push phase', () => {
     expect(result.failed).toBe(1);
     expect(result.errors).toHaveLength(1);
     expect(queueStore.read().pending).toHaveLength(1);
+  });
+
+  it('drops queue entries for locally deleted items', async () => {
+    const failManager = new SyncManager(local, remote, queueStore);
+
+    queueStore.append({
+      action: 'update',
+      itemId: 'gone',
+      timestamp: new Date().toISOString(),
+    });
+
+    const result = await failManager.pushPending();
+    expect(result.failed).toBe(0);
+    expect(queueStore.read().pending).toHaveLength(0);
   });
 
   it('processes queue in order, stops failed entry but continues others', async () => {
@@ -387,9 +415,23 @@ describe('SyncManager status callbacks', () => {
     };
     const manager = new SyncManager(local, remote, queueStore);
 
+    // Item must exist locally so the push reaches the remote call
+    local.createWorkItem({
+      title: 'Will fail on remote',
+      type: 'task',
+      status: 'backlog',
+      priority: 'medium',
+      assignee: '',
+      labels: [],
+      iteration: 'default',
+      description: '',
+      parent: null,
+      dependsOn: [],
+    });
+
     queueStore.append({
       action: 'update',
-      itemId: 'nonexistent',
+      itemId: '1',
       timestamp: new Date().toISOString(),
     });
 
