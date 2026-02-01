@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import SelectInput from 'ink-select-input';
+import { AutocompleteInput } from './AutocompleteInput.js';
 import { useAppState } from '../app.js';
 import type { Comment } from '../types.js';
 import { SyncQueueStore } from '../sync/queue.js';
@@ -68,6 +69,13 @@ export function WorkItemForm() {
   const statuses = useMemo(() => backend.getStatuses(), [backend]);
   const iterations = useMemo(() => backend.getIterations(), [backend]);
   const types = useMemo(() => backend.getWorkItemTypes(), [backend]);
+  const assignees = useMemo(() => {
+    try {
+      return backend.getAssignees();
+    } catch {
+      return [];
+    }
+  }, [backend]);
 
   const existingItem = useMemo(
     () =>
@@ -204,7 +212,7 @@ export function WorkItemForm() {
         }
       }
     },
-    { isActive: !editing || !isSelectField },
+    { isActive: !editing || (!isSelectField && currentField !== 'assignee') },
   );
 
   function getSelectItems(field: FieldName) {
@@ -379,32 +387,64 @@ export function WorkItemForm() {
       );
     }
 
-    // Text fields: title, assignee, labels, description, parent, dependsOn
+    if (field === 'assignee') {
+      if (isEditing) {
+        return (
+          <Box key={field} flexDirection="column">
+            <Box>
+              <Text color="cyan">{cursor} </Text>
+              <Text bold color="cyan">
+                {label}:{' '}
+              </Text>
+            </Box>
+            <Box marginLeft={4}>
+              <AutocompleteInput
+                value={assignee}
+                onChange={setAssignee}
+                onSubmit={() => {
+                  setEditing(false);
+                }}
+                suggestions={assignees}
+                focus={true}
+              />
+            </Box>
+          </Box>
+        );
+      }
+
+      return (
+        <Box key={field}>
+          <Text color={focused ? 'cyan' : undefined}>{cursor} </Text>
+          <Text bold={focused} color={focused ? 'cyan' : undefined}>
+            {label}:{' '}
+          </Text>
+          <Text>{assignee || <Text dimColor>(empty)</Text>}</Text>
+        </Box>
+      );
+    }
+
+    // Text fields: title, labels, description, parent, dependsOn
     const textValue =
       field === 'title'
         ? title
-        : field === 'assignee'
-          ? assignee
-          : field === 'labels'
-            ? labels
-            : field === 'parent'
-              ? parentId
-              : field === 'dependsOn'
-                ? dependsOn
-                : description;
+        : field === 'labels'
+          ? labels
+          : field === 'parent'
+            ? parentId
+            : field === 'dependsOn'
+              ? dependsOn
+              : description;
 
     const textSetter =
       field === 'title'
         ? setTitle
-        : field === 'assignee'
-          ? setAssignee
-          : field === 'labels'
-            ? setLabels
-            : field === 'parent'
-              ? setParentId
-              : field === 'dependsOn'
-                ? setDependsOn
-                : setDescription;
+        : field === 'labels'
+          ? setLabels
+          : field === 'parent'
+            ? setParentId
+            : field === 'dependsOn'
+              ? setDependsOn
+              : setDescription;
 
     if (isEditing) {
       return (
