@@ -7,6 +7,8 @@ import { isGitRepo } from '../git.js';
 import { beginImplementation } from '../implement.js';
 import { readConfig } from '../backends/local/config.js';
 import { TableLayout } from './TableLayout.js';
+import { CardLayout } from './CardLayout.js';
+import { useTerminalWidth } from '../hooks/useTerminalWidth.js';
 
 interface TreeItem {
   item: WorkItem;
@@ -58,6 +60,7 @@ export function WorkItemList() {
   const [parentInput, setParentInput] = useState('');
 
   const capabilities = useMemo(() => backend.getCapabilities(), [backend]);
+  const terminalWidth = useTerminalWidth();
   const types = useMemo(() => backend.getWorkItemTypes(), [backend]);
   const gitAvailable = useMemo(() => isGitRepo(process.cwd()), []);
 
@@ -243,6 +246,9 @@ export function WorkItemList() {
   helpParts.push(',: settings', 'q: quit');
   const helpText = helpParts.join('  ');
 
+  const compactHelpParts = ['↑↓ Nav', 'c New', '⏎ Edit', 's Status', 'q Quit'];
+  const compactHelpText = compactHelpParts.join('  ');
+
   return (
     <Box flexDirection="column">
       <Box marginBottom={1}>
@@ -252,11 +258,19 @@ export function WorkItemList() {
         <Text dimColor> ({items.length} items)</Text>
       </Box>
 
-      <TableLayout
-        treeItems={treeItems}
-        cursor={cursor}
-        capabilities={capabilities}
-      />
+      {terminalWidth >= 80 ? (
+        <TableLayout
+          treeItems={treeItems}
+          cursor={cursor}
+          capabilities={capabilities}
+        />
+      ) : (
+        <CardLayout
+          treeItems={treeItems}
+          cursor={cursor}
+          capabilities={capabilities}
+        />
+      )}
 
       {treeItems.length === 0 && (
         <Box marginTop={1}>
@@ -292,7 +306,9 @@ export function WorkItemList() {
             Delete item #{treeItems[cursor]?.item.id}? (y/n)
           </Text>
         ) : (
-          <Text dimColor>{helpText}</Text>
+          <Text dimColor>
+            {terminalWidth >= 80 ? helpText : compactHelpText}
+          </Text>
         )}
       </Box>
       {warning && (
