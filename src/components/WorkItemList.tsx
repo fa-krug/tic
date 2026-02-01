@@ -6,6 +6,7 @@ import type { WorkItem } from '../types.js';
 import { isGitRepo } from '../git.js';
 import { beginImplementation } from '../implement.js';
 import { readConfig } from '../backends/local/config.js';
+import { TableLayout } from './TableLayout.js';
 
 interface TreeItem {
   item: WorkItem;
@@ -242,11 +243,6 @@ export function WorkItemList() {
   helpParts.push(',: settings', 'q: quit');
   const helpText = helpParts.join('  ');
 
-  const colId = 5;
-  const colStatus = 14;
-  const colPriority = 10;
-  const colAssignee = 12;
-
   return (
     <Box flexDirection="column">
       <Box marginBottom={1}>
@@ -256,87 +252,17 @@ export function WorkItemList() {
         <Text dimColor> ({items.length} items)</Text>
       </Box>
 
-      <Box>
-        <Box width={2}>
-          <Text> </Text>
-        </Box>
-        <Box width={colId}>
-          <Text bold underline>
-            ID
-          </Text>
-        </Box>
-        <Box flexGrow={1}>
-          <Text bold underline>
-            Title
-          </Text>
-        </Box>
-        <Box width={colStatus}>
-          <Text bold underline>
-            Status
-          </Text>
-        </Box>
-        {capabilities.fields.priority && (
-          <Box width={colPriority}>
-            <Text bold underline>
-              Priority
-            </Text>
-          </Box>
-        )}
-        {capabilities.fields.assignee && (
-          <Box width={colAssignee}>
-            <Text bold underline>
-              Assignee
-            </Text>
-          </Box>
-        )}
-      </Box>
+      <TableLayout
+        treeItems={treeItems}
+        cursor={cursor}
+        capabilities={capabilities}
+      />
 
       {treeItems.length === 0 && (
         <Box marginTop={1}>
           <Text dimColor>No {activeType}s in this iteration.</Text>
         </Box>
       )}
-      {treeItems.map((treeItem, idx) => {
-        const { item, prefix } = treeItem;
-        const selected = idx === cursor;
-        const hasUnresolvedDeps = item.dependsOn.length > 0;
-        return (
-          <Box key={item.id}>
-            <Box width={2}>
-              <Text color="cyan">{selected ? '>' : ' '}</Text>
-            </Box>
-            <Box width={colId}>
-              <Text color={selected ? 'cyan' : undefined}>{item.id}</Text>
-            </Box>
-            <Box flexGrow={1}>
-              <Text color={selected ? 'cyan' : undefined} bold={selected}>
-                {capabilities.relationships ? prefix : ''}
-                {item.title}
-              </Text>
-            </Box>
-            <Box width={colStatus}>
-              <Text color={selected ? 'cyan' : undefined}>
-                {capabilities.fields.dependsOn && hasUnresolvedDeps ? '⧗ ' : ''}
-                {item.status}
-              </Text>
-            </Box>
-            {capabilities.fields.priority && (
-              <Box width={colPriority}>
-                <Text color={selected ? 'cyan' : undefined}>
-                  {item.priority}
-                </Text>
-              </Box>
-            )}
-            {capabilities.fields.assignee && (
-              <Box width={colAssignee}>
-                <Text color={selected ? 'cyan' : undefined}>
-                  {item.assignee}
-                </Text>
-              </Box>
-            )}
-          </Box>
-        );
-      })}
 
       <Box marginTop={1}>
         {capabilities.fields.parent && settingParent ? (
