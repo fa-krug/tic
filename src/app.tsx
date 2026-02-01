@@ -5,6 +5,7 @@ import { WorkItemForm } from './components/WorkItemForm.js';
 import { IterationPicker } from './components/IterationPicker.js';
 import { Settings } from './components/Settings.js';
 import type { Backend } from './backends/types.js';
+import type { SyncManager } from './sync/SyncManager.js';
 
 type Screen = 'list' | 'form' | 'iteration-picker' | 'settings';
 
@@ -13,6 +14,7 @@ interface AppState {
   selectedWorkItemId: string | null;
   activeType: string | null;
   backend: Backend;
+  syncManager: SyncManager | null;
   navigate: (screen: Screen) => void;
   selectWorkItem: (id: string | null) => void;
   setActiveType: (type: string | null) => void;
@@ -24,7 +26,13 @@ export function useAppState() {
   return useContext(AppContext);
 }
 
-export function App({ backend }: { backend: Backend }) {
+export function App({
+  backend,
+  syncManager,
+}: {
+  backend: Backend;
+  syncManager: SyncManager | null;
+}) {
   const [screen, setScreen] = useState<Screen>('list');
   const [selectedWorkItemId, setSelectedWorkItemId] = useState<string | null>(
     null,
@@ -36,6 +44,7 @@ export function App({ backend }: { backend: Backend }) {
     selectedWorkItemId,
     activeType,
     backend,
+    syncManager,
     navigate: setScreen,
     selectWorkItem: setSelectedWorkItemId,
     setActiveType,

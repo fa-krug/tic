@@ -1,10 +1,13 @@
 import { Command } from 'commander';
 import {
   createBackend as createBackendFromConfig,
+  createBackendWithSync,
   detectBackend,
   VALID_BACKENDS,
 } from '../backends/factory.js';
 import type { Backend, BackendCapabilities } from '../backends/types.js';
+import { SyncQueueStore } from '../sync/queue.js';
+import type { SyncManager } from '../sync/SyncManager.js';
 import { formatTsvRow, formatTsvKeyValue, formatJson } from './format.js';
 import { runInit } from './commands/init.js';
 import { runConfigGet, runConfigSet } from './commands/config.js';
@@ -82,6 +85,17 @@ export function requireTicProject(root: string): void {
 function createBackend(): Backend {
   requireTicProject(process.cwd());
   return createBackendFromConfig(process.cwd());
+}
+
+function createBackendAndSync(): {
+  backend: Backend;
+  syncManager: SyncManager | null;
+  queueStore: SyncQueueStore | null;
+} {
+  requireTicProject(process.cwd());
+  const { backend, syncManager } = createBackendWithSync(process.cwd());
+  const queueStore = syncManager ? new SyncQueueStore(process.cwd()) : null;
+  return { backend, syncManager, queueStore };
 }
 
 function tryGetCapabilities(): BackendCapabilities | null {
@@ -253,16 +267,24 @@ export function createProgram(): Command {
     create.option('--parent <id>', 'Parent item ID');
   if (!caps || caps.fields.dependsOn)
     create.option('--depends-on <ids>', 'Comma-separated dependency IDs');
-  create.action((title: string, opts: ItemCreateOptions) => {
+  create.action(async (title: string, opts: ItemCreateOptions) => {
     const parentOpts = program.opts<GlobalOpts>();
     try {
-      const backend = createBackend();
+      const { backend, syncManager, queueStore } = createBackendAndSync();
       const description = readStdin();
       const wi = runItemCreate(backend, title, {
         ...opts,
         dependsOn: opts.dependsOn,
         description,
       });
+      if (queueStore && syncManager) {
+        queueStore.append({
+          action: 'create',
+          itemId: wi.id,
+          timestamp: new Date().toISOString(),
+        });
+        await syncManager.pushPending();
+      }
       output(wi, () => itemToTsvRow(wi), parentOpts);
     } catch (err) {
       handleError(err, parentOpts.json);
@@ -289,10 +311,10 @@ export function createProgram(): Command {
     update.option('--parent <id>', 'Parent item ID');
   if (!caps || caps.fields.dependsOn)
     update.option('--depends-on <ids>', 'Comma-separated dependency IDs');
-  update.action((idStr: string, opts: ItemUpdateOptions) => {
+  update.action(async (idStr: string, opts: ItemUpdateOptions) => {
     const parentOpts = program.opts<GlobalOpts>();
     try {
-      const backend = createBackend();
+      const { backend, syncManager, queueStore } = createBackendAndSync();
       const description = readStdin();
       const updateOpts: ItemUpdateOptions = {
         ...opts,
@@ -300,6 +322,14 @@ export function createProgram(): Command {
         ...(description ? { description } : {}),
       };
       const wi = runItemUpdate(backend, idStr, updateOpts);
+      if (queueStore && syncManager) {
+        queueStore.append({
+          action: 'update',
+          itemId: wi.id,
+          timestamp: new Date().toISOString(),
+        });
+        await syncManager.pushPending();
+      }
       output(wi, () => itemToTsvRow(wi), parentOpts);
     } catch (err) {
       handleError(err, parentOpts.json);
@@ -310,11 +340,19 @@ export function createProgram(): Command {
     .command('delete')
     .description('Delete a work item')
     .argument('<id>', 'Work item ID')
-    .action((idStr: string) => {
+    .action(async (idStr: string) => {
       const parentOpts = program.opts<GlobalOpts>();
       try {
-        const backend = createBackend();
+        const { backend, syncManager, queueStore } = createBackendAndSync();
         runItemDelete(backend, idStr);
+        if (queueStore && syncManager) {
+          queueStore.append({
+            action: 'delete',
+            itemId: idStr,
+            timestamp: new Date().toISOString(),
+          });
+          await syncManager.pushPending();
+        }
         if (!parentOpts.quiet) {
           if (parentOpts.json) {
             console.log(formatJson({ deleted: idStr }));
@@ -334,11 +372,20 @@ export function createProgram(): Command {
       .argument('<id>', 'Work item ID')
       .argument('<text>', 'Comment text')
       .option('--author <name>', 'Comment author')
-      .action((idStr: string, text: string, opts: ItemCommentOptions) => {
+      .action(async (idStr: string, text: string, opts: ItemCommentOptions) => {
         const parentOpts = program.opts<GlobalOpts>();
         try {
-          const backend = createBackend();
+          const { backend, syncManager, queueStore } = createBackendAndSync();
           const comment = runItemComment(backend, idStr, text, opts);
+          if (queueStore && syncManager) {
+            queueStore.append({
+              action: 'comment',
+              itemId: idStr,
+              timestamp: new Date().toISOString(),
+              commentData: { author: comment.author, body: comment.body },
+            });
+            await syncManager.pushPending();
+          }
           output(
             comment,
             () => formatTsvRow([comment.author, comment.date, comment.body]),

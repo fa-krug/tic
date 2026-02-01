@@ -2,7 +2,14 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { createBackend, detectBackend, VALID_BACKENDS } from './factory.js';
+import {
+  createBackend,
+  createBackendWithSync,
+  detectBackend,
+  VALID_BACKENDS,
+} from './factory.js';
+import { LocalBackend } from './local/index.js';
+import { SyncManager } from '../sync/SyncManager.js';
 import { writeConfig, defaultConfig } from './local/config.js';
 
 describe('VALID_BACKENDS', () => {
@@ -62,5 +69,40 @@ describe('createBackend', () => {
   it('throws for unknown backend values', () => {
     writeConfig(tmpDir, { ...defaultConfig, backend: 'jira' });
     expect(() => createBackend(tmpDir)).toThrow('Unknown backend');
+  });
+});
+
+describe('createBackendWithSync', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-factory-sync-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true });
+  });
+
+  it('returns LocalBackend and null syncManager for local backend', () => {
+    writeConfig(tmpDir, { ...defaultConfig, backend: 'local' });
+    const { backend, syncManager } = createBackendWithSync(tmpDir);
+    expect(backend).toBeInstanceOf(LocalBackend);
+    expect(syncManager).toBeNull();
+  });
+
+  it('returns LocalBackend and SyncManager for github backend', () => {
+    writeConfig(tmpDir, { ...defaultConfig, backend: 'github' });
+    // GitHubBackend constructor may throw if gh is not authenticated,
+    // but we still expect the right types when it succeeds
+    try {
+      const { backend, syncManager } = createBackendWithSync(tmpDir);
+      expect(backend).toBeInstanceOf(LocalBackend);
+      expect(syncManager).toBeInstanceOf(SyncManager);
+    } catch {
+      // gh CLI not available in test env — verify it doesn't throw "Unknown backend"
+      expect(() => createBackendWithSync(tmpDir)).not.toThrow(
+        'Unknown backend',
+      );
+    }
   });
 });

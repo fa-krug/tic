@@ -4,6 +4,8 @@ import TextInput from 'ink-text-input';
 import SelectInput from 'ink-select-input';
 import { useAppState } from '../app.js';
 import type { Comment } from '../types.js';
+import { SyncQueueStore } from '../sync/queue.js';
+import type { QueueAction } from '../sync/types.js';
 
 type FieldName =
   | 'title'
@@ -22,7 +24,29 @@ const SELECT_FIELDS: FieldName[] = ['type', 'status', 'iteration', 'priority'];
 const PRIORITIES = ['low', 'medium', 'high', 'critical'];
 
 export function WorkItemForm() {
-  const { backend, navigate, selectedWorkItemId, activeType } = useAppState();
+  const { backend, syncManager, navigate, selectedWorkItemId, activeType } =
+    useAppState();
+
+  const queueStore = useMemo(() => {
+    if (!syncManager) return null;
+    return new SyncQueueStore(process.cwd());
+  }, [syncManager]);
+
+  const queueWrite = (
+    action: QueueAction,
+    itemId: string,
+    commentData?: { author: string; body: string },
+  ) => {
+    if (queueStore) {
+      queueStore.append({
+        action,
+        itemId,
+        timestamp: new Date().toISOString(),
+        ...(commentData ? { commentData } : {}),
+      });
+      syncManager?.pushPending().catch(() => {});
+    }
+  };
 
   const capabilities = useMemo(() => backend.getCapabilities(), [backend]);
 
@@ -113,9 +137,14 @@ export function WorkItemForm() {
         parent: parsedParent,
         dependsOn: parsedDependsOn,
       });
+      queueWrite('update', selectedWorkItemId);
 
       if (capabilities.comments && newComment.trim().length > 0) {
         const added = backend.addComment(selectedWorkItemId, {
+          author: 'me',
+          body: newComment.trim(),
+        });
+        queueWrite('comment', selectedWorkItemId, {
           author: 'me',
           body: newComment.trim(),
         });
@@ -135,9 +164,14 @@ export function WorkItemForm() {
         parent: parsedParent,
         dependsOn: parsedDependsOn,
       });
+      queueWrite('create', created.id);
 
       if (capabilities.comments && newComment.trim().length > 0) {
         backend.addComment(created.id, {
+          author: 'me',
+          body: newComment.trim(),
+        });
+        queueWrite('comment', created.id, {
           author: 'me',
           body: newComment.trim(),
         });
