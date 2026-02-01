@@ -393,4 +393,27 @@ describe('GitHubBackend', () => {
       );
     });
   });
+
+  describe('getAssignees', () => {
+    it('returns collaborator logins', () => {
+      const backend = new GitHubBackend('/repo');
+      mockGh
+        .mockReturnValueOnce({ nameWithOwner: 'owner/repo' })
+        .mockReturnValueOnce([
+          { login: 'alice' },
+          { login: 'bob' },
+          { login: 'charlie' },
+        ]);
+      expect(backend.getAssignees()).toEqual(['alice', 'bob', 'charlie']);
+    });
+
+    it('returns empty array on error', () => {
+      const backend = new GitHubBackend('/repo');
+      mockGh.mockReturnValueOnce({ nameWithOwner: 'owner/repo' });
+      mockGh.mockImplementationOnce(() => {
+        throw new Error('API error');
+      });
+      expect(backend.getAssignees()).toEqual([]);
+    });
+  });
 });

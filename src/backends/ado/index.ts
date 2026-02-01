@@ -74,6 +74,28 @@ export class AzureDevOpsBackend extends BaseBackend {
     return this.types.map((t) => t.name);
   }
 
+  getAssignees(): string[] {
+    try {
+      const members = az<{ identity: { displayName: string } }[]>(
+        [
+          'devops',
+          'team',
+          'list-members',
+          '--team',
+          `${this.project} Team`,
+          '--org',
+          `https://dev.azure.com/${this.org}`,
+          '--project',
+          this.project,
+        ],
+        this.cwd,
+      );
+      return members.map((m) => m.identity.displayName);
+    } catch {
+      return [];
+    }
+  }
+
   getIterations(): string[] {
     const iterations = az<{ path: string }[]>(
       [

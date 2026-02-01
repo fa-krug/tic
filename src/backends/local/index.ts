@@ -71,6 +71,17 @@ export class LocalBackend extends BaseBackend {
     return this.config.types;
   }
 
+  getAssignees(): string[] {
+    const items = this.listWorkItems();
+    const assignees = new Set<string>();
+    for (const item of items) {
+      if (item.assignee) {
+        assignees.add(item.assignee);
+      }
+    }
+    return [...assignees].sort();
+  }
+
   getCurrentIteration(): string {
     return this.config.current_iteration;
   }

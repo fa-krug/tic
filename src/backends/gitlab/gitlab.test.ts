@@ -549,4 +549,23 @@ describe('GitLabBackend', () => {
       ]);
     });
   });
+
+  describe('getAssignees', () => {
+    it('returns project member usernames', () => {
+      const backend = makeBackend();
+      mockGlab.mockReturnValueOnce([
+        { username: 'alice' },
+        { username: 'bob' },
+      ]);
+      expect(backend.getAssignees()).toEqual(['alice', 'bob']);
+    });
+
+    it('returns empty array on error', () => {
+      const backend = makeBackend();
+      mockGlab.mockImplementationOnce(() => {
+        throw new Error('API error');
+      });
+      expect(backend.getAssignees()).toEqual([]);
+    });
+  });
 });

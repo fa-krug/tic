@@ -497,4 +497,63 @@ describe('LocalBackend', () => {
     const updated = backend.getWorkItem(dependent.id);
     expect(updated.dependsOn).toEqual([other.id]);
   });
+
+  it('returns unique assignees from existing items', () => {
+    backend.createWorkItem({
+      title: 'A',
+      type: 'task',
+      status: 'todo',
+      iteration: 'default',
+      priority: 'low',
+      assignee: 'alice',
+      labels: [],
+      description: '',
+      parent: null,
+      dependsOn: [],
+    });
+    backend.createWorkItem({
+      title: 'B',
+      type: 'task',
+      status: 'todo',
+      iteration: 'default',
+      priority: 'low',
+      assignee: 'bob',
+      labels: [],
+      description: '',
+      parent: null,
+      dependsOn: [],
+    });
+    backend.createWorkItem({
+      title: 'C',
+      type: 'task',
+      status: 'todo',
+      iteration: 'default',
+      priority: 'low',
+      assignee: 'alice',
+      labels: [],
+      description: '',
+      parent: null,
+      dependsOn: [],
+    });
+    backend.createWorkItem({
+      title: 'D',
+      type: 'task',
+      status: 'todo',
+      iteration: 'default',
+      priority: 'low',
+      assignee: '',
+      labels: [],
+      description: '',
+      parent: null,
+      dependsOn: [],
+    });
+    const assignees = backend.getAssignees();
+    expect(assignees).toHaveLength(2);
+    expect(assignees).toContain('alice');
+    expect(assignees).toContain('bob');
+  });
+
+  it('returns empty array when no items have assignees', () => {
+    expect(backend.getAssignees()).toEqual([]);
+  });
 });

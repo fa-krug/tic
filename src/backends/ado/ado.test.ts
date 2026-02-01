@@ -546,4 +546,23 @@ describe('AzureDevOpsBackend', () => {
       ]);
     });
   });
+
+  describe('getAssignees', () => {
+    it('returns team member display names', () => {
+      const backend = makeBackend();
+      mockAz.mockReturnValueOnce([
+        { identity: { displayName: 'Alice Smith' } },
+        { identity: { displayName: 'Bob Jones' } },
+      ]);
+      expect(backend.getAssignees()).toEqual(['Alice Smith', 'Bob Jones']);
+    });
+
+    it('returns empty array on error', () => {
+      const backend = makeBackend();
+      mockAz.mockImplementationOnce(() => {
+        throw new Error('API error');
+      });
+      expect(backend.getAssignees()).toEqual([]);
+    });
+  });
 });

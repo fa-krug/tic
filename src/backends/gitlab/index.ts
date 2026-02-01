@@ -62,6 +62,18 @@ export class GitLabBackend extends BaseBackend {
     return ['epic', 'issue'];
   }
 
+  getAssignees(): string[] {
+    try {
+      const members = glab<{ username: string }[]>(
+        ['api', 'projects/:fullpath/members/all', '--paginate'],
+        this.cwd,
+      );
+      return members.map((m) => m.username);
+    } catch {
+      return [];
+    }
+  }
+
   getIterations(): string[] {
     const iterations = this.fetchIterations();
     return iterations.map((i) => i.title);

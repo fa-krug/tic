@@ -47,6 +47,19 @@ export class GitHubBackend extends BaseBackend {
     return ['issue'];
   }
 
+  getAssignees(): string[] {
+    try {
+      const owner = this.getRepoNwo();
+      const collaborators = gh<{ login: string }[]>(
+        ['api', `repos/${owner}/collaborators`, '--jq', '.'],
+        this.cwd,
+      );
+      return collaborators.map((c) => c.login);
+    } catch {
+      return [];
+    }
+  }
+
   getIterations(): string[] {
     const milestones = this.fetchMilestones();
     return milestones.map((m) => m.title);
