@@ -32,7 +32,7 @@ export class LocalBackend extends BaseBackend {
     config: Config,
     options?: LocalBackendOptions,
   ) {
-    super();
+    super(0);
     this.root = root;
     this.config = config;
     this.tempIds = options?.tempIds ?? false;
@@ -87,14 +87,7 @@ export class LocalBackend extends BaseBackend {
   }
 
   async getAssignees(): Promise<string[]> {
-    const items = await this.listWorkItems();
-    const assignees = new Set<string>();
-    for (const item of items) {
-      if (item.assignee) {
-        assignees.add(item.assignee);
-      }
-    }
-    return [...assignees].sort();
+    return this.getAssigneesFromCache();
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
@@ -128,10 +121,10 @@ export class LocalBackend extends BaseBackend {
     parent: string | null | undefined,
     dependsOn: string[] | undefined,
   ): Promise<void> {
-    const all = await this.listWorkItems();
-    const allIds = new Set(all.map((item) => item.id));
+    const all = await this.getCachedItems();
+    const itemMap = new Map(all.map((item) => [item.id, item]));
+    const allIds = new Set(itemMap.keys());
 
-    // Validate parent
     if (parent !== null && parent !== undefined) {
       if (parent === id) {
         throw new Error(`Work item #${id} cannot be its own parent`);
@@ -139,7 +132,6 @@ export class LocalBackend extends BaseBackend {
       if (!allIds.has(parent)) {
         throw new Error(`Parent #${parent} does not exist`);
       }
-      // Check for circular parent chain: walk up from proposed parent
       let current: string | null = parent;
       const visited = new Set<string>();
       while (current !== null) {
@@ -148,12 +140,11 @@ export class LocalBackend extends BaseBackend {
         }
         if (visited.has(current)) break;
         visited.add(current);
-        const parentItem = all.find((item) => item.id === current);
+        const parentItem = itemMap.get(current);
         current = parentItem?.parent ?? null;
       }
     }
 
-    // Validate dependsOn
     if (dependsOn !== undefined) {
       for (const depId of dependsOn) {
         if (depId === id) {
@@ -163,7 +154,6 @@ export class LocalBackend extends BaseBackend {
           throw new Error(`Dependency #${depId} does not exist`);
         }
       }
-      // Check for circular dependency chain: DFS from each dependency
       const hasCycle = (startId: string, targetId: string): boolean => {
         const visited = new Set<string>();
         const stack = [startId];
@@ -172,7 +162,7 @@ export class LocalBackend extends BaseBackend {
           if (current === targetId) return true;
           if (visited.has(current)) continue;
           visited.add(current);
-          const item = all.find((i) => i.id === current);
+          const item = itemMap.get(current);
           if (item) {
             for (const dep of item.dependsOn) {
               stack.push(dep);
@@ -225,6 +215,7 @@ export class LocalBackend extends BaseBackend {
     }
     await this.save();
     await writeWorkItem(this.root, item);
+    this.invalidateCache();
     return item;
   }
 
@@ -239,13 +230,14 @@ export class LocalBackend extends BaseBackend {
       updated: new Date().toISOString(),
     };
     await writeWorkItem(this.root, updated);
+    this.invalidateCache();
     return updated;
   }
 
   async deleteWorkItem(id: string): Promise<void> {
     await removeWorkItemFile(this.root, id);
-    // Clean up references in other items
     const all = await this.listWorkItems();
+    const toWrite: WorkItem[] = [];
     for (const item of all) {
       let changed = false;
       if (item.parent === id) {
@@ -257,9 +249,11 @@ export class LocalBackend extends BaseBackend {
         changed = true;
       }
       if (changed) {
-        await writeWorkItem(this.root, item);
+        toWrite.push(item);
       }
     }
+    await Promise.all(toWrite.map((item) => writeWorkItem(this.root, item)));
+    this.invalidateCache();
   }
 
   async addComment(workItemId: string, comment: NewComment): Promise<Comment> {
@@ -273,16 +267,6 @@ export class LocalBackend extends BaseBackend {
     item.updated = new Date().toISOString();
     await writeWorkItem(this.root, item);
     return newComment;
-  }
-
-  override async getChildren(id: string): Promise<WorkItem[]> {
-    const all = await this.listWorkItems();
-    return all.filter((item) => item.parent === id);
-  }
-
-  override async getDependents(id: string): Promise<WorkItem[]> {
-    const all = await this.listWorkItems();
-    return all.filter((item) => item.dependsOn.includes(id));
   }
 
   getItemUrl(id: string): string {
