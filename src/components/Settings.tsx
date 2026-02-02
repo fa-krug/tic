@@ -1,22 +1,39 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { useAppState } from '../app.js';
 import { readConfig, writeConfig } from '../backends/local/config.js';
+import type { Config } from '../backends/local/config.js';
 import { VALID_BACKENDS } from '../backends/factory.js';
 
 export function Settings() {
   const { navigate } = useAppState();
   const root = process.cwd();
-  const config = useMemo(() => readConfig(root), [root]);
 
-  const [cursor, setCursor] = useState(
-    Math.max(
-      0,
-      VALID_BACKENDS.indexOf(config.backend as (typeof VALID_BACKENDS)[number]),
-    ),
-  );
+  const [config, setConfig] = useState<Config | null>(null);
+
+  useEffect(() => {
+    void readConfig(root).then(setConfig);
+  }, [root]);
+
+  const [cursor, setCursor] = useState(0);
+
+  // Update cursor when config loads
+  useEffect(() => {
+    if (config) {
+      setCursor(
+        Math.max(
+          0,
+          VALID_BACKENDS.indexOf(
+            config.backend as (typeof VALID_BACKENDS)[number],
+          ),
+        ),
+      );
+    }
+  }, [config]);
 
   useInput((input, key) => {
+    if (!config) return;
+
     if (key.escape || input === ',') {
       navigate('list');
       return;
@@ -36,9 +53,17 @@ export function Settings() {
         return;
       }
       config.backend = selected;
-      writeConfig(root, config);
+      void writeConfig(root, config);
     }
   });
+
+  if (!config) {
+    return (
+      <Box>
+        <Text dimColor>Loading...</Text>
+      </Box>
+    );
+  }
 
   return (
     <Box flexDirection="column">

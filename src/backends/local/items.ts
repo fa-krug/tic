@@ -1,4 +1,4 @@
-import fs from 'node:fs';
+import fs from 'node:fs/promises';
 import path from 'node:path';
 import matter from 'gray-matter';
 import type { WorkItem, Comment } from '../../types.js';
@@ -11,13 +11,16 @@ function itemPath(root: string, id: string): string {
   return path.join(itemsDir(root), `${id}.md`);
 }
 
-export function listItemFiles(root: string): string[] {
+export async function listItemFiles(root: string): Promise<string[]> {
   const dir = itemsDir(root);
-  if (!fs.existsSync(dir)) return [];
-  return fs
-    .readdirSync(dir)
-    .filter((f) => f.endsWith('.md'))
-    .map((f) => path.join(dir, f));
+  try {
+    const entries = await fs.readdir(dir);
+    return entries
+      .filter((f) => f.endsWith('.md'))
+      .map((f) => path.join(dir, f));
+  } catch {
+    return [];
+  }
 }
 
 function serializeComments(comments: Comment[]): string {
@@ -67,8 +70,11 @@ function parseComments(content: string): {
   return { description, comments };
 }
 
-export function readWorkItem(root: string, id: string): WorkItem {
-  const raw = fs.readFileSync(itemPath(root, id), 'utf-8');
+export async function readWorkItem(
+  root: string,
+  id: string,
+): Promise<WorkItem> {
+  const raw = await fs.readFile(itemPath(root, id), 'utf-8');
   return parseWorkItemFile(raw);
 }
 
@@ -98,9 +104,12 @@ export function parseWorkItemFile(raw: string): WorkItem {
   };
 }
 
-export function writeWorkItem(root: string, item: WorkItem): void {
+export async function writeWorkItem(
+  root: string,
+  item: WorkItem,
+): Promise<void> {
   const dir = itemsDir(root);
-  fs.mkdirSync(dir, { recursive: true });
+  await fs.mkdir(dir, { recursive: true });
 
   const frontmatter: Record<string, unknown> = {
     id: item.id,
@@ -125,10 +134,13 @@ export function writeWorkItem(root: string, item: WorkItem): void {
 
   const body = item.description + serializeComments(item.comments);
   const content = matter.stringify(body, frontmatter);
-  fs.writeFileSync(itemPath(root, item.id), content);
+  await fs.writeFile(itemPath(root, item.id), content);
 }
 
-export function deleteWorkItem(root: string, id: string): void {
-  const p = itemPath(root, id);
-  if (fs.existsSync(p)) fs.unlinkSync(p);
+export async function deleteWorkItem(root: string, id: string): Promise<void> {
+  try {
+    await fs.unlink(itemPath(root, id));
+  } catch {
+    // File doesn't exist — nothing to delete
+  }
 }

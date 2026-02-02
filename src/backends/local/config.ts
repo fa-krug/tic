@@ -1,4 +1,5 @@
-import fs from 'node:fs';
+import fs from 'node:fs/promises';
+import fsSync from 'node:fs';
 import path from 'node:path';
 import yaml from 'yaml';
 
@@ -26,15 +27,25 @@ function configPath(root: string): string {
   return path.join(root, '.tic', 'config.yml');
 }
 
-export function readConfig(root: string): Config {
+export async function readConfig(root: string): Promise<Config> {
   const p = configPath(root);
-  if (!fs.existsSync(p)) return { ...defaultConfig };
-  const raw = fs.readFileSync(p, 'utf-8');
+  try {
+    const raw = await fs.readFile(p, 'utf-8');
+    return yaml.parse(raw) as Config;
+  } catch {
+    return { ...defaultConfig };
+  }
+}
+
+export function readConfigSync(root: string): Config {
+  const p = configPath(root);
+  if (!fsSync.existsSync(p)) return { ...defaultConfig };
+  const raw = fsSync.readFileSync(p, 'utf-8');
   return yaml.parse(raw) as Config;
 }
 
-export function writeConfig(root: string, config: Config): void {
+export async function writeConfig(root: string, config: Config): Promise<void> {
   const dir = path.join(root, '.tic');
-  fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(configPath(root), yaml.stringify(config));
+  await fs.mkdir(dir, { recursive: true });
+  await fs.writeFile(configPath(root), yaml.stringify(config));
 }

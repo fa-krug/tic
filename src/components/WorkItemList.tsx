@@ -5,10 +5,12 @@ import { useAppState } from '../app.js';
 import type { WorkItem } from '../types.js';
 import { isGitRepo } from '../git.js';
 import { beginImplementation } from '../implement.js';
-import { readConfig } from '../backends/local/config.js';
+import { readConfigSync } from '../backends/local/config.js';
 import { TableLayout } from './TableLayout.js';
 import { CardLayout } from './CardLayout.js';
-import { useTerminalWidth } from '../hooks/useTerminalWidth.js';
+import { useTerminalSize } from '../hooks/useTerminalSize.js';
+import { useScrollViewport } from '../hooks/useScrollViewport.js';
+import { useBackendData } from '../hooks/useBackendData.js';
 import { SyncQueueStore } from '../sync/queue.js';
 import type { SyncStatus, QueueAction } from '../sync/types.js';
 
@@ -62,7 +64,6 @@ export function WorkItemList() {
   const { exit } = useApp();
   const [cursor, setCursor] = useState(0);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [refresh, setRefresh] = useState(0);
   const [warning, setWarning] = useState('');
   const [settingParent, setSettingParent] = useState(false);
   const [parentInput, setParentInput] = useState('');
@@ -71,16 +72,25 @@ export function WorkItemList() {
     syncManager?.getStatus() ?? null,
   );
 
+  const {
+    capabilities,
+    types,
+    currentIteration: iteration,
+    items: allItems,
+    loading,
+    refresh: refreshData,
+  } = useBackendData(backend);
+
   useEffect(() => {
     if (!syncManager) return;
     const cb = (status: SyncStatus) => {
       setSyncStatus(status);
       if (status.state === 'idle') {
-        setRefresh((r) => r + 1);
+        refreshData();
       }
     };
     syncManager.onStatusChange(cb);
-  }, [syncManager]);
+  }, [syncManager, refreshData]);
 
   const queueStore = useMemo(() => {
     if (!syncManager) return null;
@@ -89,18 +99,16 @@ export function WorkItemList() {
 
   const queueWrite = (action: QueueAction, itemId: string) => {
     if (queueStore) {
-      queueStore.append({
+      void queueStore.append({
         action,
         itemId,
         timestamp: new Date().toISOString(),
       });
-      void syncManager?.pushPending().then(() => setRefresh((r) => r + 1));
+      void syncManager?.pushPending().then(() => refreshData());
     }
   };
 
-  const capabilities = useMemo(() => backend.getCapabilities(), [backend]);
-  const terminalWidth = useTerminalWidth();
-  const types = useMemo(() => backend.getWorkItemTypes(), [backend]);
+  const { width: terminalWidth } = useTerminalSize();
   const gitAvailable = useMemo(() => isGitRepo(process.cwd()), []);
 
   useEffect(() => {
@@ -109,11 +117,6 @@ export function WorkItemList() {
     }
   }, [activeType, types, setActiveType]);
 
-  const iteration = backend.getCurrentIteration();
-  const allItems = useMemo(
-    () => backend.listWorkItems(iteration),
-    [iteration, refresh],
-  );
   const items = useMemo(
     () => allItems.filter((item) => item.type === activeType),
     [allItems, activeType],
@@ -134,11 +137,13 @@ export function WorkItemList() {
 
     if (confirmDelete) {
       if (input === 'y' || input === 'Y') {
-        backend.deleteWorkItem(treeItems[cursor]!.item.id);
-        queueWrite('delete', treeItems[cursor]!.item.id);
-        setConfirmDelete(false);
-        setCursor((c) => Math.max(0, c - 1));
-        setRefresh((r) => r + 1);
+        void (async () => {
+          await backend.deleteWorkItem(treeItems[cursor]!.item.id);
+          queueWrite('delete', treeItems[cursor]!.item.id);
+          setConfirmDelete(false);
+          setCursor((c) => Math.max(0, c - 1));
+          refreshData();
+        })();
       } else {
         setConfirmDelete(false);
       }
@@ -173,14 +178,16 @@ export function WorkItemList() {
     }
 
     if (input === 'o' && treeItems.length > 0) {
-      backend.openItem(treeItems[cursor]!.item.id);
-      setRefresh((r) => r + 1);
+      void (async () => {
+        await backend.openItem(treeItems[cursor]!.item.id);
+        refreshData();
+      })();
     }
 
     if (input === 'b' && gitAvailable && treeItems.length > 0) {
       const item = treeItems[cursor]!.item;
       const comments = item.comments;
-      const config = readConfig(process.cwd());
+      const config = readConfigSync(process.cwd());
       try {
         const result = beginImplementation(
           item,
@@ -198,7 +205,7 @@ export function WorkItemList() {
           e instanceof Error ? e.message : 'Failed to start implementation',
         );
       }
-      setRefresh((r) => r + 1);
+      refreshData();
     }
 
     if (input === 's') {
@@ -226,7 +233,7 @@ export function WorkItemList() {
 
     if (input === 'r' && syncManager) {
       void syncManager.sync().then(() => {
-        setRefresh((r) => r + 1);
+        refreshData();
       });
     }
   });
@@ -260,6 +267,23 @@ export function WorkItemList() {
   ];
   const compactHelpText = compactHelpParts.join('  ');
 
+  const isCardMode = terminalWidth < 80;
+  const viewport = useScrollViewport({
+    totalItems: treeItems.length,
+    cursor,
+    chromeLines: 6, // title+margin (2) + table header (1) + help bar margin+text (2) + warning (1)
+    linesPerItem: isCardMode ? 3 : 1,
+  });
+  const visibleTreeItems = treeItems.slice(viewport.start, viewport.end);
+
+  if (loading) {
+    return (
+      <Box>
+        <Text dimColor>Loading...</Text>
+      </Box>
+    );
+  }
+
   return (
     <Box flexDirection="column">
       <Box marginBottom={1}>
@@ -284,14 +308,14 @@ export function WorkItemList() {
 
       {terminalWidth >= 80 ? (
         <TableLayout
-          treeItems={treeItems}
-          cursor={cursor}
+          treeItems={visibleTreeItems}
+          cursor={viewport.visibleCursor}
           capabilities={capabilities}
         />
       ) : (
         <CardLayout
-          treeItems={treeItems}
-          cursor={cursor}
+          treeItems={visibleTreeItems}
+          cursor={viewport.visibleCursor}
           capabilities={capabilities}
         />
       )}
@@ -311,18 +335,24 @@ export function WorkItemList() {
               onChange={setParentInput}
               focus={true}
               onSubmit={(value) => {
-                const item = treeItems[cursor]!.item;
-                const newParent = value.trim() === '' ? null : value.trim();
-                try {
-                  backend.updateWorkItem(item.id, { parent: newParent });
-                  queueWrite('update', item.id);
-                  setWarning('');
-                } catch (e) {
-                  setWarning(e instanceof Error ? e.message : 'Invalid parent');
-                }
-                setSettingParent(false);
-                setParentInput('');
-                setRefresh((r) => r + 1);
+                void (async () => {
+                  const item = treeItems[cursor]!.item;
+                  const newParent = value.trim() === '' ? null : value.trim();
+                  try {
+                    await backend.updateWorkItem(item.id, {
+                      parent: newParent,
+                    });
+                    queueWrite('update', item.id);
+                    setWarning('');
+                  } catch (e) {
+                    setWarning(
+                      e instanceof Error ? e.message : 'Invalid parent',
+                    );
+                  }
+                  setSettingParent(false);
+                  setParentInput('');
+                  refreshData();
+                })();
               }}
             />
           </Box>

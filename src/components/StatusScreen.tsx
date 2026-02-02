@@ -1,8 +1,9 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Box, Text, useInput, useStdout } from 'ink';
+import { Box, Text, useInput } from 'ink';
 import { useAppState } from '../app.js';
 import type { SyncStatus } from '../sync/types.js';
 import type { BackendCapabilities } from '../backends/types.js';
+import { useScrollViewport } from '../hooks/useScrollViewport.js';
 
 function CapabilityLine({
   label,
@@ -20,8 +21,6 @@ function CapabilityLine({
 
 export function StatusScreen() {
   const { backend, syncManager, navigate } = useAppState();
-  const { stdout } = useStdout();
-  const terminalHeight = stdout?.rows ?? 24;
 
   const capabilities: BackendCapabilities = useMemo(
     () => backend.getCapabilities(),
@@ -43,12 +42,15 @@ export function StatusScreen() {
   const errors = syncStatus?.errors ?? [];
   const [scrollOffset, setScrollOffset] = useState(0);
 
-  // Reserve lines for header, backend, capabilities, sync summary, help bar
-  // Approximate: header(2) + backend(2) + capabilities header(1) + 5 features + 5 fields + gap(1) + sync header(1) + sync lines(4) + help(2) = ~23
-  // Errors section gets remaining space
+  // chrome: header(2) + backend(2) + capabilities header(1) + 5 features + 5 fields + gap(1) + sync header(1) + sync lines(4) + help(2) = ~23
   const fixedLines = syncManager ? 23 : 17;
-  const availableErrorLines = Math.max(3, terminalHeight - fixedLines);
-  const maxScroll = Math.max(0, errors.length - availableErrorLines);
+  const viewport = useScrollViewport({
+    totalItems: errors.length,
+    cursor: scrollOffset,
+    chromeLines: fixedLines,
+    linesPerItem: 2,
+  });
+  const maxScroll = Math.max(0, errors.length - viewport.maxVisible);
 
   useInput((input, key) => {
     if (key.escape || input === 'q') {
@@ -66,7 +68,7 @@ export function StatusScreen() {
 
   const visibleErrors = errors.slice(
     scrollOffset,
-    scrollOffset + availableErrorLines,
+    scrollOffset + viewport.maxVisible,
   );
 
   return (
@@ -154,11 +156,11 @@ export function StatusScreen() {
                   <Text dimColor> {err.timestamp}</Text>
                 </Box>
               ))}
-              {errors.length > availableErrorLines && (
+              {errors.length > viewport.maxVisible && (
                 <Text dimColor>
                   {' '}
                   ↑↓ scroll ({scrollOffset + 1}-
-                  {Math.min(scrollOffset + availableErrorLines, errors.length)}{' '}
+                  {Math.min(scrollOffset + viewport.maxVisible, errors.length)}{' '}
                   of {errors.length})
                 </Text>
               )}

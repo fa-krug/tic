@@ -17,34 +17,34 @@ describe('tic init', () => {
     fs.rmSync(tmpDir, { recursive: true });
   });
 
-  it('creates .tic directory with config.yml', () => {
-    const result = runInit(tmpDir);
+  it('creates .tic directory with config.yml', async () => {
+    const result = await runInit(tmpDir);
     expect(result.success).toBe(true);
     expect(fs.existsSync(path.join(tmpDir, '.tic', 'config.yml'))).toBe(true);
   });
 
-  it('writes backend field to config on init', () => {
-    runInit(tmpDir, 'local');
-    const config = readConfig(tmpDir);
+  it('writes backend field to config on init', async () => {
+    await runInit(tmpDir, 'local');
+    const config = await readConfig(tmpDir);
     expect(config.backend).toBe('local');
   });
 
-  it('writes chosen backend to config', () => {
-    runInit(tmpDir, 'github');
-    const config = readConfig(tmpDir);
+  it('writes chosen backend to config', async () => {
+    await runInit(tmpDir, 'github');
+    const config = await readConfig(tmpDir);
     expect(config.backend).toBe('github');
   });
 
-  it('defaults to local when no backend specified', () => {
-    runInit(tmpDir);
-    const config = readConfig(tmpDir);
+  it('defaults to local when no backend specified', async () => {
+    await runInit(tmpDir);
+    const config = await readConfig(tmpDir);
     expect(config.backend).toBe('local');
   });
 
-  it('returns already-initialized message if .tic exists', () => {
+  it('returns already-initialized message if .tic exists', async () => {
     fs.mkdirSync(path.join(tmpDir, '.tic'), { recursive: true });
     fs.writeFileSync(path.join(tmpDir, '.tic', 'config.yml'), 'next_id: 1\n');
-    const result = runInit(tmpDir);
+    const result = await runInit(tmpDir);
     expect(result.alreadyExists).toBe(true);
   });
 });

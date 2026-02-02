@@ -39,15 +39,18 @@ export class GitHubBackend extends BaseBackend {
     };
   }
 
-  getStatuses(): string[] {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async getStatuses(): Promise<string[]> {
     return ['open', 'closed'];
   }
 
-  getWorkItemTypes(): string[] {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async getWorkItemTypes(): Promise<string[]> {
     return ['issue'];
   }
 
-  getAssignees(): string[] {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async getAssignees(): Promise<string[]> {
     try {
       const owner = this.getRepoNwo();
       const collaborators = gh<{ login: string }[]>(
@@ -60,23 +63,26 @@ export class GitHubBackend extends BaseBackend {
     }
   }
 
-  getIterations(): string[] {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async getIterations(): Promise<string[]> {
     const milestones = this.fetchMilestones();
     return milestones.map((m) => m.title);
   }
 
-  getCurrentIteration(): string {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async getCurrentIteration(): Promise<string> {
     const milestones = this.fetchOpenMilestones();
     if (milestones.length === 0) return '';
     return milestones[0]!.title;
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  setCurrentIteration(_name: string): void {
+  async setCurrentIteration(_name: string): Promise<void> {
     // No-op — current iteration is always first open milestone
   }
 
-  listWorkItems(iteration?: string): WorkItem[] {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async listWorkItems(iteration?: string): Promise<WorkItem[]> {
     const args = [
       'issue',
       'list',
@@ -94,7 +100,8 @@ export class GitHubBackend extends BaseBackend {
     return issues.map(mapIssueToWorkItem);
   }
 
-  getWorkItem(id: string): WorkItem {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async getWorkItem(id: string): Promise<WorkItem> {
     const issue = gh<GhIssue>(
       ['issue', 'view', id, '--json', ISSUE_FIELDS],
       this.cwd,
@@ -102,7 +109,7 @@ export class GitHubBackend extends BaseBackend {
     return mapIssueToWorkItem(issue);
   }
 
-  createWorkItem(data: NewWorkItem): WorkItem {
+  async createWorkItem(data: NewWorkItem): Promise<WorkItem> {
     this.validateFields(data);
     const args = ['issue', 'create', '--title', data.title];
 
@@ -129,7 +136,7 @@ export class GitHubBackend extends BaseBackend {
     return this.getWorkItem(id);
   }
 
-  updateWorkItem(id: string, data: Partial<WorkItem>): WorkItem {
+  async updateWorkItem(id: string, data: Partial<WorkItem>): Promise<WorkItem> {
     this.validateFields(data);
 
     // Handle status changes via close/reopen
@@ -179,11 +186,13 @@ export class GitHubBackend extends BaseBackend {
     return this.getWorkItem(id);
   }
 
-  deleteWorkItem(id: string): void {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async deleteWorkItem(id: string): Promise<void> {
     ghExec(['issue', 'delete', id, '--yes'], this.cwd);
   }
 
-  addComment(workItemId: string, comment: NewComment): Comment {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async addComment(workItemId: string, comment: NewComment): Promise<Comment> {
     ghExec(['issue', 'comment', workItemId, '--body', comment.body], this.cwd);
     return {
       author: comment.author,
@@ -192,14 +201,16 @@ export class GitHubBackend extends BaseBackend {
     };
   }
 
-  getChildren(id: string): WorkItem[] {
+  async getChildren(id: string): Promise<WorkItem[]> {
     this.assertSupported(this.getCapabilities().relationships, 'relationships');
-    return this.listWorkItems().filter((item) => item.parent === id);
+    return (await this.listWorkItems()).filter((item) => item.parent === id);
   }
 
-  getDependents(id: string): WorkItem[] {
+  async getDependents(id: string): Promise<WorkItem[]> {
     this.assertSupported(this.getCapabilities().relationships, 'relationships');
-    return this.listWorkItems().filter((item) => item.dependsOn.includes(id));
+    return (await this.listWorkItems()).filter((item) =>
+      item.dependsOn.includes(id),
+    );
   }
 
   getItemUrl(id: string): string {
@@ -210,7 +221,8 @@ export class GitHubBackend extends BaseBackend {
     return result.url;
   }
 
-  openItem(id: string): void {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async openItem(id: string): Promise<void> {
     ghExec(['issue', 'view', id, '--web'], this.cwd);
   }
 

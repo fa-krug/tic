@@ -32,13 +32,13 @@ export function detectBackend(root: string): BackendType {
   return 'local';
 }
 
-export function createBackend(root: string): Backend {
-  const config = readConfig(root);
+export async function createBackend(root: string): Promise<Backend> {
+  const config = await readConfig(root);
   const backend = config.backend ?? 'local';
 
   switch (backend) {
     case 'local':
-      return new LocalBackend(root);
+      return LocalBackend.create(root);
     case 'github':
       return new GitHubBackend(root);
     case 'gitlab':
@@ -57,11 +57,15 @@ export interface BackendSetup {
   syncManager: SyncManager | null;
 }
 
-export function createBackendWithSync(root: string): BackendSetup {
-  const config = readConfig(root);
+export async function createBackendWithSync(
+  root: string,
+): Promise<BackendSetup> {
+  const config = await readConfig(root);
   const backendType = config.backend ?? 'local';
 
-  const local = new LocalBackend(root, { tempIds: backendType !== 'local' });
+  const local = await LocalBackend.create(root, {
+    tempIds: backendType !== 'local',
+  });
 
   if (backendType === 'local') {
     return { backend: local, syncManager: null };

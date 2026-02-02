@@ -60,7 +60,8 @@ export class AzureDevOpsBackend extends BaseBackend {
     };
   }
 
-  getStatuses(): string[] {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async getStatuses(): Promise<string[]> {
     const allStates = new Set<string>();
     for (const type of this.types) {
       for (const state of type.states) {
@@ -70,11 +71,13 @@ export class AzureDevOpsBackend extends BaseBackend {
     return [...allStates];
   }
 
-  getWorkItemTypes(): string[] {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async getWorkItemTypes(): Promise<string[]> {
     return this.types.map((t) => t.name);
   }
 
-  getAssignees(): string[] {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async getAssignees(): Promise<string[]> {
     try {
       const members = az<{ identity: { displayName: string } }[]>(
         [
@@ -96,7 +99,8 @@ export class AzureDevOpsBackend extends BaseBackend {
     }
   }
 
-  getIterations(): string[] {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async getIterations(): Promise<string[]> {
     const iterations = az<{ path: string }[]>(
       [
         'boards',
@@ -115,7 +119,8 @@ export class AzureDevOpsBackend extends BaseBackend {
     return iterations.map((i) => i.path);
   }
 
-  getCurrentIteration(): string {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async getCurrentIteration(): Promise<string> {
     const iterations = az<{ path: string }[]>(
       [
         'boards',
@@ -137,7 +142,7 @@ export class AzureDevOpsBackend extends BaseBackend {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  setCurrentIteration(_name: string): void {
+  async setCurrentIteration(_name: string): Promise<void> {
     // No-op — current iteration is determined by date range in ADO
   }
 
@@ -167,7 +172,8 @@ export class AzureDevOpsBackend extends BaseBackend {
     return items;
   }
 
-  listWorkItems(iteration?: string): WorkItem[] {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async listWorkItems(iteration?: string): Promise<WorkItem[]> {
     let wiql = `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = '${this.escapeWiql(this.project)}'`;
     if (iteration) {
       wiql += ` AND [System.IterationPath] = '${this.escapeWiql(iteration)}'`;
@@ -195,7 +201,8 @@ export class AzureDevOpsBackend extends BaseBackend {
     return items;
   }
 
-  getWorkItem(id: string): WorkItem {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async getWorkItem(id: string): Promise<WorkItem> {
     const ado = az<AdoWorkItem>(
       [
         'boards',
@@ -227,7 +234,7 @@ export class AzureDevOpsBackend extends BaseBackend {
     return item;
   }
 
-  createWorkItem(data: NewWorkItem): WorkItem {
+  async createWorkItem(data: NewWorkItem): Promise<WorkItem> {
     this.validateFields(data);
 
     const args = [
@@ -308,7 +315,7 @@ export class AzureDevOpsBackend extends BaseBackend {
     return this.getWorkItem(createdId);
   }
 
-  updateWorkItem(id: string, data: Partial<WorkItem>): WorkItem {
+  async updateWorkItem(id: string, data: Partial<WorkItem>): Promise<WorkItem> {
     this.validateFields(data);
 
     const args = [
@@ -474,7 +481,8 @@ export class AzureDevOpsBackend extends BaseBackend {
     return this.getWorkItem(id);
   }
 
-  deleteWorkItem(id: string): void {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async deleteWorkItem(id: string): Promise<void> {
     azExec(
       [
         'boards',
@@ -492,7 +500,8 @@ export class AzureDevOpsBackend extends BaseBackend {
     );
   }
 
-  addComment(workItemId: string, comment: NewComment): Comment {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async addComment(workItemId: string, comment: NewComment): Promise<Comment> {
     azInvoke(
       {
         area: 'wit',
@@ -512,7 +521,8 @@ export class AzureDevOpsBackend extends BaseBackend {
     };
   }
 
-  getChildren(id: string): WorkItem[] {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async getChildren(id: string): Promise<WorkItem[]> {
     const numericId = parseInt(id, 10);
     if (isNaN(numericId)) throw new Error(`Invalid work item ID: "${id}"`);
 
@@ -539,7 +549,8 @@ export class AzureDevOpsBackend extends BaseBackend {
     return this.batchFetchWorkItems(ids);
   }
 
-  getDependents(id: string): WorkItem[] {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async getDependents(id: string): Promise<WorkItem[]> {
     const numericId = parseInt(id, 10);
     if (isNaN(numericId)) throw new Error(`Invalid work item ID: "${id}"`);
 
@@ -570,7 +581,8 @@ export class AzureDevOpsBackend extends BaseBackend {
     return `https://dev.azure.com/${this.org}/${encodeURIComponent(this.project)}/_workitems/edit/${id}`;
   }
 
-  openItem(id: string): void {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async openItem(id: string): Promise<void> {
     const url = this.getItemUrl(id);
     execFileSync('open', [url]);
   }

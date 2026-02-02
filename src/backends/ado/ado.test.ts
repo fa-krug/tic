@@ -124,9 +124,9 @@ describe('AzureDevOpsBackend', () => {
   });
 
   describe('getStatuses', () => {
-    it('returns the union of all states across types', () => {
+    it('returns the union of all states across types', async () => {
       const backend = makeBackend();
-      const statuses = backend.getStatuses();
+      const statuses = await backend.getStatuses();
       expect(statuses).toContain('New');
       expect(statuses).toContain('Active');
       expect(statuses).toContain('Resolved');
@@ -137,9 +137,9 @@ describe('AzureDevOpsBackend', () => {
   });
 
   describe('getWorkItemTypes', () => {
-    it('returns types from ADO project', () => {
+    it('returns types from ADO project', async () => {
       const backend = makeBackend();
-      expect(backend.getWorkItemTypes()).toEqual([
+      expect(await backend.getWorkItemTypes()).toEqual([
         'Epic',
         'User Story',
         'Task',
@@ -148,7 +148,7 @@ describe('AzureDevOpsBackend', () => {
   });
 
   describe('getIterations', () => {
-    it('returns iteration paths', () => {
+    it('returns iteration paths', async () => {
       const backend = makeBackend();
       mockAz.mockReturnValueOnce([
         {
@@ -162,7 +162,7 @@ describe('AzureDevOpsBackend', () => {
           attributes: { startDate: '2026-01-15', finishDate: '2026-01-28' },
         },
       ]);
-      expect(backend.getIterations()).toEqual([
+      expect(await backend.getIterations()).toEqual([
         'WebApp\\Sprint 1',
         'WebApp\\Sprint 2',
       ]);
@@ -170,7 +170,7 @@ describe('AzureDevOpsBackend', () => {
   });
 
   describe('getCurrentIteration', () => {
-    it('returns the current iteration path', () => {
+    it('returns the current iteration path', async () => {
       const backend = makeBackend();
       mockAz.mockReturnValueOnce([
         {
@@ -182,25 +182,27 @@ describe('AzureDevOpsBackend', () => {
           },
         },
       ]);
-      expect(backend.getCurrentIteration()).toBe('WebApp\\Sprint 1');
+      expect(await backend.getCurrentIteration()).toBe('WebApp\\Sprint 1');
     });
 
-    it('returns empty string when no current iteration', () => {
+    it('returns empty string when no current iteration', async () => {
       const backend = makeBackend();
       mockAz.mockReturnValueOnce([]);
-      expect(backend.getCurrentIteration()).toBe('');
+      expect(await backend.getCurrentIteration()).toBe('');
     });
   });
 
   describe('setCurrentIteration', () => {
-    it('is a no-op', () => {
+    it('is a no-op', async () => {
       const backend = makeBackend();
-      expect(() => backend.setCurrentIteration('Sprint 1')).not.toThrow();
+      await expect(
+        backend.setCurrentIteration('Sprint 1'),
+      ).resolves.not.toThrow();
     });
   });
 
   describe('listWorkItems', () => {
-    it('uses WIQL query and batch fetch', () => {
+    it('uses WIQL query and batch fetch', async () => {
       const backend = makeBackend();
 
       // WIQL query returns flat array of items
@@ -221,7 +223,7 @@ describe('AzureDevOpsBackend', () => {
         ],
       });
 
-      const items = backend.listWorkItems();
+      const items = await backend.listWorkItems();
       expect(items).toHaveLength(2);
       // Sorted by updated descending
       expect(items[0]!.id).toBe('42');
@@ -232,7 +234,7 @@ describe('AzureDevOpsBackend', () => {
       expect(invokeOpts.body.$expand).toBe(4);
     });
 
-    it('filters by iteration via WIQL', () => {
+    it('filters by iteration via WIQL', async () => {
       const backend = makeBackend();
 
       mockAz.mockReturnValueOnce([{ id: 42 }]);
@@ -240,7 +242,7 @@ describe('AzureDevOpsBackend', () => {
         value: [sampleWorkItem],
       });
 
-      backend.listWorkItems('WebApp\\Sprint 1');
+      await backend.listWorkItems('WebApp\\Sprint 1');
 
       expect(mockAz).toHaveBeenCalledWith(
         expect.arrayContaining(['boards', 'query', '--wiql']),
@@ -252,15 +254,15 @@ describe('AzureDevOpsBackend', () => {
       expect(wiqlArg).toContain('System.IterationPath');
     });
 
-    it('returns empty array when no items match', () => {
+    it('returns empty array when no items match', async () => {
       const backend = makeBackend();
       mockAz.mockReturnValueOnce([]);
-      expect(backend.listWorkItems()).toEqual([]);
+      expect(await backend.listWorkItems()).toEqual([]);
     });
   });
 
   describe('getWorkItem', () => {
-    it('returns a work item with comments', () => {
+    it('returns a work item with comments', async () => {
       const backend = makeBackend();
 
       mockAz.mockReturnValueOnce(sampleWorkItem);
@@ -268,7 +270,7 @@ describe('AzureDevOpsBackend', () => {
         comments: [sampleComment],
       });
 
-      const item = backend.getWorkItem('42');
+      const item = await backend.getWorkItem('42');
       expect(item.id).toBe('42');
       expect(item.title).toBe('Fix login bug');
       expect(item.comments).toHaveLength(1);
@@ -277,7 +279,7 @@ describe('AzureDevOpsBackend', () => {
   });
 
   describe('createWorkItem', () => {
-    it('creates a work item and returns it', () => {
+    it('creates a work item and returns it', async () => {
       const backend = makeBackend();
 
       mockAz.mockReturnValueOnce({ ...sampleWorkItem, id: 99 });
@@ -285,7 +287,7 @@ describe('AzureDevOpsBackend', () => {
       mockAz.mockReturnValueOnce({ ...sampleWorkItem, id: 99 });
       mockAzInvoke.mockReturnValueOnce({ comments: [] });
 
-      const item = backend.createWorkItem({
+      const item = await backend.createWorkItem({
         title: 'New item',
         type: 'User Story',
         status: 'New',
@@ -315,7 +317,7 @@ describe('AzureDevOpsBackend', () => {
   });
 
   describe('updateWorkItem', () => {
-    it('updates work item fields', () => {
+    it('updates work item fields', async () => {
       const backend = makeBackend();
 
       mockAz.mockReturnValueOnce(sampleWorkItem);
@@ -326,7 +328,7 @@ describe('AzureDevOpsBackend', () => {
       });
       mockAzInvoke.mockReturnValueOnce({ comments: [] });
 
-      backend.updateWorkItem('42', { title: 'Updated' });
+      await backend.updateWorkItem('42', { title: 'Updated' });
 
       expect(mockAz).toHaveBeenCalledWith(
         expect.arrayContaining(['boards', 'work-item', 'update', '--id', '42']),
@@ -334,7 +336,7 @@ describe('AzureDevOpsBackend', () => {
       );
     });
 
-    it('updates parent relation', () => {
+    it('updates parent relation', async () => {
       const backend = makeBackend();
 
       // Fetch current item with relations (for parent diff)
@@ -353,7 +355,7 @@ describe('AzureDevOpsBackend', () => {
       mockAz.mockReturnValueOnce(sampleWorkItem);
       mockAzInvoke.mockReturnValueOnce({ comments: [] });
 
-      backend.updateWorkItem('42', { parent: '20' });
+      await backend.updateWorkItem('42', { parent: '20' });
 
       // Should remove old parent (10)
       expect(mockAzExec).toHaveBeenCalledWith(
@@ -381,7 +383,7 @@ describe('AzureDevOpsBackend', () => {
       );
     });
 
-    it('clears parent relation when set to null', () => {
+    it('clears parent relation when set to null', async () => {
       const backend = makeBackend();
 
       // Fetch current item with existing parent
@@ -400,7 +402,7 @@ describe('AzureDevOpsBackend', () => {
       mockAz.mockReturnValueOnce({ ...sampleWorkItem, relations: [] });
       mockAzInvoke.mockReturnValueOnce({ comments: [] });
 
-      backend.updateWorkItem('42', { parent: null });
+      await backend.updateWorkItem('42', { parent: null });
 
       // Should remove old parent
       expect(mockAzExec).toHaveBeenCalledWith(
@@ -409,7 +411,7 @@ describe('AzureDevOpsBackend', () => {
       );
     });
 
-    it('updates dependency relations', () => {
+    it('updates dependency relations', async () => {
       const backend = makeBackend();
 
       // Fetch current item with existing deps [20, 21]
@@ -434,7 +436,7 @@ describe('AzureDevOpsBackend', () => {
       mockAzInvoke.mockReturnValueOnce({ comments: [] });
 
       // Change deps to [21, 30] — remove 20, keep 21, add 30
-      backend.updateWorkItem('42', { dependsOn: ['21', '30'] });
+      await backend.updateWorkItem('42', { dependsOn: ['21', '30'] });
 
       // Should remove 20
       expect(mockAzExec).toHaveBeenCalledWith(
@@ -450,11 +452,11 @@ describe('AzureDevOpsBackend', () => {
   });
 
   describe('deleteWorkItem', () => {
-    it('deletes a work item', () => {
+    it('deletes a work item', async () => {
       const backend = makeBackend();
       mockAzExec.mockReturnValue('');
 
-      backend.deleteWorkItem('42');
+      await backend.deleteWorkItem('42');
 
       expect(mockAzExec).toHaveBeenCalledWith(
         expect.arrayContaining([
@@ -471,11 +473,11 @@ describe('AzureDevOpsBackend', () => {
   });
 
   describe('addComment', () => {
-    it('adds a comment and returns it', () => {
+    it('adds a comment and returns it', async () => {
       const backend = makeBackend();
       mockAzInvoke.mockReturnValueOnce(sampleComment);
 
-      const comment = backend.addComment('42', {
+      const comment = await backend.addComment('42', {
         author: 'Alice',
         body: 'A comment.',
       });
@@ -486,7 +488,7 @@ describe('AzureDevOpsBackend', () => {
   });
 
   describe('getChildren', () => {
-    it('returns child work items via WIQL', () => {
+    it('returns child work items via WIQL', async () => {
       const backend = makeBackend();
 
       // Link queries include the source item; code filters it out
@@ -498,19 +500,19 @@ describe('AzureDevOpsBackend', () => {
         ],
       });
 
-      const children = backend.getChildren('42');
+      const children = await backend.getChildren('42');
       expect(children).toHaveLength(2);
     });
 
-    it('returns empty array when no children', () => {
+    it('returns empty array when no children', async () => {
       const backend = makeBackend();
       mockAz.mockReturnValueOnce([]);
-      expect(backend.getChildren('42')).toEqual([]);
+      expect(await backend.getChildren('42')).toEqual([]);
     });
   });
 
   describe('getDependents', () => {
-    it('returns dependent work items via WIQL', () => {
+    it('returns dependent work items via WIQL', async () => {
       const backend = makeBackend();
 
       // Link queries include the source item; code filters it out
@@ -519,7 +521,7 @@ describe('AzureDevOpsBackend', () => {
         value: [{ ...sampleWorkItem, id: 60 }],
       });
 
-      const dependents = backend.getDependents('42');
+      const dependents = await backend.getDependents('42');
       expect(dependents).toHaveLength(1);
     });
   });
@@ -535,11 +537,11 @@ describe('AzureDevOpsBackend', () => {
   });
 
   describe('openItem', () => {
-    it('opens the work item URL in the browser', () => {
+    it('opens the work item URL in the browser', async () => {
       const backend = makeBackend();
       mockExecFileSync.mockReturnValue('');
 
-      backend.openItem('42');
+      await backend.openItem('42');
 
       expect(mockExecFileSync).toHaveBeenCalledWith('open', [
         'https://dev.azure.com/contoso/WebApp/_workitems/edit/42',
@@ -548,21 +550,24 @@ describe('AzureDevOpsBackend', () => {
   });
 
   describe('getAssignees', () => {
-    it('returns team member display names', () => {
+    it('returns team member display names', async () => {
       const backend = makeBackend();
       mockAz.mockReturnValueOnce([
         { identity: { displayName: 'Alice Smith' } },
         { identity: { displayName: 'Bob Jones' } },
       ]);
-      expect(backend.getAssignees()).toEqual(['Alice Smith', 'Bob Jones']);
+      expect(await backend.getAssignees()).toEqual([
+        'Alice Smith',
+        'Bob Jones',
+      ]);
     });
 
-    it('returns empty array on error', () => {
+    it('returns empty array on error', async () => {
       const backend = makeBackend();
       mockAz.mockImplementationOnce(() => {
         throw new Error('API error');
       });
-      expect(backend.getAssignees()).toEqual([]);
+      expect(await backend.getAssignees()).toEqual([]);
     });
   });
 });

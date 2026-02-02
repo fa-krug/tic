@@ -54,15 +54,18 @@ export class GitLabBackend extends BaseBackend {
     };
   }
 
-  getStatuses(): string[] {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async getStatuses(): Promise<string[]> {
     return ['open', 'closed'];
   }
 
-  getWorkItemTypes(): string[] {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async getWorkItemTypes(): Promise<string[]> {
     return ['epic', 'issue'];
   }
 
-  getAssignees(): string[] {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async getAssignees(): Promise<string[]> {
     try {
       const members = glab<{ username: string }[]>(
         ['api', 'projects/:fullpath/members/all', '--paginate'],
@@ -74,12 +77,14 @@ export class GitLabBackend extends BaseBackend {
     }
   }
 
-  getIterations(): string[] {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async getIterations(): Promise<string[]> {
     const iterations = this.fetchIterations();
     return iterations.map((i) => i.title);
   }
 
-  getCurrentIteration(): string {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async getCurrentIteration(): Promise<string> {
     const iterations = this.fetchIterations();
     const today = new Date().toISOString().split('T')[0]!;
     const current = iterations.find(
@@ -89,11 +94,12 @@ export class GitLabBackend extends BaseBackend {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  setCurrentIteration(_name: string): void {
+  async setCurrentIteration(_name: string): Promise<void> {
     // No-op — current iteration is determined by date range
   }
 
-  listWorkItems(iteration?: string): WorkItem[] {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async listWorkItems(iteration?: string): Promise<WorkItem[]> {
     // Fetch issues
     const issueArgs = [
       'issue',
@@ -125,7 +131,8 @@ export class GitLabBackend extends BaseBackend {
     return allItems;
   }
 
-  getWorkItem(id: string): WorkItem {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async getWorkItem(id: string): Promise<WorkItem> {
     const { type, iid } = parseId(id);
 
     if (type === 'issue') {
@@ -161,7 +168,7 @@ export class GitLabBackend extends BaseBackend {
     return item;
   }
 
-  createWorkItem(data: NewWorkItem): WorkItem {
+  async createWorkItem(data: NewWorkItem): Promise<WorkItem> {
     this.validateFields(data);
 
     if (data.type === 'epic') {
@@ -170,7 +177,7 @@ export class GitLabBackend extends BaseBackend {
     return this.createIssue(data);
   }
 
-  updateWorkItem(id: string, data: Partial<WorkItem>): WorkItem {
+  async updateWorkItem(id: string, data: Partial<WorkItem>): Promise<WorkItem> {
     this.validateFields(data);
     const { type, iid } = parseId(id);
 
@@ -180,7 +187,8 @@ export class GitLabBackend extends BaseBackend {
     return this.updateEpic(iid, data);
   }
 
-  deleteWorkItem(id: string): void {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async deleteWorkItem(id: string): Promise<void> {
     const { type, iid } = parseId(id);
 
     if (type === 'issue') {
@@ -195,7 +203,8 @@ export class GitLabBackend extends BaseBackend {
     );
   }
 
-  addComment(workItemId: string, comment: NewComment): Comment {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async addComment(workItemId: string, comment: NewComment): Promise<Comment> {
     const { type, iid } = parseId(workItemId);
 
     if (type === 'issue') {
@@ -222,7 +231,8 @@ export class GitLabBackend extends BaseBackend {
     };
   }
 
-  getChildren(id: string): WorkItem[] {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async getChildren(id: string): Promise<WorkItem[]> {
     const { type, iid } = parseId(id);
 
     if (type === 'issue') {
@@ -237,8 +247,8 @@ export class GitLabBackend extends BaseBackend {
     return issues.map(mapIssueToWorkItem);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  getDependents(_id: string): WorkItem[] {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/require-await
+  async getDependents(_id: string): Promise<WorkItem[]> {
     return [];
   }
 
@@ -256,7 +266,8 @@ export class GitLabBackend extends BaseBackend {
     return `https://gitlab.com/groups/${this.group}/-/epics/${iid}`;
   }
 
-  openItem(id: string): void {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async openItem(id: string): Promise<void> {
     const { type, iid } = parseId(id);
 
     if (type === 'issue') {
@@ -276,7 +287,7 @@ export class GitLabBackend extends BaseBackend {
     );
   }
 
-  private createIssue(data: NewWorkItem): WorkItem {
+  private async createIssue(data: NewWorkItem): Promise<WorkItem> {
     const args = ['issue', 'create', '--title', data.title, '--yes'];
 
     if (data.description) {
@@ -302,7 +313,8 @@ export class GitLabBackend extends BaseBackend {
     return this.getWorkItem(`issue-${iid}`);
   }
 
-  private createEpic(data: NewWorkItem): WorkItem {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  private async createEpic(data: NewWorkItem): Promise<WorkItem> {
     const encodedGroup = encodeURIComponent(this.group);
     const args = [
       'api',
@@ -324,7 +336,10 @@ export class GitLabBackend extends BaseBackend {
     return mapEpicToWorkItem(epic);
   }
 
-  private updateIssue(iid: string, data: Partial<WorkItem>): WorkItem {
+  private async updateIssue(
+    iid: string,
+    data: Partial<WorkItem>,
+  ): Promise<WorkItem> {
     // Handle status changes via close/reopen
     if (data.status === 'closed') {
       glabExec(['issue', 'close', iid], this.cwd);
@@ -372,7 +387,10 @@ export class GitLabBackend extends BaseBackend {
     return this.getWorkItem(`issue-${iid}`);
   }
 
-  private updateEpic(iid: string, data: Partial<WorkItem>): WorkItem {
+  private async updateEpic(
+    iid: string,
+    data: Partial<WorkItem>,
+  ): Promise<WorkItem> {
     const encodedGroup = encodeURIComponent(this.group);
     const args = ['api', `groups/${encodedGroup}/epics/${iid}`, '-X', 'PUT'];
     let hasEdits = false;

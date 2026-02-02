@@ -4,9 +4,11 @@ import TextInput from 'ink-text-input';
 import SelectInput from 'ink-select-input';
 import { AutocompleteInput } from './AutocompleteInput.js';
 import { useAppState } from '../app.js';
-import type { Comment } from '../types.js';
+import type { Comment, WorkItem } from '../types.js';
 import { SyncQueueStore } from '../sync/queue.js';
 import type { QueueAction } from '../sync/types.js';
+import { useScrollViewport } from '../hooks/useScrollViewport.js';
+import { useBackendData } from '../hooks/useBackendData.js';
 
 type FieldName =
   | 'title'
@@ -49,7 +51,7 @@ export function WorkItemForm() {
     commentData?: { author: string; body: string },
   ) => {
     if (queueStore) {
-      queueStore.append({
+      void queueStore.append({
         action,
         itemId,
         timestamp: new Date().toISOString(),
@@ -59,57 +61,90 @@ export function WorkItemForm() {
     }
   };
 
-  const capabilities = useMemo(() => backend.getCapabilities(), [backend]);
+  const {
+    capabilities,
+    statuses,
+    iterations,
+    types,
+    assignees,
+    currentIteration,
+    loading: configLoading,
+  } = useBackendData(backend);
+
+  const [existingItem, setExistingItem] = useState<WorkItem | null>(null);
+  const [children, setChildren] = useState<WorkItem[]>([]);
+  const [dependents, setDependents] = useState<WorkItem[]>([]);
+  const [parentItem, setParentItem] = useState<WorkItem | null>(null);
+  const [itemLoading, setItemLoading] = useState(selectedWorkItemId !== null);
+
+  useEffect(() => {
+    if (selectedWorkItemId === null) {
+      setExistingItem(null);
+      setChildren([]);
+      setDependents([]);
+      setParentItem(null);
+      setItemLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setItemLoading(true);
+    void (async () => {
+      try {
+        const item = await backend.getWorkItem(selectedWorkItemId);
+        const [ch, dep] = capabilities.relationships
+          ? await Promise.all([
+              backend.getChildren(selectedWorkItemId),
+              backend.getDependents(selectedWorkItemId),
+            ])
+          : [[], []];
+        const pi = item.parent ? await backend.getWorkItem(item.parent) : null;
+        if (cancelled) return;
+        setExistingItem(item);
+        setChildren(ch);
+        setDependents(dep);
+        setParentItem(pi);
+      } catch {
+        if (cancelled) return;
+        setExistingItem(null);
+        setChildren([]);
+        setDependents([]);
+        setParentItem(null);
+      } finally {
+        if (!cancelled) setItemLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedWorkItemId, backend, capabilities.relationships]);
 
   const fields = useMemo(() => {
     const all: FieldName[] = ['title'];
     if (capabilities.customTypes) all.push('type');
-    all.push('status'); // always shown
+    all.push('status');
     if (capabilities.iterations) all.push('iteration');
     if (capabilities.fields.priority) all.push('priority');
     if (capabilities.fields.assignee) all.push('assignee');
     if (capabilities.fields.labels) all.push('labels');
-    all.push('description'); // always shown
+    all.push('description');
     if (capabilities.fields.parent) all.push('parent');
     if (capabilities.fields.dependsOn) all.push('dependsOn');
     if (capabilities.comments) all.push('comments');
 
     if (selectedWorkItemId !== null && capabilities.relationships) {
-      const item = backend.getWorkItem(selectedWorkItemId);
-      if (item.parent) {
+      if (existingItem?.parent) {
         all.push('rel-parent');
       }
-      const children = backend.getChildren(selectedWorkItemId);
       for (const child of children) {
         all.push(`rel-child-${child.id}`);
       }
-      const dependents = backend.getDependents(selectedWorkItemId);
       for (const dep of dependents) {
         all.push(`rel-dependent-${dep.id}`);
       }
     }
 
     return all;
-  }, [capabilities, selectedWorkItemId, backend]);
-
-  const statuses = useMemo(() => backend.getStatuses(), [backend]);
-  const iterations = useMemo(() => backend.getIterations(), [backend]);
-  const types = useMemo(() => backend.getWorkItemTypes(), [backend]);
-  const assignees = useMemo(() => {
-    try {
-      return backend.getAssignees();
-    } catch {
-      return [];
-    }
-  }, [backend]);
-
-  const existingItem = useMemo(
-    () =>
-      selectedWorkItemId !== null
-        ? backend.getWorkItem(selectedWorkItemId)
-        : null,
-    [selectedWorkItemId, backend],
-  );
+  }, [capabilities, selectedWorkItemId, existingItem, children, dependents]);
 
   const [title, setTitle] = useState(existingItem?.title ?? '');
   const [type, setType] = useState(
@@ -119,7 +154,7 @@ export function WorkItemForm() {
     existingItem?.status ?? statuses[0] ?? '',
   );
   const [iteration, setIteration] = useState(
-    existingItem?.iteration ?? backend.getCurrentIteration(),
+    existingItem?.iteration ?? currentIteration,
   );
   const [priority, setPriority] = useState(existingItem?.priority ?? 'medium');
   const [assignee, setAssignee] = useState(existingItem?.assignee ?? '');
@@ -148,6 +183,14 @@ export function WorkItemForm() {
     setEditing(false);
   }, [selectedWorkItemId]);
 
+  if (configLoading || itemLoading) {
+    return (
+      <Box>
+        <Text dimColor>Loading...</Text>
+      </Box>
+    );
+  }
+
   const currentField = fields[focusedField]!;
   const isSelectField = SELECT_FIELDS.includes(currentField);
   const isRelationshipField =
@@ -155,7 +198,7 @@ export function WorkItemForm() {
     currentField.startsWith('rel-child-') ||
     currentField.startsWith('rel-dependent-');
 
-  function save() {
+  async function save() {
     const parsedLabels = labels
       .split(',')
       .map((l) => l.trim())
@@ -168,7 +211,7 @@ export function WorkItemForm() {
       .filter((s) => s.length > 0);
 
     if (selectedWorkItemId !== null) {
-      backend.updateWorkItem(selectedWorkItemId, {
+      await backend.updateWorkItem(selectedWorkItemId, {
         title,
         type,
         status,
@@ -183,7 +226,7 @@ export function WorkItemForm() {
       queueWrite('update', selectedWorkItemId);
 
       if (capabilities.comments && newComment.trim().length > 0) {
-        const added = backend.addComment(selectedWorkItemId, {
+        const added = await backend.addComment(selectedWorkItemId, {
           author: 'me',
           body: newComment.trim(),
         });
@@ -195,7 +238,7 @@ export function WorkItemForm() {
         setNewComment('');
       }
     } else {
-      const created = backend.createWorkItem({
+      const created = await backend.createWorkItem({
         title: title || 'Untitled',
         type,
         status,
@@ -210,7 +253,7 @@ export function WorkItemForm() {
       queueWrite('create', created.id);
 
       if (capabilities.comments && newComment.trim().length > 0) {
-        backend.addComment(created.id, {
+        await backend.addComment(created.id, {
           author: 'me',
           body: newComment.trim(),
         });
@@ -244,8 +287,10 @@ export function WorkItemForm() {
               targetId = currentField.slice('rel-dependent-'.length);
             }
             if (targetId) {
-              save();
-              pushWorkItem(targetId);
+              void (async () => {
+                await save();
+                pushWorkItem(targetId);
+              })();
             }
           } else {
             setEditing(true);
@@ -253,11 +298,13 @@ export function WorkItemForm() {
         }
 
         if (key.escape) {
-          save();
-          const prev = popWorkItem();
-          if (prev === null) {
-            navigate('list');
-          }
+          void (async () => {
+            await save();
+            const prev = popWorkItem();
+            if (prev === null) {
+              navigate('list');
+            }
+          })();
         }
       } else {
         if (key.escape) {
@@ -538,16 +585,17 @@ export function WorkItemForm() {
         ? field.slice('rel-dependent-'.length)
         : null;
 
-    let item: { id: string; title: string };
-    if (field === 'rel-parent' && existingItem?.parent) {
-      const parentItem = backend.getWorkItem(existingItem.parent);
+    let item: { id: string; title: string } | null = null;
+    if (field === 'rel-parent' && parentItem) {
       item = { id: parentItem.id, title: parentItem.title };
     } else if (id) {
-      const relItem = backend.getWorkItem(id);
-      item = { id: relItem.id, title: relItem.title };
-    } else {
-      return null;
+      const child = children.find((c) => c.id === id);
+      const dep = dependents.find((d) => d.id === id);
+      const relItem = child ?? dep;
+      item = relItem ? { id: relItem.id, title: relItem.title } : null;
     }
+
+    if (!item) return null;
 
     return (
       <Box key={field}>
@@ -561,6 +609,15 @@ export function WorkItemForm() {
 
   const mode = selectedWorkItemId !== null ? 'Edit' : 'Create';
   const typeLabel = type.charAt(0).toUpperCase() + type.slice(1);
+
+  const viewport = useScrollViewport({
+    totalItems: fields.length,
+    cursor: focusedField,
+    chromeLines: 4, // title+margin (2) + help bar margin+text (2)
+  });
+
+  const isFieldVisible = (index: number) =>
+    index >= viewport.start && index < viewport.end;
 
   return (
     <Box flexDirection="column">
@@ -579,39 +636,45 @@ export function WorkItemForm() {
         ) {
           return null;
         }
+        if (!isFieldVisible(index)) return null;
         return renderField(field, index);
       })}
 
       {selectedWorkItemId !== null &&
         capabilities.relationships &&
-        fields.some((f) => f.startsWith('rel-')) && (
+        fields.some((f, i) => f.startsWith('rel-') && isFieldVisible(i)) && (
           <Box flexDirection="column" marginTop={1}>
             <Text bold dimColor>
               Relationships:
             </Text>
 
-            {existingItem?.parent && (
-              <Box flexDirection="column">
-                <Box marginLeft={2}>
-                  <Text dimColor>Parent:</Text>
+            {existingItem?.parent &&
+              fields.some(
+                (f, i) => f === 'rel-parent' && isFieldVisible(i),
+              ) && (
+                <Box flexDirection="column">
+                  <Box marginLeft={2}>
+                    <Text dimColor>Parent:</Text>
+                  </Box>
+                  {fields.map((field, index) =>
+                    field === 'rel-parent' && isFieldVisible(index) ? (
+                      <Box key={field} marginLeft={2}>
+                        {renderRelationshipField(field, index)}
+                      </Box>
+                    ) : null,
+                  )}
                 </Box>
-                {fields.map((field, index) =>
-                  field === 'rel-parent' ? (
-                    <Box key={field} marginLeft={2}>
-                      {renderRelationshipField(field, index)}
-                    </Box>
-                  ) : null,
-                )}
-              </Box>
-            )}
+              )}
 
-            {fields.some((f) => f.startsWith('rel-child-')) && (
+            {fields.some(
+              (f, i) => f.startsWith('rel-child-') && isFieldVisible(i),
+            ) && (
               <Box flexDirection="column">
                 <Box marginLeft={2}>
                   <Text dimColor>Children:</Text>
                 </Box>
                 {fields.map((field, index) =>
-                  field.startsWith('rel-child-') ? (
+                  field.startsWith('rel-child-') && isFieldVisible(index) ? (
                     <Box key={field} marginLeft={2}>
                       {renderRelationshipField(field, index)}
                     </Box>
@@ -620,13 +683,16 @@ export function WorkItemForm() {
               </Box>
             )}
 
-            {fields.some((f) => f.startsWith('rel-dependent-')) && (
+            {fields.some(
+              (f, i) => f.startsWith('rel-dependent-') && isFieldVisible(i),
+            ) && (
               <Box flexDirection="column">
                 <Box marginLeft={2}>
                   <Text dimColor>Depended on by:</Text>
                 </Box>
                 {fields.map((field, index) =>
-                  field.startsWith('rel-dependent-') ? (
+                  field.startsWith('rel-dependent-') &&
+                  isFieldVisible(index) ? (
                     <Box key={field} marginLeft={2}>
                       {renderRelationshipField(field, index)}
                     </Box>

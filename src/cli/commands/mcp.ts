@@ -46,9 +46,9 @@ function error(message: string): ToolResult {
   };
 }
 
-export function handleInitProject(root: string): ToolResult {
+export async function handleInitProject(root: string): Promise<ToolResult> {
   try {
-    const result = runInit(root);
+    const result = await runInit(root);
     if (result.alreadyExists) {
       return success({ alreadyExists: true });
     }
@@ -65,15 +65,18 @@ export interface ListItemsArgs {
   all?: boolean;
 }
 
-export function handleGetConfig(backend: Backend, root: string): ToolResult {
+export async function handleGetConfig(
+  backend: Backend,
+  root: string,
+): Promise<ToolResult> {
   try {
-    const config = readConfig(root);
+    const config = await readConfig(root);
     return success({
       backend: config.backend,
-      statuses: backend.getStatuses(),
-      types: backend.getWorkItemTypes(),
-      iterations: backend.getIterations(),
-      currentIteration: backend.getCurrentIteration(),
+      statuses: await backend.getStatuses(),
+      types: await backend.getWorkItemTypes(),
+      iterations: await backend.getIterations(),
+      currentIteration: await backend.getCurrentIteration(),
       capabilities: backend.getCapabilities(),
     });
   } catch (err) {
@@ -81,31 +84,31 @@ export function handleGetConfig(backend: Backend, root: string): ToolResult {
   }
 }
 
-export function handleSetBackend(
+export async function handleSetBackend(
   root: string,
   args: { backend: string },
-): ToolResult {
+): Promise<ToolResult> {
   try {
     if (!(VALID_BACKENDS as readonly string[]).includes(args.backend)) {
       return error(
         `Invalid backend "${args.backend}". Valid backends: ${VALID_BACKENDS.join(', ')}`,
       );
     }
-    const config = readConfig(root);
+    const config = await readConfig(root);
     config.backend = args.backend;
-    writeConfig(root, config);
+    await writeConfig(root, config);
     return success({ backend: args.backend });
   } catch (err) {
     return error(err instanceof Error ? err.message : String(err));
   }
 }
 
-export function handleListItems(
+export async function handleListItems(
   backend: Backend,
   args: ListItemsArgs,
-): ToolResult {
+): Promise<ToolResult> {
   try {
-    const items = runItemList(backend, {
+    const items = await runItemList(backend, {
       status: args.status,
       type: args.type,
       iteration: args.iteration,
@@ -117,12 +120,12 @@ export function handleListItems(
   }
 }
 
-export function handleShowItem(
+export async function handleShowItem(
   backend: Backend,
   args: { id: string },
-): ToolResult {
+): Promise<ToolResult> {
   try {
-    const item = runItemShow(backend, args.id);
+    const item = await runItemShow(backend, args.id);
     const url = backend.getItemUrl(args.id);
     return success({ ...item, url });
   } catch (err) {
@@ -158,10 +161,10 @@ export interface UpdateItemArgs {
   description?: string;
 }
 
-export function handleCreateItem(
+export async function handleCreateItem(
   backend: Backend,
   args: CreateItemArgs,
-): ToolResult {
+): Promise<ToolResult> {
   try {
     const opts: ItemCreateOptions = {};
     if (args.type !== undefined) opts.type = args.type;
@@ -174,7 +177,7 @@ export function handleCreateItem(
     if (args.depends_on !== undefined)
       opts.dependsOn = args.depends_on.join(',');
     if (args.description !== undefined) opts.description = args.description;
-    const item = runItemCreate(backend, args.title, opts);
+    const item = await runItemCreate(backend, args.title, opts);
     return success(item);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -182,10 +185,10 @@ export function handleCreateItem(
   }
 }
 
-export function handleUpdateItem(
+export async function handleUpdateItem(
   backend: Backend,
   args: UpdateItemArgs,
-): ToolResult {
+): Promise<ToolResult> {
   try {
     const opts: ItemUpdateOptions = {};
     if (args.title !== undefined) opts.title = args.title;
@@ -200,7 +203,7 @@ export function handleUpdateItem(
     if (args.depends_on !== undefined)
       opts.dependsOn = args.depends_on.join(',');
     if (args.description !== undefined) opts.description = args.description;
-    const item = runItemUpdate(backend, args.id, opts);
+    const item = await runItemUpdate(backend, args.id, opts);
     return success(item);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -214,16 +217,20 @@ export function createDeleteTracker(): DeleteTracker {
   return new Set<string>();
 }
 
-export function handleDeleteItem(
+export async function handleDeleteItem(
   backend: Backend,
   args: { id: string },
   pendingDeletes: DeleteTracker,
-): ToolResult {
+): Promise<ToolResult> {
   try {
-    const item = backend.getWorkItem(args.id);
+    const item = await backend.getWorkItem(args.id);
     const caps = backend.getCapabilities();
-    const children = caps.relationships ? backend.getChildren(args.id) : [];
-    const dependents = caps.relationships ? backend.getDependents(args.id) : [];
+    const children = caps.relationships
+      ? await backend.getChildren(args.id)
+      : [];
+    const dependents = caps.relationships
+      ? await backend.getDependents(args.id)
+      : [];
     pendingDeletes.add(args.id);
     return success({
       preview: true,
@@ -246,18 +253,18 @@ export function handleDeleteItem(
   }
 }
 
-export function handleConfirmDelete(
+export async function handleConfirmDelete(
   backend: Backend,
   args: { id: string },
   pendingDeletes: DeleteTracker,
-): ToolResult {
+): Promise<ToolResult> {
   if (!pendingDeletes.has(args.id)) {
     return error(
       `No pending delete for item ${args.id}. Call delete_item first to preview.`,
     );
   }
   try {
-    runItemDelete(backend, args.id);
+    await runItemDelete(backend, args.id);
     pendingDeletes.delete(args.id);
     return success({ deleted: args.id });
   } catch (err) {
@@ -266,12 +273,12 @@ export function handleConfirmDelete(
   }
 }
 
-export function handleAddComment(
+export async function handleAddComment(
   backend: Backend,
   args: { id: string; text: string; author?: string },
-): ToolResult {
+): Promise<ToolResult> {
   try {
-    const comment = runItemComment(backend, args.id, args.text, {
+    const comment = await runItemComment(backend, args.id, args.text, {
       author: args.author,
     });
     return success(comment);
@@ -281,12 +288,12 @@ export function handleAddComment(
   }
 }
 
-export function handleSetIteration(
+export async function handleSetIteration(
   backend: Backend,
   args: { name: string },
-): ToolResult {
+): Promise<ToolResult> {
   try {
-    runIterationSet(backend, args.name);
+    await runIterationSet(backend, args.name);
     return success({ currentIteration: args.name });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -302,12 +309,12 @@ export interface SearchItemsArgs {
   all?: boolean;
 }
 
-export function handleSearchItems(
+export async function handleSearchItems(
   backend: Backend,
   args: SearchItemsArgs,
-): ToolResult {
+): Promise<ToolResult> {
   try {
-    const items = runItemList(backend, {
+    const items = await runItemList(backend, {
       status: args.status,
       type: args.type,
       iteration: args.iteration,
@@ -325,12 +332,12 @@ export function handleSearchItems(
   }
 }
 
-export function handleGetChildren(
+export async function handleGetChildren(
   backend: Backend,
   args: { id: string },
-): ToolResult {
+): Promise<ToolResult> {
   try {
-    const children = backend.getChildren(args.id);
+    const children = await backend.getChildren(args.id);
     return success(children);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -338,12 +345,12 @@ export function handleGetChildren(
   }
 }
 
-export function handleGetDependents(
+export async function handleGetDependents(
   backend: Backend,
   args: { id: string },
-): ToolResult {
+): Promise<ToolResult> {
   try {
-    const dependents = backend.getDependents(args.id);
+    const dependents = await backend.getDependents(args.id);
     return success(dependents);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -361,17 +368,17 @@ interface TreeNode {
   children: TreeNode[];
 }
 
-export function handleGetItemTree(
+export async function handleGetItemTree(
   backend: Backend,
   args: ListItemsArgs,
-): ToolResult {
+): Promise<ToolResult> {
   try {
     const opts: ItemListOptions = {};
     if (args.type) opts.type = args.type;
     if (args.status) opts.status = args.status;
     if (args.iteration) opts.iteration = args.iteration;
     if (args.all) opts.all = args.all;
-    const items = runItemList(backend, opts);
+    const items = await runItemList(backend, opts);
 
     const nodeMap = new Map<string, TreeNode>();
     for (const item of items) {
@@ -416,11 +423,7 @@ export function registerTools(
 ): void {
   const caps = backend.getCapabilities();
 
-  server.tool('init_project', 'Initialize a new tic project', () => {
-    return handleInitProject(root);
-  });
-
-  server.tool('get_config', 'Get project configuration', () => {
+  server.tool('get_config', 'Get project configuration', async () => {
     return handleGetConfig(backend, root);
   });
 
@@ -433,7 +436,7 @@ export function registerTools(
       iteration: z.string().optional().describe('Filter by iteration'),
       all: z.boolean().optional().describe('Show all iterations'),
     },
-    (args) => {
+    async (args) => {
       return handleListItems(backend, args);
     },
   );
@@ -444,7 +447,7 @@ export function registerTools(
     {
       id: z.string().describe('Work item ID'),
     },
-    (args) => {
+    async (args) => {
       return handleShowItem(backend, args);
     },
   );
@@ -468,10 +471,10 @@ export function registerTools(
       description: z.string().optional().describe('Work item description'),
     },
     async (args) => {
-      const result = handleCreateItem(backend, args);
+      const result = await handleCreateItem(backend, args);
       if (!result.isError && syncState?.queueStore && syncState?.syncManager) {
         const data = JSON.parse(result.content[0]!.text) as { id: string };
-        syncState.queueStore.append({
+        await syncState.queueStore.append({
           action: 'create',
           itemId: data.id,
           timestamp: new Date().toISOString(),
@@ -506,10 +509,10 @@ export function registerTools(
       description: z.string().optional().describe('Work item description'),
     },
     async (args) => {
-      const result = handleUpdateItem(backend, args);
+      const result = await handleUpdateItem(backend, args);
       if (!result.isError && syncState?.queueStore && syncState?.syncManager) {
         const data = JSON.parse(result.content[0]!.text) as { id: string };
-        syncState.queueStore.append({
+        await syncState.queueStore.append({
           action: 'update',
           itemId: data.id,
           timestamp: new Date().toISOString(),
@@ -526,7 +529,7 @@ export function registerTools(
     {
       id: z.string().describe('Work item ID'),
     },
-    (args) => {
+    async (args) => {
       return handleDeleteItem(backend, args, pendingDeletes);
     },
   );
@@ -538,9 +541,9 @@ export function registerTools(
       id: z.string().describe('Work item ID'),
     },
     async (args) => {
-      const result = handleConfirmDelete(backend, args, pendingDeletes);
+      const result = await handleConfirmDelete(backend, args, pendingDeletes);
       if (!result.isError && syncState?.queueStore && syncState?.syncManager) {
-        syncState.queueStore.append({
+        await syncState.queueStore.append({
           action: 'delete',
           itemId: args.id,
           timestamp: new Date().toISOString(),
@@ -561,7 +564,7 @@ export function registerTools(
       iteration: z.string().optional().describe('Filter by iteration'),
       all: z.boolean().optional().describe('Show all iterations'),
     },
-    (args) => {
+    async (args) => {
       return handleSearchItems(backend, args);
     },
   );
@@ -574,7 +577,7 @@ export function registerTools(
         .string()
         .describe(`Backend type: ${VALID_BACKENDS.join(', ')}`),
     },
-    (args) => {
+    async (args) => {
       return handleSetBackend(root, args);
     },
   );
@@ -589,7 +592,7 @@ export function registerTools(
         author: z.string().optional().describe('Comment author'),
       },
       async (args) => {
-        const result = handleAddComment(backend, args);
+        const result = await handleAddComment(backend, args);
         if (
           !result.isError &&
           syncState?.queueStore &&
@@ -599,7 +602,7 @@ export function registerTools(
             author: string;
             body: string;
           };
-          syncState.queueStore.append({
+          await syncState.queueStore.append({
             action: 'comment',
             itemId: args.id,
             timestamp: new Date().toISOString(),
@@ -619,7 +622,7 @@ export function registerTools(
       {
         name: z.string().describe('Iteration name'),
       },
-      (args) => {
+      async (args) => {
         return handleSetIteration(backend, args);
       },
     );
@@ -632,7 +635,7 @@ export function registerTools(
       {
         id: z.string().describe('Work item ID'),
       },
-      (args) => {
+      async (args) => {
         return handleGetChildren(backend, args);
       },
     );
@@ -643,7 +646,7 @@ export function registerTools(
       {
         id: z.string().describe('Work item ID'),
       },
-      (args) => {
+      async (args) => {
         return handleGetDependents(backend, args);
       },
     );
@@ -657,7 +660,7 @@ export function registerTools(
         iteration: z.string().optional().describe('Filter by iteration'),
         all: z.boolean().optional().describe('Show all iterations'),
       },
-      (args) => {
+      async (args) => {
         return handleGetItemTree(backend, args);
       },
     );
@@ -679,7 +682,7 @@ export async function startMcpServer(): Promise<void> {
   const syncState: SyncState = { syncManager: null, queueStore: null };
 
   if (isTicProject(root)) {
-    const setup = createBackendWithSync(root);
+    const setup = await createBackendWithSync(root);
     backend = setup.backend;
     syncState.syncManager = setup.syncManager;
     syncState.queueStore = syncState.syncManager
@@ -692,22 +695,24 @@ export async function startMcpServer(): Promise<void> {
   const guardedBackend = new Proxy({} as Backend, {
     get(_target, prop: string | symbol) {
       if (!backend) {
-        // Re-check after init_project may have created the project
-        if (isTicProject(root)) {
-          const setup = createBackendWithSync(root);
-          backend = setup.backend;
-          syncState.syncManager = setup.syncManager;
-          syncState.queueStore = syncState.syncManager
-            ? new SyncQueueStore(root)
-            : null;
-        } else {
-          throw new Error(
-            'Not a tic project. Use the init_project tool first.',
-          );
-        }
+        throw new Error('Not a tic project. Use the init_project tool first.');
       }
       return (backend as unknown as Record<string | symbol, unknown>)[prop];
     },
+  });
+
+  // Register init_project separately so it can re-initialize the backend
+  server.tool('init_project', 'Initialize a new tic project', async () => {
+    const result = await handleInitProject(root);
+    if (!result.isError && !backend && isTicProject(root)) {
+      const setup = await createBackendWithSync(root);
+      backend = setup.backend;
+      syncState.syncManager = setup.syncManager;
+      syncState.queueStore = syncState.syncManager
+        ? new SyncQueueStore(root)
+        : null;
+    }
+    return result;
   });
 
   registerTools(server, guardedBackend, pendingDeletes, root, syncState);

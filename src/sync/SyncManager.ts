@@ -28,7 +28,7 @@ export class SyncManager {
     this.queue = queue;
     this.status = {
       state: 'idle',
-      pendingCount: queue.read().pending.length,
+      pendingCount: 0,
       lastSyncTime: null,
       errors: [],
     };
@@ -50,14 +50,14 @@ export class SyncManager {
   }
 
   async pushPending(): Promise<PushResult> {
-    const { pending } = this.queue.read();
+    const { pending } = await this.queue.read();
     let pushed = 0;
     const errors: SyncError[] = [];
 
     for (const entry of pending) {
       try {
         const resolvedId = await this.pushEntry(entry);
-        this.queue.remove(resolvedId, entry.action);
+        await this.queue.remove(resolvedId, entry.action);
         pushed++;
       } catch (e) {
         const isLocalMissing =
@@ -66,7 +66,7 @@ export class SyncManager {
           (e as NodeJS.ErrnoException).code === 'ENOENT';
         if (isLocalMissing) {
           // Local item was deleted or never synced — drop unrecoverable entry
-          this.queue.remove(entry.itemId, entry.action);
+          await this.queue.remove(entry.itemId, entry.action);
         } else {
           errors.push({
             entry,
@@ -78,19 +78,18 @@ export class SyncManager {
     }
 
     this.updateStatus({
-      pendingCount: this.queue.read().pending.length,
+      pendingCount: (await this.queue.read()).pending.length,
       errors,
     });
 
     return { pushed, failed: errors.length, errors };
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   private async pushEntry(entry: QueueEntry): Promise<string> {
     switch (entry.action) {
       case 'create': {
-        const localItem = this.local.getWorkItem(entry.itemId);
-        const remoteItem = this.remote.createWorkItem({
+        const localItem = await this.local.getWorkItem(entry.itemId);
+        const remoteItem = await this.remote.createWorkItem({
           title: localItem.title,
           type: localItem.type,
           status: localItem.status,
@@ -103,15 +102,15 @@ export class SyncManager {
           dependsOn: localItem.dependsOn,
         });
         if (remoteItem.id !== entry.itemId) {
-          this.renameLocalItem(entry.itemId, remoteItem.id);
-          this.queue.renameItem(entry.itemId, remoteItem.id);
+          await this.renameLocalItem(entry.itemId, remoteItem.id);
+          await this.queue.renameItem(entry.itemId, remoteItem.id);
           return remoteItem.id;
         }
         return entry.itemId;
       }
       case 'update': {
-        const localItem = this.local.getWorkItem(entry.itemId);
-        this.remote.updateWorkItem(entry.itemId, {
+        const localItem = await this.local.getWorkItem(entry.itemId);
+        await this.remote.updateWorkItem(entry.itemId, {
           title: localItem.title,
           type: localItem.type,
           status: localItem.status,
@@ -126,12 +125,12 @@ export class SyncManager {
         return entry.itemId;
       }
       case 'delete': {
-        this.remote.deleteWorkItem(entry.itemId);
+        await this.remote.deleteWorkItem(entry.itemId);
         return entry.itemId;
       }
       case 'comment': {
         if (entry.commentData) {
-          this.remote.addComment(entry.itemId, {
+          await this.remote.addComment(entry.itemId, {
             author: entry.commentData.author,
             body: entry.commentData.body,
           });
@@ -143,13 +142,13 @@ export class SyncManager {
     }
   }
 
-  private renameLocalItem(oldId: string, newId: string): void {
-    const item = this.local.getWorkItem(oldId);
+  private async renameLocalItem(oldId: string, newId: string): Promise<void> {
+    const item = await this.local.getWorkItem(oldId);
     const root = this.local.getRoot();
     const renamedItem = { ...item, id: newId };
-    writeWorkItem(root, renamedItem);
-    removeWorkItemFile(root, oldId);
-    const allItems = this.local.listWorkItems();
+    await writeWorkItem(root, renamedItem);
+    await removeWorkItemFile(root, oldId);
+    const allItems = await this.local.listWorkItems();
     for (const other of allItems) {
       let changed = false;
       if (other.parent === oldId) {
@@ -161,7 +160,7 @@ export class SyncManager {
         changed = true;
       }
       if (changed) {
-        writeWorkItem(root, other);
+        await writeWorkItem(root, other);
       }
     }
   }
@@ -174,37 +173,38 @@ export class SyncManager {
 
     this.updateStatus({
       state: push.errors.length > 0 ? 'error' : 'idle',
-      pendingCount: this.queue.read().pending.length,
+      pendingCount: (await this.queue.read()).pending.length,
       lastSyncTime: new Date(),
     });
 
     return { push, pullCount };
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   private async pull(): Promise<number> {
-    this.local.syncConfigFromRemote({
-      iterations: this.remote.getIterations(),
-      currentIteration: this.remote.getCurrentIteration(),
-      statuses: this.remote.getStatuses(),
-      types: this.remote.getWorkItemTypes(),
+    await this.local.syncConfigFromRemote({
+      iterations: await this.remote.getIterations(),
+      currentIteration: await this.remote.getCurrentIteration(),
+      statuses: await this.remote.getStatuses(),
+      types: await this.remote.getWorkItemTypes(),
     });
 
-    const remoteItems = this.remote.listWorkItems();
+    const remoteItems = await this.remote.listWorkItems();
     const root = this.local.getRoot();
-    const pendingIds = new Set(this.queue.read().pending.map((e) => e.itemId));
+    const pendingIds = new Set(
+      (await this.queue.read()).pending.map((e) => e.itemId),
+    );
 
-    const localItems = this.local.listWorkItems();
+    const localItems = await this.local.listWorkItems();
     const localIds = new Set(localItems.map((i) => i.id));
     const remoteIds = new Set(remoteItems.map((i) => i.id));
 
     for (const item of remoteItems) {
-      writeWorkItem(root, item);
+      await writeWorkItem(root, item);
     }
 
     for (const localId of localIds) {
       if (!remoteIds.has(localId) && !pendingIds.has(localId)) {
-        removeWorkItemFile(root, localId);
+        await removeWorkItemFile(root, localId);
       }
     }
 

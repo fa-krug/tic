@@ -14,8 +14,8 @@ import {
   listItemFiles,
   parseWorkItemFile,
 } from './items.js';
-import { execSync } from 'node:child_process';
-import fs from 'node:fs';
+import { spawn } from 'node:child_process';
+import fs from 'node:fs/promises';
 import path from 'node:path';
 
 export interface LocalBackendOptions {
@@ -27,11 +27,23 @@ export class LocalBackend extends BaseBackend {
   private config: Config;
   private tempIds: boolean;
 
-  constructor(root: string, options?: LocalBackendOptions) {
+  private constructor(
+    root: string,
+    config: Config,
+    options?: LocalBackendOptions,
+  ) {
     super();
     this.root = root;
-    this.config = readConfig(root);
+    this.config = config;
     this.tempIds = options?.tempIds ?? false;
+  }
+
+  static async create(
+    root: string,
+    options?: LocalBackendOptions,
+  ): Promise<LocalBackend> {
+    const config = await readConfig(root);
+    return new LocalBackend(root, config, options);
   }
 
   getRoot(): string {
@@ -55,24 +67,27 @@ export class LocalBackend extends BaseBackend {
     };
   }
 
-  private save(): void {
-    writeConfig(this.root, this.config);
+  private async save(): Promise<void> {
+    await writeConfig(this.root, this.config);
   }
 
-  getStatuses(): string[] {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async getStatuses(): Promise<string[]> {
     return this.config.statuses;
   }
 
-  getIterations(): string[] {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async getIterations(): Promise<string[]> {
     return this.config.iterations;
   }
 
-  getWorkItemTypes(): string[] {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async getWorkItemTypes(): Promise<string[]> {
     return this.config.types;
   }
 
-  getAssignees(): string[] {
-    const items = this.listWorkItems();
+  async getAssignees(): Promise<string[]> {
+    const items = await this.listWorkItems();
     const assignees = new Set<string>();
     for (const item of items) {
       if (item.assignee) {
@@ -82,37 +97,38 @@ export class LocalBackend extends BaseBackend {
     return [...assignees].sort();
   }
 
-  getCurrentIteration(): string {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async getCurrentIteration(): Promise<string> {
     return this.config.current_iteration;
   }
 
-  setCurrentIteration(name: string): void {
+  async setCurrentIteration(name: string): Promise<void> {
     this.config.current_iteration = name;
     if (!this.config.iterations.includes(name)) {
       this.config.iterations.push(name);
     }
-    this.save();
+    await this.save();
   }
 
-  syncConfigFromRemote(remote: {
+  async syncConfigFromRemote(remote: {
     iterations: string[];
     currentIteration: string;
     statuses: string[];
     types: string[];
-  }): void {
+  }): Promise<void> {
     this.config.iterations = remote.iterations;
     this.config.current_iteration = remote.currentIteration;
     this.config.statuses = remote.statuses;
     this.config.types = remote.types;
-    this.save();
+    await this.save();
   }
 
-  private validateRelationships(
+  private async validateRelationships(
     id: string,
     parent: string | null | undefined,
     dependsOn: string[] | undefined,
-  ): void {
-    const all = this.listWorkItems();
+  ): Promise<void> {
+    const all = await this.listWorkItems();
     const allIds = new Set(all.map((item) => item.id));
 
     // Validate parent
@@ -173,27 +189,29 @@ export class LocalBackend extends BaseBackend {
     }
   }
 
-  listWorkItems(iteration?: string): WorkItem[] {
-    const files = listItemFiles(this.root);
-    const items = files.map((f) => {
-      const raw = fs.readFileSync(f, 'utf-8');
-      return parseWorkItemFile(raw);
-    });
+  async listWorkItems(iteration?: string): Promise<WorkItem[]> {
+    const files = await listItemFiles(this.root);
+    const items = await Promise.all(
+      files.map(async (f) => {
+        const raw = await fs.readFile(f, 'utf-8');
+        return parseWorkItemFile(raw);
+      }),
+    );
     if (iteration) return items.filter((i) => i.iteration === iteration);
     return items;
   }
 
-  getWorkItem(id: string): WorkItem {
-    return readWorkItem(this.root, id);
+  async getWorkItem(id: string): Promise<WorkItem> {
+    return await readWorkItem(this.root, id);
   }
 
-  createWorkItem(data: NewWorkItem): WorkItem {
+  async createWorkItem(data: NewWorkItem): Promise<WorkItem> {
     this.validateFields(data);
     const now = new Date().toISOString();
     const id = this.tempIds
       ? `local-${this.config.next_id}`
       : String(this.config.next_id);
-    this.validateRelationships(id, data.parent, data.dependsOn);
+    await this.validateRelationships(id, data.parent, data.dependsOn);
     const item: WorkItem = {
       ...data,
       id,
@@ -205,29 +223,29 @@ export class LocalBackend extends BaseBackend {
     if (data.iteration && !this.config.iterations.includes(data.iteration)) {
       this.config.iterations.push(data.iteration);
     }
-    this.save();
-    writeWorkItem(this.root, item);
+    await this.save();
+    await writeWorkItem(this.root, item);
     return item;
   }
 
-  updateWorkItem(id: string, data: Partial<WorkItem>): WorkItem {
+  async updateWorkItem(id: string, data: Partial<WorkItem>): Promise<WorkItem> {
     this.validateFields(data);
-    const item = this.getWorkItem(id);
-    this.validateRelationships(id, data.parent, data.dependsOn);
+    const item = await this.getWorkItem(id);
+    await this.validateRelationships(id, data.parent, data.dependsOn);
     const updated = {
       ...item,
       ...data,
       id,
       updated: new Date().toISOString(),
     };
-    writeWorkItem(this.root, updated);
+    await writeWorkItem(this.root, updated);
     return updated;
   }
 
-  deleteWorkItem(id: string): void {
-    removeWorkItemFile(this.root, id);
+  async deleteWorkItem(id: string): Promise<void> {
+    await removeWorkItemFile(this.root, id);
     // Clean up references in other items
-    const all = this.listWorkItems();
+    const all = await this.listWorkItems();
     for (const item of all) {
       let changed = false;
       if (item.parent === id) {
@@ -239,13 +257,13 @@ export class LocalBackend extends BaseBackend {
         changed = true;
       }
       if (changed) {
-        writeWorkItem(this.root, item);
+        await writeWorkItem(this.root, item);
       }
     }
   }
 
-  addComment(workItemId: string, comment: NewComment): Comment {
-    const item = this.getWorkItem(workItemId);
+  async addComment(workItemId: string, comment: NewComment): Promise<Comment> {
+    const item = await this.getWorkItem(workItemId);
     const newComment: Comment = {
       author: comment.author,
       date: new Date().toISOString(),
@@ -253,17 +271,17 @@ export class LocalBackend extends BaseBackend {
     };
     item.comments.push(newComment);
     item.updated = new Date().toISOString();
-    writeWorkItem(this.root, item);
+    await writeWorkItem(this.root, item);
     return newComment;
   }
 
-  getChildren(id: string): WorkItem[] {
-    const all = this.listWorkItems();
+  async getChildren(id: string): Promise<WorkItem[]> {
+    const all = await this.listWorkItems();
     return all.filter((item) => item.parent === id);
   }
 
-  getDependents(id: string): WorkItem[] {
-    const all = this.listWorkItems();
+  async getDependents(id: string): Promise<WorkItem[]> {
+    const all = await this.listWorkItems();
     return all.filter((item) => item.dependsOn.includes(id));
   }
 
@@ -271,12 +289,17 @@ export class LocalBackend extends BaseBackend {
     return path.resolve(this.root, '.tic', 'items', `${id}.md`);
   }
 
-  openItem(id: string): void {
+  async openItem(id: string): Promise<void> {
     const filePath = this.getItemUrl(id);
-    if (!fs.existsSync(filePath)) {
-      throw new Error(`Work item #${id} does not exist`);
-    }
+    await fs.access(filePath);
     const editor = process.env['VISUAL'] || process.env['EDITOR'] || 'vi';
-    execSync(`${editor} ${filePath}`, { stdio: 'inherit' });
+    return new Promise<void>((resolve, reject) => {
+      const child = spawn(editor, [filePath], { stdio: 'inherit' });
+      child.on('close', (code) => {
+        if (code === 0) resolve();
+        else reject(new Error(`Editor exited with code ${code}`));
+      });
+      child.on('error', reject);
+    });
   }
 }

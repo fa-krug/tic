@@ -24,7 +24,7 @@ describe('items', () => {
     fs.rmSync(tmpDir, { recursive: true });
   });
 
-  it('writes and reads a work item', () => {
+  it('writes and reads a work item', async () => {
     const item: WorkItem = {
       id: '1',
       title: 'Test item',
@@ -41,15 +41,15 @@ describe('items', () => {
       parent: null,
       dependsOn: [],
     };
-    writeWorkItem(tmpDir, item);
-    const read = readWorkItem(tmpDir, '1');
+    await writeWorkItem(tmpDir, item);
+    const read = await readWorkItem(tmpDir, '1');
     expect(read.title).toBe('Test item');
     expect(read.type).toBe('task');
     expect(read.labels).toEqual(['bug']);
     expect(read.description).toBe('A test item.');
   });
 
-  it('writes and reads a work item with comments', () => {
+  it('writes and reads a work item with comments', async () => {
     const item: WorkItem = {
       id: '2',
       title: 'With comments',
@@ -73,13 +73,13 @@ describe('items', () => {
       parent: null,
       dependsOn: [],
     };
-    writeWorkItem(tmpDir, item);
-    const read = readWorkItem(tmpDir, '2');
+    await writeWorkItem(tmpDir, item);
+    const read = await readWorkItem(tmpDir, '2');
     expect(read.comments).toHaveLength(2);
     expect(read.comments[0]!.body).toBe('First comment.');
   });
 
-  it('deletes a work item file', () => {
+  it('deletes a work item file', async () => {
     const item: WorkItem = {
       id: '3',
       title: 'To delete',
@@ -96,14 +96,14 @@ describe('items', () => {
       parent: null,
       dependsOn: [],
     };
-    writeWorkItem(tmpDir, item);
+    await writeWorkItem(tmpDir, item);
     expect(fs.existsSync(path.join(itemsDirPath, '3.md'))).toBe(true);
-    deleteWorkItem(tmpDir, '3');
+    await deleteWorkItem(tmpDir, '3');
     expect(fs.existsSync(path.join(itemsDirPath, '3.md'))).toBe(false);
   });
 
-  it('lists all item files', () => {
-    writeWorkItem(tmpDir, {
+  it('lists all item files', async () => {
+    await writeWorkItem(tmpDir, {
       id: '1',
       title: 'A',
       type: 'task',
@@ -119,7 +119,7 @@ describe('items', () => {
       parent: null,
       dependsOn: [],
     });
-    writeWorkItem(tmpDir, {
+    await writeWorkItem(tmpDir, {
       id: '2',
       title: 'B',
       type: 'epic',
@@ -135,11 +135,11 @@ describe('items', () => {
       parent: null,
       dependsOn: [],
     });
-    const files = listItemFiles(tmpDir);
+    const files = await listItemFiles(tmpDir);
     expect(files).toHaveLength(2);
   });
 
-  it('writes and reads a work item with parent and dependsOn', () => {
+  it('writes and reads a work item with parent and dependsOn', async () => {
     const item: WorkItem = {
       id: '1',
       title: 'Child item',
@@ -156,13 +156,13 @@ describe('items', () => {
       parent: '5',
       dependsOn: ['3', '4'],
     };
-    writeWorkItem(tmpDir, item);
-    const read = readWorkItem(tmpDir, '1');
+    await writeWorkItem(tmpDir, item);
+    const read = await readWorkItem(tmpDir, '1');
     expect(read.parent).toBe('5');
     expect(read.dependsOn).toEqual(['3', '4']);
   });
 
-  it('reads items without parent/dependsOn as defaults', () => {
+  it('reads items without parent/dependsOn as defaults', async () => {
     const item: WorkItem = {
       id: '2',
       title: 'Legacy item',
@@ -179,8 +179,8 @@ describe('items', () => {
       parent: null,
       dependsOn: [],
     };
-    writeWorkItem(tmpDir, item);
-    const read = readWorkItem(tmpDir, '2');
+    await writeWorkItem(tmpDir, item);
+    const read = await readWorkItem(tmpDir, '2');
     expect(read.parent).toBeNull();
     expect(read.dependsOn).toEqual([]);
   });

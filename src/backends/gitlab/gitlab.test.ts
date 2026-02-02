@@ -97,21 +97,21 @@ describe('GitLabBackend', () => {
   });
 
   describe('getStatuses', () => {
-    it('returns open and closed', () => {
+    it('returns open and closed', async () => {
       const backend = makeBackend();
-      expect(backend.getStatuses()).toEqual(['open', 'closed']);
+      expect(await backend.getStatuses()).toEqual(['open', 'closed']);
     });
   });
 
   describe('getWorkItemTypes', () => {
-    it('returns epic and issue', () => {
+    it('returns epic and issue', async () => {
       const backend = makeBackend();
-      expect(backend.getWorkItemTypes()).toEqual(['epic', 'issue']);
+      expect(await backend.getWorkItemTypes()).toEqual(['epic', 'issue']);
     });
   });
 
   describe('getIterations', () => {
-    it('returns iteration titles', () => {
+    it('returns iteration titles', async () => {
       const backend = makeBackend();
       mockGlab.mockReturnValueOnce([
         {
@@ -125,18 +125,18 @@ describe('GitLabBackend', () => {
           due_date: '2026-01-28',
         },
       ]);
-      expect(backend.getIterations()).toEqual(['Sprint 1', 'Sprint 2']);
+      expect(await backend.getIterations()).toEqual(['Sprint 1', 'Sprint 2']);
     });
 
-    it('returns empty array when no iterations', () => {
+    it('returns empty array when no iterations', async () => {
       const backend = makeBackend();
       mockGlab.mockReturnValueOnce([]);
-      expect(backend.getIterations()).toEqual([]);
+      expect(await backend.getIterations()).toEqual([]);
     });
   });
 
   describe('getCurrentIteration', () => {
-    it('returns iteration that spans today', () => {
+    it('returns iteration that spans today', async () => {
       const backend = makeBackend();
       mockGlab.mockReturnValueOnce([
         {
@@ -150,10 +150,10 @@ describe('GitLabBackend', () => {
           due_date: '2030-12-31',
         },
       ]);
-      expect(backend.getCurrentIteration()).toBe('Current Sprint');
+      expect(await backend.getCurrentIteration()).toBe('Current Sprint');
     });
 
-    it('returns empty string when no current iteration', () => {
+    it('returns empty string when no current iteration', async () => {
       const backend = makeBackend();
       mockGlab.mockReturnValueOnce([
         {
@@ -162,19 +162,21 @@ describe('GitLabBackend', () => {
           due_date: '2020-01-14',
         },
       ]);
-      expect(backend.getCurrentIteration()).toBe('');
+      expect(await backend.getCurrentIteration()).toBe('');
     });
   });
 
   describe('setCurrentIteration', () => {
-    it('is a no-op', () => {
+    it('is a no-op', async () => {
       const backend = makeBackend();
-      expect(() => backend.setCurrentIteration('Sprint 1')).not.toThrow();
+      await expect(
+        backend.setCurrentIteration('Sprint 1'),
+      ).resolves.not.toThrow();
     });
   });
 
   describe('listWorkItems', () => {
-    it('returns merged issues and epics sorted by updated desc', () => {
+    it('returns merged issues and epics sorted by updated desc', async () => {
       const backend = makeBackend();
 
       // First call: issues
@@ -188,7 +190,7 @@ describe('GitLabBackend', () => {
           { ...sampleEpic, iid: 1, updated_at: '2026-01-19T00:00:00Z' },
         ]);
 
-      const items = backend.listWorkItems();
+      const items = await backend.listWorkItems();
       expect(items).toHaveLength(3);
       // Sorted by updated descending
       expect(items[0]!.id).toBe('issue-1');
@@ -196,7 +198,7 @@ describe('GitLabBackend', () => {
       expect(items[2]!.id).toBe('issue-2');
     });
 
-    it('filters issues by iteration', () => {
+    it('filters issues by iteration', async () => {
       const backend = makeBackend();
 
       mockGlab
@@ -216,7 +218,7 @@ describe('GitLabBackend', () => {
         ])
         .mockReturnValueOnce([]);
 
-      const items = backend.listWorkItems('v1.0');
+      const items = await backend.listWorkItems('v1.0');
       const issueItems = items.filter((i) => i.type === 'issue');
       expect(issueItems).toHaveLength(1);
       expect(issueItems[0]!.iteration).toBe('v1.0');
@@ -224,47 +226,47 @@ describe('GitLabBackend', () => {
   });
 
   describe('getWorkItem', () => {
-    it('returns an issue with comments', () => {
+    it('returns an issue with comments', async () => {
       const backend = makeBackend();
 
       mockGlab
         .mockReturnValueOnce(sampleIssue) // issue view
         .mockReturnValueOnce([sampleNote]); // notes
 
-      const item = backend.getWorkItem('issue-42');
+      const item = await backend.getWorkItem('issue-42');
       expect(item.id).toBe('issue-42');
       expect(item.title).toBe('Fix login bug');
       expect(item.comments).toHaveLength(1);
       expect(item.comments[0]!.author).toBe('charlie');
     });
 
-    it('returns an epic with comments', () => {
+    it('returns an epic with comments', async () => {
       const backend = makeBackend();
 
       mockGlab
         .mockReturnValueOnce(sampleEpic) // epic view
         .mockReturnValueOnce([sampleNote]); // notes
 
-      const item = backend.getWorkItem('epic-5');
+      const item = await backend.getWorkItem('epic-5');
       expect(item.id).toBe('epic-5');
       expect(item.title).toBe('Big feature');
       expect(item.type).toBe('epic');
       expect(item.comments).toHaveLength(1);
     });
 
-    it('throws on invalid ID format', () => {
+    it('throws on invalid ID format', async () => {
       const backend = makeBackend();
-      expect(() => backend.getWorkItem('42')).toThrow(
+      await expect(backend.getWorkItem('42')).rejects.toThrow(
         'Invalid GitLab ID format',
       );
-      expect(() => backend.getWorkItem('task-42')).toThrow(
+      await expect(backend.getWorkItem('task-42')).rejects.toThrow(
         'Invalid GitLab ID format',
       );
     });
   });
 
   describe('createWorkItem', () => {
-    it('creates an issue and returns the WorkItem', () => {
+    it('creates an issue and returns the WorkItem', async () => {
       const backend = makeBackend();
 
       mockGlabExec.mockReturnValue(
@@ -278,7 +280,7 @@ describe('GitLabBackend', () => {
         })
         .mockReturnValueOnce([]); // notes
 
-      const item = backend.createWorkItem({
+      const item = await backend.createWorkItem({
         title: 'New issue',
         type: 'issue',
         status: 'open',
@@ -304,7 +306,7 @@ describe('GitLabBackend', () => {
       );
     });
 
-    it('creates an epic via API', () => {
+    it('creates an epic via API', async () => {
       const backend = makeBackend();
 
       mockGlab.mockReturnValueOnce({
@@ -313,7 +315,7 @@ describe('GitLabBackend', () => {
         title: 'New epic',
       });
 
-      const item = backend.createWorkItem({
+      const item = await backend.createWorkItem({
         title: 'New epic',
         type: 'epic',
         status: 'open',
@@ -332,7 +334,7 @@ describe('GitLabBackend', () => {
   });
 
   describe('updateWorkItem', () => {
-    it('updates issue title and description', () => {
+    it('updates issue title and description', async () => {
       const backend = makeBackend();
 
       mockGlabExec.mockReturnValue('');
@@ -345,7 +347,7 @@ describe('GitLabBackend', () => {
         })
         .mockReturnValueOnce([]); // notes
 
-      const item = backend.updateWorkItem('issue-5', {
+      const item = await backend.updateWorkItem('issue-5', {
         title: 'Updated title',
         description: 'Updated body',
       });
@@ -353,7 +355,7 @@ describe('GitLabBackend', () => {
       expect(item.title).toBe('Updated title');
     });
 
-    it('closes an issue when status changes to closed', () => {
+    it('closes an issue when status changes to closed', async () => {
       const backend = makeBackend();
       mockGlabExec.mockReturnValue('');
       mockGlab
@@ -364,14 +366,14 @@ describe('GitLabBackend', () => {
         })
         .mockReturnValueOnce([]);
 
-      backend.updateWorkItem('issue-5', { status: 'closed' });
+      await backend.updateWorkItem('issue-5', { status: 'closed' });
       expect(mockGlabExec).toHaveBeenCalledWith(
         ['issue', 'close', '5'],
         '/repo',
       );
     });
 
-    it('reopens an issue when status changes to open', () => {
+    it('reopens an issue when status changes to open', async () => {
       const backend = makeBackend();
       mockGlabExec.mockReturnValue('');
       mockGlab
@@ -382,14 +384,14 @@ describe('GitLabBackend', () => {
         })
         .mockReturnValueOnce([]);
 
-      backend.updateWorkItem('issue-5', { status: 'open' });
+      await backend.updateWorkItem('issue-5', { status: 'open' });
       expect(mockGlabExec).toHaveBeenCalledWith(
         ['issue', 'reopen', '5'],
         '/repo',
       );
     });
 
-    it('updates epic via API with state_event', () => {
+    it('updates epic via API with state_event', async () => {
       const backend = makeBackend();
 
       // First glab call: PUT to update epic
@@ -399,7 +401,7 @@ describe('GitLabBackend', () => {
       // Third glab call: GET notes
       mockGlab.mockReturnValueOnce([]);
 
-      backend.updateWorkItem('epic-5', { status: 'closed' });
+      await backend.updateWorkItem('epic-5', { status: 'closed' });
 
       expect(mockGlab).toHaveBeenCalledWith(
         expect.arrayContaining([
@@ -416,20 +418,20 @@ describe('GitLabBackend', () => {
   });
 
   describe('deleteWorkItem', () => {
-    it('deletes an issue', () => {
+    it('deletes an issue', async () => {
       const backend = makeBackend();
       mockGlabExec.mockReturnValue('');
-      backend.deleteWorkItem('issue-7');
+      await backend.deleteWorkItem('issue-7');
       expect(mockGlabExec).toHaveBeenCalledWith(
         ['issue', 'delete', '7', '--yes'],
         '/repo',
       );
     });
 
-    it('deletes an epic via API', () => {
+    it('deletes an epic via API', async () => {
       const backend = makeBackend();
       mockGlab.mockReturnValueOnce({});
-      backend.deleteWorkItem('epic-3');
+      await backend.deleteWorkItem('epic-3');
       expect(mockGlab).toHaveBeenCalledWith(
         ['api', 'groups/mygroup/epics/3', '-X', 'DELETE'],
         '/repo',
@@ -438,11 +440,11 @@ describe('GitLabBackend', () => {
   });
 
   describe('addComment', () => {
-    it('adds a comment to an issue', () => {
+    it('adds a comment to an issue', async () => {
       const backend = makeBackend();
       mockGlabExec.mockReturnValue('');
 
-      const comment = backend.addComment('issue-3', {
+      const comment = await backend.addComment('issue-3', {
         author: 'alice',
         body: 'This is a comment.',
       });
@@ -456,11 +458,11 @@ describe('GitLabBackend', () => {
       expect(comment.date).toBeDefined();
     });
 
-    it('adds a comment to an epic via API', () => {
+    it('adds a comment to an epic via API', async () => {
       const backend = makeBackend();
       mockGlab.mockReturnValueOnce({});
 
-      const comment = backend.addComment('epic-5', {
+      const comment = await backend.addComment('epic-5', {
         author: 'bob',
         body: 'Epic comment.',
       });
@@ -482,19 +484,19 @@ describe('GitLabBackend', () => {
   });
 
   describe('getChildren', () => {
-    it('returns empty array for issues', () => {
+    it('returns empty array for issues', async () => {
       const backend = makeBackend();
-      expect(backend.getChildren('issue-42')).toEqual([]);
+      expect(await backend.getChildren('issue-42')).toEqual([]);
     });
 
-    it('returns epic children as WorkItems', () => {
+    it('returns epic children as WorkItems', async () => {
       const backend = makeBackend();
       mockGlab.mockReturnValueOnce([
         { ...sampleIssue, iid: 10 },
         { ...sampleIssue, iid: 11 },
       ]);
 
-      const children = backend.getChildren('epic-5');
+      const children = await backend.getChildren('epic-5');
       expect(children).toHaveLength(2);
       expect(children[0]!.id).toBe('issue-10');
       expect(children[1]!.id).toBe('issue-11');
@@ -502,10 +504,10 @@ describe('GitLabBackend', () => {
   });
 
   describe('getDependents', () => {
-    it('returns empty array', () => {
+    it('returns empty array', async () => {
       const backend = makeBackend();
-      expect(backend.getDependents('issue-42')).toEqual([]);
-      expect(backend.getDependents('epic-5')).toEqual([]);
+      expect(await backend.getDependents('issue-42')).toEqual([]);
+      expect(await backend.getDependents('epic-5')).toEqual([]);
     });
   });
 
@@ -528,22 +530,22 @@ describe('GitLabBackend', () => {
   });
 
   describe('openItem', () => {
-    it('opens an issue in the browser via glab', () => {
+    it('opens an issue in the browser via glab', async () => {
       const backend = makeBackend();
       mockGlabExec.mockReturnValue('');
 
-      backend.openItem('issue-5');
+      await backend.openItem('issue-5');
       expect(mockGlabExec).toHaveBeenCalledWith(
         ['issue', 'view', '5', '--web'],
         '/repo',
       );
     });
 
-    it('opens an epic URL via open command', () => {
+    it('opens an epic URL via open command', async () => {
       const backend = makeBackend();
       mockExecFileSync.mockReturnValue('');
 
-      backend.openItem('epic-5');
+      await backend.openItem('epic-5');
       expect(mockExecFileSync).toHaveBeenCalledWith('open', [
         'https://gitlab.com/groups/mygroup/-/epics/5',
       ]);
@@ -551,21 +553,21 @@ describe('GitLabBackend', () => {
   });
 
   describe('getAssignees', () => {
-    it('returns project member usernames', () => {
+    it('returns project member usernames', async () => {
       const backend = makeBackend();
       mockGlab.mockReturnValueOnce([
         { username: 'alice' },
         { username: 'bob' },
       ]);
-      expect(backend.getAssignees()).toEqual(['alice', 'bob']);
+      expect(await backend.getAssignees()).toEqual(['alice', 'bob']);
     });
 
-    it('returns empty array on error', () => {
+    it('returns empty array on error', async () => {
       const backend = makeBackend();
       mockGlab.mockImplementationOnce(() => {
         throw new Error('API error');
       });
-      expect(backend.getAssignees()).toEqual([]);
+      expect(await backend.getAssignees()).toEqual([]);
     });
   });
 });

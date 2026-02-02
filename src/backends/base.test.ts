@@ -59,48 +59,66 @@ class TestBackend extends BaseBackend {
   }
 
   // Abstract method stubs (not under test)
-  getStatuses(): string[] {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async getStatuses(): Promise<string[]> {
     return [];
   }
-  getIterations(): string[] {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async getIterations(): Promise<string[]> {
     return [];
   }
-  getWorkItemTypes(): string[] {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async getWorkItemTypes(): Promise<string[]> {
     return [];
   }
-  getAssignees(): string[] {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async getAssignees(): Promise<string[]> {
     return [];
   }
-  getCurrentIteration(): string {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async getCurrentIteration(): Promise<string> {
     return '';
   }
-  setCurrentIteration(_name: string): void {}
-  listWorkItems(_iteration?: string): WorkItem[] {
+  async setCurrentIteration(_name: string): Promise<void> {}
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async listWorkItems(_iteration?: string): Promise<WorkItem[]> {
     return [];
   }
-  getWorkItem(_id: string): WorkItem {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async getWorkItem(_id: string): Promise<WorkItem> {
     throw new Error('not implemented');
   }
-  createWorkItem(_data: NewWorkItem): WorkItem {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async createWorkItem(_data: NewWorkItem): Promise<WorkItem> {
     throw new Error('not implemented');
   }
-  updateWorkItem(_id: string, _data: Partial<WorkItem>): WorkItem {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async updateWorkItem(
+    _id: string,
+    _data: Partial<WorkItem>,
+  ): Promise<WorkItem> {
     throw new Error('not implemented');
   }
-  deleteWorkItem(_id: string): void {}
-  addComment(_workItemId: string, _comment: NewComment): Comment {
+  async deleteWorkItem(_id: string): Promise<void> {}
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async addComment(
+    _workItemId: string,
+    _comment: NewComment,
+  ): Promise<Comment> {
     throw new Error('not implemented');
   }
-  getChildren(_id: string): WorkItem[] {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async getChildren(_id: string): Promise<WorkItem[]> {
     return [];
   }
-  getDependents(_id: string): WorkItem[] {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async getDependents(_id: string): Promise<WorkItem[]> {
     return [];
   }
   getItemUrl(_id: string): string {
     return '';
   }
-  openItem(_id: string): void {}
+  async openItem(_id: string): Promise<void> {}
 }
 /* eslint-enable @typescript-eslint/no-unused-vars */
 

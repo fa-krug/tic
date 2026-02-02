@@ -8,9 +8,9 @@ describe('LocalBackend', () => {
   let tmpDir: string;
   let backend: LocalBackend;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-test-'));
-    backend = new LocalBackend(tmpDir);
+    backend = await LocalBackend.create(tmpDir);
   });
 
   afterEach(() => {
@@ -35,8 +35,8 @@ describe('LocalBackend', () => {
     });
   });
 
-  it('returns default statuses', () => {
-    expect(backend.getStatuses()).toEqual([
+  it('returns default statuses', async () => {
+    expect(await backend.getStatuses()).toEqual([
       'backlog',
       'todo',
       'in-progress',
@@ -45,12 +45,12 @@ describe('LocalBackend', () => {
     ]);
   });
 
-  it('returns default work item types', () => {
-    expect(backend.getWorkItemTypes()).toEqual(['epic', 'issue', 'task']);
+  it('returns default work item types', async () => {
+    expect(await backend.getWorkItemTypes()).toEqual(['epic', 'issue', 'task']);
   });
 
-  it('creates and lists work items', () => {
-    backend.createWorkItem({
+  it('creates and lists work items', async () => {
+    await backend.createWorkItem({
       title: 'Test',
       type: 'task',
       status: 'todo',
@@ -62,15 +62,15 @@ describe('LocalBackend', () => {
       parent: null,
       dependsOn: [],
     });
-    const items = backend.listWorkItems();
+    const items = await backend.listWorkItems();
     expect(items).toHaveLength(1);
     expect(items[0]!.title).toBe('Test');
     expect(items[0]!.type).toBe('task');
     expect(items[0]!.id).toBe('1');
   });
 
-  it('filters work items by iteration', () => {
-    backend.createWorkItem({
+  it('filters work items by iteration', async () => {
+    await backend.createWorkItem({
       title: 'A',
       type: 'epic',
       status: 'todo',
@@ -82,7 +82,7 @@ describe('LocalBackend', () => {
       parent: null,
       dependsOn: [],
     });
-    backend.createWorkItem({
+    await backend.createWorkItem({
       title: 'B',
       type: 'issue',
       status: 'todo',
@@ -94,12 +94,12 @@ describe('LocalBackend', () => {
       parent: null,
       dependsOn: [],
     });
-    expect(backend.listWorkItems('v1')).toHaveLength(1);
-    expect(backend.listWorkItems('v2')).toHaveLength(1);
+    expect(await backend.listWorkItems('v1')).toHaveLength(1);
+    expect(await backend.listWorkItems('v2')).toHaveLength(1);
   });
 
-  it('updates a work item', () => {
-    backend.createWorkItem({
+  it('updates a work item', async () => {
+    await backend.createWorkItem({
       title: 'Original',
       type: 'issue',
       status: 'todo',
@@ -111,14 +111,17 @@ describe('LocalBackend', () => {
       parent: null,
       dependsOn: [],
     });
-    backend.updateWorkItem('1', { title: 'Updated', status: 'in-progress' });
-    const item = backend.getWorkItem('1');
+    await backend.updateWorkItem('1', {
+      title: 'Updated',
+      status: 'in-progress',
+    });
+    const item = await backend.getWorkItem('1');
     expect(item.title).toBe('Updated');
     expect(item.status).toBe('in-progress');
   });
 
-  it('deletes a work item', () => {
-    backend.createWorkItem({
+  it('deletes a work item', async () => {
+    await backend.createWorkItem({
       title: 'Delete me',
       type: 'task',
       status: 'todo',
@@ -130,13 +133,13 @@ describe('LocalBackend', () => {
       parent: null,
       dependsOn: [],
     });
-    expect(backend.listWorkItems()).toHaveLength(1);
-    backend.deleteWorkItem('1');
-    expect(backend.listWorkItems()).toHaveLength(0);
+    expect(await backend.listWorkItems()).toHaveLength(1);
+    await backend.deleteWorkItem('1');
+    expect(await backend.listWorkItems()).toHaveLength(0);
   });
 
-  it('adds a comment', () => {
-    backend.createWorkItem({
+  it('adds a comment', async () => {
+    await backend.createWorkItem({
       title: 'Commentable',
       type: 'issue',
       status: 'todo',
@@ -148,21 +151,21 @@ describe('LocalBackend', () => {
       parent: null,
       dependsOn: [],
     });
-    backend.addComment('1', { author: 'dev', body: 'A comment.' });
-    const item = backend.getWorkItem('1');
+    await backend.addComment('1', { author: 'dev', body: 'A comment.' });
+    const item = await backend.getWorkItem('1');
     expect(item.comments).toHaveLength(1);
     expect(item.comments[0]!.body).toBe('A comment.');
   });
 
-  it('manages iterations', () => {
-    expect(backend.getCurrentIteration()).toBe('default');
-    backend.setCurrentIteration('v1');
-    expect(backend.getCurrentIteration()).toBe('v1');
-    expect(backend.getIterations()).toContain('v1');
+  it('manages iterations', async () => {
+    expect(await backend.getCurrentIteration()).toBe('default');
+    await backend.setCurrentIteration('v1');
+    expect(await backend.getCurrentIteration()).toBe('v1');
+    expect(await backend.getIterations()).toContain('v1');
   });
 
-  it('returns children of a work item', () => {
-    const parent = backend.createWorkItem({
+  it('returns children of a work item', async () => {
+    const parent = await backend.createWorkItem({
       title: 'Parent',
       type: 'epic',
       status: 'todo',
@@ -174,7 +177,7 @@ describe('LocalBackend', () => {
       parent: null,
       dependsOn: [],
     });
-    backend.createWorkItem({
+    await backend.createWorkItem({
       title: 'Child 1',
       type: 'task',
       status: 'todo',
@@ -186,7 +189,7 @@ describe('LocalBackend', () => {
       parent: parent.id,
       dependsOn: [],
     });
-    backend.createWorkItem({
+    await backend.createWorkItem({
       title: 'Child 2',
       type: 'task',
       status: 'todo',
@@ -198,15 +201,15 @@ describe('LocalBackend', () => {
       parent: parent.id,
       dependsOn: [],
     });
-    const children = backend.getChildren(parent.id);
+    const children = await backend.getChildren(parent.id);
     expect(children).toHaveLength(2);
     expect(children.map((c) => c.title)).toEqual(
       expect.arrayContaining(['Child 1', 'Child 2']),
     );
   });
 
-  it('returns empty array when item has no children', () => {
-    const item = backend.createWorkItem({
+  it('returns empty array when item has no children', async () => {
+    const item = await backend.createWorkItem({
       title: 'Lonely',
       type: 'task',
       status: 'todo',
@@ -218,11 +221,11 @@ describe('LocalBackend', () => {
       parent: null,
       dependsOn: [],
     });
-    expect(backend.getChildren(item.id)).toEqual([]);
+    expect(await backend.getChildren(item.id)).toEqual([]);
   });
 
-  it('returns dependents of a work item', () => {
-    const dep = backend.createWorkItem({
+  it('returns dependents of a work item', async () => {
+    const dep = await backend.createWorkItem({
       title: 'Dependency',
       type: 'task',
       status: 'todo',
@@ -234,7 +237,7 @@ describe('LocalBackend', () => {
       parent: null,
       dependsOn: [],
     });
-    backend.createWorkItem({
+    await backend.createWorkItem({
       title: 'Dependent',
       type: 'task',
       status: 'todo',
@@ -246,13 +249,13 @@ describe('LocalBackend', () => {
       parent: null,
       dependsOn: [dep.id],
     });
-    const dependents = backend.getDependents(dep.id);
+    const dependents = await backend.getDependents(dep.id);
     expect(dependents).toHaveLength(1);
     expect(dependents[0]!.title).toBe('Dependent');
   });
 
-  it('returns empty array when item has no dependents', () => {
-    const item = backend.createWorkItem({
+  it('returns empty array when item has no dependents', async () => {
+    const item = await backend.createWorkItem({
       title: 'Independent',
       type: 'task',
       status: 'todo',
@@ -264,11 +267,11 @@ describe('LocalBackend', () => {
       parent: null,
       dependsOn: [],
     });
-    expect(backend.getDependents(item.id)).toEqual([]);
+    expect(await backend.getDependents(item.id)).toEqual([]);
   });
 
-  it('rejects self-reference as parent', () => {
-    const item = backend.createWorkItem({
+  it('rejects self-reference as parent', async () => {
+    const item = await backend.createWorkItem({
       title: 'Self',
       type: 'task',
       status: 'todo',
@@ -280,13 +283,13 @@ describe('LocalBackend', () => {
       parent: null,
       dependsOn: [],
     });
-    expect(() =>
+    await expect(
       backend.updateWorkItem(item.id, { parent: item.id }),
-    ).toThrow();
+    ).rejects.toThrow();
   });
 
-  it('rejects self-reference in dependsOn', () => {
-    const item = backend.createWorkItem({
+  it('rejects self-reference in dependsOn', async () => {
+    const item = await backend.createWorkItem({
       title: 'Self',
       type: 'task',
       status: 'todo',
@@ -298,13 +301,13 @@ describe('LocalBackend', () => {
       parent: null,
       dependsOn: [],
     });
-    expect(() =>
+    await expect(
       backend.updateWorkItem(item.id, { dependsOn: [item.id] }),
-    ).toThrow();
+    ).rejects.toThrow();
   });
 
-  it('rejects circular parent chain', () => {
-    const a = backend.createWorkItem({
+  it('rejects circular parent chain', async () => {
+    const a = await backend.createWorkItem({
       title: 'A',
       type: 'task',
       status: 'todo',
@@ -316,7 +319,7 @@ describe('LocalBackend', () => {
       parent: null,
       dependsOn: [],
     });
-    backend.createWorkItem({
+    await backend.createWorkItem({
       title: 'B',
       type: 'task',
       status: 'todo',
@@ -328,7 +331,7 @@ describe('LocalBackend', () => {
       parent: a.id,
       dependsOn: [],
     });
-    const c = backend.createWorkItem({
+    const c = await backend.createWorkItem({
       title: 'C',
       type: 'task',
       status: 'todo',
@@ -341,11 +344,13 @@ describe('LocalBackend', () => {
       dependsOn: [],
     });
     // Try to make A a child of C — creates cycle A -> B -> C -> A
-    expect(() => backend.updateWorkItem(a.id, { parent: c.id })).toThrow();
+    await expect(
+      backend.updateWorkItem(a.id, { parent: c.id }),
+    ).rejects.toThrow();
   });
 
-  it('rejects circular dependency chain', () => {
-    const a = backend.createWorkItem({
+  it('rejects circular dependency chain', async () => {
+    const a = await backend.createWorkItem({
       title: 'A',
       type: 'task',
       status: 'todo',
@@ -357,7 +362,7 @@ describe('LocalBackend', () => {
       parent: null,
       dependsOn: [],
     });
-    const b = backend.createWorkItem({
+    const b = await backend.createWorkItem({
       title: 'B',
       type: 'task',
       status: 'todo',
@@ -370,11 +375,13 @@ describe('LocalBackend', () => {
       dependsOn: [a.id],
     });
     // Try to make A depend on B — creates cycle A -> B -> A
-    expect(() => backend.updateWorkItem(a.id, { dependsOn: [b.id] })).toThrow();
+    await expect(
+      backend.updateWorkItem(a.id, { dependsOn: [b.id] }),
+    ).rejects.toThrow();
   });
 
-  it('rejects reference to non-existent parent', () => {
-    expect(() =>
+  it('rejects reference to non-existent parent', async () => {
+    await expect(
       backend.createWorkItem({
         title: 'Orphan',
         type: 'task',
@@ -387,11 +394,11 @@ describe('LocalBackend', () => {
         parent: '999',
         dependsOn: [],
       }),
-    ).toThrow();
+    ).rejects.toThrow();
   });
 
-  it('rejects reference to non-existent dependency', () => {
-    expect(() =>
+  it('rejects reference to non-existent dependency', async () => {
+    await expect(
       backend.createWorkItem({
         title: 'Bad dep',
         type: 'task',
@@ -404,11 +411,11 @@ describe('LocalBackend', () => {
         parent: null,
         dependsOn: ['999'],
       }),
-    ).toThrow();
+    ).rejects.toThrow();
   });
 
-  it('clears parent reference when parent is deleted', () => {
-    const parent = backend.createWorkItem({
+  it('clears parent reference when parent is deleted', async () => {
+    const parent = await backend.createWorkItem({
       title: 'Parent',
       type: 'epic',
       status: 'todo',
@@ -420,7 +427,7 @@ describe('LocalBackend', () => {
       parent: null,
       dependsOn: [],
     });
-    const child = backend.createWorkItem({
+    const child = await backend.createWorkItem({
       title: 'Child',
       type: 'task',
       status: 'todo',
@@ -432,15 +439,15 @@ describe('LocalBackend', () => {
       parent: parent.id,
       dependsOn: [],
     });
-    backend.deleteWorkItem(parent.id);
-    const updated = backend.getWorkItem(child.id);
+    await backend.deleteWorkItem(parent.id);
+    const updated = await backend.getWorkItem(child.id);
     expect(updated.parent).toBeNull();
   });
 
   describe('LocalBackend temp IDs', () => {
-    it('generates local- prefixed IDs when tempIds option is set', () => {
-      const backend = new LocalBackend(tmpDir, { tempIds: true });
-      const item = backend.createWorkItem({
+    it('generates local- prefixed IDs when tempIds option is set', async () => {
+      const backend = await LocalBackend.create(tmpDir, { tempIds: true });
+      const item = await backend.createWorkItem({
         title: 'Temp',
         type: 'task',
         status: 'backlog',
@@ -456,8 +463,8 @@ describe('LocalBackend', () => {
     });
   });
 
-  it('removes deleted item from dependsOn lists', () => {
-    const dep = backend.createWorkItem({
+  it('removes deleted item from dependsOn lists', async () => {
+    const dep = await backend.createWorkItem({
       title: 'Dependency',
       type: 'task',
       status: 'todo',
@@ -469,7 +476,7 @@ describe('LocalBackend', () => {
       parent: null,
       dependsOn: [],
     });
-    const other = backend.createWorkItem({
+    const other = await backend.createWorkItem({
       title: 'Other dep',
       type: 'task',
       status: 'todo',
@@ -481,7 +488,7 @@ describe('LocalBackend', () => {
       parent: null,
       dependsOn: [],
     });
-    const dependent = backend.createWorkItem({
+    const dependent = await backend.createWorkItem({
       title: 'Dependent',
       type: 'task',
       status: 'todo',
@@ -493,13 +500,13 @@ describe('LocalBackend', () => {
       parent: null,
       dependsOn: [dep.id, other.id],
     });
-    backend.deleteWorkItem(dep.id);
-    const updated = backend.getWorkItem(dependent.id);
+    await backend.deleteWorkItem(dep.id);
+    const updated = await backend.getWorkItem(dependent.id);
     expect(updated.dependsOn).toEqual([other.id]);
   });
 
-  it('returns unique assignees from existing items', () => {
-    backend.createWorkItem({
+  it('returns unique assignees from existing items', async () => {
+    await backend.createWorkItem({
       title: 'A',
       type: 'task',
       status: 'todo',
@@ -511,7 +518,7 @@ describe('LocalBackend', () => {
       parent: null,
       dependsOn: [],
     });
-    backend.createWorkItem({
+    await backend.createWorkItem({
       title: 'B',
       type: 'task',
       status: 'todo',
@@ -523,7 +530,7 @@ describe('LocalBackend', () => {
       parent: null,
       dependsOn: [],
     });
-    backend.createWorkItem({
+    await backend.createWorkItem({
       title: 'C',
       type: 'task',
       status: 'todo',
@@ -535,7 +542,7 @@ describe('LocalBackend', () => {
       parent: null,
       dependsOn: [],
     });
-    backend.createWorkItem({
+    await backend.createWorkItem({
       title: 'D',
       type: 'task',
       status: 'todo',
@@ -547,13 +554,13 @@ describe('LocalBackend', () => {
       parent: null,
       dependsOn: [],
     });
-    const assignees = backend.getAssignees();
+    const assignees = await backend.getAssignees();
     expect(assignees).toHaveLength(2);
     expect(assignees).toContain('alice');
     expect(assignees).toContain('bob');
   });
 
-  it('returns empty array when no items have assignees', () => {
-    expect(backend.getAssignees()).toEqual([]);
+  it('returns empty array when no items have assignees', async () => {
+    expect(await backend.getAssignees()).toEqual([]);
   });
 });

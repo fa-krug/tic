@@ -11,6 +11,7 @@ import type { WorkItem, NewWorkItem, NewComment, Comment } from '../types.js';
 function createMockRemote(items: WorkItem[] = []): Backend {
   const store = new Map(items.map((i) => [i.id, i]));
   let nextId = 100;
+  /* eslint-disable @typescript-eslint/require-await */
   return {
     getCapabilities: () => ({
       relationships: true,
@@ -26,19 +27,19 @@ function createMockRemote(items: WorkItem[] = []): Backend {
         dependsOn: true,
       },
     }),
-    getStatuses: () => ['backlog', 'todo', 'in-progress', 'done'],
-    getIterations: () => ['default'],
-    getWorkItemTypes: () => ['epic', 'issue', 'task'],
-    getAssignees: () => [],
-    getCurrentIteration: () => 'default',
-    setCurrentIteration: vi.fn(),
-    listWorkItems: () => [...store.values()],
-    getWorkItem: (id: string) => {
+    getStatuses: async () => ['backlog', 'todo', 'in-progress', 'done'],
+    getIterations: async () => ['default'],
+    getWorkItemTypes: async () => ['epic', 'issue', 'task'],
+    getAssignees: async () => [],
+    getCurrentIteration: async () => 'default',
+    setCurrentIteration: vi.fn(async () => {}),
+    listWorkItems: async () => [...store.values()],
+    getWorkItem: async (id: string) => {
       const item = store.get(id);
       if (!item) throw new Error(`Item #${id} not found`);
       return item;
     },
-    createWorkItem: (data: NewWorkItem) => {
+    createWorkItem: async (data: NewWorkItem) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
       const id: string = (data as any).id ?? String(nextId++);
       const item: WorkItem = {
@@ -51,7 +52,7 @@ function createMockRemote(items: WorkItem[] = []): Backend {
       store.set(id, item);
       return item;
     },
-    updateWorkItem: (id: string, data: Partial<WorkItem>) => {
+    updateWorkItem: async (id: string, data: Partial<WorkItem>) => {
       const existing = store.get(id);
       if (!existing) throw new Error(`Item #${id} not found`);
       const updated = {
@@ -63,10 +64,10 @@ function createMockRemote(items: WorkItem[] = []): Backend {
       store.set(id, updated);
       return updated;
     },
-    deleteWorkItem: (id: string) => {
+    deleteWorkItem: async (id: string) => {
       store.delete(id);
     },
-    addComment: (workItemId: string, comment: NewComment) => {
+    addComment: async (workItemId: string, comment: NewComment) => {
       const item = store.get(workItemId);
       if (!item) throw new Error(`Item #${workItemId} not found`);
       const c: Comment = {
@@ -77,11 +78,12 @@ function createMockRemote(items: WorkItem[] = []): Backend {
       item.comments.push(c);
       return c;
     },
-    getChildren: () => [],
-    getDependents: () => [],
+    getChildren: async () => [],
+    getDependents: async () => [],
     getItemUrl: (id: string) => `https://remote/${id}`,
-    openItem: vi.fn(),
+    openItem: vi.fn(async () => {}),
   };
+  /* eslint-enable @typescript-eslint/require-await */
 }
 
 describe('end-to-end sync', () => {
@@ -97,12 +99,12 @@ describe('end-to-end sync', () => {
   });
 
   it('full cycle: create locally, push, pull, verify', async () => {
-    const local = new LocalBackend(tmpDir, { tempIds: true });
+    const local = await LocalBackend.create(tmpDir, { tempIds: true });
     const remote = createMockRemote([]);
     const queue = new SyncQueueStore(tmpDir);
     const manager = new SyncManager(local, remote, queue);
 
-    const item = local.createWorkItem({
+    const item = await local.createWorkItem({
       title: 'E2E Test',
       type: 'task',
       status: 'backlog',
@@ -116,7 +118,7 @@ describe('end-to-end sync', () => {
     });
     expect(item.id.startsWith('local-')).toBe(true);
 
-    queue.append({
+    await queue.append({
       action: 'create',
       itemId: item.id,
       timestamp: new Date().toISOString(),
@@ -126,7 +128,7 @@ describe('end-to-end sync', () => {
     expect(result.push.pushed).toBe(1);
     expect(result.push.failed).toBe(0);
 
-    const localItems = local.listWorkItems();
+    const localItems = await local.listWorkItems();
     expect(localItems).toHaveLength(1);
     expect(localItems[0]!.id.startsWith('local-')).toBe(false);
     expect(localItems[0]!.title).toBe('E2E Test');
@@ -134,10 +136,10 @@ describe('end-to-end sync', () => {
   });
 
   it('remote changes overwrite local on pull', async () => {
-    const local = new LocalBackend(tmpDir);
+    const local = await LocalBackend.create(tmpDir);
     const queue = new SyncQueueStore(tmpDir);
 
-    local.createWorkItem({
+    await local.createWorkItem({
       title: 'Will be overwritten',
       type: 'task',
       status: 'backlog',
@@ -171,7 +173,7 @@ describe('end-to-end sync', () => {
 
     await manager.sync();
 
-    const item = local.getWorkItem('1');
+    const item = await local.getWorkItem('1');
     expect(item.title).toBe('Remote Version');
     expect(item.status).toBe('done');
     expect(item.priority).toBe('high');

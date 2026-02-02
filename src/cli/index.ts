@@ -6,6 +6,10 @@ import {
   VALID_BACKENDS,
 } from '../backends/factory.js';
 import type { Backend, BackendCapabilities } from '../backends/types.js';
+import { GitHubBackend } from '../backends/github/index.js';
+import { GitLabBackend } from '../backends/gitlab/index.js';
+import { AzureDevOpsBackend } from '../backends/ado/index.js';
+import { readConfigSync } from '../backends/local/config.js';
 import { SyncQueueStore } from '../sync/queue.js';
 import type { SyncManager } from '../sync/SyncManager.js';
 import { formatTsvRow, formatTsvKeyValue, formatJson } from './format.js';
@@ -82,18 +86,18 @@ export function requireTicProject(root: string): void {
   }
 }
 
-function createBackend(): Backend {
+async function createBackend(): Promise<Backend> {
   requireTicProject(process.cwd());
   return createBackendFromConfig(process.cwd());
 }
 
-function createBackendAndSync(): {
+async function createBackendAndSync(): Promise<{
   backend: Backend;
   syncManager: SyncManager | null;
   queueStore: SyncQueueStore | null;
-} {
+}> {
   requireTicProject(process.cwd());
-  const { backend, syncManager } = createBackendWithSync(process.cwd());
+  const { backend, syncManager } = await createBackendWithSync(process.cwd());
   const queueStore = syncManager ? new SyncQueueStore(process.cwd()) : null;
   return { backend, syncManager, queueStore };
 }
@@ -101,10 +105,20 @@ function createBackendAndSync(): {
 function tryGetCapabilities(): BackendCapabilities | null {
   try {
     requireTicProject(process.cwd());
-    const backend = createBackendFromConfig(process.cwd());
-    return backend.getCapabilities();
+    const config = readConfigSync(process.cwd());
+    const backendType = config.backend ?? 'local';
+    switch (backendType) {
+      case 'github':
+        return new GitHubBackend(process.cwd()).getCapabilities();
+      case 'gitlab':
+        return new GitLabBackend(process.cwd()).getCapabilities();
+      case 'azure':
+        return new AzureDevOpsBackend(process.cwd()).getCapabilities();
+      default:
+        return null; // local — show all options
+    }
   } catch {
-    return null; // no project — show all options
+    return null;
   }
 }
 
@@ -145,7 +159,7 @@ export function createProgram(): Command {
       '--backend <backend>',
       'Backend type (local, github, gitlab, azure)',
     )
-    .action((opts: { backend?: string }) => {
+    .action(async (opts: { backend?: string }) => {
       const parentOpts = program.opts<GlobalOpts>();
       try {
         let backend = opts.backend;
@@ -163,7 +177,7 @@ export function createProgram(): Command {
             `Invalid backend "${backend}". Valid: ${VALID_BACKENDS.join(', ')}`,
           );
         }
-        const result = runInit(process.cwd(), backend);
+        const result = await runInit(process.cwd(), backend);
         if (result.alreadyExists) {
           console.log('Already initialized in .tic/');
         } else {
@@ -189,11 +203,11 @@ export function createProgram(): Command {
     .option('--iteration <name>', 'Filter by iteration')
     .option('--all', 'Show all iterations')
     .option('--headers', 'Include column headers')
-    .action((opts: ItemListOptions & { headers?: boolean }) => {
+    .action(async (opts: ItemListOptions & { headers?: boolean }) => {
       const parentOpts = program.opts<GlobalOpts>();
       try {
-        const backend = createBackend();
-        const items = runItemList(backend, opts);
+        const backend = await createBackend();
+        const items = await runItemList(backend, opts);
         if (parentOpts.quiet) return;
         if (parentOpts.json) {
           console.log(formatJson(items));
@@ -223,11 +237,11 @@ export function createProgram(): Command {
     .command('show')
     .description('Show work item details')
     .argument('<id>', 'Work item ID')
-    .action((idStr: string) => {
+    .action(async (idStr: string) => {
       const parentOpts = program.opts<GlobalOpts>();
       try {
-        const backend = createBackend();
-        const wi = runItemShow(backend, idStr);
+        const backend = await createBackend();
+        const wi = await runItemShow(backend, idStr);
         output(wi, () => itemToTsvDetail(wi), parentOpts);
       } catch (err) {
         handleError(err, parentOpts.json);
@@ -238,11 +252,11 @@ export function createProgram(): Command {
     .command('open')
     .description('Open a work item in an external editor or browser')
     .argument('<id>', 'Work item ID')
-    .action((idStr: string) => {
+    .action(async (idStr: string) => {
       const parentOpts = program.opts<GlobalOpts>();
       try {
-        const backend = createBackend();
-        runItemOpen(backend, idStr);
+        const backend = await createBackend();
+        await runItemOpen(backend, idStr);
       } catch (err) {
         handleError(err, parentOpts.json);
       }
@@ -270,15 +284,15 @@ export function createProgram(): Command {
   create.action(async (title: string, opts: ItemCreateOptions) => {
     const parentOpts = program.opts<GlobalOpts>();
     try {
-      const { backend, syncManager, queueStore } = createBackendAndSync();
+      const { backend, syncManager, queueStore } = await createBackendAndSync();
       const description = readStdin();
-      const wi = runItemCreate(backend, title, {
+      const wi = await runItemCreate(backend, title, {
         ...opts,
         dependsOn: opts.dependsOn,
         description,
       });
       if (queueStore && syncManager) {
-        queueStore.append({
+        await queueStore.append({
           action: 'create',
           itemId: wi.id,
           timestamp: new Date().toISOString(),
@@ -314,16 +328,16 @@ export function createProgram(): Command {
   update.action(async (idStr: string, opts: ItemUpdateOptions) => {
     const parentOpts = program.opts<GlobalOpts>();
     try {
-      const { backend, syncManager, queueStore } = createBackendAndSync();
+      const { backend, syncManager, queueStore } = await createBackendAndSync();
       const description = readStdin();
       const updateOpts: ItemUpdateOptions = {
         ...opts,
         dependsOn: opts.dependsOn,
         ...(description ? { description } : {}),
       };
-      const wi = runItemUpdate(backend, idStr, updateOpts);
+      const wi = await runItemUpdate(backend, idStr, updateOpts);
       if (queueStore && syncManager) {
-        queueStore.append({
+        await queueStore.append({
           action: 'update',
           itemId: wi.id,
           timestamp: new Date().toISOString(),
@@ -343,10 +357,11 @@ export function createProgram(): Command {
     .action(async (idStr: string) => {
       const parentOpts = program.opts<GlobalOpts>();
       try {
-        const { backend, syncManager, queueStore } = createBackendAndSync();
-        runItemDelete(backend, idStr);
+        const { backend, syncManager, queueStore } =
+          await createBackendAndSync();
+        await runItemDelete(backend, idStr);
         if (queueStore && syncManager) {
-          queueStore.append({
+          await queueStore.append({
             action: 'delete',
             itemId: idStr,
             timestamp: new Date().toISOString(),
@@ -375,10 +390,11 @@ export function createProgram(): Command {
       .action(async (idStr: string, text: string, opts: ItemCommentOptions) => {
         const parentOpts = program.opts<GlobalOpts>();
         try {
-          const { backend, syncManager, queueStore } = createBackendAndSync();
-          const comment = runItemComment(backend, idStr, text, opts);
+          const { backend, syncManager, queueStore } =
+            await createBackendAndSync();
+          const comment = await runItemComment(backend, idStr, text, opts);
           if (queueStore && syncManager) {
-            queueStore.append({
+            await queueStore.append({
               action: 'comment',
               itemId: idStr,
               timestamp: new Date().toISOString(),
@@ -406,11 +422,11 @@ export function createProgram(): Command {
     iteration
       .command('list')
       .description('List iterations')
-      .action(() => {
+      .action(async () => {
         const parentOpts = program.opts<GlobalOpts>();
         try {
-          const backend = createBackend();
-          const result = runIterationList(backend);
+          const backend = await createBackend();
+          const result = await runIterationList(backend);
           if (parentOpts.quiet) return;
           if (parentOpts.json) {
             console.log(formatJson(result));
@@ -429,11 +445,11 @@ export function createProgram(): Command {
       .command('set')
       .description('Set current iteration')
       .argument('<name>', 'Iteration name')
-      .action((name: string) => {
+      .action(async (name: string) => {
         const parentOpts = program.opts<GlobalOpts>();
         try {
-          const backend = createBackend();
-          runIterationSet(backend, name);
+          const backend = await createBackend();
+          await runIterationSet(backend, name);
           if (!parentOpts.quiet) {
             if (parentOpts.json) {
               console.log(formatJson({ current_iteration: name }));
@@ -456,11 +472,11 @@ export function createProgram(): Command {
     .command('get')
     .description('Get a configuration value')
     .argument('<key>', 'Config key')
-    .action((key: string) => {
+    .action(async (key: string) => {
       const parentOpts = program.opts<GlobalOpts>();
       try {
         requireTicProject(process.cwd());
-        const value = runConfigGet(process.cwd(), key);
+        const value = await runConfigGet(process.cwd(), key);
         if (parentOpts.quiet) return;
         if (parentOpts.json) {
           console.log(formatJson({ [key]: value }));
@@ -477,11 +493,11 @@ export function createProgram(): Command {
     .description('Set a configuration value')
     .argument('<key>', 'Config key')
     .argument('<value>', 'Config value')
-    .action((key: string, value: string) => {
+    .action(async (key: string, value: string) => {
       const parentOpts = program.opts<GlobalOpts>();
       try {
         requireTicProject(process.cwd());
-        runConfigSet(process.cwd(), key, value);
+        await runConfigSet(process.cwd(), key, value);
         if (!parentOpts.quiet) {
           if (parentOpts.json) {
             console.log(formatJson({ [key]: value }));

@@ -51,21 +51,21 @@ describe('GitHubBackend', () => {
   });
 
   describe('getStatuses', () => {
-    it('returns open and closed', () => {
+    it('returns open and closed', async () => {
       const backend = new GitHubBackend('/repo');
-      expect(backend.getStatuses()).toEqual(['open', 'closed']);
+      expect(await backend.getStatuses()).toEqual(['open', 'closed']);
     });
   });
 
   describe('getWorkItemTypes', () => {
-    it('returns issue', () => {
+    it('returns issue', async () => {
       const backend = new GitHubBackend('/repo');
-      expect(backend.getWorkItemTypes()).toEqual(['issue']);
+      expect(await backend.getWorkItemTypes()).toEqual(['issue']);
     });
   });
 
   describe('getIterations', () => {
-    it('returns milestone titles', () => {
+    it('returns milestone titles', async () => {
       const backend = new GitHubBackend('/repo');
       mockGh
         .mockReturnValueOnce({ nameWithOwner: 'owner/repo' })
@@ -73,20 +73,20 @@ describe('GitHubBackend', () => {
           { title: 'v1.0', state: 'open', due_on: null },
           { title: 'v2.0', state: 'open', due_on: null },
         ]);
-      expect(backend.getIterations()).toEqual(['v1.0', 'v2.0']);
+      expect(await backend.getIterations()).toEqual(['v1.0', 'v2.0']);
     });
 
-    it('returns empty array when no milestones', () => {
+    it('returns empty array when no milestones', async () => {
       const backend = new GitHubBackend('/repo');
       mockGh
         .mockReturnValueOnce({ nameWithOwner: 'owner/repo' })
         .mockReturnValueOnce([]);
-      expect(backend.getIterations()).toEqual([]);
+      expect(await backend.getIterations()).toEqual([]);
     });
   });
 
   describe('getCurrentIteration', () => {
-    it('returns first open milestone sorted by due date', () => {
+    it('returns first open milestone sorted by due date', async () => {
       const backend = new GitHubBackend('/repo');
       mockGh
         .mockReturnValueOnce({ nameWithOwner: 'owner/repo' })
@@ -94,27 +94,27 @@ describe('GitHubBackend', () => {
           { title: 'v1.0', state: 'open', due_on: '2026-03-01T00:00:00Z' },
           { title: 'v2.0', state: 'open', due_on: '2026-06-01T00:00:00Z' },
         ]);
-      expect(backend.getCurrentIteration()).toBe('v1.0');
+      expect(await backend.getCurrentIteration()).toBe('v1.0');
     });
 
-    it('returns empty string when no open milestones', () => {
+    it('returns empty string when no open milestones', async () => {
       const backend = new GitHubBackend('/repo');
       mockGh
         .mockReturnValueOnce({ nameWithOwner: 'owner/repo' })
         .mockReturnValueOnce([]);
-      expect(backend.getCurrentIteration()).toBe('');
+      expect(await backend.getCurrentIteration()).toBe('');
     });
   });
 
   describe('setCurrentIteration', () => {
-    it('is a no-op', () => {
+    it('is a no-op', async () => {
       const backend = new GitHubBackend('/repo');
-      expect(() => backend.setCurrentIteration('v1.0')).not.toThrow();
+      await expect(backend.setCurrentIteration('v1.0')).resolves.not.toThrow();
     });
   });
 
   describe('listWorkItems', () => {
-    it('returns all issues mapped to WorkItems', () => {
+    it('returns all issues mapped to WorkItems', async () => {
       const backend = new GitHubBackend('/repo');
       mockGh.mockReturnValue([
         {
@@ -143,7 +143,7 @@ describe('GitHubBackend', () => {
         },
       ]);
 
-      const items = backend.listWorkItems();
+      const items = await backend.listWorkItems();
       expect(items).toHaveLength(2);
       expect(items[0]!.id).toBe('1');
       expect(items[0]!.status).toBe('open');
@@ -151,7 +151,7 @@ describe('GitHubBackend', () => {
       expect(items[1]!.status).toBe('closed');
     });
 
-    it('passes milestone filter to gh when iteration provided', () => {
+    it('passes milestone filter to gh when iteration provided', async () => {
       const backend = new GitHubBackend('/repo');
       mockGh.mockReturnValue([
         {
@@ -168,7 +168,7 @@ describe('GitHubBackend', () => {
         },
       ]);
 
-      const items = backend.listWorkItems('v1.0');
+      const items = await backend.listWorkItems('v1.0');
       expect(items).toHaveLength(1);
       expect(items[0]!.title).toBe('In v1');
       expect(mockGh).toHaveBeenCalledWith(
@@ -179,7 +179,7 @@ describe('GitHubBackend', () => {
   });
 
   describe('getWorkItem', () => {
-    it('returns a single issue as WorkItem', () => {
+    it('returns a single issue as WorkItem', async () => {
       const backend = new GitHubBackend('/repo');
       mockGh.mockReturnValue({
         number: 42,
@@ -200,7 +200,7 @@ describe('GitHubBackend', () => {
         ],
       });
 
-      const item = backend.getWorkItem('42');
+      const item = await backend.getWorkItem('42');
       expect(item.id).toBe('42');
       expect(item.title).toBe('The issue');
       expect(item.assignee).toBe('bob');
@@ -210,7 +210,7 @@ describe('GitHubBackend', () => {
   });
 
   describe('createWorkItem', () => {
-    it('creates an issue and returns the WorkItem', () => {
+    it('creates an issue and returns the WorkItem', async () => {
       const backend = new GitHubBackend('/repo');
 
       // gh issue create returns the new issue URL, then we fetch it
@@ -228,7 +228,7 @@ describe('GitHubBackend', () => {
         comments: [],
       });
 
-      const item = backend.createWorkItem({
+      const item = await backend.createWorkItem({
         title: 'New issue',
         type: 'issue',
         status: 'open',
@@ -247,7 +247,7 @@ describe('GitHubBackend', () => {
   });
 
   describe('updateWorkItem', () => {
-    it('updates title and body', () => {
+    it('updates title and body', async () => {
       const backend = new GitHubBackend('/repo');
 
       mockGhExec.mockReturnValue('');
@@ -264,7 +264,7 @@ describe('GitHubBackend', () => {
         comments: [],
       });
 
-      const item = backend.updateWorkItem('5', {
+      const item = await backend.updateWorkItem('5', {
         title: 'Updated title',
         description: 'Updated body',
       });
@@ -273,7 +273,7 @@ describe('GitHubBackend', () => {
       expect(item.description).toBe('Updated body');
     });
 
-    it('closes an issue when status changes to closed', () => {
+    it('closes an issue when status changes to closed', async () => {
       const backend = new GitHubBackend('/repo');
       mockGhExec.mockReturnValue('');
       mockGh.mockReturnValue({
@@ -289,12 +289,12 @@ describe('GitHubBackend', () => {
         comments: [],
       });
 
-      const item = backend.updateWorkItem('5', { status: 'closed' });
+      const item = await backend.updateWorkItem('5', { status: 'closed' });
       expect(item.status).toBe('closed');
       expect(mockGhExec).toHaveBeenCalledWith(['issue', 'close', '5'], '/repo');
     });
 
-    it('reopens an issue when status changes to open', () => {
+    it('reopens an issue when status changes to open', async () => {
       const backend = new GitHubBackend('/repo');
       mockGhExec.mockReturnValue('');
       mockGh.mockReturnValue({
@@ -310,7 +310,7 @@ describe('GitHubBackend', () => {
         comments: [],
       });
 
-      const item = backend.updateWorkItem('5', { status: 'open' });
+      const item = await backend.updateWorkItem('5', { status: 'open' });
       expect(item.status).toBe('open');
       expect(mockGhExec).toHaveBeenCalledWith(
         ['issue', 'reopen', '5'],
@@ -320,10 +320,10 @@ describe('GitHubBackend', () => {
   });
 
   describe('deleteWorkItem', () => {
-    it('deletes an issue', () => {
+    it('deletes an issue', async () => {
       const backend = new GitHubBackend('/repo');
       mockGhExec.mockReturnValue('');
-      backend.deleteWorkItem('7');
+      await backend.deleteWorkItem('7');
       expect(mockGhExec).toHaveBeenCalledWith(
         ['issue', 'delete', '7', '--yes'],
         '/repo',
@@ -332,11 +332,11 @@ describe('GitHubBackend', () => {
   });
 
   describe('addComment', () => {
-    it('adds a comment and returns it', () => {
+    it('adds a comment and returns it', async () => {
       const backend = new GitHubBackend('/repo');
       mockGhExec.mockReturnValue('');
 
-      const comment = backend.addComment('3', {
+      const comment = await backend.addComment('3', {
         author: 'alice',
         body: 'This is a comment.',
       });
@@ -364,11 +364,11 @@ describe('GitHubBackend', () => {
   });
 
   describe('openItem', () => {
-    it('opens the issue in the browser', () => {
+    it('opens the issue in the browser', async () => {
       const backend = new GitHubBackend('/repo');
       mockGhExec.mockReturnValue('');
 
-      backend.openItem('5');
+      await backend.openItem('5');
       expect(mockGhExec).toHaveBeenCalledWith(
         ['issue', 'view', '5', '--web'],
         '/repo',
@@ -377,25 +377,25 @@ describe('GitHubBackend', () => {
   });
 
   describe('getChildren', () => {
-    it('throws UnsupportedOperationError', () => {
+    it('throws UnsupportedOperationError', async () => {
       const backend = new GitHubBackend('/repo');
-      expect(() => backend.getChildren('1')).toThrow(
+      await expect(backend.getChildren('1')).rejects.toThrow(
         'relationships is not supported by the GitHubBackend backend',
       );
     });
   });
 
   describe('getDependents', () => {
-    it('throws UnsupportedOperationError', () => {
+    it('throws UnsupportedOperationError', async () => {
       const backend = new GitHubBackend('/repo');
-      expect(() => backend.getDependents('1')).toThrow(
+      await expect(backend.getDependents('1')).rejects.toThrow(
         'relationships is not supported by the GitHubBackend backend',
       );
     });
   });
 
   describe('getAssignees', () => {
-    it('returns collaborator logins', () => {
+    it('returns collaborator logins', async () => {
       const backend = new GitHubBackend('/repo');
       mockGh
         .mockReturnValueOnce({ nameWithOwner: 'owner/repo' })
@@ -404,16 +404,16 @@ describe('GitHubBackend', () => {
           { login: 'bob' },
           { login: 'charlie' },
         ]);
-      expect(backend.getAssignees()).toEqual(['alice', 'bob', 'charlie']);
+      expect(await backend.getAssignees()).toEqual(['alice', 'bob', 'charlie']);
     });
 
-    it('returns empty array on error', () => {
+    it('returns empty array on error', async () => {
       const backend = new GitHubBackend('/repo');
       mockGh.mockReturnValueOnce({ nameWithOwner: 'owner/repo' });
       mockGh.mockImplementationOnce(() => {
         throw new Error('API error');
       });
-      expect(backend.getAssignees()).toEqual([]);
+      expect(await backend.getAssignees()).toEqual([]);
     });
   });
 });

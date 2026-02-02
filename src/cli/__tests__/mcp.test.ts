@@ -36,8 +36,8 @@ describe('MCP handlers', () => {
   let backend: LocalBackend;
 
   describe('handleInitProject', () => {
-    it('initializes a new project', () => {
-      const result = handleInitProject(tmpDir);
+    it('initializes a new project', async () => {
+      const result = await handleInitProject(tmpDir);
       expect(result.isError).toBeUndefined();
       const data = JSON.parse(result.content[0]!.text) as {
         initialized?: boolean;
@@ -47,9 +47,9 @@ describe('MCP handlers', () => {
       expect(fs.existsSync(path.join(tmpDir, '.tic', 'config.yml'))).toBe(true);
     });
 
-    it('returns alreadyExists for existing project', () => {
-      handleInitProject(tmpDir);
-      const result = handleInitProject(tmpDir);
+    it('returns alreadyExists for existing project', async () => {
+      await handleInitProject(tmpDir);
+      const result = await handleInitProject(tmpDir);
       expect(result.isError).toBeUndefined();
       const data = JSON.parse(result.content[0]!.text) as {
         alreadyExists: boolean;
@@ -59,10 +59,10 @@ describe('MCP handlers', () => {
   });
 
   describe('handleGetConfig', () => {
-    it('returns config from backend', () => {
-      handleInitProject(tmpDir);
-      backend = new LocalBackend(tmpDir);
-      const result = handleGetConfig(backend, tmpDir);
+    it('returns config from backend', async () => {
+      await handleInitProject(tmpDir);
+      backend = await LocalBackend.create(tmpDir);
+      const result = await handleGetConfig(backend, tmpDir);
       expect(result.isError).toBeUndefined();
       const data = JSON.parse(result.content[0]!.text) as {
         backend: string;
@@ -86,13 +86,13 @@ describe('MCP handlers', () => {
   });
 
   describe('handleListItems', () => {
-    beforeEach(() => {
-      handleInitProject(tmpDir);
-      backend = new LocalBackend(tmpDir);
+    beforeEach(async () => {
+      await handleInitProject(tmpDir);
+      backend = await LocalBackend.create(tmpDir);
     });
 
-    it('lists items', () => {
-      backend.createWorkItem({
+    it('lists items', async () => {
+      await backend.createWorkItem({
         title: 'Item A',
         type: 'task',
         status: 'backlog',
@@ -104,7 +104,7 @@ describe('MCP handlers', () => {
         dependsOn: [],
         description: '',
       });
-      backend.createWorkItem({
+      await backend.createWorkItem({
         title: 'Item B',
         type: 'task',
         status: 'backlog',
@@ -116,13 +116,13 @@ describe('MCP handlers', () => {
         dependsOn: [],
         description: '',
       });
-      const result = handleListItems(backend, {});
+      const result = await handleListItems(backend, {});
       const data = JSON.parse(result.content[0]!.text) as WorkItem[];
       expect(data).toHaveLength(2);
     });
 
-    it('filters by type', () => {
-      backend.createWorkItem({
+    it('filters by type', async () => {
+      await backend.createWorkItem({
         title: 'Epic A',
         type: 'epic',
         status: 'backlog',
@@ -134,7 +134,7 @@ describe('MCP handlers', () => {
         dependsOn: [],
         description: '',
       });
-      backend.createWorkItem({
+      await backend.createWorkItem({
         title: 'Task A',
         type: 'task',
         status: 'backlog',
@@ -146,14 +146,14 @@ describe('MCP handlers', () => {
         dependsOn: [],
         description: '',
       });
-      const result = handleListItems(backend, { type: 'epic' });
+      const result = await handleListItems(backend, { type: 'epic' });
       const data = JSON.parse(result.content[0]!.text) as WorkItem[];
       expect(data).toHaveLength(1);
       expect(data[0]!.title).toBe('Epic A');
     });
 
-    it('filters by status', () => {
-      backend.createWorkItem({
+    it('filters by status', async () => {
+      await backend.createWorkItem({
         title: 'Todo item',
         type: 'task',
         status: 'todo',
@@ -165,7 +165,7 @@ describe('MCP handlers', () => {
         dependsOn: [],
         description: '',
       });
-      backend.createWorkItem({
+      await backend.createWorkItem({
         title: 'Done item',
         type: 'task',
         status: 'done',
@@ -177,7 +177,7 @@ describe('MCP handlers', () => {
         dependsOn: [],
         description: '',
       });
-      const result = handleListItems(backend, { status: 'todo' });
+      const result = await handleListItems(backend, { status: 'todo' });
       const data = JSON.parse(result.content[0]!.text) as WorkItem[];
       expect(data).toHaveLength(1);
       expect(data[0]!.title).toBe('Todo item');
@@ -185,13 +185,13 @@ describe('MCP handlers', () => {
   });
 
   describe('handleShowItem', () => {
-    beforeEach(() => {
-      handleInitProject(tmpDir);
-      backend = new LocalBackend(tmpDir);
+    beforeEach(async () => {
+      await handleInitProject(tmpDir);
+      backend = await LocalBackend.create(tmpDir);
     });
 
-    it('returns item details', () => {
-      backend.createWorkItem({
+    it('returns item details', async () => {
+      await backend.createWorkItem({
         title: 'Show me',
         type: 'task',
         status: 'backlog',
@@ -203,7 +203,7 @@ describe('MCP handlers', () => {
         dependsOn: [],
         description: 'Details here',
       });
-      const result = handleShowItem(backend, { id: '1' });
+      const result = await handleShowItem(backend, { id: '1' });
       expect(result.isError).toBeUndefined();
       const data = JSON.parse(result.content[0]!.text) as WorkItem;
       expect(data.title).toBe('Show me');
@@ -211,20 +211,20 @@ describe('MCP handlers', () => {
       expect(data.description).toBe('Details here');
     });
 
-    it('returns error for non-existent item', () => {
-      const result = handleShowItem(backend, { id: '999' });
+    it('returns error for non-existent item', async () => {
+      const result = await handleShowItem(backend, { id: '999' });
       expect(result.isError).toBe(true);
     });
   });
 
   describe('handleCreateItem', () => {
-    beforeEach(() => {
-      handleInitProject(tmpDir);
-      backend = new LocalBackend(tmpDir);
+    beforeEach(async () => {
+      await handleInitProject(tmpDir);
+      backend = await LocalBackend.create(tmpDir);
     });
 
-    it('creates with defaults', () => {
-      const result = handleCreateItem(backend, { title: 'New task' });
+    it('creates with defaults', async () => {
+      const result = await handleCreateItem(backend, { title: 'New task' });
       expect(result.isError).toBeUndefined();
       const data = JSON.parse(result.content[0]!.text) as WorkItem;
       expect(data.title).toBe('New task');
@@ -234,8 +234,8 @@ describe('MCP handlers', () => {
       expect(data.id).toBe('1');
     });
 
-    it('creates with all options', () => {
-      const result = handleCreateItem(backend, {
+    it('creates with all options', async () => {
+      const result = await handleCreateItem(backend, {
         title: 'Full item',
         type: 'epic',
         status: 'todo',
@@ -258,13 +258,13 @@ describe('MCP handlers', () => {
   });
 
   describe('handleUpdateItem', () => {
-    beforeEach(() => {
-      handleInitProject(tmpDir);
-      backend = new LocalBackend(tmpDir);
+    beforeEach(async () => {
+      await handleInitProject(tmpDir);
+      backend = await LocalBackend.create(tmpDir);
     });
 
-    it('updates fields', () => {
-      backend.createWorkItem({
+    it('updates fields', async () => {
+      await backend.createWorkItem({
         title: 'Original',
         type: 'task',
         status: 'backlog',
@@ -276,7 +276,7 @@ describe('MCP handlers', () => {
         dependsOn: [],
         description: '',
       });
-      const result = handleUpdateItem(backend, {
+      const result = await handleUpdateItem(backend, {
         id: '1',
         title: 'Updated',
         status: 'done',
@@ -288,8 +288,8 @@ describe('MCP handlers', () => {
       expect(data.type).toBe('task');
     });
 
-    it('returns error for non-existent item', () => {
-      const result = handleUpdateItem(backend, {
+    it('returns error for non-existent item', async () => {
+      const result = await handleUpdateItem(backend, {
         id: '999',
         title: 'Nope',
       });
@@ -300,14 +300,14 @@ describe('MCP handlers', () => {
   describe('handleDeleteItem', () => {
     let pendingDeletes: Set<string>;
 
-    beforeEach(() => {
-      handleInitProject(tmpDir);
-      backend = new LocalBackend(tmpDir);
+    beforeEach(async () => {
+      await handleInitProject(tmpDir);
+      backend = await LocalBackend.create(tmpDir);
       pendingDeletes = createDeleteTracker();
     });
 
-    it('returns preview without deleting', () => {
-      backend.createWorkItem({
+    it('returns preview without deleting', async () => {
+      await backend.createWorkItem({
         title: 'Delete me',
         type: 'task',
         status: 'backlog',
@@ -319,7 +319,11 @@ describe('MCP handlers', () => {
         dependsOn: [],
         description: '',
       });
-      const result = handleDeleteItem(backend, { id: '1' }, pendingDeletes);
+      const result = await handleDeleteItem(
+        backend,
+        { id: '1' },
+        pendingDeletes,
+      );
       expect(result.isError).toBeUndefined();
       const data = JSON.parse(result.content[0]!.text) as {
         preview: boolean;
@@ -331,11 +335,11 @@ describe('MCP handlers', () => {
       expect(data.preview).toBe(true);
       expect(data.item.title).toBe('Delete me');
       // Item should still exist
-      expect(backend.getWorkItem('1').title).toBe('Delete me');
+      expect((await backend.getWorkItem('1')).title).toBe('Delete me');
     });
 
-    it('shows affected children and dependents', () => {
-      backend.createWorkItem({
+    it('shows affected children and dependents', async () => {
+      await backend.createWorkItem({
         title: 'Parent',
         type: 'task',
         status: 'backlog',
@@ -347,7 +351,7 @@ describe('MCP handlers', () => {
         dependsOn: [],
         description: '',
       });
-      backend.createWorkItem({
+      await backend.createWorkItem({
         title: 'Child',
         type: 'task',
         status: 'backlog',
@@ -359,7 +363,7 @@ describe('MCP handlers', () => {
         dependsOn: [],
         description: '',
       });
-      backend.createWorkItem({
+      await backend.createWorkItem({
         title: 'Dependent',
         type: 'task',
         status: 'backlog',
@@ -371,7 +375,11 @@ describe('MCP handlers', () => {
         dependsOn: ['1'],
         description: '',
       });
-      const result = handleDeleteItem(backend, { id: '1' }, pendingDeletes);
+      const result = await handleDeleteItem(
+        backend,
+        { id: '1' },
+        pendingDeletes,
+      );
       const data = JSON.parse(result.content[0]!.text) as {
         preview: boolean;
         item: { id: string; title: string; type: string; status: string };
@@ -393,14 +401,14 @@ describe('MCP handlers', () => {
   describe('handleConfirmDelete', () => {
     let pendingDeletes: Set<string>;
 
-    beforeEach(() => {
-      handleInitProject(tmpDir);
-      backend = new LocalBackend(tmpDir);
+    beforeEach(async () => {
+      await handleInitProject(tmpDir);
+      backend = await LocalBackend.create(tmpDir);
       pendingDeletes = createDeleteTracker();
     });
 
-    it('works after preview', () => {
-      backend.createWorkItem({
+    it('works after preview', async () => {
+      await backend.createWorkItem({
         title: 'Delete me',
         type: 'task',
         status: 'backlog',
@@ -412,14 +420,18 @@ describe('MCP handlers', () => {
         dependsOn: [],
         description: '',
       });
-      handleDeleteItem(backend, { id: '1' }, pendingDeletes);
-      const result = handleConfirmDelete(backend, { id: '1' }, pendingDeletes);
+      await handleDeleteItem(backend, { id: '1' }, pendingDeletes);
+      const result = await handleConfirmDelete(
+        backend,
+        { id: '1' },
+        pendingDeletes,
+      );
       expect(result.isError).toBeUndefined();
-      expect(() => backend.getWorkItem('1')).toThrow();
+      await expect(backend.getWorkItem('1')).rejects.toThrow();
     });
 
-    it('rejects without preview', () => {
-      backend.createWorkItem({
+    it('rejects without preview', async () => {
+      await backend.createWorkItem({
         title: 'No preview',
         type: 'task',
         status: 'backlog',
@@ -431,14 +443,18 @@ describe('MCP handlers', () => {
         dependsOn: [],
         description: '',
       });
-      const result = handleConfirmDelete(backend, { id: '1' }, pendingDeletes);
+      const result = await handleConfirmDelete(
+        backend,
+        { id: '1' },
+        pendingDeletes,
+      );
       expect(result.isError).toBe(true);
       // Item should still exist
-      expect(backend.getWorkItem('1').title).toBe('No preview');
+      expect((await backend.getWorkItem('1')).title).toBe('No preview');
     });
 
-    it('rejects second call', () => {
-      backend.createWorkItem({
+    it('rejects second call', async () => {
+      await backend.createWorkItem({
         title: 'Once only',
         type: 'task',
         status: 'backlog',
@@ -450,21 +466,25 @@ describe('MCP handlers', () => {
         dependsOn: [],
         description: '',
       });
-      handleDeleteItem(backend, { id: '1' }, pendingDeletes);
-      handleConfirmDelete(backend, { id: '1' }, pendingDeletes);
-      const result = handleConfirmDelete(backend, { id: '1' }, pendingDeletes);
+      await handleDeleteItem(backend, { id: '1' }, pendingDeletes);
+      await handleConfirmDelete(backend, { id: '1' }, pendingDeletes);
+      const result = await handleConfirmDelete(
+        backend,
+        { id: '1' },
+        pendingDeletes,
+      );
       expect(result.isError).toBe(true);
     });
   });
 
   describe('handleAddComment', () => {
-    beforeEach(() => {
-      handleInitProject(tmpDir);
-      backend = new LocalBackend(tmpDir);
+    beforeEach(async () => {
+      await handleInitProject(tmpDir);
+      backend = await LocalBackend.create(tmpDir);
     });
 
-    it('adds comment to item', () => {
-      backend.createWorkItem({
+    it('adds comment to item', async () => {
+      await backend.createWorkItem({
         title: 'Commentable',
         type: 'task',
         status: 'backlog',
@@ -476,7 +496,7 @@ describe('MCP handlers', () => {
         dependsOn: [],
         description: '',
       });
-      const result = handleAddComment(backend, {
+      const result = await handleAddComment(backend, {
         id: '1',
         text: 'Great work',
         author: 'alice',
@@ -487,8 +507,8 @@ describe('MCP handlers', () => {
       expect(data.author).toBe('alice');
     });
 
-    it('defaults author to anonymous', () => {
-      backend.createWorkItem({
+    it('defaults author to anonymous', async () => {
+      await backend.createWorkItem({
         title: 'Commentable',
         type: 'task',
         status: 'backlog',
@@ -500,7 +520,7 @@ describe('MCP handlers', () => {
         dependsOn: [],
         description: '',
       });
-      const result = handleAddComment(backend, {
+      const result = await handleAddComment(backend, {
         id: '1',
         text: 'Anonymous note',
       });
@@ -509,8 +529,8 @@ describe('MCP handlers', () => {
       expect(data.author).toBe('anonymous');
     });
 
-    it('returns error for non-existent item', () => {
-      const result = handleAddComment(backend, {
+    it('returns error for non-existent item', async () => {
+      const result = await handleAddComment(backend, {
         id: '999',
         text: 'Nope',
       });
@@ -519,23 +539,23 @@ describe('MCP handlers', () => {
   });
 
   describe('handleSetIteration', () => {
-    beforeEach(() => {
-      handleInitProject(tmpDir);
-      backend = new LocalBackend(tmpDir);
+    beforeEach(async () => {
+      await handleInitProject(tmpDir);
+      backend = await LocalBackend.create(tmpDir);
     });
 
-    it('sets current iteration', () => {
-      const result = handleSetIteration(backend, { name: 'sprint-2' });
+    it('sets current iteration', async () => {
+      const result = await handleSetIteration(backend, { name: 'sprint-2' });
       expect(result.isError).toBeUndefined();
-      expect(backend.getCurrentIteration()).toBe('sprint-2');
+      expect(await backend.getCurrentIteration()).toBe('sprint-2');
     });
   });
 
   describe('handleSearchItems', () => {
-    beforeEach(() => {
-      handleInitProject(tmpDir);
-      backend = new LocalBackend(tmpDir);
-      backend.createWorkItem({
+    beforeEach(async () => {
+      await handleInitProject(tmpDir);
+      backend = await LocalBackend.create(tmpDir);
+      await backend.createWorkItem({
         title: 'Fix login bug',
         type: 'issue',
         status: 'todo',
@@ -547,7 +567,7 @@ describe('MCP handlers', () => {
         dependsOn: [],
         description: 'The login page crashes on submit',
       });
-      backend.createWorkItem({
+      await backend.createWorkItem({
         title: 'Add dashboard',
         type: 'task',
         status: 'backlog',
@@ -559,7 +579,7 @@ describe('MCP handlers', () => {
         dependsOn: [],
         description: 'Create a new dashboard view',
       });
-      backend.createWorkItem({
+      await backend.createWorkItem({
         title: 'Update login styles',
         type: 'task',
         status: 'done',
@@ -573,35 +593,35 @@ describe('MCP handlers', () => {
       });
     });
 
-    it('finds by title', () => {
-      const result = handleSearchItems(backend, { query: 'login' });
+    it('finds by title', async () => {
+      const result = await handleSearchItems(backend, { query: 'login' });
       const data = JSON.parse(result.content[0]!.text) as WorkItem[];
       expect(data).toHaveLength(2);
       expect(data.map((i) => i.title)).toContain('Fix login bug');
       expect(data.map((i) => i.title)).toContain('Update login styles');
     });
 
-    it('finds by description', () => {
-      const result = handleSearchItems(backend, { query: 'dashboard' });
+    it('finds by description', async () => {
+      const result = await handleSearchItems(backend, { query: 'dashboard' });
       const data = JSON.parse(result.content[0]!.text) as WorkItem[];
       expect(data).toHaveLength(1);
       expect(data[0]!.title).toBe('Add dashboard');
     });
 
-    it('is case-insensitive', () => {
-      const result = handleSearchItems(backend, { query: 'LOGIN' });
+    it('is case-insensitive', async () => {
+      const result = await handleSearchItems(backend, { query: 'LOGIN' });
       const data = JSON.parse(result.content[0]!.text) as WorkItem[];
       expect(data).toHaveLength(2);
     });
 
-    it('returns empty array for no results', () => {
-      const result = handleSearchItems(backend, { query: 'nonexistent' });
+    it('returns empty array for no results', async () => {
+      const result = await handleSearchItems(backend, { query: 'nonexistent' });
       const data = JSON.parse(result.content[0]!.text) as WorkItem[];
       expect(data).toHaveLength(0);
     });
 
-    it('combines with filters', () => {
-      const result = handleSearchItems(backend, {
+    it('combines with filters', async () => {
+      const result = await handleSearchItems(backend, {
         query: 'login',
         status: 'todo',
       });
@@ -612,13 +632,13 @@ describe('MCP handlers', () => {
   });
 
   describe('handleGetChildren', () => {
-    beforeEach(() => {
-      handleInitProject(tmpDir);
-      backend = new LocalBackend(tmpDir);
+    beforeEach(async () => {
+      await handleInitProject(tmpDir);
+      backend = await LocalBackend.create(tmpDir);
     });
 
-    it('returns children', () => {
-      backend.createWorkItem({
+    it('returns children', async () => {
+      await backend.createWorkItem({
         title: 'Parent',
         type: 'epic',
         status: 'backlog',
@@ -630,7 +650,7 @@ describe('MCP handlers', () => {
         dependsOn: [],
         description: '',
       });
-      backend.createWorkItem({
+      await backend.createWorkItem({
         title: 'Child 1',
         type: 'task',
         status: 'backlog',
@@ -642,7 +662,7 @@ describe('MCP handlers', () => {
         dependsOn: [],
         description: '',
       });
-      backend.createWorkItem({
+      await backend.createWorkItem({
         title: 'Child 2',
         type: 'task',
         status: 'backlog',
@@ -654,7 +674,7 @@ describe('MCP handlers', () => {
         dependsOn: [],
         description: '',
       });
-      const result = handleGetChildren(backend, { id: '1' });
+      const result = await handleGetChildren(backend, { id: '1' });
       expect(result.isError).toBeUndefined();
       const data = JSON.parse(result.content[0]!.text) as WorkItem[];
       expect(data).toHaveLength(2);
@@ -664,13 +684,13 @@ describe('MCP handlers', () => {
   });
 
   describe('handleGetDependents', () => {
-    beforeEach(() => {
-      handleInitProject(tmpDir);
-      backend = new LocalBackend(tmpDir);
+    beforeEach(async () => {
+      await handleInitProject(tmpDir);
+      backend = await LocalBackend.create(tmpDir);
     });
 
-    it('returns dependents', () => {
-      backend.createWorkItem({
+    it('returns dependents', async () => {
+      await backend.createWorkItem({
         title: 'Dependency',
         type: 'task',
         status: 'backlog',
@@ -682,7 +702,7 @@ describe('MCP handlers', () => {
         dependsOn: [],
         description: '',
       });
-      backend.createWorkItem({
+      await backend.createWorkItem({
         title: 'Dependent',
         type: 'task',
         status: 'backlog',
@@ -694,7 +714,7 @@ describe('MCP handlers', () => {
         dependsOn: ['1'],
         description: '',
       });
-      const result = handleGetDependents(backend, { id: '1' });
+      const result = await handleGetDependents(backend, { id: '1' });
       expect(result.isError).toBeUndefined();
       const data = JSON.parse(result.content[0]!.text) as WorkItem[];
       expect(data).toHaveLength(1);
@@ -713,13 +733,13 @@ describe('MCP handlers', () => {
       children: TreeNode[];
     }
 
-    beforeEach(() => {
-      handleInitProject(tmpDir);
-      backend = new LocalBackend(tmpDir);
+    beforeEach(async () => {
+      await handleInitProject(tmpDir);
+      backend = await LocalBackend.create(tmpDir);
     });
 
-    it('returns items nested under parents', () => {
-      backend.createWorkItem({
+    it('returns items nested under parents', async () => {
+      await backend.createWorkItem({
         title: 'Epic',
         type: 'epic',
         status: 'backlog',
@@ -731,7 +751,7 @@ describe('MCP handlers', () => {
         dependsOn: [],
         description: '',
       });
-      backend.createWorkItem({
+      await backend.createWorkItem({
         title: 'Child A',
         type: 'task',
         status: 'todo',
@@ -743,7 +763,7 @@ describe('MCP handlers', () => {
         dependsOn: [],
         description: '',
       });
-      backend.createWorkItem({
+      await backend.createWorkItem({
         title: 'Standalone',
         type: 'task',
         status: 'backlog',
@@ -755,7 +775,7 @@ describe('MCP handlers', () => {
         dependsOn: [],
         description: '',
       });
-      const result = handleGetItemTree(backend, {});
+      const result = await handleGetItemTree(backend, {});
       expect(result.isError).toBeUndefined();
       const data = JSON.parse(result.content[0]!.text) as TreeNode[];
       expect(data).toHaveLength(2);
@@ -766,8 +786,8 @@ describe('MCP handlers', () => {
       expect(standalone.children).toHaveLength(0);
     });
 
-    it('builds deeply nested tree', () => {
-      backend.createWorkItem({
+    it('builds deeply nested tree', async () => {
+      await backend.createWorkItem({
         title: 'Root',
         type: 'epic',
         status: 'backlog',
@@ -779,7 +799,7 @@ describe('MCP handlers', () => {
         dependsOn: [],
         description: '',
       });
-      backend.createWorkItem({
+      await backend.createWorkItem({
         title: 'Level 1',
         type: 'issue',
         status: 'backlog',
@@ -791,7 +811,7 @@ describe('MCP handlers', () => {
         dependsOn: [],
         description: '',
       });
-      backend.createWorkItem({
+      await backend.createWorkItem({
         title: 'Level 2',
         type: 'task',
         status: 'backlog',
@@ -803,7 +823,7 @@ describe('MCP handlers', () => {
         dependsOn: [],
         description: '',
       });
-      const result = handleGetItemTree(backend, {});
+      const result = await handleGetItemTree(backend, {});
       expect(result.isError).toBeUndefined();
       const data = JSON.parse(result.content[0]!.text) as TreeNode[];
       expect(data).toHaveLength(1);

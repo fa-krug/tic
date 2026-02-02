@@ -16,9 +16,9 @@ describe('item commands', () => {
   let tmpDir: string;
   let backend: LocalBackend;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-cli-test-'));
-    backend = new LocalBackend(tmpDir);
+    backend = await LocalBackend.create(tmpDir);
   });
 
   afterEach(() => {
@@ -26,16 +26,16 @@ describe('item commands', () => {
   });
 
   describe('runItemCreate', () => {
-    it('creates an item with title and defaults', () => {
-      const item = runItemCreate(backend, 'Fix bug', {});
+    it('creates an item with title and defaults', async () => {
+      const item = await runItemCreate(backend, 'Fix bug', {});
       expect(item.title).toBe('Fix bug');
       expect(item.type).toBe('task');
       expect(item.status).toBe('backlog');
       expect(item.id).toBe('1');
     });
 
-    it('creates an item with all options', () => {
-      const item = runItemCreate(backend, 'Epic thing', {
+    it('creates an item with all options', async () => {
+      const item = await runItemCreate(backend, 'Epic thing', {
         type: 'epic',
         status: 'todo',
         priority: 'high',
@@ -51,8 +51,8 @@ describe('item commands', () => {
       expect(item.iteration).toBe('sprint-1');
     });
 
-    it('accepts description option', () => {
-      const item = runItemCreate(backend, 'Bug', {
+    it('accepts description option', async () => {
+      const item = await runItemCreate(backend, 'Bug', {
         description: 'Details here',
       });
       expect(item.description).toBe('Details here');
@@ -60,54 +60,54 @@ describe('item commands', () => {
   });
 
   describe('runItemList', () => {
-    it('lists items for current iteration', () => {
-      runItemCreate(backend, 'A', {});
-      runItemCreate(backend, 'B', {});
-      const items = runItemList(backend, {});
+    it('lists items for current iteration', async () => {
+      await runItemCreate(backend, 'A', {});
+      await runItemCreate(backend, 'B', {});
+      const items = await runItemList(backend, {});
       expect(items).toHaveLength(2);
     });
 
-    it('filters by status', () => {
-      runItemCreate(backend, 'A', { status: 'todo' });
-      runItemCreate(backend, 'B', { status: 'done' });
-      const items = runItemList(backend, { status: 'todo' });
+    it('filters by status', async () => {
+      await runItemCreate(backend, 'A', { status: 'todo' });
+      await runItemCreate(backend, 'B', { status: 'done' });
+      const items = await runItemList(backend, { status: 'todo' });
       expect(items).toHaveLength(1);
       expect(items[0]!.title).toBe('A');
     });
 
-    it('filters by type', () => {
-      runItemCreate(backend, 'A', { type: 'epic' });
-      runItemCreate(backend, 'B', { type: 'task' });
-      const items = runItemList(backend, { type: 'epic' });
+    it('filters by type', async () => {
+      await runItemCreate(backend, 'A', { type: 'epic' });
+      await runItemCreate(backend, 'B', { type: 'task' });
+      const items = await runItemList(backend, { type: 'epic' });
       expect(items).toHaveLength(1);
       expect(items[0]!.title).toBe('A');
     });
 
-    it('shows all iterations with --all', () => {
-      runItemCreate(backend, 'A', { iteration: 'v1' });
-      runItemCreate(backend, 'B', { iteration: 'v2' });
-      const items = runItemList(backend, { all: true });
+    it('shows all iterations with --all', async () => {
+      await runItemCreate(backend, 'A', { iteration: 'v1' });
+      await runItemCreate(backend, 'B', { iteration: 'v2' });
+      const items = await runItemList(backend, { all: true });
       expect(items).toHaveLength(2);
     });
   });
 
   describe('runItemShow', () => {
-    it('returns a single item by id', () => {
-      runItemCreate(backend, 'Bug', {});
-      const item = runItemShow(backend, '1');
+    it('returns a single item by id', async () => {
+      await runItemCreate(backend, 'Bug', {});
+      const item = await runItemShow(backend, '1');
       expect(item.title).toBe('Bug');
       expect(item.id).toBe('1');
     });
 
-    it('throws for non-existent id', () => {
-      expect(() => runItemShow(backend, '999')).toThrow();
+    it('throws for non-existent id', async () => {
+      await expect(runItemShow(backend, '999')).rejects.toThrow();
     });
   });
 
   describe('runItemUpdate', () => {
-    it('updates specified fields only', () => {
-      runItemCreate(backend, 'Original', {});
-      const item = runItemUpdate(backend, '1', {
+    it('updates specified fields only', async () => {
+      await runItemCreate(backend, 'Original', {});
+      const item = await runItemUpdate(backend, '1', {
         title: 'Updated',
         status: 'done',
       });
@@ -118,56 +118,58 @@ describe('item commands', () => {
   });
 
   describe('runItemDelete', () => {
-    it('deletes an item', () => {
-      runItemCreate(backend, 'Delete me', {});
-      runItemDelete(backend, '1');
-      const items = runItemList(backend, { all: true });
+    it('deletes an item', async () => {
+      await runItemCreate(backend, 'Delete me', {});
+      await runItemDelete(backend, '1');
+      const items = await runItemList(backend, { all: true });
       expect(items).toHaveLength(0);
     });
   });
 
   describe('runItemComment', () => {
-    it('adds a comment to an item', () => {
-      runItemCreate(backend, 'Commentable', {});
-      const comment = runItemComment(backend, '1', 'Looks good', {
+    it('adds a comment to an item', async () => {
+      await runItemCreate(backend, 'Commentable', {});
+      const comment = await runItemComment(backend, '1', 'Looks good', {
         author: 'alice',
       });
       expect(comment.body).toBe('Looks good');
       expect(comment.author).toBe('alice');
     });
 
-    it('defaults author to anonymous', () => {
-      runItemCreate(backend, 'Commentable', {});
-      const comment = runItemComment(backend, '1', 'Note', {});
+    it('defaults author to anonymous', async () => {
+      await runItemCreate(backend, 'Commentable', {});
+      const comment = await runItemComment(backend, '1', 'Note', {});
       expect(comment.author).toBe('anonymous');
     });
   });
 
   describe('item workflow integration', () => {
-    it('create → list → show → update → comment → delete', () => {
-      const created = runItemCreate(backend, 'Workflow test', {
+    it('create → list → show → update → comment → delete', async () => {
+      const created = await runItemCreate(backend, 'Workflow test', {
         type: 'issue',
         status: 'todo',
         priority: 'high',
       });
       expect(created.id).toBe('1');
 
-      const listed = runItemList(backend, { all: true });
+      const listed = await runItemList(backend, { all: true });
       expect(listed).toHaveLength(1);
 
-      const shown = runItemShow(backend, '1');
+      const shown = await runItemShow(backend, '1');
       expect(shown.title).toBe('Workflow test');
 
-      const updated = runItemUpdate(backend, '1', { status: 'in-progress' });
+      const updated = await runItemUpdate(backend, '1', {
+        status: 'in-progress',
+      });
       expect(updated.status).toBe('in-progress');
 
-      const comment = runItemComment(backend, '1', 'Working on it', {
+      const comment = await runItemComment(backend, '1', 'Working on it', {
         author: 'dev',
       });
       expect(comment.body).toBe('Working on it');
 
-      runItemDelete(backend, '1');
-      const afterDelete = runItemList(backend, { all: true });
+      await runItemDelete(backend, '1');
+      const afterDelete = await runItemList(backend, { all: true });
       expect(afterDelete).toHaveLength(0);
     });
   });

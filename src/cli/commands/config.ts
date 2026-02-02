@@ -16,23 +16,30 @@ function isValidKey(key: string): key is ConfigKey {
   return (READABLE_KEYS as readonly string[]).includes(key);
 }
 
-export function runConfigGet(root: string, key: string): unknown {
+export async function runConfigGet(
+  root: string,
+  key: string,
+): Promise<unknown> {
   if (!isValidKey(key)) {
     throw new Error(
       `Unknown config key "${key}". Valid keys: ${READABLE_KEYS.join(', ')}`,
     );
   }
-  const config = readConfig(root);
+  const config = await readConfig(root);
   return config[key];
 }
 
-export function runConfigSet(root: string, key: string, value: string): void {
+export async function runConfigSet(
+  root: string,
+  key: string,
+  value: string,
+): Promise<void> {
   if (!isValidKey(key)) {
     throw new Error(
       `Unknown config key "${key}". Valid keys: ${READABLE_KEYS.join(', ')}`,
     );
   }
-  const config = readConfig(root);
+  const config = await readConfig(root);
 
   if (key === 'backend') {
     if (!(VALID_BACKENDS as readonly string[]).includes(value)) {
@@ -47,5 +54,5 @@ export function runConfigSet(root: string, key: string, value: string): void {
     throw new Error(`Config key "${key}" is read-only`);
   }
 
-  writeConfig(root, config);
+  await writeConfig(root, config);
 }

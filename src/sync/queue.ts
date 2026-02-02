@@ -1,4 +1,4 @@
-import fs from 'node:fs';
+import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { QueueAction, QueueEntry, SyncQueue } from './types.js';
 
@@ -9,10 +9,9 @@ export class SyncQueueStore {
     this.filePath = path.join(root, '.tic', 'sync-queue.json');
   }
 
-  read(): SyncQueue {
+  async read(): Promise<SyncQueue> {
     try {
-      if (!fs.existsSync(this.filePath)) return { pending: [] };
-      const raw = fs.readFileSync(this.filePath, 'utf-8');
+      const raw = await fs.readFile(this.filePath, 'utf-8');
       const data = JSON.parse(raw) as SyncQueue;
       if (!Array.isArray(data.pending)) return { pending: [] };
       return data;
@@ -21,41 +20,41 @@ export class SyncQueueStore {
     }
   }
 
-  private write(queue: SyncQueue): void {
+  private async write(queue: SyncQueue): Promise<void> {
     const dir = path.dirname(this.filePath);
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(this.filePath, JSON.stringify(queue, null, 2));
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(this.filePath, JSON.stringify(queue, null, 2));
   }
 
-  append(entry: QueueEntry): void {
-    const queue = this.read();
+  async append(entry: QueueEntry): Promise<void> {
+    const queue = await this.read();
     // Collapse: remove existing entry with same itemId + action
     queue.pending = queue.pending.filter(
       (e) => !(e.itemId === entry.itemId && e.action === entry.action),
     );
     queue.pending.push(entry);
-    this.write(queue);
+    await this.write(queue);
   }
 
-  remove(itemId: string, action: QueueAction): void {
-    const queue = this.read();
+  async remove(itemId: string, action: QueueAction): Promise<void> {
+    const queue = await this.read();
     queue.pending = queue.pending.filter(
       (e) => !(e.itemId === itemId && e.action === action),
     );
-    this.write(queue);
+    await this.write(queue);
   }
 
-  clear(): void {
-    this.write({ pending: [] });
+  async clear(): Promise<void> {
+    await this.write({ pending: [] });
   }
 
-  renameItem(oldId: string, newId: string): void {
-    const queue = this.read();
+  async renameItem(oldId: string, newId: string): Promise<void> {
+    const queue = await this.read();
     for (const entry of queue.pending) {
       if (entry.itemId === oldId) {
         entry.itemId = newId;
       }
     }
-    this.write(queue);
+    await this.write(queue);
   }
 }

@@ -1,11 +1,23 @@
 import { Box, Text } from 'ink';
 import SelectInput from 'ink-select-input';
 import { useAppState } from '../app.js';
+import { useBackendData } from '../hooks/useBackendData.js';
 
 export function IterationPicker() {
   const { backend, navigate } = useAppState();
-  const iterations = backend.getIterations();
-  const current = backend.getCurrentIteration();
+  const {
+    iterations,
+    currentIteration: current,
+    loading,
+  } = useBackendData(backend);
+
+  if (loading) {
+    return (
+      <Box>
+        <Text dimColor>Loading...</Text>
+      </Box>
+    );
+  }
 
   const items = iterations.map((it) => ({
     label: it === current ? `${it} (current)` : it,
@@ -21,8 +33,10 @@ export function IterationPicker() {
         items={items}
         initialIndex={iterations.indexOf(current)}
         onSelect={(item) => {
-          backend.setCurrentIteration(item.value);
-          navigate('list');
+          void (async () => {
+            await backend.setCurrentIteration(item.value);
+            navigate('list');
+          })();
         }}
       />
       <Box marginTop={1}>

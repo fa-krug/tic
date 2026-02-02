@@ -5,13 +5,18 @@ export interface IterationListResult {
   current: string;
 }
 
-export function runIterationList(backend: Backend): IterationListResult {
+export async function runIterationList(
+  backend: Backend,
+): Promise<IterationListResult> {
   return {
-    iterations: backend.getIterations(),
-    current: backend.getCurrentIteration(),
+    iterations: await backend.getIterations(),
+    current: await backend.getCurrentIteration(),
   };
 }
 
-export function runIterationSet(backend: Backend, name: string): void {
-  backend.setCurrentIteration(name);
+export async function runIterationSet(
+  backend: Backend,
+  name: string,
+): Promise<void> {
+  await backend.setCurrentIteration(name);
 }

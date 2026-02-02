@@ -7,10 +7,10 @@ import { runCli } from './cli/index.js';
 if (process.argv.length > 2) {
   await runCli(process.argv);
 } else {
-  const { backend, syncManager } = createBackendWithSync(process.cwd());
+  const { backend, syncManager } = await createBackendWithSync(process.cwd());
 
   if (syncManager) {
-    const items = backend.listWorkItems();
+    const items = await backend.listWorkItems();
     if (items.length === 0) {
       process.stderr.write('Syncing...\n');
       await syncManager.sync();

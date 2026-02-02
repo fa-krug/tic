@@ -37,13 +37,13 @@ export interface ItemCommentOptions {
   author?: string;
 }
 
-export function runItemCreate(
+export async function runItemCreate(
   backend: Backend,
   title: string,
   opts: ItemCreateOptions,
-): WorkItem {
-  const statuses = backend.getStatuses();
-  const types = backend.getWorkItemTypes();
+): Promise<WorkItem> {
+  const statuses = await backend.getStatuses();
+  const types = await backend.getWorkItemTypes();
   return backend.createWorkItem({
     title,
     type: opts.type ?? (types.includes('task') ? 'task' : types[0]!),
@@ -51,7 +51,7 @@ export function runItemCreate(
     priority: (opts.priority as WorkItem['priority']) ?? 'medium',
     assignee: opts.assignee ?? '',
     labels: opts.labels ? opts.labels.split(',').map((l) => l.trim()) : [],
-    iteration: opts.iteration ?? backend.getCurrentIteration(),
+    iteration: opts.iteration ?? (await backend.getCurrentIteration()),
     parent: opts.parent ? opts.parent : null,
     dependsOn: opts.dependsOn
       ? opts.dependsOn
@@ -63,14 +63,14 @@ export function runItemCreate(
   });
 }
 
-export function runItemList(
+export async function runItemList(
   backend: Backend,
   opts: ItemListOptions,
-): WorkItem[] {
+): Promise<WorkItem[]> {
   const iteration = opts.all
     ? undefined
-    : (opts.iteration ?? backend.getCurrentIteration());
-  let items = backend.listWorkItems(iteration);
+    : (opts.iteration ?? (await backend.getCurrentIteration()));
+  let items = await backend.listWorkItems(iteration);
   if (opts.status) {
     items = items.filter((i) => i.status === opts.status);
   }
@@ -80,15 +80,18 @@ export function runItemList(
   return items;
 }
 
-export function runItemShow(backend: Backend, id: string): WorkItem {
+export async function runItemShow(
+  backend: Backend,
+  id: string,
+): Promise<WorkItem> {
   return backend.getWorkItem(id);
 }
 
-export function runItemUpdate(
+export async function runItemUpdate(
   backend: Backend,
   id: string,
   opts: ItemUpdateOptions,
-): WorkItem {
+): Promise<WorkItem> {
   const data: Partial<WorkItem> = {};
   if (opts.title !== undefined) data.title = opts.title;
   if (opts.type !== undefined) data.type = opts.type;
@@ -113,20 +116,23 @@ export function runItemUpdate(
   return backend.updateWorkItem(id, data);
 }
 
-export function runItemDelete(backend: Backend, id: string): void {
-  backend.deleteWorkItem(id);
+export async function runItemDelete(
+  backend: Backend,
+  id: string,
+): Promise<void> {
+  await backend.deleteWorkItem(id);
 }
 
-export function runItemOpen(backend: Backend, id: string): void {
-  backend.openItem(id);
+export async function runItemOpen(backend: Backend, id: string): Promise<void> {
+  await backend.openItem(id);
 }
 
-export function runItemComment(
+export async function runItemComment(
   backend: Backend,
   id: string,
   text: string,
   opts: ItemCommentOptions,
-): Comment {
+): Promise<Comment> {
   return backend.addComment(id, {
     author: opts.author ?? 'anonymous',
     body: text,
