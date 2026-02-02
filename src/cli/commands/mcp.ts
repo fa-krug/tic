@@ -463,11 +463,17 @@ export function registerTools(
       assignee: z.string().optional().describe('Assignee'),
       labels: z.string().optional().describe('Comma-separated labels'),
       iteration: z.string().optional().describe('Iteration'),
-      parent: z.string().optional().describe('Parent item ID'),
-      depends_on: z
-        .array(z.string())
-        .optional()
-        .describe('Dependency item IDs'),
+      ...(caps.fields.parent
+        ? { parent: z.string().optional().describe('Parent item ID') }
+        : {}),
+      ...(caps.fields.dependsOn
+        ? {
+            depends_on: z
+              .array(z.string())
+              .optional()
+              .describe('Dependency item IDs'),
+          }
+        : {}),
       description: z.string().optional().describe('Work item description'),
     },
     async (args) => {
@@ -497,15 +503,23 @@ export function registerTools(
       assignee: z.string().optional().describe('Assignee'),
       labels: z.string().optional().describe('Comma-separated labels'),
       iteration: z.string().optional().describe('Iteration'),
-      parent: z
-        .string()
-        .nullable()
-        .optional()
-        .describe('Parent item ID (null to clear)'),
-      depends_on: z
-        .array(z.string())
-        .optional()
-        .describe('Dependency item IDs'),
+      ...(caps.fields.parent
+        ? {
+            parent: z
+              .string()
+              .nullable()
+              .optional()
+              .describe('Parent item ID (null to clear)'),
+          }
+        : {}),
+      ...(caps.fields.dependsOn
+        ? {
+            depends_on: z
+              .array(z.string())
+              .optional()
+              .describe('Dependency item IDs'),
+          }
+        : {}),
       description: z.string().optional().describe('Work item description'),
     },
     async (args) => {

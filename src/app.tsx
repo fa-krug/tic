@@ -5,6 +5,7 @@ import { WorkItemForm } from './components/WorkItemForm.js';
 import { IterationPicker } from './components/IterationPicker.js';
 import { Settings } from './components/Settings.js';
 import { StatusScreen } from './components/StatusScreen.js';
+import { Header } from './components/Header.js';
 import type { Backend } from './backends/types.js';
 import type { SyncManager } from './sync/SyncManager.js';
 
@@ -83,6 +84,7 @@ export function App({
   return (
     <AppContext.Provider value={state}>
       <Box flexDirection="column">
+        {screen === 'list' && <Header />}
         {screen === 'list' && <WorkItemList />}
         {screen === 'form' && <WorkItemForm />}
         {screen === 'iteration-picker' && <IterationPicker />}

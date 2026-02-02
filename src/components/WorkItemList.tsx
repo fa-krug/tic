@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
+import Spinner from 'ink-spinner';
 import TextInput from 'ink-text-input';
 import { useAppState } from '../app.js';
 import { isGitRepo } from '../git.js';
@@ -310,23 +311,28 @@ export function WorkItemList() {
   return (
     <Box flexDirection="column">
       <Box marginBottom={1}>
-        <Text bold color="cyan">
-          {typeLabel} — {iteration}
+        <Text wrap="truncate">
+          <Text bold color="cyan">
+            {typeLabel} — {iteration}
+          </Text>
+          <Text dimColor>{` (${items.length} items)`}</Text>
         </Text>
-        <Text dimColor> ({items.length} items)</Text>
-        {syncStatus && (
-          <Box>
-            <Text dimColor>
-              {syncStatus.state === 'syncing'
-                ? ' ⟳ Syncing...'
-                : syncStatus.state === 'error'
-                  ? ` ⚠ Sync failed (${syncStatus.errors.length} errors)`
-                  : syncStatus.pendingCount > 0
-                    ? ` ↑ ${syncStatus.pendingCount} pending`
-                    : ' ✓ Synced'}
+        {syncStatus && syncStatus.state === 'syncing' ? (
+          <Box marginLeft={1}>
+            <Text color="yellow">
+              <Spinner type="dots" />
             </Text>
+            <Text dimColor> Syncing...</Text>
           </Box>
-        )}
+        ) : syncStatus && syncStatus.state === 'error' ? (
+          <Text dimColor>
+            {` ⚠ Sync failed (${syncStatus.errors.length} errors)`}
+          </Text>
+        ) : syncStatus && syncStatus.pendingCount > 0 ? (
+          <Text dimColor>{` ↑ ${syncStatus.pendingCount} pending`}</Text>
+        ) : syncStatus ? (
+          <Text dimColor> ✓ Synced</Text>
+        ) : null}
       </Box>
 
       {terminalWidth >= 80 ? (

@@ -43,5 +43,12 @@ export function ghGraphQL<T>(
     encoding: 'utf-8',
     stdio: ['pipe', 'pipe', 'pipe'],
   });
-  return (JSON.parse(result) as { data: T }).data;
+  const parsed = JSON.parse(result) as {
+    data?: T;
+    errors?: { message: string }[];
+  };
+  if (parsed.errors?.length) {
+    throw new Error(`GraphQL error: ${parsed.errors[0]!.message}`);
+  }
+  return parsed.data as T;
 }

@@ -50,6 +50,7 @@ export class SyncManager {
   }
 
   async pushPending(): Promise<PushResult> {
+    this.updateStatus({ state: 'syncing' });
     const { pending } = await this.queue.read();
     let pushed = 0;
     const errors: SyncError[] = [];
@@ -78,6 +79,7 @@ export class SyncManager {
     }
 
     this.updateStatus({
+      state: errors.length > 0 ? 'error' : 'idle',
       pendingCount: (await this.queue.read()).pending.length,
       errors,
     });

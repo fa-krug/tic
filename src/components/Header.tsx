@@ -20,7 +20,7 @@ function shortenPath(fullPath: string): string {
 }
 
 // Checkmark icon in block characters
-const ART_LINES = ['        ██', ' ██    ██ ', '  ██  ██  ', '   ████   '];
+const ART_LINES = ['        ██', '       ██ ', '  ██  ██  ', '   ████   '];
 
 export function Header() {
   const root = process.cwd();
@@ -30,10 +30,10 @@ export function Header() {
   const projectPath = shortenPath(root);
 
   return (
-    <Box marginBottom={1}>
+    <Box marginTop={1} marginBottom={1}>
       <Box flexDirection="column" marginRight={3}>
         {ART_LINES.map((line, i) => (
-          <Text key={i} color="green">
+          <Text key={i} color="cyan">
             {line}
           </Text>
         ))}

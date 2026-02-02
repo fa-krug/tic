@@ -45,13 +45,13 @@ export function WorkItemForm() {
     return new SyncQueueStore(process.cwd());
   }, [syncManager]);
 
-  const queueWrite = (
+  const queueWrite = async (
     action: QueueAction,
     itemId: string,
     commentData?: { author: string; body: string },
   ) => {
     if (queueStore) {
-      void queueStore.append({
+      await queueStore.append({
         action,
         itemId,
         timestamp: new Date().toISOString(),
@@ -68,6 +68,7 @@ export function WorkItemForm() {
     types,
     assignees,
     currentIteration,
+    items: allItems,
     loading: configLoading,
   } = useBackendData(backend);
 
@@ -174,15 +175,27 @@ export function WorkItemForm() {
     setDescription(existingItem.description ?? '');
     setParentId(
       existingItem.parent !== null && existingItem.parent !== undefined
-        ? String(existingItem.parent)
+        ? (() => {
+            const pi = allItems.find((i) => i.id === existingItem.parent);
+            return pi
+              ? `#${existingItem.parent} - ${pi.title}`
+              : String(existingItem.parent);
+          })()
         : '',
     );
     setDependsOn(existingItem.dependsOn?.join(', ') ?? '');
     setComments(existingItem.comments ?? []);
   }, [existingItem]);
 
+  const parentSuggestions = useMemo(() => {
+    return allItems
+      .filter((item) => item.id !== selectedWorkItemId)
+      .map((item) => `#${item.id} - ${item.title}`);
+  }, [allItems, selectedWorkItemId]);
+
   const [focusedField, setFocusedField] = useState(0);
   const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setFocusedField(0);
@@ -202,7 +215,12 @@ export function WorkItemForm() {
       .map((l) => l.trim())
       .filter((l) => l.length > 0);
 
-    const parsedParent = parentId.trim() === '' ? null : parentId.trim();
+    const parsedParent = (() => {
+      const trimmed = parentId.trim();
+      if (!trimmed) return null;
+      const match = trimmed.match(/^#(\S+)\s*-\s/);
+      return match ? match[1]! : trimmed;
+    })();
     const parsedDependsOn = dependsOn
       .split(',')
       .map((s) => s.trim())
@@ -221,14 +239,14 @@ export function WorkItemForm() {
         parent: parsedParent,
         dependsOn: parsedDependsOn,
       });
-      queueWrite('update', selectedWorkItemId);
+      await queueWrite('update', selectedWorkItemId);
 
       if (capabilities.comments && newComment.trim().length > 0) {
         const added = await backend.addComment(selectedWorkItemId, {
           author: 'me',
           body: newComment.trim(),
         });
-        queueWrite('comment', selectedWorkItemId, {
+        await queueWrite('comment', selectedWorkItemId, {
           author: 'me',
           body: newComment.trim(),
         });
@@ -248,14 +266,14 @@ export function WorkItemForm() {
         parent: parsedParent,
         dependsOn: parsedDependsOn,
       });
-      queueWrite('create', created.id);
+      await queueWrite('create', created.id);
 
       if (capabilities.comments && newComment.trim().length > 0) {
         await backend.addComment(created.id, {
           author: 'me',
           body: newComment.trim(),
         });
-        queueWrite('comment', created.id, {
+        await queueWrite('comment', created.id, {
           author: 'me',
           body: newComment.trim(),
         });
@@ -265,7 +283,7 @@ export function WorkItemForm() {
 
   useInput(
     (_input, key) => {
-      if (configLoading || itemLoading) return;
+      if (configLoading || itemLoading || saving) return;
       if (!editing) {
         if (key.upArrow) {
           setFocusedField((f) => Math.max(0, f - 1));
@@ -286,6 +304,7 @@ export function WorkItemForm() {
               targetId = currentField.slice('rel-dependent-'.length);
             }
             if (targetId) {
+              setSaving(true);
               void (async () => {
                 await save();
                 pushWorkItem(targetId);
@@ -297,13 +316,11 @@ export function WorkItemForm() {
         }
 
         if (key.escape) {
-          void (async () => {
-            await save();
-            const prev = popWorkItem();
-            if (prev === null) {
-              navigate('list');
-            }
-          })();
+          void save();
+          const prev = popWorkItem();
+          if (prev === null) {
+            navigate('list');
+          }
         }
       } else {
         if (key.escape) {
@@ -315,7 +332,11 @@ export function WorkItemForm() {
       isActive:
         !configLoading &&
         !itemLoading &&
-        (!editing || (!isSelectField && currentField !== 'assignee')),
+        !saving &&
+        (!editing ||
+          (!isSelectField &&
+            currentField !== 'assignee' &&
+            currentField !== 'parent')),
     },
   );
 
@@ -527,28 +548,60 @@ export function WorkItemForm() {
       );
     }
 
-    // Text fields: title, labels, description, parent, dependsOn
+    if (field === 'parent') {
+      if (isEditing) {
+        return (
+          <Box key={field} flexDirection="column">
+            <Box>
+              <Text color="cyan">{cursor} </Text>
+              <Text bold color="cyan">
+                {label}:{' '}
+              </Text>
+            </Box>
+            <Box marginLeft={4}>
+              <AutocompleteInput
+                value={parentId}
+                onChange={setParentId}
+                onSubmit={() => {
+                  setEditing(false);
+                }}
+                suggestions={parentSuggestions}
+                focus={true}
+              />
+            </Box>
+          </Box>
+        );
+      }
+
+      return (
+        <Box key={field}>
+          <Text color={focused ? 'cyan' : undefined}>{cursor} </Text>
+          <Text bold={focused} color={focused ? 'cyan' : undefined}>
+            {label}:{' '}
+          </Text>
+          <Text>{parentId || <Text dimColor>(empty)</Text>}</Text>
+        </Box>
+      );
+    }
+
+    // Text fields: title, labels, description, dependsOn
     const textValue =
       field === 'title'
         ? title
         : field === 'labels'
           ? labels
-          : field === 'parent'
-            ? parentId
-            : field === 'dependsOn'
-              ? dependsOn
-              : description;
+          : field === 'dependsOn'
+            ? dependsOn
+            : description;
 
     const textSetter =
       field === 'title'
         ? setTitle
         : field === 'labels'
           ? setLabels
-          : field === 'parent'
-            ? setParentId
-            : field === 'dependsOn'
-              ? setDependsOn
-              : setDescription;
+          : field === 'dependsOn'
+            ? setDependsOn
+            : setDescription;
 
     if (isEditing) {
       return (
@@ -720,7 +773,9 @@ export function WorkItemForm() {
           {editing
             ? isSelectField
               ? 'up/down: navigate  enter: select'
-              : 'type to edit  enter/esc: confirm'
+              : currentField === 'assignee' || currentField === 'parent'
+                ? 'type to search  up/down: navigate  enter: select  esc: confirm'
+                : 'type to edit  enter/esc: confirm'
             : isRelationshipField
               ? 'up/down: navigate  enter: open item  esc: save & back'
               : 'up/down: navigate  enter: edit field  esc: save & back'}
