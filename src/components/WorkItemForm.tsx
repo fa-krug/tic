@@ -34,6 +34,7 @@ export function WorkItemForm() {
     backend,
     syncManager,
     navigate,
+    navigateToHelp,
     selectedWorkItemId,
     activeType,
     pushWorkItem,
@@ -285,6 +286,11 @@ export function WorkItemForm() {
     (_input, key) => {
       if (configLoading || itemLoading || saving) return;
       if (!editing) {
+        if (_input === '?') {
+          navigateToHelp();
+          return;
+        }
+
         if (key.upArrow) {
           setFocusedField((f) => Math.max(0, f - 1));
         }
@@ -770,15 +776,7 @@ export function WorkItemForm() {
 
       <Box marginTop={1}>
         <Text dimColor>
-          {editing
-            ? isSelectField
-              ? 'up/down: navigate  enter: select'
-              : currentField === 'assignee' || currentField === 'parent'
-                ? 'type to search  up/down: navigate  enter: select  esc: confirm'
-                : 'type to edit  enter/esc: confirm'
-            : isRelationshipField
-              ? 'up/down: navigate  enter: open item  esc: save & back'
-              : 'up/down: navigate  enter: edit field  esc: save & back'}
+          {'↑↓ navigate  enter edit field  esc save & back  ? help'}
         </Text>
       </Box>
     </Box>
