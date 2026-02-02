@@ -5,6 +5,9 @@ vi.mock('./az.js', () => ({
   az: vi.fn(),
   azExec: vi.fn(),
   azInvoke: vi.fn(),
+  azSync: vi.fn(),
+  azExecSync: vi.fn(),
+  azInvokeSync: vi.fn(),
 }));
 
 vi.mock('./remote.js', () => ({
@@ -19,12 +22,14 @@ vi.mock('node:child_process', () => ({
   execSync: vi.fn(),
 }));
 
-import { az, azExec, azInvoke } from './az.js';
+import { az, azExec, azInvoke, azExecSync, azInvokeSync } from './az.js';
 import { execFileSync } from 'node:child_process';
 
 const mockAz = vi.mocked(az);
 const mockAzExec = vi.mocked(azExec);
 const mockAzInvoke = vi.mocked(azInvoke);
+const mockAzExecSync = vi.mocked(azExecSync);
+const mockAzInvokeSync = vi.mocked(azInvokeSync);
 const mockExecFileSync = vi.mocked(execFileSync);
 
 function makeBackend(): AzureDevOpsBackend {
@@ -66,10 +71,10 @@ const sampleComment = {
 describe('AzureDevOpsBackend', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Constructor calls azExec for auth check
-    mockAzExec.mockReturnValue('');
-    // Constructor calls azInvoke for work item types
-    mockAzInvoke.mockReturnValue({
+    // Constructor calls azExecSync for auth check
+    mockAzExecSync.mockReturnValue('');
+    // Constructor calls azInvokeSync for work item types
+    mockAzInvokeSync.mockReturnValue({
       value: [
         {
           name: 'Epic',
@@ -95,11 +100,11 @@ describe('AzureDevOpsBackend', () => {
   describe('constructor', () => {
     it('verifies az auth on construction', () => {
       makeBackend();
-      expect(mockAzExec).toHaveBeenCalledWith(['account', 'show'], '/repo');
+      expect(mockAzExecSync).toHaveBeenCalledWith(['account', 'show'], '/repo');
     });
 
     it('throws when az auth fails', () => {
-      mockAzExec.mockImplementation(() => {
+      mockAzExecSync.mockImplementation(() => {
         throw new Error('Please run az login');
       });
       expect(() => makeBackend()).toThrow();
@@ -150,7 +155,7 @@ describe('AzureDevOpsBackend', () => {
   describe('getIterations', () => {
     it('returns iteration paths', async () => {
       const backend = makeBackend();
-      mockAz.mockReturnValueOnce([
+      mockAz.mockResolvedValueOnce([
         {
           name: 'Sprint 1',
           path: 'WebApp\\Sprint 1',
@@ -161,7 +166,7 @@ describe('AzureDevOpsBackend', () => {
           path: 'WebApp\\Sprint 2',
           attributes: { startDate: '2026-01-15', finishDate: '2026-01-28' },
         },
-      ]);
+      ] as never);
       expect(await backend.getIterations()).toEqual([
         'WebApp\\Sprint 1',
         'WebApp\\Sprint 2',
@@ -172,7 +177,7 @@ describe('AzureDevOpsBackend', () => {
   describe('getCurrentIteration', () => {
     it('returns the current iteration path', async () => {
       const backend = makeBackend();
-      mockAz.mockReturnValueOnce([
+      mockAz.mockResolvedValueOnce([
         {
           name: 'Sprint 1',
           path: 'WebApp\\Sprint 1',
@@ -181,13 +186,13 @@ describe('AzureDevOpsBackend', () => {
             finishDate: '2030-12-31T00:00:00Z',
           },
         },
-      ]);
+      ] as never);
       expect(await backend.getCurrentIteration()).toBe('WebApp\\Sprint 1');
     });
 
     it('returns empty string when no current iteration', async () => {
       const backend = makeBackend();
-      mockAz.mockReturnValueOnce([]);
+      mockAz.mockResolvedValueOnce([] as never);
       expect(await backend.getCurrentIteration()).toBe('');
     });
   });
@@ -206,10 +211,10 @@ describe('AzureDevOpsBackend', () => {
       const backend = makeBackend();
 
       // WIQL query returns flat array of items
-      mockAz.mockReturnValueOnce([{ id: 42 }, { id: 43 }]);
+      mockAz.mockResolvedValueOnce([{ id: 42 }, { id: 43 }] as never);
 
       // Batch fetch returns full items
-      mockAzInvoke.mockReturnValueOnce({
+      mockAzInvoke.mockResolvedValueOnce({
         value: [
           { ...sampleWorkItem, id: 42 },
           {
@@ -221,15 +226,15 @@ describe('AzureDevOpsBackend', () => {
             },
           },
         ],
-      });
+      } as never);
 
       const items = await backend.listWorkItems();
       expect(items).toHaveLength(2);
       // Sorted by updated descending
       expect(items[0]!.id).toBe('42');
       expect(items[1]!.id).toBe('43');
-      // Verify batch fetch includes $expand for relations (call[0] is constructor's workitemtypes)
-      const invokeCall = mockAzInvoke.mock.calls[1]!;
+      // Verify batch fetch includes $expand for relations
+      const invokeCall = mockAzInvoke.mock.calls[0]!;
       const invokeOpts = invokeCall[0] as { body: { $expand: number } };
       expect(invokeOpts.body.$expand).toBe(4);
     });
@@ -237,10 +242,10 @@ describe('AzureDevOpsBackend', () => {
     it('filters by iteration via WIQL', async () => {
       const backend = makeBackend();
 
-      mockAz.mockReturnValueOnce([{ id: 42 }]);
-      mockAzInvoke.mockReturnValueOnce({
+      mockAz.mockResolvedValueOnce([{ id: 42 }] as never);
+      mockAzInvoke.mockResolvedValueOnce({
         value: [sampleWorkItem],
-      });
+      } as never);
 
       await backend.listWorkItems('WebApp\\Sprint 1');
 
@@ -256,7 +261,7 @@ describe('AzureDevOpsBackend', () => {
 
     it('returns empty array when no items match', async () => {
       const backend = makeBackend();
-      mockAz.mockReturnValueOnce([]);
+      mockAz.mockResolvedValueOnce([] as never);
       expect(await backend.listWorkItems()).toEqual([]);
     });
   });
@@ -265,10 +270,10 @@ describe('AzureDevOpsBackend', () => {
     it('returns a work item with comments', async () => {
       const backend = makeBackend();
 
-      mockAz.mockReturnValueOnce(sampleWorkItem);
-      mockAzInvoke.mockReturnValueOnce({
+      mockAz.mockResolvedValueOnce(sampleWorkItem as never);
+      mockAzInvoke.mockResolvedValueOnce({
         comments: [sampleComment],
-      });
+      } as never);
 
       const item = await backend.getWorkItem('42');
       expect(item.id).toBe('42');
@@ -282,10 +287,10 @@ describe('AzureDevOpsBackend', () => {
     it('creates a work item and returns it', async () => {
       const backend = makeBackend();
 
-      mockAz.mockReturnValueOnce({ ...sampleWorkItem, id: 99 });
-      // getWorkItem refetch
-      mockAz.mockReturnValueOnce({ ...sampleWorkItem, id: 99 });
-      mockAzInvoke.mockReturnValueOnce({ comments: [] });
+      mockAz.mockResolvedValueOnce({ ...sampleWorkItem, id: 99 } as never);
+      // getWorkItem refetch (parallel: az + azInvoke)
+      mockAz.mockResolvedValueOnce({ ...sampleWorkItem, id: 99 } as never);
+      mockAzInvoke.mockResolvedValueOnce({ comments: [] } as never);
 
       const item = await backend.createWorkItem({
         title: 'New item',
@@ -320,13 +325,13 @@ describe('AzureDevOpsBackend', () => {
     it('updates work item fields', async () => {
       const backend = makeBackend();
 
-      mockAz.mockReturnValueOnce(sampleWorkItem);
-      // getWorkItem refetch
-      mockAz.mockReturnValueOnce({
+      mockAz.mockResolvedValueOnce(sampleWorkItem as never);
+      // getWorkItem refetch (parallel: az + azInvoke)
+      mockAz.mockResolvedValueOnce({
         ...sampleWorkItem,
         fields: { ...sampleWorkItem.fields, 'System.Title': 'Updated' },
-      });
-      mockAzInvoke.mockReturnValueOnce({ comments: [] });
+      } as never);
+      mockAzInvoke.mockResolvedValueOnce({ comments: [] } as never);
 
       await backend.updateWorkItem('42', { title: 'Updated' });
 
@@ -340,7 +345,7 @@ describe('AzureDevOpsBackend', () => {
       const backend = makeBackend();
 
       // Fetch current item with relations (for parent diff)
-      mockAz.mockReturnValueOnce({
+      mockAz.mockResolvedValueOnce({
         ...sampleWorkItem,
         relations: [
           {
@@ -349,11 +354,11 @@ describe('AzureDevOpsBackend', () => {
             attributes: {},
           },
         ],
-      });
-      mockAzExec.mockReturnValue('');
-      // getWorkItem refetch
-      mockAz.mockReturnValueOnce(sampleWorkItem);
-      mockAzInvoke.mockReturnValueOnce({ comments: [] });
+      } as never);
+      mockAzExec.mockResolvedValue('' as never);
+      // getWorkItem refetch (parallel: az + azInvoke)
+      mockAz.mockResolvedValueOnce(sampleWorkItem as never);
+      mockAzInvoke.mockResolvedValueOnce({ comments: [] } as never);
 
       await backend.updateWorkItem('42', { parent: '20' });
 
@@ -387,7 +392,7 @@ describe('AzureDevOpsBackend', () => {
       const backend = makeBackend();
 
       // Fetch current item with existing parent
-      mockAz.mockReturnValueOnce({
+      mockAz.mockResolvedValueOnce({
         ...sampleWorkItem,
         relations: [
           {
@@ -396,11 +401,14 @@ describe('AzureDevOpsBackend', () => {
             attributes: {},
           },
         ],
-      });
-      mockAzExec.mockReturnValue('');
-      // getWorkItem refetch
-      mockAz.mockReturnValueOnce({ ...sampleWorkItem, relations: [] });
-      mockAzInvoke.mockReturnValueOnce({ comments: [] });
+      } as never);
+      mockAzExec.mockResolvedValue('' as never);
+      // getWorkItem refetch (parallel: az + azInvoke)
+      mockAz.mockResolvedValueOnce({
+        ...sampleWorkItem,
+        relations: [],
+      } as never);
+      mockAzInvoke.mockResolvedValueOnce({ comments: [] } as never);
 
       await backend.updateWorkItem('42', { parent: null });
 
@@ -415,7 +423,7 @@ describe('AzureDevOpsBackend', () => {
       const backend = makeBackend();
 
       // Fetch current item with existing deps [20, 21]
-      mockAz.mockReturnValueOnce({
+      mockAz.mockResolvedValueOnce({
         ...sampleWorkItem,
         relations: [
           {
@@ -429,11 +437,11 @@ describe('AzureDevOpsBackend', () => {
             attributes: {},
           },
         ],
-      });
-      mockAzExec.mockReturnValue('');
-      // getWorkItem refetch
-      mockAz.mockReturnValueOnce(sampleWorkItem);
-      mockAzInvoke.mockReturnValueOnce({ comments: [] });
+      } as never);
+      mockAzExec.mockResolvedValue('' as never);
+      // getWorkItem refetch (parallel: az + azInvoke)
+      mockAz.mockResolvedValueOnce(sampleWorkItem as never);
+      mockAzInvoke.mockResolvedValueOnce({ comments: [] } as never);
 
       // Change deps to [21, 30] — remove 20, keep 21, add 30
       await backend.updateWorkItem('42', { dependsOn: ['21', '30'] });
@@ -454,7 +462,7 @@ describe('AzureDevOpsBackend', () => {
   describe('deleteWorkItem', () => {
     it('deletes a work item', async () => {
       const backend = makeBackend();
-      mockAzExec.mockReturnValue('');
+      mockAzExec.mockResolvedValue('' as never);
 
       await backend.deleteWorkItem('42');
 
@@ -475,7 +483,7 @@ describe('AzureDevOpsBackend', () => {
   describe('addComment', () => {
     it('adds a comment and returns it', async () => {
       const backend = makeBackend();
-      mockAzInvoke.mockReturnValueOnce(sampleComment);
+      mockAzInvoke.mockResolvedValueOnce(sampleComment as never);
 
       const comment = await backend.addComment('42', {
         author: 'Alice',
@@ -492,13 +500,17 @@ describe('AzureDevOpsBackend', () => {
       const backend = makeBackend();
 
       // Link queries include the source item; code filters it out
-      mockAz.mockReturnValueOnce([{ id: 42 }, { id: 50 }, { id: 51 }]);
-      mockAzInvoke.mockReturnValueOnce({
+      mockAz.mockResolvedValueOnce([
+        { id: 42 },
+        { id: 50 },
+        { id: 51 },
+      ] as never);
+      mockAzInvoke.mockResolvedValueOnce({
         value: [
           { ...sampleWorkItem, id: 50 },
           { ...sampleWorkItem, id: 51 },
         ],
-      });
+      } as never);
 
       const children = await backend.getChildren('42');
       expect(children).toHaveLength(2);
@@ -506,7 +518,7 @@ describe('AzureDevOpsBackend', () => {
 
     it('returns empty array when no children', async () => {
       const backend = makeBackend();
-      mockAz.mockReturnValueOnce([]);
+      mockAz.mockResolvedValueOnce([] as never);
       expect(await backend.getChildren('42')).toEqual([]);
     });
   });
@@ -516,10 +528,10 @@ describe('AzureDevOpsBackend', () => {
       const backend = makeBackend();
 
       // Link queries include the source item; code filters it out
-      mockAz.mockReturnValueOnce([{ id: 42 }, { id: 60 }]);
-      mockAzInvoke.mockReturnValueOnce({
+      mockAz.mockResolvedValueOnce([{ id: 42 }, { id: 60 }] as never);
+      mockAzInvoke.mockResolvedValueOnce({
         value: [{ ...sampleWorkItem, id: 60 }],
-      });
+      } as never);
 
       const dependents = await backend.getDependents('42');
       expect(dependents).toHaveLength(1);
@@ -552,10 +564,10 @@ describe('AzureDevOpsBackend', () => {
   describe('getAssignees', () => {
     it('returns team member display names', async () => {
       const backend = makeBackend();
-      mockAz.mockReturnValueOnce([
+      mockAz.mockResolvedValueOnce([
         { identity: { displayName: 'Alice Smith' } },
         { identity: { displayName: 'Bob Jones' } },
-      ]);
+      ] as never);
       expect(await backend.getAssignees()).toEqual([
         'Alice Smith',
         'Bob Jones',
@@ -564,9 +576,7 @@ describe('AzureDevOpsBackend', () => {
 
     it('returns empty array on error', async () => {
       const backend = makeBackend();
-      mockAz.mockImplementationOnce(() => {
-        throw new Error('API error');
-      });
+      mockAz.mockRejectedValueOnce(new Error('API error'));
       expect(await backend.getAssignees()).toEqual([]);
     });
   });

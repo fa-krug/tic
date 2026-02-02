@@ -146,34 +146,40 @@ export function WorkItemForm() {
     return all;
   }, [capabilities, selectedWorkItemId, existingItem, children, dependents]);
 
-  const [title, setTitle] = useState(existingItem?.title ?? '');
-  const [type, setType] = useState(
-    existingItem?.type ?? activeType ?? types[0] ?? '',
-  );
-  const [status, setStatus] = useState(
-    existingItem?.status ?? statuses[0] ?? '',
-  );
-  const [iteration, setIteration] = useState(
-    existingItem?.iteration ?? currentIteration,
-  );
-  const [priority, setPriority] = useState(existingItem?.priority ?? 'medium');
-  const [assignee, setAssignee] = useState(existingItem?.assignee ?? '');
-  const [labels, setLabels] = useState(existingItem?.labels.join(', ') ?? '');
-  const [description, setDescription] = useState(
-    existingItem?.description ?? '',
-  );
-  const [parentId, setParentId] = useState(
-    existingItem?.parent !== null && existingItem?.parent !== undefined
-      ? String(existingItem.parent)
-      : '',
-  );
-  const [dependsOn, setDependsOn] = useState(
-    existingItem?.dependsOn?.join(', ') ?? '',
-  );
+  const [title, setTitle] = useState('');
+  const [type, setType] = useState(activeType ?? types[0] ?? '');
+  const [status, setStatus] = useState(statuses[0] ?? '');
+  const [iteration, setIteration] = useState(currentIteration);
+  const [priority, setPriority] = useState<
+    'low' | 'medium' | 'high' | 'critical'
+  >('medium');
+  const [assignee, setAssignee] = useState('');
+  const [labels, setLabels] = useState('');
+  const [description, setDescription] = useState('');
+  const [parentId, setParentId] = useState('');
+  const [dependsOn, setDependsOn] = useState('');
   const [newComment, setNewComment] = useState('');
-  const [comments, setComments] = useState<Comment[]>(
-    existingItem?.comments ?? [],
-  );
+  const [comments, setComments] = useState<Comment[]>([]);
+
+  // Sync form fields when the existing item finishes loading
+  useEffect(() => {
+    if (!existingItem) return;
+    setTitle(existingItem.title);
+    setType(existingItem.type);
+    setStatus(existingItem.status);
+    setIteration(existingItem.iteration);
+    setPriority(existingItem.priority ?? 'medium');
+    setAssignee(existingItem.assignee ?? '');
+    setLabels(existingItem.labels.join(', '));
+    setDescription(existingItem.description ?? '');
+    setParentId(
+      existingItem.parent !== null && existingItem.parent !== undefined
+        ? String(existingItem.parent)
+        : '',
+    );
+    setDependsOn(existingItem.dependsOn?.join(', ') ?? '');
+    setComments(existingItem.comments ?? []);
+  }, [existingItem]);
 
   const [focusedField, setFocusedField] = useState(0);
   const [editing, setEditing] = useState(false);

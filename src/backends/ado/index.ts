@@ -7,7 +7,7 @@ import type {
   NewComment,
   Comment,
 } from '../../types.js';
-import { az, azExec, azInvoke } from './az.js';
+import { az, azExec, azInvoke, azExecSync, azInvokeSync } from './az.js';
 import { parseAdoRemote } from './remote.js';
 import {
   mapWorkItemToWorkItem,
@@ -28,11 +28,11 @@ export class AzureDevOpsBackend extends BaseBackend {
   constructor(cwd: string) {
     super();
     this.cwd = cwd;
-    azExec(['account', 'show'], cwd);
+    azExecSync(['account', 'show'], cwd);
     const remote = parseAdoRemote(cwd);
     this.org = remote.org;
     this.project = remote.project;
-    this.types = azInvoke<{ value: AdoWorkItemType[] }>(
+    this.types = azInvokeSync<{ value: AdoWorkItemType[] }>(
       {
         area: 'wit',
         resource: 'workitemtypes',
@@ -76,10 +76,9 @@ export class AzureDevOpsBackend extends BaseBackend {
     return this.types.map((t) => t.name);
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async getAssignees(): Promise<string[]> {
     try {
-      const members = az<{ identity: { displayName: string } }[]>(
+      const members = await az<{ identity: { displayName: string } }[]>(
         [
           'devops',
           'team',
@@ -99,9 +98,8 @@ export class AzureDevOpsBackend extends BaseBackend {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async getIterations(): Promise<string[]> {
-    const iterations = az<{ path: string }[]>(
+    const iterations = await az<{ path: string }[]>(
       [
         'boards',
         'iteration',
@@ -119,9 +117,8 @@ export class AzureDevOpsBackend extends BaseBackend {
     return iterations.map((i) => i.path);
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async getCurrentIteration(): Promise<string> {
-    const iterations = az<{ path: string }[]>(
+    const iterations = await az<{ path: string }[]>(
       [
         'boards',
         'iteration',
@@ -150,13 +147,13 @@ export class AzureDevOpsBackend extends BaseBackend {
     return value.replace(/'/g, "''");
   }
 
-  private batchFetchWorkItems(ids: number[]): WorkItem[] {
+  private async batchFetchWorkItems(ids: number[]): Promise<WorkItem[]> {
     const CHUNK_SIZE = 200;
     const items: WorkItem[] = [];
 
     for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
       const chunk = ids.slice(i, i + CHUNK_SIZE);
-      const batchResult = azInvoke<{ value: AdoWorkItem[] }>(
+      const batchResult = await azInvoke<{ value: AdoWorkItem[] }>(
         {
           area: 'wit',
           resource: 'workitemsbatch',
@@ -172,14 +169,13 @@ export class AzureDevOpsBackend extends BaseBackend {
     return items;
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async listWorkItems(iteration?: string): Promise<WorkItem[]> {
     let wiql = `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = '${this.escapeWiql(this.project)}'`;
     if (iteration) {
       wiql += ` AND [System.IterationPath] = '${this.escapeWiql(iteration)}'`;
     }
 
-    const queryResult = az<{ id: number }[]>(
+    const queryResult = await az<{ id: number }[]>(
       [
         'boards',
         'query',
@@ -196,40 +192,40 @@ export class AzureDevOpsBackend extends BaseBackend {
     const ids = queryResult.map((w) => w.id);
     if (ids.length === 0) return [];
 
-    const items = this.batchFetchWorkItems(ids);
+    const items = await this.batchFetchWorkItems(ids);
     items.sort((a, b) => b.updated.localeCompare(a.updated));
     return items;
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async getWorkItem(id: string): Promise<WorkItem> {
-    const ado = az<AdoWorkItem>(
-      [
-        'boards',
-        'work-item',
-        'show',
-        '--id',
-        id,
-        '--expand',
-        'relations',
-        '--org',
-        `https://dev.azure.com/${this.org}`,
-      ],
-      this.cwd,
-    );
+    // Fetch work item and comments in parallel
+    const [ado, commentResult] = await Promise.all([
+      az<AdoWorkItem>(
+        [
+          'boards',
+          'work-item',
+          'show',
+          '--id',
+          id,
+          '--expand',
+          'relations',
+          '--org',
+          `https://dev.azure.com/${this.org}`,
+        ],
+        this.cwd,
+      ),
+      azInvoke<{ comments: AdoComment[] }>(
+        {
+          area: 'wit',
+          resource: 'comments',
+          routeParameters: `workItemId=${id}`,
+          apiVersion: '7.1',
+        },
+        this.cwd,
+      ),
+    ]);
 
     const item = mapWorkItemToWorkItem(ado);
-
-    // Fetch comments
-    const commentResult = azInvoke<{ comments: AdoComment[] }>(
-      {
-        area: 'wit',
-        resource: 'comments',
-        routeParameters: `workItemId=${id}`,
-        apiVersion: '7.1',
-      },
-      this.cwd,
-    );
     item.comments = (commentResult.comments ?? []).map(mapCommentToComment);
     return item;
   }
@@ -267,12 +263,12 @@ export class AzureDevOpsBackend extends BaseBackend {
       args.push('--fields', field);
     }
 
-    const created = az<AdoWorkItem>(args, this.cwd);
+    const created = await az<AdoWorkItem>(args, this.cwd);
     const createdId = String(created.id);
 
     // Add parent relation if specified
     if (data.parent) {
-      azExec(
+      await azExec(
         [
           'boards',
           'work-item',
@@ -293,7 +289,7 @@ export class AzureDevOpsBackend extends BaseBackend {
 
     // Add dependency relations
     for (const depId of data.dependsOn) {
-      azExec(
+      await azExec(
         [
           'boards',
           'work-item',
@@ -349,12 +345,12 @@ export class AzureDevOpsBackend extends BaseBackend {
     }
 
     if (fields.length > 0) {
-      az(args, this.cwd);
+      await az(args, this.cwd);
     }
 
     // Handle parent relation changes
     if (data.parent !== undefined) {
-      const current = az<AdoWorkItem>(
+      const current = await az<AdoWorkItem>(
         [
           'boards',
           'work-item',
@@ -371,7 +367,7 @@ export class AzureDevOpsBackend extends BaseBackend {
       const currentParent = extractParent(current.relations);
 
       if (currentParent && currentParent !== data.parent) {
-        azExec(
+        await azExec(
           [
             'boards',
             'work-item',
@@ -391,7 +387,7 @@ export class AzureDevOpsBackend extends BaseBackend {
         );
       }
       if (data.parent && data.parent !== currentParent) {
-        azExec(
+        await azExec(
           [
             'boards',
             'work-item',
@@ -413,7 +409,7 @@ export class AzureDevOpsBackend extends BaseBackend {
 
     // Handle dependency relation changes
     if (data.dependsOn !== undefined) {
-      const current = az<AdoWorkItem>(
+      const current = await az<AdoWorkItem>(
         [
           'boards',
           'work-item',
@@ -433,7 +429,7 @@ export class AzureDevOpsBackend extends BaseBackend {
       // Remove deps that are no longer in the list
       for (const dep of currentDeps) {
         if (!newDeps.has(dep)) {
-          azExec(
+          await azExec(
             [
               'boards',
               'work-item',
@@ -457,7 +453,7 @@ export class AzureDevOpsBackend extends BaseBackend {
       // Add deps that are new
       for (const dep of newDeps) {
         if (!currentDeps.has(dep)) {
-          azExec(
+          await azExec(
             [
               'boards',
               'work-item',
@@ -481,9 +477,8 @@ export class AzureDevOpsBackend extends BaseBackend {
     return this.getWorkItem(id);
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async deleteWorkItem(id: string): Promise<void> {
-    azExec(
+    await azExec(
       [
         'boards',
         'work-item',
@@ -500,9 +495,8 @@ export class AzureDevOpsBackend extends BaseBackend {
     );
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async addComment(workItemId: string, comment: NewComment): Promise<Comment> {
-    azInvoke(
+    await azInvoke(
       {
         area: 'wit',
         resource: 'comments',
@@ -521,14 +515,13 @@ export class AzureDevOpsBackend extends BaseBackend {
     };
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async getChildren(id: string): Promise<WorkItem[]> {
     const numericId = parseInt(id, 10);
     if (isNaN(numericId)) throw new Error(`Invalid work item ID: "${id}"`);
 
     const wiql = `SELECT [System.Id] FROM WorkItemLinks WHERE [Source].[System.Id] = ${numericId} AND [System.Links.LinkType] = 'System.LinkTypes.Hierarchy-Forward' MODE (MustContain)`;
 
-    const queryResult = az<{ id: number }[]>(
+    const queryResult = await az<{ id: number }[]>(
       [
         'boards',
         'query',
@@ -549,14 +542,13 @@ export class AzureDevOpsBackend extends BaseBackend {
     return this.batchFetchWorkItems(ids);
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async getDependents(id: string): Promise<WorkItem[]> {
     const numericId = parseInt(id, 10);
     if (isNaN(numericId)) throw new Error(`Invalid work item ID: "${id}"`);
 
     const wiql = `SELECT [System.Id] FROM WorkItemLinks WHERE [Source].[System.Id] = ${numericId} AND [System.Links.LinkType] = 'System.LinkTypes.Dependency-Forward' MODE (MustContain)`;
 
-    const queryResult = az<{ id: number }[]>(
+    const queryResult = await az<{ id: number }[]>(
       [
         'boards',
         'query',
