@@ -7,7 +7,14 @@ import type {
   NewComment,
   Comment,
 } from '../../types.js';
-import { az, azExec, azInvoke, azExecSync, azInvokeSync } from './az.js';
+import {
+  az,
+  azExec,
+  azInvoke,
+  azRest,
+  azExecSync,
+  azInvokeSync,
+} from './az.js';
 import { parseAdoRemote } from './remote.js';
 import {
   mapWorkItemToWorkItem,
@@ -214,12 +221,9 @@ export class AzureDevOpsBackend extends BaseBackend {
         ],
         this.cwd,
       ),
-      azInvoke<{ comments: AdoComment[] }>(
+      azRest<{ comments: AdoComment[] }>(
         {
-          area: 'wit',
-          resource: 'comments',
-          routeParameters: `workItemId=${id}`,
-          apiVersion: '7.1',
+          url: `https://dev.azure.com/${this.org}/${encodeURIComponent(this.project)}/_apis/wit/workItems/${id}/comments?api-version=7.1-preview.4`,
         },
         this.cwd,
       ),
@@ -496,14 +500,11 @@ export class AzureDevOpsBackend extends BaseBackend {
   }
 
   async addComment(workItemId: string, comment: NewComment): Promise<Comment> {
-    await azInvoke(
+    await azRest(
       {
-        area: 'wit',
-        resource: 'comments',
-        routeParameters: `workItemId=${workItemId}`,
+        url: `https://dev.azure.com/${this.org}/${encodeURIComponent(this.project)}/_apis/wit/workItems/${workItemId}/comments?api-version=7.1-preview.4`,
         httpMethod: 'POST',
         body: { text: comment.body },
-        apiVersion: '7.1',
       },
       this.cwd,
     );

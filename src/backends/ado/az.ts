@@ -106,6 +106,52 @@ export function azInvokeSync<T>(options: AzInvokeOptions, cwd: string): T {
   }
 }
 
+export interface AzRestOptions {
+  url: string;
+  httpMethod?: string;
+  body?: unknown;
+}
+
+/**
+ * Call Azure DevOps REST APIs directly via `az rest`.
+ * Use this instead of azInvoke for preview APIs that
+ * `az devops invoke` cannot handle (it fails to parse preview version strings).
+ */
+export async function azRest<T>(
+  options: AzRestOptions,
+  cwd: string,
+): Promise<T> {
+  const args = ['rest', '--uri', options.url];
+
+  if (options.httpMethod) {
+    args.push('--method', options.httpMethod);
+  }
+
+  let tmpFile: string | undefined;
+  if (options.body) {
+    tmpFile = path.join(os.tmpdir(), `tic-az-${Date.now()}.json`);
+    await fsp.writeFile(tmpFile, JSON.stringify(options.body));
+    args.push('--body', `@${tmpFile}`);
+  }
+
+  // Azure DevOps resource ID for authentication
+  args.push('--resource', '499b84ac-1321-427f-aa17-267ca6975798');
+
+  try {
+    const { stdout } = await execFileAsync('az', args, {
+      cwd,
+      encoding: 'utf-8',
+      timeout: AZ_TIMEOUT_MS,
+      maxBuffer: AZ_MAX_BUFFER,
+    });
+    return JSON.parse(stdout) as T;
+  } finally {
+    if (tmpFile) {
+      await fsp.unlink(tmpFile);
+    }
+  }
+}
+
 export async function azInvoke<T>(
   options: AzInvokeOptions,
   cwd: string,

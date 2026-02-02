@@ -5,6 +5,7 @@ vi.mock('./az.js', () => ({
   az: vi.fn(),
   azExec: vi.fn(),
   azInvoke: vi.fn(),
+  azRest: vi.fn(),
   azSync: vi.fn(),
   azExecSync: vi.fn(),
   azInvokeSync: vi.fn(),
@@ -22,12 +23,20 @@ vi.mock('node:child_process', () => ({
   execSync: vi.fn(),
 }));
 
-import { az, azExec, azInvoke, azExecSync, azInvokeSync } from './az.js';
+import {
+  az,
+  azExec,
+  azInvoke,
+  azRest,
+  azExecSync,
+  azInvokeSync,
+} from './az.js';
 import { execFileSync } from 'node:child_process';
 
 const mockAz = vi.mocked(az);
 const mockAzExec = vi.mocked(azExec);
 const mockAzInvoke = vi.mocked(azInvoke);
+const mockAzRest = vi.mocked(azRest);
 const mockAzExecSync = vi.mocked(azExecSync);
 const mockAzInvokeSync = vi.mocked(azInvokeSync);
 const mockExecFileSync = vi.mocked(execFileSync);
@@ -271,7 +280,7 @@ describe('AzureDevOpsBackend', () => {
       const backend = makeBackend();
 
       mockAz.mockResolvedValueOnce(sampleWorkItem as never);
-      mockAzInvoke.mockResolvedValueOnce({
+      mockAzRest.mockResolvedValueOnce({
         comments: [sampleComment],
       } as never);
 
@@ -288,9 +297,9 @@ describe('AzureDevOpsBackend', () => {
       const backend = makeBackend();
 
       mockAz.mockResolvedValueOnce({ ...sampleWorkItem, id: 99 } as never);
-      // getWorkItem refetch (parallel: az + azInvoke)
+      // getWorkItem refetch (parallel: az + azRest)
       mockAz.mockResolvedValueOnce({ ...sampleWorkItem, id: 99 } as never);
-      mockAzInvoke.mockResolvedValueOnce({ comments: [] } as never);
+      mockAzRest.mockResolvedValueOnce({ comments: [] } as never);
 
       const item = await backend.createWorkItem({
         title: 'New item',
@@ -326,12 +335,12 @@ describe('AzureDevOpsBackend', () => {
       const backend = makeBackend();
 
       mockAz.mockResolvedValueOnce(sampleWorkItem as never);
-      // getWorkItem refetch (parallel: az + azInvoke)
+      // getWorkItem refetch (parallel: az + azRest)
       mockAz.mockResolvedValueOnce({
         ...sampleWorkItem,
         fields: { ...sampleWorkItem.fields, 'System.Title': 'Updated' },
       } as never);
-      mockAzInvoke.mockResolvedValueOnce({ comments: [] } as never);
+      mockAzRest.mockResolvedValueOnce({ comments: [] } as never);
 
       await backend.updateWorkItem('42', { title: 'Updated' });
 
@@ -356,9 +365,9 @@ describe('AzureDevOpsBackend', () => {
         ],
       } as never);
       mockAzExec.mockResolvedValue('' as never);
-      // getWorkItem refetch (parallel: az + azInvoke)
+      // getWorkItem refetch (parallel: az + azRest)
       mockAz.mockResolvedValueOnce(sampleWorkItem as never);
-      mockAzInvoke.mockResolvedValueOnce({ comments: [] } as never);
+      mockAzRest.mockResolvedValueOnce({ comments: [] } as never);
 
       await backend.updateWorkItem('42', { parent: '20' });
 
@@ -403,12 +412,12 @@ describe('AzureDevOpsBackend', () => {
         ],
       } as never);
       mockAzExec.mockResolvedValue('' as never);
-      // getWorkItem refetch (parallel: az + azInvoke)
+      // getWorkItem refetch (parallel: az + azRest)
       mockAz.mockResolvedValueOnce({
         ...sampleWorkItem,
         relations: [],
       } as never);
-      mockAzInvoke.mockResolvedValueOnce({ comments: [] } as never);
+      mockAzRest.mockResolvedValueOnce({ comments: [] } as never);
 
       await backend.updateWorkItem('42', { parent: null });
 
@@ -439,9 +448,9 @@ describe('AzureDevOpsBackend', () => {
         ],
       } as never);
       mockAzExec.mockResolvedValue('' as never);
-      // getWorkItem refetch (parallel: az + azInvoke)
+      // getWorkItem refetch (parallel: az + azRest)
       mockAz.mockResolvedValueOnce(sampleWorkItem as never);
-      mockAzInvoke.mockResolvedValueOnce({ comments: [] } as never);
+      mockAzRest.mockResolvedValueOnce({ comments: [] } as never);
 
       // Change deps to [21, 30] — remove 20, keep 21, add 30
       await backend.updateWorkItem('42', { dependsOn: ['21', '30'] });
@@ -483,7 +492,7 @@ describe('AzureDevOpsBackend', () => {
   describe('addComment', () => {
     it('adds a comment and returns it', async () => {
       const backend = makeBackend();
-      mockAzInvoke.mockResolvedValueOnce(sampleComment as never);
+      mockAzRest.mockResolvedValueOnce(sampleComment as never);
 
       const comment = await backend.addComment('42', {
         author: 'Alice',
