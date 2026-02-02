@@ -1,11 +1,12 @@
 import { Box, Text } from 'ink';
 import type { BackendCapabilities } from '../backends/types.js';
-import type { TreeItem } from './WorkItemList.js';
+import type { TreeItem } from './buildTree.js';
 
 interface CardLayoutProps {
   treeItems: TreeItem[];
   cursor: number;
   capabilities: BackendCapabilities;
+  collapsedIds: Set<string>;
 }
 
 export function formatPriority(priority: string | undefined): string {
@@ -36,41 +37,61 @@ export function CardLayout({
   treeItems,
   cursor,
   capabilities,
+  collapsedIds,
 }: CardLayoutProps) {
   if (treeItems.length === 0) return null;
 
   return (
     <Box flexDirection="column">
       {treeItems.map((treeItem, idx) => {
-        const { item, depth } = treeItem;
+        const { item, depth, isCrossType, hasChildren } = treeItem;
         const selected = idx === cursor;
         const indent = '  '.repeat(depth);
         const marker = selected ? '>' : ' ';
         const hasDeps =
           capabilities.fields.dependsOn && item.dependsOn.length > 0;
         const depIndicator = hasDeps ? ' ⧗' : '';
+        const collapseIndicator = hasChildren
+          ? collapsedIds.has(item.id)
+            ? '▶ '
+            : '▼ '
+          : '  ';
+        const typeLabel = isCrossType ? ` (${item.type})` : '';
+        const dimmed = isCrossType && !selected;
 
         // Indent for meta line: align with title start
-        // marker(1) + indent + '#'(1) + id + ' '(1) = offset
-        const metaIndent = ' ' + indent + ' '.repeat(item.id.length + 2);
+        // marker(1) + indent + collapseIndicator(2) + '#'(1) + id + ' '(1) = offset
+        const metaIndent = ' ' + indent + '  ' + ' '.repeat(item.id.length + 2);
 
         return (
           <Box
-            key={item.id}
+            key={`${item.id}-${item.type}`}
             flexDirection="column"
             marginBottom={idx < treeItems.length - 1 ? 1 : 0}
           >
             <Box>
-              <Text color={selected ? 'cyan' : undefined} bold={selected}>
+              <Text
+                color={selected ? 'cyan' : undefined}
+                bold={selected}
+                dimColor={dimmed}
+              >
                 {marker}
-                {indent}#{item.id} {item.title}
+                {indent}
+                {collapseIndicator}#{item.id} {item.title}
+                {typeLabel}
                 {depIndicator}
               </Text>
             </Box>
             <Box>
-              <Text color={selected ? 'cyan' : undefined}>{metaIndent}</Text>
+              <Text color={selected ? 'cyan' : undefined} dimColor={dimmed}>
+                {metaIndent}
+              </Text>
               <Text color={statusColor(item.status)}>●</Text>
-              <Text color={selected ? 'cyan' : undefined} bold={selected}>
+              <Text
+                color={selected ? 'cyan' : undefined}
+                bold={selected}
+                dimColor={dimmed}
+              >
                 {' '}
                 {item.status}
                 {capabilities.fields.priority && formatPriority(item.priority)

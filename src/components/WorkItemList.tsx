@@ -12,7 +12,7 @@ import { useScrollViewport } from '../hooks/useScrollViewport.js';
 import { useBackendData } from '../hooks/useBackendData.js';
 import { SyncQueueStore } from '../sync/queue.js';
 import type { SyncStatus, QueueAction } from '../sync/types.js';
-import { buildTree } from './buildTree.js';
+import { buildTree, type TreeItem } from './buildTree.js';
 export type { TreeItem } from './buildTree.js';
 
 export function WorkItemList() {
@@ -60,14 +60,14 @@ export function WorkItemList() {
     return new SyncQueueStore(process.cwd());
   }, [syncManager]);
 
-  const queueWrite = (action: QueueAction, itemId: string) => {
+  const queueWrite = async (action: QueueAction, itemId: string) => {
     if (queueStore) {
-      void queueStore.append({
+      await queueStore.append({
         action,
         itemId,
         timestamp: new Date().toISOString(),
       });
-      void syncManager?.pushPending().then(() => refreshData());
+      await syncManager?.pushPending();
     }
   };
 
@@ -84,10 +84,49 @@ export function WorkItemList() {
     () => allItems.filter((item) => item.type === activeType),
     [allItems, activeType],
   );
-  const treeItems = useMemo(
-    () => buildTree(items, allItems, activeType ?? ''),
-    [items, allItems, activeType],
+  const fullTree = useMemo(
+    () =>
+      capabilities.relationships
+        ? buildTree(items, allItems, activeType ?? '')
+        : buildTree(items, items, activeType ?? ''),
+    [items, allItems, activeType, capabilities.relationships],
   );
+
+  // Collapse state: set of item IDs that are collapsed (collapsed by default)
+  // Track explicitly expanded items (inverse of collapsed).
+  // All parents are collapsed by default; expanding removes from this set.
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(
+    () => new Set<string>(),
+  );
+
+  // Derive collapsedIds: all parents minus explicitly expanded ones
+  const collapsedIds = useMemo(() => {
+    const parentIds = new Set(
+      fullTree.filter((t) => t.hasChildren).map((t) => t.item.id),
+    );
+    const collapsed = new Set<string>();
+    for (const id of parentIds) {
+      if (!expandedIds.has(id)) {
+        collapsed.add(id);
+      }
+    }
+    return collapsed;
+  }, [fullTree, expandedIds]);
+
+  // Filter tree to hide children of collapsed items
+  const treeItems = useMemo(() => {
+    const result: TreeItem[] = [];
+    let skipDepth: number | null = null;
+    for (const t of fullTree) {
+      if (skipDepth !== null && t.depth > skipDepth) continue;
+      skipDepth = null;
+      result.push(t);
+      if (collapsedIds.has(t.item.id)) {
+        skipDepth = t.depth;
+      }
+    }
+    return result;
+  }, [fullTree, collapsedIds]);
 
   useEffect(() => {
     setCursor((c) => Math.min(c, Math.max(0, treeItems.length - 1)));
@@ -105,7 +144,7 @@ export function WorkItemList() {
       if (input === 'y' || input === 'Y') {
         void (async () => {
           await backend.deleteWorkItem(treeItems[cursor]!.item.id);
-          queueWrite('delete', treeItems[cursor]!.item.id);
+          await queueWrite('delete', treeItems[cursor]!.item.id);
           setConfirmDelete(false);
           setCursor((c) => Math.max(0, c - 1));
           refreshData();
@@ -123,6 +162,31 @@ export function WorkItemList() {
     if (key.downArrow) {
       setCursor((c) => Math.min(treeItems.length - 1, c + 1));
       setWarning('');
+    }
+
+    if (key.rightArrow && treeItems.length > 0) {
+      const current = treeItems[cursor];
+      if (current && current.hasChildren && collapsedIds.has(current.item.id)) {
+        setExpandedIds((prev) => new Set(prev).add(current.item.id));
+      }
+    }
+
+    if (key.leftArrow && treeItems.length > 0) {
+      const current = treeItems[cursor];
+      if (current) {
+        if (current.hasChildren && !collapsedIds.has(current.item.id)) {
+          setExpandedIds((prev) => {
+            const next = new Set(prev);
+            next.delete(current.item.id);
+            return next;
+          });
+        } else if (current.depth > 0 && current.item.parent) {
+          const parentIdx = treeItems.findIndex(
+            (t) => t.item.id === current.item.parent,
+          );
+          if (parentIdx >= 0) setCursor(parentIdx);
+        }
+      }
     }
 
     if (key.return && treeItems.length > 0) {
@@ -208,13 +272,9 @@ export function WorkItemList() {
     ? activeType.charAt(0).toUpperCase() + activeType.slice(1) + 's'
     : '';
 
-  const helpParts = [
-    'up/down: navigate',
-    'enter: edit',
-    'o: open',
-    'c: create',
-    'd: delete',
-  ];
+  const helpParts = ['up/down: navigate'];
+  if (capabilities.relationships) helpParts.push('left/right: collapse/expand');
+  helpParts.push('enter: edit', 'o: open', 'c: create', 'd: delete');
   if (capabilities.fields.parent) helpParts.push('p: set parent');
   if (capabilities.customTypes) helpParts.push('tab: type');
   if (capabilities.iterations) helpParts.push('i: iteration');
@@ -223,14 +283,11 @@ export function WorkItemList() {
   helpParts.push('s: status', ',: settings', 'q: quit');
   const helpText = helpParts.join('  ');
 
-  const compactHelpParts = [
-    '↑↓ Nav',
-    'c New',
-    '⏎ Edit',
-    '⇥ Type',
-    's Status',
-    'q Quit',
-  ];
+  const compactHelpParts = ['↑↓ Nav'];
+  if (capabilities.relationships) compactHelpParts.push('←→ Fold');
+  compactHelpParts.push('c New', '⏎ Edit');
+  if (capabilities.customTypes) compactHelpParts.push('⇥ Type');
+  compactHelpParts.push('s Status', 'q Quit');
   const compactHelpText = compactHelpParts.join('  ');
 
   const isCardMode = terminalWidth < 80;
@@ -277,12 +334,14 @@ export function WorkItemList() {
           treeItems={visibleTreeItems}
           cursor={viewport.visibleCursor}
           capabilities={capabilities}
+          collapsedIds={collapsedIds}
         />
       ) : (
         <CardLayout
           treeItems={visibleTreeItems}
           cursor={viewport.visibleCursor}
           capabilities={capabilities}
+          collapsedIds={collapsedIds}
         />
       )}
 
@@ -308,7 +367,7 @@ export function WorkItemList() {
                     await backend.updateWorkItem(item.id, {
                       parent: newParent,
                     });
-                    queueWrite('update', item.id);
+                    await queueWrite('update', item.id);
                     setWarning('');
                   } catch (e) {
                     setWarning(
