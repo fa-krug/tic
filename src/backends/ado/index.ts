@@ -33,7 +33,7 @@ export class AzureDevOpsBackend extends BaseBackend {
   private types: AdoWorkItemType[];
 
   constructor(cwd: string) {
-    super();
+    super(60_000);
     this.cwd = cwd;
     azExecSync(['account', 'show'], cwd);
     const remote = parseAdoRemote(cwd);
@@ -355,8 +355,8 @@ export class AzureDevOpsBackend extends BaseBackend {
       await az(args, this.cwd);
     }
 
-    // Handle parent relation changes
-    if (data.parent !== undefined) {
+    // Handle parent and dependency relation changes (single fetch)
+    if (data.parent !== undefined || data.dependsOn !== undefined) {
       const current = await az<AdoWorkItem>(
         [
           'boards',
@@ -371,71 +371,11 @@ export class AzureDevOpsBackend extends BaseBackend {
         ],
         this.cwd,
       );
-      const currentParent = extractParent(current.relations);
 
-      if (currentParent && currentParent !== data.parent) {
-        await azExec(
-          [
-            'boards',
-            'work-item',
-            'relation',
-            'remove',
-            '--id',
-            id,
-            '--relation-type',
-            'System.LinkTypes.Hierarchy-Reverse',
-            '--target-id',
-            currentParent,
-            '--org',
-            `https://dev.azure.com/${this.org}`,
-            '--yes',
-          ],
-          this.cwd,
-        );
-      }
-      if (data.parent && data.parent !== currentParent) {
-        await azExec(
-          [
-            'boards',
-            'work-item',
-            'relation',
-            'add',
-            '--id',
-            id,
-            '--relation-type',
-            'System.LinkTypes.Hierarchy-Reverse',
-            '--target-id',
-            data.parent,
-            '--org',
-            `https://dev.azure.com/${this.org}`,
-          ],
-          this.cwd,
-        );
-      }
-    }
+      if (data.parent !== undefined) {
+        const currentParent = extractParent(current.relations);
 
-    // Handle dependency relation changes
-    if (data.dependsOn !== undefined) {
-      const current = await az<AdoWorkItem>(
-        [
-          'boards',
-          'work-item',
-          'show',
-          '--id',
-          id,
-          '--expand',
-          'relations',
-          '--org',
-          `https://dev.azure.com/${this.org}`,
-        ],
-        this.cwd,
-      );
-      const currentDeps = new Set(extractPredecessors(current.relations));
-      const newDeps = new Set(data.dependsOn);
-
-      // Remove deps that are no longer in the list
-      for (const dep of currentDeps) {
-        if (!newDeps.has(dep)) {
+        if (currentParent && currentParent !== data.parent) {
           await azExec(
             [
               'boards',
@@ -445,9 +385,9 @@ export class AzureDevOpsBackend extends BaseBackend {
               '--id',
               id,
               '--relation-type',
-              'System.LinkTypes.Dependency-Reverse',
+              'System.LinkTypes.Hierarchy-Reverse',
               '--target-id',
-              dep,
+              currentParent,
               '--org',
               `https://dev.azure.com/${this.org}`,
               '--yes',
@@ -455,11 +395,7 @@ export class AzureDevOpsBackend extends BaseBackend {
             this.cwd,
           );
         }
-      }
-
-      // Add deps that are new
-      for (const dep of newDeps) {
-        if (!currentDeps.has(dep)) {
+        if (data.parent && data.parent !== currentParent) {
           await azExec(
             [
               'boards',
@@ -469,14 +405,66 @@ export class AzureDevOpsBackend extends BaseBackend {
               '--id',
               id,
               '--relation-type',
-              'System.LinkTypes.Dependency-Reverse',
+              'System.LinkTypes.Hierarchy-Reverse',
               '--target-id',
-              dep,
+              data.parent,
               '--org',
               `https://dev.azure.com/${this.org}`,
             ],
             this.cwd,
           );
+        }
+      }
+
+      if (data.dependsOn !== undefined) {
+        const currentDeps = new Set(extractPredecessors(current.relations));
+        const newDeps = new Set(data.dependsOn);
+
+        // Remove deps that are no longer in the list
+        for (const dep of currentDeps) {
+          if (!newDeps.has(dep)) {
+            await azExec(
+              [
+                'boards',
+                'work-item',
+                'relation',
+                'remove',
+                '--id',
+                id,
+                '--relation-type',
+                'System.LinkTypes.Dependency-Reverse',
+                '--target-id',
+                dep,
+                '--org',
+                `https://dev.azure.com/${this.org}`,
+                '--yes',
+              ],
+              this.cwd,
+            );
+          }
+        }
+
+        // Add deps that are new
+        for (const dep of newDeps) {
+          if (!currentDeps.has(dep)) {
+            await azExec(
+              [
+                'boards',
+                'work-item',
+                'relation',
+                'add',
+                '--id',
+                id,
+                '--relation-type',
+                'System.LinkTypes.Dependency-Reverse',
+                '--target-id',
+                dep,
+                '--org',
+                `https://dev.azure.com/${this.org}`,
+              ],
+              this.cwd,
+            );
+          }
         }
       }
     }
