@@ -1,5 +1,5 @@
 import { useState, createContext, useContext } from 'react';
-import { Box } from 'ink';
+import { Box, Text } from 'ink';
 import { WorkItemList } from './components/WorkItemList.js';
 import { WorkItemForm } from './components/WorkItemForm.js';
 import { IterationPicker } from './components/IterationPicker.js';
@@ -9,7 +9,13 @@ import { Header } from './components/Header.js';
 import type { Backend } from './backends/types.js';
 import type { SyncManager } from './sync/SyncManager.js';
 
-type Screen = 'list' | 'form' | 'iteration-picker' | 'settings' | 'status';
+type Screen =
+  | 'list'
+  | 'form'
+  | 'iteration-picker'
+  | 'settings'
+  | 'status'
+  | 'help';
 
 interface AppState {
   screen: Screen;
@@ -23,6 +29,8 @@ interface AppState {
   setActiveType: (type: string | null) => void;
   pushWorkItem: (id: string) => void;
   popWorkItem: () => string | null;
+  navigateToHelp: () => void;
+  navigateBackFromHelp: () => void;
 }
 
 export const AppContext = createContext<AppState>(null!);
@@ -44,6 +52,7 @@ export function App({
   );
   const [activeType, setActiveType] = useState<string | null>(null);
   const [navigationStack, setNavigationStack] = useState<string[]>([]);
+  const [previousScreen, setPreviousScreen] = useState<Screen>('list');
 
   const pushWorkItem = (id: string) => {
     if (selectedWorkItemId !== null) {
@@ -67,6 +76,15 @@ export function App({
     setScreen(newScreen);
   };
 
+  const navigateToHelp = () => {
+    setPreviousScreen(screen);
+    setScreen('help');
+  };
+
+  const navigateBackFromHelp = () => {
+    setScreen(previousScreen);
+  };
+
   const state: AppState = {
     screen,
     selectedWorkItemId,
@@ -79,6 +97,8 @@ export function App({
     setActiveType,
     pushWorkItem,
     popWorkItem,
+    navigateToHelp,
+    navigateBackFromHelp,
   };
 
   return (
@@ -90,6 +110,11 @@ export function App({
         {screen === 'iteration-picker' && <IterationPicker />}
         {screen === 'settings' && <Settings />}
         {screen === 'status' && <StatusScreen />}
+        {screen === 'help' && (
+          <Box>
+            <Text>Help screen placeholder</Text>
+          </Box>
+        )}
       </Box>
     </AppContext.Provider>
   );
