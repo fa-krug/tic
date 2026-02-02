@@ -10,7 +10,7 @@ import { Header } from './components/Header.js';
 import type { Backend } from './backends/types.js';
 import type { SyncManager } from './sync/SyncManager.js';
 
-type Screen =
+export type Screen =
   | 'list'
   | 'form'
   | 'iteration-picker'

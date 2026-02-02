@@ -1,16 +1,9 @@
 import { useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { useAppState } from '../app.js';
+import type { Screen } from '../app.js';
 import { isGitRepo } from '../git.js';
 import type { BackendCapabilities } from '../backends/types.js';
-
-type Screen =
-  | 'list'
-  | 'form'
-  | 'iteration-picker'
-  | 'settings'
-  | 'status'
-  | 'help';
 
 interface ShortcutEntry {
   key: string;
