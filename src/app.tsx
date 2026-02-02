@@ -1,10 +1,11 @@
 import { useState, createContext, useContext } from 'react';
-import { Box, Text } from 'ink';
+import { Box } from 'ink';
 import { WorkItemList } from './components/WorkItemList.js';
 import { WorkItemForm } from './components/WorkItemForm.js';
 import { IterationPicker } from './components/IterationPicker.js';
 import { Settings } from './components/Settings.js';
 import { StatusScreen } from './components/StatusScreen.js';
+import { HelpScreen } from './components/HelpScreen.js';
 import { Header } from './components/Header.js';
 import type { Backend } from './backends/types.js';
 import type { SyncManager } from './sync/SyncManager.js';
@@ -110,11 +111,7 @@ export function App({
         {screen === 'iteration-picker' && <IterationPicker />}
         {screen === 'settings' && <Settings />}
         {screen === 'status' && <StatusScreen />}
-        {screen === 'help' && (
-          <Box>
-            <Text>Help screen placeholder</Text>
-          </Box>
-        )}
+        {screen === 'help' && <HelpScreen sourceScreen={previousScreen} />}
       </Box>
     </AppContext.Provider>
   );
