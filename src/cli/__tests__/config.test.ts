@@ -47,9 +47,15 @@ describe('tic config', () => {
     });
 
     it('validates backend values', async () => {
-      await expect(runConfigSet(tmpDir, 'backend', 'jira')).rejects.toThrow(
+      await expect(runConfigSet(tmpDir, 'backend', 'foobar')).rejects.toThrow(
         'Invalid backend',
       );
+    });
+
+    it('accepts jira as a valid backend', async () => {
+      await runConfigSet(tmpDir, 'backend', 'jira');
+      const config = await readConfig(tmpDir);
+      expect(config.backend).toBe('jira');
     });
 
     it('sets current_iteration', async () => {
