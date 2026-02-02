@@ -5,12 +5,8 @@ export default defineConfig({
     include: ['**/*.e2e.test.ts'],
     testTimeout: 300_000,
     hookTimeout: 120_000,
-    pool: 'forks',
-    poolOptions: {
-      forks: {
-        singleFork: true,
-      },
-    },
+    maxWorkers: 1,
+    isolate: false,
     sequence: {
       concurrent: false,
     },
