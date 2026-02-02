@@ -2,7 +2,6 @@ import { useState, useMemo, useEffect } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
 import TextInput from 'ink-text-input';
 import { useAppState } from '../app.js';
-import type { WorkItem } from '../types.js';
 import { isGitRepo } from '../git.js';
 import { beginImplementation } from '../implement.js';
 import { readConfigSync } from '../backends/local/config.js';
@@ -13,44 +12,8 @@ import { useScrollViewport } from '../hooks/useScrollViewport.js';
 import { useBackendData } from '../hooks/useBackendData.js';
 import { SyncQueueStore } from '../sync/queue.js';
 import type { SyncStatus, QueueAction } from '../sync/types.js';
-
-export interface TreeItem {
-  item: WorkItem;
-  depth: number;
-  prefix: string;
-}
-
-function buildTree(items: WorkItem[]): TreeItem[] {
-  const itemMap = new Map(items.map((i) => [i.id, i]));
-  const childrenMap = new Map<string | null, WorkItem[]>();
-
-  for (const item of items) {
-    const parentId =
-      item.parent !== null && itemMap.has(item.parent) ? item.parent : null;
-    if (!childrenMap.has(parentId)) childrenMap.set(parentId, []);
-    childrenMap.get(parentId)!.push(item);
-  }
-
-  const result: TreeItem[] = [];
-
-  function walk(parentId: string | null, depth: number, parentPrefix: string) {
-    const children = childrenMap.get(parentId) ?? [];
-    children.forEach((child, idx) => {
-      const isLast = idx === children.length - 1;
-      let prefix = '';
-      if (depth > 0) {
-        prefix = parentPrefix + (isLast ? '└─' : '├─');
-      }
-      result.push({ item: child, depth, prefix });
-      const nextParentPrefix =
-        depth > 0 ? parentPrefix + (isLast ? '  ' : '│ ') : '';
-      walk(child.id, depth + 1, nextParentPrefix);
-    });
-  }
-
-  walk(null, 0, '');
-  return result;
-}
+import { buildTree } from './buildTree.js';
+export type { TreeItem } from './buildTree.js';
 
 export function WorkItemList() {
   const {
@@ -121,7 +84,10 @@ export function WorkItemList() {
     () => allItems.filter((item) => item.type === activeType),
     [allItems, activeType],
   );
-  const treeItems = useMemo(() => buildTree(items), [items]);
+  const treeItems = useMemo(
+    () => buildTree(items, allItems, activeType ?? ''),
+    [items, allItems, activeType],
+  );
 
   useEffect(() => {
     setCursor((c) => Math.min(c, Math.max(0, treeItems.length - 1)));
