@@ -13,8 +13,14 @@ import { SyncManager } from '../sync/SyncManager.js';
 import { writeConfig, defaultConfig } from './local/config.js';
 
 describe('VALID_BACKENDS', () => {
-  it('contains the four known backends', () => {
-    expect(VALID_BACKENDS).toEqual(['local', 'github', 'gitlab', 'azure']);
+  it('contains the five known backends', () => {
+    expect(VALID_BACKENDS).toEqual([
+      'local',
+      'github',
+      'gitlab',
+      'azure',
+      'jira',
+    ]);
   });
 });
 
@@ -78,8 +84,25 @@ describe('createBackend', () => {
     },
   );
 
+  it('attempts to create JiraBackend when backend is jira', async () => {
+    await writeConfig(tmpDir, {
+      ...defaultConfig,
+      backend: 'jira',
+      jira: {
+        site: 'https://mycompany.atlassian.net',
+        project: 'TEAM',
+      },
+    });
+    try {
+      await createBackend(tmpDir);
+    } catch (e) {
+      expect((e as Error).message).not.toContain('not yet implemented');
+      expect((e as Error).message).not.toContain('Unknown backend');
+    }
+  });
+
   it('throws for unknown backend values', async () => {
-    await writeConfig(tmpDir, { ...defaultConfig, backend: 'jira' });
+    await writeConfig(tmpDir, { ...defaultConfig, backend: 'foobar' });
     await expect(createBackend(tmpDir)).rejects.toThrow('Unknown backend');
   });
 });
@@ -112,6 +135,24 @@ describe('createBackendWithSync', () => {
       expect(syncManager).toBeInstanceOf(SyncManager);
     } catch (e) {
       // gh CLI not available in test env — verify it doesn't throw "Unknown backend"
+      expect((e as Error).message).not.toContain('Unknown backend');
+    }
+  });
+
+  it('returns LocalBackend and SyncManager for jira backend', async () => {
+    await writeConfig(tmpDir, {
+      ...defaultConfig,
+      backend: 'jira',
+      jira: {
+        site: 'https://mycompany.atlassian.net',
+        project: 'TEAM',
+      },
+    });
+    try {
+      const { backend, syncManager } = await createBackendWithSync(tmpDir);
+      expect(backend).toBeInstanceOf(LocalBackend);
+      expect(syncManager).toBeInstanceOf(SyncManager);
+    } catch (e) {
       expect((e as Error).message).not.toContain('Unknown backend');
     }
   });

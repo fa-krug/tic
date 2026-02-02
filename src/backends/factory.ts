@@ -4,11 +4,18 @@ import { LocalBackend } from './local/index.js';
 import { GitHubBackend } from './github/index.js';
 import { GitLabBackend } from './gitlab/index.js';
 import { AzureDevOpsBackend } from './ado/index.js';
+import { JiraBackend } from './jira/index.js';
 import { readConfig } from './local/config.js';
 import { SyncManager } from '../sync/SyncManager.js';
 import { SyncQueueStore } from '../sync/queue.js';
 
-export const VALID_BACKENDS = ['local', 'github', 'gitlab', 'azure'] as const;
+export const VALID_BACKENDS = [
+  'local',
+  'github',
+  'gitlab',
+  'azure',
+  'jira',
+] as const;
 export type BackendType = (typeof VALID_BACKENDS)[number];
 
 export function detectBackend(root: string): BackendType {
@@ -45,6 +52,8 @@ export async function createBackend(root: string): Promise<Backend> {
       return new GitLabBackend(root);
     case 'azure':
       return new AzureDevOpsBackend(root);
+    case 'jira':
+      return JiraBackend.create(root);
     default:
       throw new Error(
         `Unknown backend "${backend}". Valid backends: ${VALID_BACKENDS.join(', ')}`,
@@ -81,6 +90,9 @@ export async function createBackendWithSync(
       break;
     case 'azure':
       remote = new AzureDevOpsBackend(root);
+      break;
+    case 'jira':
+      remote = await JiraBackend.create(root);
       break;
     default:
       throw new Error(
