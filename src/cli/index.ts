@@ -210,7 +210,8 @@ export function createProgram(): Command {
     .action(async (opts: ItemListOptions & { headers?: boolean }) => {
       const parentOpts = program.opts<GlobalOpts>();
       try {
-        const backend = await createBackend();
+        const { backend, syncManager } = await createBackendAndSync();
+        if (syncManager) await syncManager.sync();
         const items = await runItemList(backend, opts);
         if (parentOpts.quiet) return;
         if (parentOpts.json) {

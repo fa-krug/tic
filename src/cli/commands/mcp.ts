@@ -437,6 +437,7 @@ export function registerTools(
       all: z.boolean().optional().describe('Show all iterations'),
     },
     async (args) => {
+      if (syncState?.syncManager) await syncState.syncManager.sync();
       return handleListItems(backend, args);
     },
   );
@@ -584,6 +585,7 @@ export function registerTools(
       all: z.boolean().optional().describe('Show all iterations'),
     },
     async (args) => {
+      if (syncState?.syncManager) await syncState.syncManager.sync();
       return handleSearchItems(backend, args);
     },
   );
@@ -680,6 +682,7 @@ export function registerTools(
         all: z.boolean().optional().describe('Show all iterations'),
       },
       async (args) => {
+        if (syncState?.syncManager) await syncState.syncManager.sync();
         return handleGetItemTree(backend, args);
       },
     );
