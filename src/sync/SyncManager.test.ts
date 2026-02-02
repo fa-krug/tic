@@ -142,6 +142,36 @@ describe('SyncManager push phase', () => {
     expect((await queueStore.read()).pending).toHaveLength(0);
   });
 
+  it('returns idMappings when create produces a different remote ID', async () => {
+    const item = await local.createWorkItem({
+      title: 'Mapped',
+      type: 'task',
+      status: 'backlog',
+      priority: 'medium',
+      assignee: '',
+      labels: [],
+      iteration: 'default',
+      description: '',
+      parent: null,
+      dependsOn: [],
+    });
+    const localId = item.id;
+    await queueStore.append({
+      action: 'create',
+      itemId: localId,
+      timestamp: new Date().toISOString(),
+    });
+
+    const result = await manager.pushPending();
+    expect(result.idMappings.size).toBe(1);
+    const remoteId = result.idMappings.get(localId);
+    expect(remoteId).toBeDefined();
+    expect(remoteId).not.toBe(localId);
+    // Local item should now be accessible by the remote ID
+    const resolved = await local.getWorkItem(remoteId!);
+    expect(resolved.title).toBe('Mapped');
+  });
+
   it('pushes an update to remote', async () => {
     const item = await local.createWorkItem({
       title: 'Original',

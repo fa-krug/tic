@@ -54,11 +54,15 @@ export class SyncManager {
     const { pending } = await this.queue.read();
     let pushed = 0;
     const errors: SyncError[] = [];
+    const idMappings = new Map<string, string>();
 
     for (const entry of pending) {
       try {
         const resolvedId = await this.pushEntry(entry);
         await this.queue.remove(resolvedId, entry.action);
+        if (resolvedId !== entry.itemId) {
+          idMappings.set(entry.itemId, resolvedId);
+        }
         pushed++;
       } catch (e) {
         const isLocalMissing =
@@ -84,7 +88,7 @@ export class SyncManager {
       errors,
     });
 
-    return { pushed, failed: errors.length, errors };
+    return { pushed, failed: errors.length, errors, idMappings };
   }
 
   private async pushEntry(entry: QueueEntry): Promise<string> {

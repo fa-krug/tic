@@ -485,7 +485,12 @@ export function registerTools(
           itemId: data.id,
           timestamp: new Date().toISOString(),
         });
-        await syncState.syncManager.pushPending();
+        const pushResult = await syncState.syncManager.pushPending();
+        const resolvedId = pushResult.idMappings.get(data.id);
+        if (resolvedId) {
+          const resolved = await backend.getWorkItem(resolvedId);
+          return success(resolved);
+        }
       }
       return result;
     },

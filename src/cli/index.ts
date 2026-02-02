@@ -294,7 +294,7 @@ export function createProgram(): Command {
     try {
       const { backend, syncManager, queueStore } = await createBackendAndSync();
       const description = readStdin();
-      const wi = await runItemCreate(backend, title, {
+      let wi = await runItemCreate(backend, title, {
         ...opts,
         dependsOn: opts.dependsOn,
         description,
@@ -305,7 +305,11 @@ export function createProgram(): Command {
           itemId: wi.id,
           timestamp: new Date().toISOString(),
         });
-        await syncManager.pushPending();
+        const pushResult = await syncManager.pushPending();
+        const resolvedId = pushResult.idMappings.get(wi.id);
+        if (resolvedId) {
+          wi = await backend.getWorkItem(resolvedId);
+        }
       }
       output(wi, () => itemToTsvRow(wi), parentOpts);
     } catch (err) {

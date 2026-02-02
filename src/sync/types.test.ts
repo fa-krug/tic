@@ -56,15 +56,17 @@ describe('sync types', () => {
       pushed: 3,
       failed: 1,
       errors: [],
+      idMappings: new Map([['local-1', '42']]),
     };
     expect(result.pushed).toBe(3);
     expect(result.failed).toBe(1);
     expect(result.errors).toEqual([]);
+    expect(result.idMappings.get('local-1')).toBe('42');
   });
 
   it('SyncResult has required fields', () => {
     const result: SyncResult = {
-      push: { pushed: 2, failed: 0, errors: [] },
+      push: { pushed: 2, failed: 0, errors: [], idMappings: new Map() },
       pullCount: 5,
     };
     expect(result.push.pushed).toBe(2);

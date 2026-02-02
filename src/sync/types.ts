@@ -29,6 +29,8 @@ export interface PushResult {
   pushed: number;
   failed: number;
   errors: SyncError[];
+  /** Maps local temp IDs to resolved remote IDs (e.g. "local-1" → "42") */
+  idMappings: Map<string, string>;
 }
 
 export interface SyncResult {
