@@ -1,15 +1,21 @@
-import { Box, Text } from 'ink';
+import { Box, Text, useInput } from 'ink';
 import SelectInput from 'ink-select-input';
 import { useAppState } from '../app.js';
 import { useBackendData } from '../hooks/useBackendData.js';
 
 export function IterationPicker() {
-  const { backend, navigate } = useAppState();
+  const { backend, navigate, navigateToHelp } = useAppState();
   const {
     iterations,
     currentIteration: current,
     loading,
   } = useBackendData(backend);
+
+  useInput((input) => {
+    if (input === '?') {
+      navigateToHelp();
+    }
+  });
 
   if (loading) {
     return (
@@ -40,7 +46,7 @@ export function IterationPicker() {
         }}
       />
       <Box marginTop={1}>
-        <Text dimColor>up/down: navigate enter: select</Text>
+        <Text dimColor>{'↑↓ navigate  enter select  esc back  ? help'}</Text>
       </Box>
     </Box>
   );
