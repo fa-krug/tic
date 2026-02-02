@@ -8,18 +8,21 @@ describe('mapIssueToWorkItem', () => {
       title: 'Fix login bug',
       body: 'The login form breaks on mobile.',
       state: 'OPEN',
-      assignees: [{ login: 'alice' }, { login: 'bob' }],
-      labels: [{ name: 'bug' }, { name: 'urgent' }],
+      assignees: { nodes: [{ login: 'alice' }, { login: 'bob' }] },
+      labels: { nodes: [{ name: 'bug' }, { name: 'urgent' }] },
       milestone: { title: 'v1.0' },
       createdAt: '2026-01-15T10:00:00Z',
       updatedAt: '2026-01-20T14:30:00Z',
-      comments: [
-        {
-          author: { login: 'charlie' },
-          createdAt: '2026-01-16T09:00:00Z',
-          body: 'I can reproduce this.',
-        },
-      ],
+      comments: {
+        nodes: [
+          {
+            author: { login: 'charlie' },
+            createdAt: '2026-01-16T09:00:00Z',
+            body: 'I can reproduce this.',
+          },
+        ],
+      },
+      parent: null,
     };
 
     const item = mapIssueToWorkItem(ghIssue);
@@ -47,12 +50,13 @@ describe('mapIssueToWorkItem', () => {
       title: 'Empty',
       body: null,
       state: 'CLOSED',
-      assignees: [],
-      labels: [],
+      assignees: { nodes: [] },
+      labels: { nodes: [] },
       milestone: null,
       createdAt: '2026-01-01T00:00:00Z',
       updatedAt: '2026-01-01T00:00:00Z',
-      comments: [],
+      comments: { nodes: [] },
+      parent: null,
     };
 
     const item = mapIssueToWorkItem(ghIssue);
@@ -71,11 +75,13 @@ describe('mapIssueToWorkItem', () => {
       title: 'No comments',
       body: 'Test',
       state: 'OPEN',
-      assignees: [],
-      labels: [],
+      assignees: { nodes: [] },
+      labels: { nodes: [] },
       milestone: null,
       createdAt: '2026-01-01T00:00:00Z',
       updatedAt: '2026-01-01T00:00:00Z',
+      comments: { nodes: [] },
+      parent: null,
     };
 
     const item = mapIssueToWorkItem(ghIssue);
