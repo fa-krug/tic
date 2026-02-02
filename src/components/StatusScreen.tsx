@@ -20,7 +20,7 @@ function CapabilityLine({
 }
 
 export function StatusScreen() {
-  const { backend, syncManager, navigate } = useAppState();
+  const { backend, syncManager, navigate, navigateToHelp } = useAppState();
 
   const capabilities: BackendCapabilities = useMemo(
     () => backend.getCapabilities(),
@@ -55,6 +55,11 @@ export function StatusScreen() {
   useInput((input, key) => {
     if (key.escape || input === 'q') {
       navigate('list');
+      return;
+    }
+
+    if (input === '?') {
+      navigateToHelp();
       return;
     }
 
@@ -179,7 +184,7 @@ export function StatusScreen() {
       )}
 
       <Box marginTop={1}>
-        <Text dimColor>esc: back</Text>
+        <Text dimColor>{'↑↓ scroll  esc back  ? help'}</Text>
       </Box>
     </Box>
   );
