@@ -311,7 +311,7 @@ export function WorkItemList() {
     ? activeType.charAt(0).toUpperCase() + activeType.slice(1) + 's'
     : '';
 
-  const helpText = '↑↓ navigate  enter edit  c create  ? help';
+  const helpText = '↑↓ navigate  enter edit  c create  / search  ? help';
 
   const isCardMode = terminalWidth < 80;
   const viewport = useScrollViewport({

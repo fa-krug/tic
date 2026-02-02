@@ -41,6 +41,7 @@ describe('getShortcuts', () => {
     expect(allKeys).toContain('i');
     expect(allKeys).toContain('r');
     expect(allKeys).toContain('b');
+    expect(allKeys).toContain('/');
   });
 
   it('omits capability-dependent shortcuts when not supported', () => {

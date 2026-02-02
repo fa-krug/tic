@@ -46,6 +46,7 @@ export function getShortcuts(
         { key: 'o', description: 'Open in browser' },
         { key: 's', description: 'Status screen' },
       ];
+      actions.push({ key: '/', description: 'Quick search' });
       if (capabilities.fields.parent) {
         actions.push({ key: 'p', description: 'Set parent' });
       }
