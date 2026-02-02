@@ -11,6 +11,11 @@ export interface Config {
   iterations: string[];
   next_id: number;
   branchMode: 'worktree' | 'branch';
+  jira?: {
+    site: string;
+    project: string;
+    boardId?: number;
+  };
 }
 
 export const defaultConfig: Config = {
