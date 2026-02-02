@@ -27,10 +27,16 @@ export class JiraBackend extends BaseBackend {
   private cwd: string;
   private config: JiraConfig;
 
+  private cachedSprints: JiraSprint[] | null = null;
+
   private constructor(cwd: string, config: JiraConfig) {
-    super();
+    super(60_000);
     this.cwd = cwd;
     this.config = config;
+  }
+
+  protected override onCacheInvalidate(): void {
+    this.cachedSprints = null;
   }
 
   static async create(cwd: string): Promise<JiraBackend> {
@@ -247,6 +253,7 @@ export class JiraBackend extends BaseBackend {
       );
     }
 
+    this.invalidateCache();
     return this.getWorkItem(key);
   }
 
@@ -318,12 +325,14 @@ export class JiraBackend extends BaseBackend {
       acliExec(editArgs, this.cwd);
     }
 
+    this.invalidateCache();
     return this.getWorkItem(id);
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
   async deleteWorkItem(id: string): Promise<void> {
     acliExec(['jira', 'workitem', 'delete', '--key', id, '--yes'], this.cwd);
+    this.invalidateCache();
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
@@ -396,7 +405,8 @@ export class JiraBackend extends BaseBackend {
   }
 
   private fetchSprints(): JiraSprint[] {
-    return acli<JiraSprint[]>(
+    if (this.cachedSprints) return this.cachedSprints;
+    this.cachedSprints = acli<JiraSprint[]>(
       [
         'jira',
         'board',
@@ -408,5 +418,6 @@ export class JiraBackend extends BaseBackend {
       ],
       this.cwd,
     );
+    return this.cachedSprints;
   }
 }
