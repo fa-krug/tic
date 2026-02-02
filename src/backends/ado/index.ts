@@ -205,7 +205,10 @@ export class AzureDevOpsBackend extends BaseBackend {
   }
 
   async getWorkItem(id: string): Promise<WorkItem> {
-    // Fetch work item and comments in parallel
+    // Fetch work item and comments in parallel.
+    // Comments use `az rest` which requires AAD auth (`az login`).
+    // If only PAT auth is available (`az devops login`), comments
+    // gracefully degrade to an empty array.
     const [ado, commentResult] = await Promise.all([
       az<AdoWorkItem>(
         [
@@ -226,7 +229,7 @@ export class AzureDevOpsBackend extends BaseBackend {
           url: `https://dev.azure.com/${this.org}/${encodeURIComponent(this.project)}/_apis/wit/workItems/${id}/comments?api-version=7.1-preview.4`,
         },
         this.cwd,
-      ),
+      ).catch(() => ({ comments: [] as AdoComment[] })),
     ]);
 
     const item = mapWorkItemToWorkItem(ado);
@@ -499,15 +502,38 @@ export class AzureDevOpsBackend extends BaseBackend {
     );
   }
 
+  /**
+   * Add a comment to a work item.
+   *
+   * The Work Item Comments API is preview-only (7.1-preview.4) and cannot be
+   * called via `az devops invoke` (it fails to parse preview version strings),
+   * so we use `az rest` instead. Unlike `az devops` commands which honor PAT
+   * auth from `az devops login`, `az rest --resource` requires an Azure AD
+   * token obtained via `az login`. If only PAT auth is available, this method
+   * throws a descriptive error directing the user to run `az login`.
+   */
   async addComment(workItemId: string, comment: NewComment): Promise<Comment> {
-    await azRest(
-      {
-        url: `https://dev.azure.com/${this.org}/${encodeURIComponent(this.project)}/_apis/wit/workItems/${workItemId}/comments?api-version=7.1-preview.4`,
-        httpMethod: 'POST',
-        body: { text: comment.body },
-      },
-      this.cwd,
-    );
+    try {
+      await azRest(
+        {
+          url: `https://dev.azure.com/${this.org}/${encodeURIComponent(this.project)}/_apis/wit/workItems/${workItemId}/comments?api-version=7.1-preview.4`,
+          httpMethod: 'POST',
+          body: { text: comment.body },
+        },
+        this.cwd,
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (
+        msg.includes('not been materialized') ||
+        msg.includes('not allowed')
+      ) {
+        throw new Error(
+          'Adding comments requires Azure AD authentication. Run `az login` in addition to `az devops login`.',
+        );
+      }
+      throw err;
+    }
 
     return {
       author: comment.author,

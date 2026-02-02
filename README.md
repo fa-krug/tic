@@ -250,6 +250,24 @@ Add `--json` to any command for machine-readable output, or `--quiet` to suppres
 
 Each backend supports a different set of capabilities (types, statuses, iterations, relationships, etc.). The TUI and CLI automatically adapt to show only what the active backend supports.
 
+### Azure DevOps Authentication
+
+Azure DevOps requires the [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/) (`az`) with the `azure-devops` extension. There are two authentication methods, and **both are recommended** for full functionality:
+
+| Method | Command | What it enables |
+|--------|---------|-----------------|
+| PAT (Personal Access Token) | `az devops login` | Work items, queries, iterations, relations |
+| Azure AD / Entra ID | `az login` | Comments (read and write) |
+
+The Work Item Comments API is a preview endpoint that requires Azure AD tokens. If you only use `az devops login`, everything works except comments — they will silently be unavailable when viewing items and explicitly fail when adding comments.
+
+For full functionality:
+
+```bash
+az login                # Azure AD — needed for comments
+az devops login         # PAT — needed for work items
+```
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, architecture, and conventions.
