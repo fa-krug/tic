@@ -61,6 +61,8 @@ function createProject(org: string, name: string): AdoProject {
       org,
       '--visibility',
       'private',
+      '--process',
+      'Agile',
       '-o',
       'json',
     ],
@@ -101,7 +103,7 @@ function waitForProject(org: string, name: string, timeoutMs: number): void {
     } catch {
       // Project not ready yet
     }
-    execFileSync('sleep', ['2']);
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 2000);
   }
   throw new Error(`Project ${name} did not become ready within ${timeoutMs}ms`);
 }
@@ -179,7 +181,13 @@ describeE2e('ADO E2E', () => {
     });
 
     // Construct backend
-    backend = new AzureDevOpsBackend(tmpDir);
+    try {
+      backend = new AzureDevOpsBackend(tmpDir);
+    } catch (err: unknown) {
+      throw new Error(
+        `Failed to initialize AzureDevOpsBackend for project ${projectName}: ${String(err)}`,
+      );
+    }
   });
 
   afterAll(() => {
@@ -257,7 +265,7 @@ describeE2e('ADO E2E', () => {
       expect(item.title).toBe('E2E Test Item');
     });
 
-    it('updates title, status, priority, assignee, labels', async () => {
+    it('updates title, status, priority, and labels', async () => {
       const statuses = await backend.getStatuses();
       // Pick a status different from the default if possible
       const newStatus =
