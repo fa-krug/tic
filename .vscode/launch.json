@@ -1,0 +1,49 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug TUI",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "node",
+      "args": ["dist/index.js"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "sourceMaps": true,
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "preLaunchTask": "npm: build",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "Debug CLI Command",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "node",
+      "args": ["dist/index.js", "${input:cliArgs}"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "sourceMaps": true,
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "preLaunchTask": "npm: build",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "Debug Current Test File",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npx",
+      "args": ["vitest", "run", "${relativeFile}"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "sourceMaps": true,
+      "skipFiles": ["<node_internals>/**"]
+    }
+  ],
+  "inputs": [
+    {
+      "id": "cliArgs",
+      "type": "promptString",
+      "description": "CLI arguments (e.g. item list --json)"
+    }
+  ]
+}
