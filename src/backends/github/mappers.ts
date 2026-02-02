@@ -5,12 +5,13 @@ export interface GhIssue {
   title: string;
   body: string | null;
   state: string;
-  assignees: { login: string }[];
-  labels: { name: string }[];
+  assignees: { nodes: { login: string }[] };
+  labels: { nodes: { name: string }[] };
   milestone: { title: string } | null;
   createdAt: string;
   updatedAt: string;
-  comments?: GhComment[];
+  comments: { nodes: GhComment[] };
+  parent: { number: number } | null;
 }
 
 export interface GhComment {
@@ -40,14 +41,14 @@ export function mapIssueToWorkItem(ghIssue: GhIssue): WorkItem {
     description: ghIssue.body ?? '',
     status: ghIssue.state === 'OPEN' ? 'open' : 'closed',
     type: 'issue',
-    assignee: ghIssue.assignees[0]?.login ?? '',
-    labels: ghIssue.labels.map((l) => l.name),
+    assignee: ghIssue.assignees.nodes[0]?.login ?? '',
+    labels: ghIssue.labels.nodes.map((l) => l.name),
     iteration: ghIssue.milestone?.title ?? '',
     priority: 'medium',
     created: ghIssue.createdAt,
     updated: ghIssue.updatedAt,
-    parent: null,
+    parent: ghIssue.parent ? String(ghIssue.parent.number) : null,
     dependsOn: [],
-    comments: (ghIssue.comments ?? []).map(mapCommentToComment),
+    comments: ghIssue.comments.nodes.map(mapCommentToComment),
   };
 }
