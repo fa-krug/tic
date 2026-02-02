@@ -21,6 +21,7 @@ export function WorkItemList() {
     backend,
     syncManager,
     navigate,
+    navigateToHelp,
     selectWorkItem,
     activeType,
     setActiveType,
@@ -156,6 +157,11 @@ export function WorkItemList() {
       return;
     }
 
+    if (input === '?') {
+      navigateToHelp();
+      return;
+    }
+
     if (key.upArrow) {
       setCursor((c) => Math.max(0, c - 1));
       setWarning('');
@@ -273,23 +279,7 @@ export function WorkItemList() {
     ? activeType.charAt(0).toUpperCase() + activeType.slice(1) + 's'
     : '';
 
-  const helpParts = ['up/down: navigate'];
-  if (capabilities.relationships) helpParts.push('left/right: collapse/expand');
-  helpParts.push('enter: edit', 'o: open', 'c: create', 'd: delete');
-  if (capabilities.fields.parent) helpParts.push('p: set parent');
-  if (capabilities.customTypes) helpParts.push('tab: type');
-  if (capabilities.iterations) helpParts.push('i: iteration');
-  if (gitAvailable) helpParts.push('b: branch');
-  if (syncManager) helpParts.push('r: sync');
-  helpParts.push('s: status', ',: settings', 'q: quit');
-  const helpText = helpParts.join('  ');
-
-  const compactHelpParts = ['↑↓ Nav'];
-  if (capabilities.relationships) compactHelpParts.push('←→ Fold');
-  compactHelpParts.push('c New', '⏎ Edit');
-  if (capabilities.customTypes) compactHelpParts.push('⇥ Type');
-  compactHelpParts.push('s Status', 'q Quit');
-  const compactHelpText = compactHelpParts.join('  ');
+  const helpText = '↑↓ navigate  enter edit  c create  ? help';
 
   const isCardMode = terminalWidth < 80;
   const viewport = useScrollViewport({
@@ -392,9 +382,7 @@ export function WorkItemList() {
             Delete item #{treeItems[cursor]?.item.id}? (y/n)
           </Text>
         ) : (
-          <Text dimColor>
-            {terminalWidth >= 80 ? helpText : compactHelpText}
-          </Text>
+          <Text dimColor>{helpText}</Text>
         )}
       </Box>
       {warning && (
