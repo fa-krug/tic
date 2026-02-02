@@ -17,7 +17,7 @@ function isAvailable(b: string): boolean {
 }
 
 export function Settings() {
-  const { navigate } = useAppState();
+  const { navigate, navigateToHelp } = useAppState();
   const root = process.cwd();
 
   const [config, setConfig] = useState<Config | null>(null);
@@ -97,6 +97,11 @@ export function Settings() {
   useInput(
     (input, key) => {
       if (!config) return;
+
+      if (input === '?') {
+        navigateToHelp();
+        return;
+      }
 
       if (key.escape || input === ',') {
         navigate('list');
@@ -258,13 +263,7 @@ export function Settings() {
       </Box>
 
       <Box marginTop={1}>
-        <Text dimColor>
-          {editing
-            ? 'type to edit  enter/esc: confirm'
-            : navItems[cursor]?.kind === 'jira-field'
-              ? 'up/down: navigate  enter: edit field  esc/,: back'
-              : 'up/down: navigate  enter: select  esc/,: back'}
-        </Text>
+        <Text dimColor>{'↑↓ navigate  enter select  esc back  ? help'}</Text>
       </Box>
     </Box>
   );
