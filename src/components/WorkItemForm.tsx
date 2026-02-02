@@ -183,20 +183,12 @@ export function WorkItemForm() {
     setEditing(false);
   }, [selectedWorkItemId]);
 
-  if (configLoading || itemLoading) {
-    return (
-      <Box>
-        <Text dimColor>Loading...</Text>
-      </Box>
-    );
-  }
-
   const currentField = fields[focusedField]!;
   const isSelectField = SELECT_FIELDS.includes(currentField);
   const isRelationshipField =
     currentField === 'rel-parent' ||
-    currentField.startsWith('rel-child-') ||
-    currentField.startsWith('rel-dependent-');
+    currentField?.startsWith('rel-child-') ||
+    currentField?.startsWith('rel-dependent-');
 
   async function save() {
     const parsedLabels = labels
@@ -267,6 +259,7 @@ export function WorkItemForm() {
 
   useInput(
     (_input, key) => {
+      if (configLoading || itemLoading) return;
       if (!editing) {
         if (key.upArrow) {
           setFocusedField((f) => Math.max(0, f - 1));
@@ -312,7 +305,12 @@ export function WorkItemForm() {
         }
       }
     },
-    { isActive: !editing || (!isSelectField && currentField !== 'assignee') },
+    {
+      isActive:
+        !configLoading &&
+        !itemLoading &&
+        (!editing || (!isSelectField && currentField !== 'assignee')),
+    },
   );
 
   function getSelectItems(field: FieldName) {
@@ -607,14 +605,22 @@ export function WorkItemForm() {
     );
   }
 
-  const mode = selectedWorkItemId !== null ? 'Edit' : 'Create';
-  const typeLabel = type.charAt(0).toUpperCase() + type.slice(1);
-
   const viewport = useScrollViewport({
     totalItems: fields.length,
     cursor: focusedField,
     chromeLines: 4, // title+margin (2) + help bar margin+text (2)
   });
+
+  if (configLoading || itemLoading) {
+    return (
+      <Box>
+        <Text dimColor>Loading...</Text>
+      </Box>
+    );
+  }
+
+  const mode = selectedWorkItemId !== null ? 'Edit' : 'Create';
+  const typeLabel = type.charAt(0).toUpperCase() + type.slice(1);
 
   const isFieldVisible = (index: number) =>
     index >= viewport.start && index < viewport.end;
