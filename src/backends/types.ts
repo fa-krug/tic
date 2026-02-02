@@ -1,4 +1,5 @@
 import type { WorkItem, NewWorkItem, NewComment, Comment } from '../types.js';
+import { BackendCache } from './cache.js';
 
 export interface BackendCapabilities {
   relationships: boolean;
@@ -35,6 +36,9 @@ export interface Backend {
   createWorkItem(data: NewWorkItem): Promise<WorkItem>;
   updateWorkItem(id: string, data: Partial<WorkItem>): Promise<WorkItem>;
   deleteWorkItem(id: string): Promise<void>;
+  cachedCreateWorkItem(data: NewWorkItem): Promise<WorkItem>;
+  cachedUpdateWorkItem(id: string, data: Partial<WorkItem>): Promise<WorkItem>;
+  cachedDeleteWorkItem(id: string): Promise<void>;
   addComment(workItemId: string, comment: NewComment): Promise<Comment>;
   getChildren(id: string): Promise<WorkItem[]>;
   getDependents(id: string): Promise<WorkItem[]>;
@@ -43,6 +47,12 @@ export interface Backend {
 }
 
 export abstract class BaseBackend implements Backend {
+  protected cache: BackendCache;
+
+  constructor(ttl = 0) {
+    this.cache = new BackendCache(ttl);
+  }
+
   abstract getCapabilities(): BackendCapabilities;
   abstract getStatuses(): Promise<string[]>;
   abstract getIterations(): Promise<string[]>;
@@ -62,10 +72,64 @@ export abstract class BaseBackend implements Backend {
     workItemId: string,
     comment: NewComment,
   ): Promise<Comment>;
-  abstract getChildren(id: string): Promise<WorkItem[]>;
-  abstract getDependents(id: string): Promise<WorkItem[]>;
   abstract getItemUrl(id: string): string;
   abstract openItem(id: string): Promise<void>;
+
+  async getChildren(id: string): Promise<WorkItem[]> {
+    const all = await this.getCachedItems();
+    return all.filter((item) => item.parent === id);
+  }
+
+  async getDependents(id: string): Promise<WorkItem[]> {
+    const all = await this.getCachedItems();
+    return all.filter((item) => item.dependsOn.includes(id));
+  }
+
+  protected async getCachedItems(iteration?: string): Promise<WorkItem[]> {
+    const cached = this.cache.get(iteration);
+    if (cached) return cached;
+    const items = await this.listWorkItems(iteration);
+    this.cache.set(items, iteration);
+    return items;
+  }
+
+  protected async getAssigneesFromCache(): Promise<string[]> {
+    const items = await this.getCachedItems();
+    const assignees = new Set<string>();
+    for (const item of items) {
+      if (item.assignee) assignees.add(item.assignee);
+    }
+    return [...assignees].sort();
+  }
+
+  protected onCacheInvalidate(): void {
+    // Override in subclasses to clear secondary caches
+  }
+
+  protected invalidateCache(): void {
+    this.cache.invalidate();
+    this.onCacheInvalidate();
+  }
+
+  async cachedCreateWorkItem(data: NewWorkItem): Promise<WorkItem> {
+    const result = await this.createWorkItem(data);
+    this.invalidateCache();
+    return result;
+  }
+
+  async cachedUpdateWorkItem(
+    id: string,
+    data: Partial<WorkItem>,
+  ): Promise<WorkItem> {
+    const result = await this.updateWorkItem(id, data);
+    this.invalidateCache();
+    return result;
+  }
+
+  async cachedDeleteWorkItem(id: string): Promise<void> {
+    await this.deleteWorkItem(id);
+    this.invalidateCache();
+  }
 
   protected validateFields(data: Partial<NewWorkItem>): void {
     const caps = this.getCapabilities();

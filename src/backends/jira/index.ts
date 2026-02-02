@@ -349,7 +349,7 @@ export class JiraBackend extends BaseBackend {
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
-  async getChildren(id: string): Promise<WorkItem[]> {
+  override async getChildren(id: string): Promise<WorkItem[]> {
     const issues = acli<JiraIssue[]>(
       [
         'jira',
@@ -368,7 +368,7 @@ export class JiraBackend extends BaseBackend {
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
-  async getDependents(id: string): Promise<WorkItem[]> {
+  override async getDependents(id: string): Promise<WorkItem[]> {
     const issues = acli<JiraIssue[]>(
       [
         'jira',

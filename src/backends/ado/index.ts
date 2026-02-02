@@ -542,7 +542,7 @@ export class AzureDevOpsBackend extends BaseBackend {
     };
   }
 
-  async getChildren(id: string): Promise<WorkItem[]> {
+  override async getChildren(id: string): Promise<WorkItem[]> {
     const numericId = parseInt(id, 10);
     if (isNaN(numericId)) throw new Error(`Invalid work item ID: "${id}"`);
 
@@ -569,7 +569,7 @@ export class AzureDevOpsBackend extends BaseBackend {
     return this.batchFetchWorkItems(ids);
   }
 
-  async getDependents(id: string): Promise<WorkItem[]> {
+  override async getDependents(id: string): Promise<WorkItem[]> {
     const numericId = parseInt(id, 10);
     if (isNaN(numericId)) throw new Error(`Invalid work item ID: "${id}"`);
 

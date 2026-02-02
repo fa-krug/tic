@@ -108,11 +108,11 @@ class TestBackend extends BaseBackend {
     throw new Error('not implemented');
   }
   // eslint-disable-next-line @typescript-eslint/require-await
-  async getChildren(_id: string): Promise<WorkItem[]> {
+  override async getChildren(_id: string): Promise<WorkItem[]> {
     return [];
   }
   // eslint-disable-next-line @typescript-eslint/require-await
-  async getDependents(_id: string): Promise<WorkItem[]> {
+  override async getDependents(_id: string): Promise<WorkItem[]> {
     return [];
   }
   getItemUrl(_id: string): string {

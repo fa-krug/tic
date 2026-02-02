@@ -232,7 +232,7 @@ export class GitLabBackend extends BaseBackend {
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
-  async getChildren(id: string): Promise<WorkItem[]> {
+  override async getChildren(id: string): Promise<WorkItem[]> {
     const { type, iid } = parseId(id);
 
     if (type === 'issue') {
@@ -248,7 +248,7 @@ export class GitLabBackend extends BaseBackend {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/require-await
-  async getDependents(_id: string): Promise<WorkItem[]> {
+  override async getDependents(_id: string): Promise<WorkItem[]> {
     return [];
   }
 

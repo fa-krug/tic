@@ -308,11 +308,11 @@ export class GitHubBackend extends BaseBackend {
     };
   }
 
-  async getChildren(id: string): Promise<WorkItem[]> {
+  override async getChildren(id: string): Promise<WorkItem[]> {
     return (await this.listWorkItems()).filter((item) => item.parent === id);
   }
 
-  async getDependents(id: string): Promise<WorkItem[]> {
+  override async getDependents(id: string): Promise<WorkItem[]> {
     this.assertSupported(this.getCapabilities().fields.dependsOn, 'dependsOn');
     return (await this.listWorkItems()).filter((item) =>
       item.dependsOn.includes(id),

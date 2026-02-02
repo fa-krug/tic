@@ -92,6 +92,37 @@ function createMockRemote(items: WorkItem[] = []): Backend {
     getChildren: async () => [],
     // eslint-disable-next-line @typescript-eslint/require-await
     getDependents: async () => [],
+    // eslint-disable-next-line @typescript-eslint/require-await
+    cachedCreateWorkItem: async (data: NewWorkItem) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+      const id: string = (data as any).id ?? String(nextId++);
+      const item: WorkItem = {
+        ...data,
+        id,
+        created: new Date().toISOString(),
+        updated: new Date().toISOString(),
+        comments: [],
+      };
+      store.set(id, item);
+      return item;
+    },
+    // eslint-disable-next-line @typescript-eslint/require-await
+    cachedUpdateWorkItem: async (id: string, data: Partial<WorkItem>) => {
+      const existing = store.get(id);
+      if (!existing) throw new Error(`Item #${id} not found`);
+      const updated = {
+        ...existing,
+        ...data,
+        id,
+        updated: new Date().toISOString(),
+      };
+      store.set(id, updated);
+      return updated;
+    },
+    // eslint-disable-next-line @typescript-eslint/require-await
+    cachedDeleteWorkItem: async (id: string) => {
+      store.delete(id);
+    },
     getItemUrl: (id: string) => `https://remote/${id}`,
     openItem: vi.fn(async () => {}),
   };

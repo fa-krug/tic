@@ -275,12 +275,12 @@ export class LocalBackend extends BaseBackend {
     return newComment;
   }
 
-  async getChildren(id: string): Promise<WorkItem[]> {
+  override async getChildren(id: string): Promise<WorkItem[]> {
     const all = await this.listWorkItems();
     return all.filter((item) => item.parent === id);
   }
 
-  async getDependents(id: string): Promise<WorkItem[]> {
+  override async getDependents(id: string): Promise<WorkItem[]> {
     const all = await this.listWorkItems();
     return all.filter((item) => item.dependsOn.includes(id));
   }
