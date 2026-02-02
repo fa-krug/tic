@@ -50,7 +50,10 @@ function itemToTsvRow(item: WorkItem): string {
   ]);
 }
 
-function itemToTsvDetail(item: WorkItem): string {
+function itemToTsvDetail(
+  item: WorkItem,
+  caps?: BackendCapabilities | null,
+): string {
   const pairs: [string, string][] = [
     ['id', String(item.id)],
     ['title', item.title],
@@ -60,11 +63,12 @@ function itemToTsvDetail(item: WorkItem): string {
     ['iteration', item.iteration],
     ['assignee', item.assignee],
     ['labels', item.labels.join(',')],
-    ['parent', item.parent !== null ? String(item.parent) : ''],
-    ['depends_on', item.dependsOn.join(',')],
-    ['created', item.created],
-    ['updated', item.updated],
   ];
+  if (!caps || caps.fields.parent)
+    pairs.push(['parent', item.parent !== null ? String(item.parent) : '']);
+  if (!caps || caps.fields.dependsOn)
+    pairs.push(['depends_on', item.dependsOn.join(',')]);
+  pairs.push(['created', item.created], ['updated', item.updated]);
   let output = formatTsvKeyValue(pairs);
   if (item.description) {
     output += '\n\n' + item.description;
@@ -242,7 +246,11 @@ export function createProgram(): Command {
       try {
         const backend = await createBackend();
         const wi = await runItemShow(backend, idStr);
-        output(wi, () => itemToTsvDetail(wi), parentOpts);
+        output(
+          wi,
+          () => itemToTsvDetail(wi, backend.getCapabilities()),
+          parentOpts,
+        );
       } catch (err) {
         handleError(err, parentOpts.json);
       }
