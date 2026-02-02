@@ -14,6 +14,8 @@ import { useBackendData } from '../hooks/useBackendData.js';
 import { SyncQueueStore } from '../sync/queue.js';
 import type { SyncStatus, QueueAction } from '../sync/types.js';
 import { buildTree, type TreeItem } from './buildTree.js';
+import { SearchOverlay } from './SearchOverlay.js';
+import type { WorkItem } from '../types.js';
 export type { TreeItem } from './buildTree.js';
 
 export function WorkItemList() {
@@ -32,6 +34,8 @@ export function WorkItemList() {
   const [warning, setWarning] = useState('');
   const [settingParent, setSettingParent] = useState(false);
   const [parentInput, setParentInput] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [allSearchItems, setAllSearchItems] = useState<WorkItem[]>([]);
 
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(
     syncManager?.getStatus() ?? null,
@@ -134,6 +138,17 @@ export function WorkItemList() {
     setCursor((c) => Math.min(c, Math.max(0, treeItems.length - 1)));
   }, [treeItems.length]);
 
+  useEffect(() => {
+    if (!isSearching) return;
+    let cancelled = false;
+    void backend.listWorkItems().then((items) => {
+      if (!cancelled) setAllSearchItems(items);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isSearching, backend]);
+
   useInput((input, key) => {
     if (settingParent) {
       if (key.escape) {
@@ -141,6 +156,8 @@ export function WorkItemList() {
       }
       return;
     }
+
+    if (isSearching) return;
 
     if (confirmDelete) {
       if (input === 'y' || input === 'Y') {
@@ -154,6 +171,11 @@ export function WorkItemList() {
       } else {
         setConfirmDelete(false);
       }
+      return;
+    }
+
+    if (input === '/') {
+      setIsSearching(true);
       return;
     }
 
@@ -275,6 +297,16 @@ export function WorkItemList() {
     }
   });
 
+  const handleSearchSelect = (item: WorkItem) => {
+    setIsSearching(false);
+    selectWorkItem(item.id);
+    navigate('form');
+  };
+
+  const handleSearchCancel = () => {
+    setIsSearching(false);
+  };
+
   const typeLabel = activeType
     ? activeType.charAt(0).toUpperCase() + activeType.slice(1) + 's'
     : '';
@@ -300,95 +332,108 @@ export function WorkItemList() {
 
   return (
     <Box flexDirection="column">
-      <Box marginBottom={1}>
-        <Text wrap="truncate">
-          <Text bold color="cyan">
-            {typeLabel} — {iteration}
-          </Text>
-          <Text dimColor>{` (${items.length} items)`}</Text>
-        </Text>
-        {syncStatus && syncStatus.state === 'syncing' ? (
-          <Box marginLeft={1}>
-            <Text color="yellow">
-              <Spinner type="dots" />
+      {isSearching && (
+        <SearchOverlay
+          items={allSearchItems}
+          currentIteration={iteration}
+          onSelect={handleSearchSelect}
+          onCancel={handleSearchCancel}
+        />
+      )}
+      {!isSearching && (
+        <>
+          <Box marginBottom={1}>
+            <Text wrap="truncate">
+              <Text bold color="cyan">
+                {typeLabel} — {iteration}
+              </Text>
+              <Text dimColor>{` (${items.length} items)`}</Text>
             </Text>
-            <Text dimColor> Syncing...</Text>
+            {syncStatus && syncStatus.state === 'syncing' ? (
+              <Box marginLeft={1}>
+                <Text color="yellow">
+                  <Spinner type="dots" />
+                </Text>
+                <Text dimColor> Syncing...</Text>
+              </Box>
+            ) : syncStatus && syncStatus.state === 'error' ? (
+              <Text dimColor>
+                {` ⚠ Sync failed (${syncStatus.errors.length} errors)`}
+              </Text>
+            ) : syncStatus && syncStatus.pendingCount > 0 ? (
+              <Text dimColor>{` ↑ ${syncStatus.pendingCount} pending`}</Text>
+            ) : syncStatus ? (
+              <Text dimColor> ✓ Synced</Text>
+            ) : null}
           </Box>
-        ) : syncStatus && syncStatus.state === 'error' ? (
-          <Text dimColor>
-            {` ⚠ Sync failed (${syncStatus.errors.length} errors)`}
-          </Text>
-        ) : syncStatus && syncStatus.pendingCount > 0 ? (
-          <Text dimColor>{` ↑ ${syncStatus.pendingCount} pending`}</Text>
-        ) : syncStatus ? (
-          <Text dimColor> ✓ Synced</Text>
-        ) : null}
-      </Box>
 
-      {terminalWidth >= 80 ? (
-        <TableLayout
-          treeItems={visibleTreeItems}
-          cursor={viewport.visibleCursor}
-          capabilities={capabilities}
-          collapsedIds={collapsedIds}
-        />
-      ) : (
-        <CardLayout
-          treeItems={visibleTreeItems}
-          cursor={viewport.visibleCursor}
-          capabilities={capabilities}
-          collapsedIds={collapsedIds}
-        />
-      )}
-
-      {treeItems.length === 0 && (
-        <Box marginTop={1}>
-          <Text dimColor>No {activeType}s in this iteration.</Text>
-        </Box>
-      )}
-
-      <Box marginTop={1}>
-        {capabilities.fields.parent && settingParent ? (
-          <Box>
-            <Text color="cyan">Set parent ID (empty to clear): </Text>
-            <TextInput
-              value={parentInput}
-              onChange={setParentInput}
-              focus={true}
-              onSubmit={(value) => {
-                void (async () => {
-                  const item = treeItems[cursor]!.item;
-                  const newParent = value.trim() === '' ? null : value.trim();
-                  try {
-                    await backend.updateWorkItem(item.id, {
-                      parent: newParent,
-                    });
-                    await queueWrite('update', item.id);
-                    setWarning('');
-                  } catch (e) {
-                    setWarning(
-                      e instanceof Error ? e.message : 'Invalid parent',
-                    );
-                  }
-                  setSettingParent(false);
-                  setParentInput('');
-                  refreshData();
-                })();
-              }}
+          {terminalWidth >= 80 ? (
+            <TableLayout
+              treeItems={visibleTreeItems}
+              cursor={viewport.visibleCursor}
+              capabilities={capabilities}
+              collapsedIds={collapsedIds}
             />
+          ) : (
+            <CardLayout
+              treeItems={visibleTreeItems}
+              cursor={viewport.visibleCursor}
+              capabilities={capabilities}
+              collapsedIds={collapsedIds}
+            />
+          )}
+
+          {treeItems.length === 0 && (
+            <Box marginTop={1}>
+              <Text dimColor>No {activeType}s in this iteration.</Text>
+            </Box>
+          )}
+
+          <Box marginTop={1}>
+            {capabilities.fields.parent && settingParent ? (
+              <Box>
+                <Text color="cyan">Set parent ID (empty to clear): </Text>
+                <TextInput
+                  value={parentInput}
+                  onChange={setParentInput}
+                  focus={true}
+                  onSubmit={(value) => {
+                    void (async () => {
+                      const item = treeItems[cursor]!.item;
+                      const newParent =
+                        value.trim() === '' ? null : value.trim();
+                      try {
+                        await backend.updateWorkItem(item.id, {
+                          parent: newParent,
+                        });
+                        await queueWrite('update', item.id);
+                        setWarning('');
+                      } catch (e) {
+                        setWarning(
+                          e instanceof Error ? e.message : 'Invalid parent',
+                        );
+                      }
+                      setSettingParent(false);
+                      setParentInput('');
+                      refreshData();
+                    })();
+                  }}
+                />
+              </Box>
+            ) : confirmDelete ? (
+              <Text color="red">
+                Delete item #{treeItems[cursor]?.item.id}? (y/n)
+              </Text>
+            ) : (
+              <Text dimColor>{helpText}</Text>
+            )}
           </Box>
-        ) : confirmDelete ? (
-          <Text color="red">
-            Delete item #{treeItems[cursor]?.item.id}? (y/n)
-          </Text>
-        ) : (
-          <Text dimColor>{helpText}</Text>
-        )}
-      </Box>
-      {warning && (
-        <Box>
-          <Text color="yellow">⚠ {warning}</Text>
-        </Box>
+          {warning && (
+            <Box>
+              <Text color="yellow">⚠ {warning}</Text>
+            </Box>
+          )}
+        </>
       )}
     </Box>
   );
