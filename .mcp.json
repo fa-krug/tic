@@ -1,0 +1,6 @@
+{
+  "tic": {
+    "command": "npx",
+    "args": ["-y", "@sascha384/tic", "mcp", "serve"]
+  }
+}
