@@ -389,6 +389,40 @@ export function WorkItemList() {
     if (input === 'b' && treeItems.length > 0) {
       setShowBulkMenu(true);
     }
+
+    if (input === 'P' && capabilities.fields.priority && treeItems.length > 0) {
+      const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+      if (targetIds.length > 0) {
+        setBulkTargetIds(targetIds);
+        setShowPriorityPicker(true);
+      }
+    }
+
+    if (input === 'a' && capabilities.fields.assignee && treeItems.length > 0) {
+      const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+      if (targetIds.length > 0) {
+        setBulkTargetIds(targetIds);
+        setSettingAssignee(true);
+        setAssigneeInput('');
+      }
+    }
+
+    if (input === 'l' && capabilities.fields.labels && treeItems.length > 0) {
+      const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+      if (targetIds.length > 0) {
+        setBulkTargetIds(targetIds);
+        setSettingLabels(true);
+        setLabelsInput('');
+      }
+    }
+
+    if (input === 't' && capabilities.customTypes && treeItems.length > 0) {
+      const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+      if (targetIds.length > 0) {
+        setBulkTargetIds(targetIds);
+        setShowTypePicker(true);
+      }
+    }
   });
 
   const handleSearchSelect = (item: WorkItem) => {
