@@ -16,6 +16,9 @@ import type { SyncStatus, QueueAction } from '../sync/types.js';
 import { buildTree, type TreeItem } from './buildTree.js';
 import { SearchOverlay } from './SearchOverlay.js';
 import { BulkMenu, type BulkAction } from './BulkMenu.js';
+import { PriorityPicker } from './PriorityPicker.js';
+import { TypePicker } from './TypePicker.js';
+import { StatusPicker } from './StatusPicker.js';
 import type { WorkItem } from '../types.js';
 export type { TreeItem } from './buildTree.js';
 
@@ -52,6 +55,35 @@ export function WorkItemList() {
   const [deleteTargetIds, setDeleteTargetIds] = useState<string[]>([]);
   const [parentTargetIds, setParentTargetIds] = useState<string[]>([]);
   const [showBulkMenu, setShowBulkMenu] = useState(false);
+  const [showStatusPicker, setShowStatusPicker] = useState(false);
+  const [showTypePicker, setShowTypePicker] = useState(false);
+  const [showPriorityPicker, setShowPriorityPicker] = useState(false);
+  const [settingAssignee, setSettingAssignee] = useState(false);
+  const [assigneeInput, setAssigneeInput] = useState('');
+  const [settingLabels, setSettingLabels] = useState(false);
+  const [labelsInput, setLabelsInput] = useState('');
+  const [bulkTargetIds, setBulkTargetIds] = useState<string[]>([]);
+
+  // Void workarounds for unused imports/state (will be used in Tasks 21-23)
+  void PriorityPicker;
+  void TypePicker;
+  void StatusPicker;
+  void showStatusPicker;
+  void setShowStatusPicker;
+  void showTypePicker;
+  void setShowTypePicker;
+  void showPriorityPicker;
+  void setShowPriorityPicker;
+  void settingAssignee;
+  void setSettingAssignee;
+  void assigneeInput;
+  void setAssigneeInput;
+  void settingLabels;
+  void setSettingLabels;
+  void labelsInput;
+  void setLabelsInput;
+  void bulkTargetIds;
+  void setBulkTargetIds;
 
   // Marked count for header display
   const markedCount = markedIds.size;
