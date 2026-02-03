@@ -18,6 +18,19 @@ import { SearchOverlay } from './SearchOverlay.js';
 import type { WorkItem } from '../types.js';
 export type { TreeItem } from './buildTree.js';
 
+function getTargetIds(
+  markedIds: Set<string>,
+  cursorItem: { id: string } | undefined,
+): string[] {
+  if (markedIds.size > 0) {
+    return [...markedIds];
+  }
+  return cursorItem ? [cursorItem.id] : [];
+}
+
+// Temporary: prevent unused variable error until used by bulk operations
+void getTargetIds;
+
 export function WorkItemList() {
   const {
     backend,
