@@ -8,6 +8,7 @@ interface TableLayoutProps {
   cursor: number;
   capabilities: BackendCapabilities;
   collapsedIds: Set<string>;
+  markedIds: Set<string>;
 }
 
 const colStatus = 14;
@@ -20,6 +21,7 @@ export function TableLayout({
   cursor,
   capabilities,
   collapsedIds,
+  markedIds,
 }: TableLayoutProps) {
   const colId = useMemo(() => {
     const maxLen = treeItems.reduce(
@@ -69,6 +71,7 @@ export function TableLayout({
       {treeItems.map((treeItem, idx) => {
         const { item, prefix, isCrossType, hasChildren } = treeItem;
         const selected = idx === cursor;
+        const marked = markedIds.has(item.id);
         const hasUnresolvedDeps = item.dependsOn.length > 0;
         const collapseIndicator = hasChildren
           ? collapsedIds.has(item.id)
@@ -78,7 +81,10 @@ export function TableLayout({
         const typeLabel = isCrossType ? ` (${item.type})` : '';
         const dimmed = isCrossType && !selected;
         return (
-          <Box key={`${item.id}-${item.type}`}>
+          <Box
+            key={`${item.id}-${item.type}`}
+            {...(marked && !selected ? { backgroundColor: 'cyan' } : {})}
+          >
             <Box width={2}>
               <Text color="cyan">{selected ? '>' : ' '}</Text>
             </Box>

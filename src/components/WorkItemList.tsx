@@ -15,8 +15,22 @@ import { SyncQueueStore } from '../sync/queue.js';
 import type { SyncStatus, QueueAction } from '../sync/types.js';
 import { buildTree, type TreeItem } from './buildTree.js';
 import { SearchOverlay } from './SearchOverlay.js';
+import { BulkMenu, type BulkAction } from './BulkMenu.js';
+import { PriorityPicker } from './PriorityPicker.js';
+import { TypePicker } from './TypePicker.js';
+import { StatusPicker } from './StatusPicker.js';
 import type { WorkItem } from '../types.js';
 export type { TreeItem } from './buildTree.js';
+
+export function getTargetIds(
+  markedIds: Set<string>,
+  cursorItem: { id: string } | undefined,
+): string[] {
+  if (markedIds.size > 0) {
+    return [...markedIds];
+  }
+  return cursorItem ? [cursorItem.id] : [];
+}
 
 export function WorkItemList() {
   const {
@@ -36,6 +50,22 @@ export function WorkItemList() {
   const [parentInput, setParentInput] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [allSearchItems, setAllSearchItems] = useState<WorkItem[]>([]);
+  // Marked items state for bulk operations
+  const [markedIds, setMarkedIds] = useState<Set<string>>(() => new Set());
+  const [deleteTargetIds, setDeleteTargetIds] = useState<string[]>([]);
+  const [parentTargetIds, setParentTargetIds] = useState<string[]>([]);
+  const [showBulkMenu, setShowBulkMenu] = useState(false);
+  const [showStatusPicker, setShowStatusPicker] = useState(false);
+  const [showTypePicker, setShowTypePicker] = useState(false);
+  const [showPriorityPicker, setShowPriorityPicker] = useState(false);
+  const [settingAssignee, setSettingAssignee] = useState(false);
+  const [assigneeInput, setAssigneeInput] = useState('');
+  const [settingLabels, setSettingLabels] = useState(false);
+  const [labelsInput, setLabelsInput] = useState('');
+  const [bulkTargetIds, setBulkTargetIds] = useState<string[]>([]);
+
+  // Marked count for header display
+  const markedCount = markedIds.size;
 
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(
     syncManager?.getStatus() ?? null,
@@ -44,6 +74,7 @@ export function WorkItemList() {
   const {
     capabilities,
     types,
+    statuses,
     currentIteration: iteration,
     items: allItems,
     loading,
@@ -157,19 +188,48 @@ export function WorkItemList() {
       return;
     }
 
+    if (showBulkMenu) return;
+
+    if (settingAssignee) {
+      if (key.escape) {
+        setSettingAssignee(false);
+        setBulkTargetIds([]);
+      }
+      return;
+    }
+
+    if (settingLabels) {
+      if (key.escape) {
+        setSettingLabels(false);
+        setBulkTargetIds([]);
+      }
+      return;
+    }
+
     if (isSearching) return;
 
     if (confirmDelete) {
       if (input === 'y' || input === 'Y') {
         void (async () => {
-          await backend.cachedDeleteWorkItem(treeItems[cursor]!.item.id);
-          await queueWrite('delete', treeItems[cursor]!.item.id);
+          for (const id of deleteTargetIds) {
+            await backend.cachedDeleteWorkItem(id);
+            await queueWrite('delete', id);
+          }
           setConfirmDelete(false);
+          setDeleteTargetIds([]);
+          setMarkedIds((prev) => {
+            const next = new Set(prev);
+            for (const id of deleteTargetIds) {
+              next.delete(id);
+            }
+            return next;
+          });
           setCursor((c) => Math.max(0, c - 1));
           refreshData();
         })();
       } else {
         setConfirmDelete(false);
+        setDeleteTargetIds([]);
       }
       return;
     }
@@ -233,7 +293,11 @@ export function WorkItemList() {
     }
 
     if (input === 'd' && treeItems.length > 0) {
-      setConfirmDelete(true);
+      const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+      if (targetIds.length > 0) {
+        setDeleteTargetIds(targetIds);
+        setConfirmDelete(true);
+      }
     }
 
     if (input === 'o' && treeItems.length > 0) {
@@ -243,7 +307,7 @@ export function WorkItemList() {
       })();
     }
 
-    if (input === 'b' && gitAvailable && treeItems.length > 0) {
+    if (input === 'B' && gitAvailable && treeItems.length > 0) {
       const item = treeItems[cursor]!.item;
       const comments = item.comments;
       const config = readConfigSync(process.cwd());
@@ -277,9 +341,18 @@ export function WorkItemList() {
       treeItems.length > 0 &&
       !settingParent
     ) {
-      setSettingParent(true);
-      const currentParent = treeItems[cursor]!.item.parent;
-      setParentInput(currentParent !== null ? String(currentParent) : '');
+      const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+      if (targetIds.length > 0) {
+        setParentTargetIds(targetIds);
+        setSettingParent(true);
+        // For single item, prefill current parent
+        if (targetIds.length === 1) {
+          const item = treeItems.find((t) => t.item.id === targetIds[0]);
+          setParentInput(item?.item.parent ?? '');
+        } else {
+          setParentInput('');
+        }
+      }
     }
 
     if (key.tab && capabilities.customTypes && types.length > 0) {
@@ -295,6 +368,61 @@ export function WorkItemList() {
         refreshData();
       });
     }
+
+    if (input === 'm' && treeItems.length > 0) {
+      const itemId = treeItems[cursor]!.item.id;
+      setMarkedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(itemId)) {
+          next.delete(itemId);
+        } else {
+          next.add(itemId);
+        }
+        return next;
+      });
+    }
+
+    if (input === 'M') {
+      setMarkedIds(new Set());
+    }
+
+    if (input === 'b' && treeItems.length > 0) {
+      setShowBulkMenu(true);
+    }
+
+    if (input === 'P' && capabilities.fields.priority && treeItems.length > 0) {
+      const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+      if (targetIds.length > 0) {
+        setBulkTargetIds(targetIds);
+        setShowPriorityPicker(true);
+      }
+    }
+
+    if (input === 'a' && capabilities.fields.assignee && treeItems.length > 0) {
+      const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+      if (targetIds.length > 0) {
+        setBulkTargetIds(targetIds);
+        setSettingAssignee(true);
+        setAssigneeInput('');
+      }
+    }
+
+    if (input === 'l' && capabilities.fields.labels && treeItems.length > 0) {
+      const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+      if (targetIds.length > 0) {
+        setBulkTargetIds(targetIds);
+        setSettingLabels(true);
+        setLabelsInput('');
+      }
+    }
+
+    if (input === 't' && capabilities.customTypes && treeItems.length > 0) {
+      const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+      if (targetIds.length > 0) {
+        setBulkTargetIds(targetIds);
+        setShowTypePicker(true);
+      }
+    }
   });
 
   const handleSearchSelect = (item: WorkItem) => {
@@ -305,6 +433,44 @@ export function WorkItemList() {
 
   const handleSearchCancel = () => {
     setIsSearching(false);
+  };
+
+  const handleBulkAction = (action: BulkAction) => {
+    const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+    if (targetIds.length === 0) return;
+    setBulkTargetIds(targetIds);
+
+    switch (action) {
+      case 'status':
+        setShowStatusPicker(true);
+        break;
+      case 'iteration':
+        navigate('iteration-picker');
+        break;
+      case 'parent':
+        setParentTargetIds(targetIds);
+        setSettingParent(true);
+        setParentInput('');
+        break;
+      case 'type':
+        setShowTypePicker(true);
+        break;
+      case 'priority':
+        setShowPriorityPicker(true);
+        break;
+      case 'assignee':
+        setSettingAssignee(true);
+        setAssigneeInput('');
+        break;
+      case 'labels':
+        setSettingLabels(true);
+        setLabelsInput('');
+        break;
+      case 'delete':
+        setDeleteTargetIds(targetIds);
+        setConfirmDelete(true);
+        break;
+    }
   };
 
   const typeLabel = activeType
@@ -342,6 +508,76 @@ export function WorkItemList() {
       )}
       {!isSearching && (
         <>
+          {showBulkMenu && (
+            <BulkMenu
+              itemCount={markedIds.size > 0 ? markedIds.size : 1}
+              capabilities={capabilities}
+              onSelect={(action) => {
+                setShowBulkMenu(false);
+                handleBulkAction(action);
+              }}
+              onCancel={() => setShowBulkMenu(false)}
+            />
+          )}
+          {showStatusPicker && (
+            <StatusPicker
+              statuses={statuses}
+              onSelect={(status) => {
+                void (async () => {
+                  setShowStatusPicker(false);
+                  for (const id of bulkTargetIds) {
+                    await backend.cachedUpdateWorkItem(id, { status });
+                    await queueWrite('update', id);
+                  }
+                  setBulkTargetIds([]);
+                  refreshData();
+                })();
+              }}
+              onCancel={() => {
+                setShowStatusPicker(false);
+                setBulkTargetIds([]);
+              }}
+            />
+          )}
+          {showTypePicker && (
+            <TypePicker
+              types={types}
+              onSelect={(type) => {
+                void (async () => {
+                  setShowTypePicker(false);
+                  for (const id of bulkTargetIds) {
+                    await backend.cachedUpdateWorkItem(id, { type });
+                    await queueWrite('update', id);
+                  }
+                  setBulkTargetIds([]);
+                  refreshData();
+                })();
+              }}
+              onCancel={() => {
+                setShowTypePicker(false);
+                setBulkTargetIds([]);
+              }}
+            />
+          )}
+          {showPriorityPicker && (
+            <PriorityPicker
+              onSelect={(priority) => {
+                void (async () => {
+                  setShowPriorityPicker(false);
+                  for (const id of bulkTargetIds) {
+                    await backend.cachedUpdateWorkItem(id, { priority });
+                    await queueWrite('update', id);
+                  }
+                  setBulkTargetIds([]);
+                  refreshData();
+                })();
+              }}
+              onCancel={() => {
+                setShowPriorityPicker(false);
+                setBulkTargetIds([]);
+              }}
+            />
+          )}
           <Box marginBottom={1}>
             <Text wrap="truncate">
               <Text bold color="cyan">
@@ -365,6 +601,9 @@ export function WorkItemList() {
             ) : syncStatus ? (
               <Text dimColor> ✓ Synced</Text>
             ) : null}
+            {markedCount > 0 && (
+              <Text color="magenta">{` ● ${markedCount} marked`}</Text>
+            )}
           </Box>
 
           {terminalWidth >= 80 ? (
@@ -373,6 +612,7 @@ export function WorkItemList() {
               cursor={viewport.visibleCursor}
               capabilities={capabilities}
               collapsedIds={collapsedIds}
+              markedIds={markedIds}
             />
           ) : (
             <CardLayout
@@ -380,6 +620,7 @@ export function WorkItemList() {
               cursor={viewport.visibleCursor}
               capabilities={capabilities}
               collapsedIds={collapsedIds}
+              markedIds={markedIds}
             />
           )}
 
@@ -392,21 +633,25 @@ export function WorkItemList() {
           <Box marginTop={1}>
             {capabilities.fields.parent && settingParent ? (
               <Box>
-                <Text color="cyan">Set parent ID (empty to clear): </Text>
+                <Text color="cyan">
+                  Set parent for {parentTargetIds.length} item
+                  {parentTargetIds.length > 1 ? 's' : ''} (empty to clear):{' '}
+                </Text>
                 <TextInput
                   value={parentInput}
                   onChange={setParentInput}
                   focus={true}
                   onSubmit={(value) => {
                     void (async () => {
-                      const item = treeItems[cursor]!.item;
                       const newParent =
                         value.trim() === '' ? null : value.trim();
                       try {
-                        await backend.cachedUpdateWorkItem(item.id, {
-                          parent: newParent,
-                        });
-                        await queueWrite('update', item.id);
+                        for (const id of parentTargetIds) {
+                          await backend.cachedUpdateWorkItem(id, {
+                            parent: newParent,
+                          });
+                          await queueWrite('update', id);
+                        }
                         setWarning('');
                       } catch (e) {
                         setWarning(
@@ -415,6 +660,60 @@ export function WorkItemList() {
                       }
                       setSettingParent(false);
                       setParentInput('');
+                      setParentTargetIds([]);
+                      refreshData();
+                    })();
+                  }}
+                />
+              </Box>
+            ) : settingAssignee ? (
+              <Box>
+                <Text color="cyan">
+                  Set assignee for {bulkTargetIds.length} item
+                  {bulkTargetIds.length > 1 ? 's' : ''}:{' '}
+                </Text>
+                <TextInput
+                  value={assigneeInput}
+                  onChange={setAssigneeInput}
+                  focus={true}
+                  onSubmit={(value) => {
+                    void (async () => {
+                      const assignee = value.trim();
+                      for (const id of bulkTargetIds) {
+                        await backend.cachedUpdateWorkItem(id, { assignee });
+                        await queueWrite('update', id);
+                      }
+                      setSettingAssignee(false);
+                      setAssigneeInput('');
+                      setBulkTargetIds([]);
+                      refreshData();
+                    })();
+                  }}
+                />
+              </Box>
+            ) : settingLabels ? (
+              <Box>
+                <Text color="cyan">
+                  Set labels for {bulkTargetIds.length} item
+                  {bulkTargetIds.length > 1 ? 's' : ''} (comma-separated):{' '}
+                </Text>
+                <TextInput
+                  value={labelsInput}
+                  onChange={setLabelsInput}
+                  focus={true}
+                  onSubmit={(value) => {
+                    void (async () => {
+                      const labels = value
+                        .split(',')
+                        .map((l) => l.trim())
+                        .filter(Boolean);
+                      for (const id of bulkTargetIds) {
+                        await backend.cachedUpdateWorkItem(id, { labels });
+                        await queueWrite('update', id);
+                      }
+                      setSettingLabels(false);
+                      setLabelsInput('');
+                      setBulkTargetIds([]);
                       refreshData();
                     })();
                   }}
@@ -422,7 +721,8 @@ export function WorkItemList() {
               </Box>
             ) : confirmDelete ? (
               <Text color="red">
-                Delete item #{treeItems[cursor]?.item.id}? (y/n)
+                Delete {deleteTargetIds.length} item
+                {deleteTargetIds.length > 1 ? 's' : ''}? (y/n)
               </Text>
             ) : (
               <Text dimColor>{helpText}</Text>

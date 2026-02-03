@@ -7,6 +7,7 @@ interface CardLayoutProps {
   cursor: number;
   capabilities: BackendCapabilities;
   collapsedIds: Set<string>;
+  markedIds: Set<string>;
 }
 
 export function formatPriority(priority: string | undefined): string {
@@ -38,6 +39,7 @@ export function CardLayout({
   cursor,
   capabilities,
   collapsedIds,
+  markedIds,
 }: CardLayoutProps) {
   if (treeItems.length === 0) return null;
 
@@ -46,6 +48,7 @@ export function CardLayout({
       {treeItems.map((treeItem, idx) => {
         const { item, depth, isCrossType, hasChildren } = treeItem;
         const selected = idx === cursor;
+        const marked = markedIds.has(item.id);
         const indent = '  '.repeat(depth);
         const marker = selected ? '>' : ' ';
         const hasDeps =
@@ -68,6 +71,7 @@ export function CardLayout({
             key={`${item.id}-${item.type}`}
             flexDirection="column"
             marginBottom={idx < treeItems.length - 1 ? 1 : 0}
+            {...(marked && !selected ? { backgroundColor: 'cyan' } : {})}
           >
             <Box>
               <Text
