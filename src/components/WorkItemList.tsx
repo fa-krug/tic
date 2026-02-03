@@ -36,6 +36,13 @@ export function WorkItemList() {
   const [parentInput, setParentInput] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [allSearchItems, setAllSearchItems] = useState<WorkItem[]>([]);
+  // Marked items state for bulk operations (setter used in subsequent tasks)
+  const [markedIds, setMarkedIds] = useState<Set<string>>(() => new Set());
+  void setMarkedIds; // Will be used for 'm' key toggle in subsequent task
+
+  // Marked count for header display (used in subsequent tasks)
+  const markedCount = markedIds.size;
+  void markedCount; // Will be displayed in header in subsequent task
 
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(
     syncManager?.getStatus() ?? null,
