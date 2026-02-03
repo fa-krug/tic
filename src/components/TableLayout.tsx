@@ -23,7 +23,6 @@ export function TableLayout({
   collapsedIds,
   markedIds,
 }: TableLayoutProps) {
-  void markedIds; // Will be used for visual highlighting in Task 6
   const colId = useMemo(() => {
     const maxLen = treeItems.reduce(
       (max, { item }) => Math.max(max, item.id.length),
@@ -72,6 +71,7 @@ export function TableLayout({
       {treeItems.map((treeItem, idx) => {
         const { item, prefix, isCrossType, hasChildren } = treeItem;
         const selected = idx === cursor;
+        const marked = markedIds.has(item.id);
         const hasUnresolvedDeps = item.dependsOn.length > 0;
         const collapseIndicator = hasChildren
           ? collapsedIds.has(item.id)
@@ -81,7 +81,10 @@ export function TableLayout({
         const typeLabel = isCrossType ? ` (${item.type})` : '';
         const dimmed = isCrossType && !selected;
         return (
-          <Box key={`${item.id}-${item.type}`}>
+          <Box
+            key={`${item.id}-${item.type}`}
+            {...(marked && !selected ? { backgroundColor: 'cyan' } : {})}
+          >
             <Box width={2}>
               <Text color="cyan">{selected ? '>' : ' '}</Text>
             </Box>
