@@ -50,6 +50,21 @@ export function getShortcuts(
       if (capabilities.fields.parent) {
         actions.push({ key: 'p', description: 'Set parent' });
       }
+      actions.push({ key: 'm', description: 'Toggle mark' });
+      actions.push({ key: 'M', description: 'Clear all marks' });
+      actions.push({ key: 'b', description: 'Bulk actions menu' });
+      if (capabilities.customTypes) {
+        actions.push({ key: 't', description: 'Set type' });
+      }
+      if (capabilities.fields.priority) {
+        actions.push({ key: 'P', description: 'Set priority' });
+      }
+      if (capabilities.fields.assignee) {
+        actions.push({ key: 'a', description: 'Set assignee' });
+      }
+      if (capabilities.fields.labels) {
+        actions.push({ key: 'l', description: 'Set labels' });
+      }
 
       const switching: ShortcutEntry[] = [];
       if (capabilities.customTypes) {
