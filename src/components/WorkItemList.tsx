@@ -64,10 +64,6 @@ export function WorkItemList() {
   const [labelsInput, setLabelsInput] = useState('');
   const [bulkTargetIds, setBulkTargetIds] = useState<string[]>([]);
 
-  // Void workarounds for unused imports/state (will be used in future tasks)
-  void settingLabels;
-  void labelsInput;
-
   // Marked count for header display
   const markedCount = markedIds.size;
 
@@ -197,6 +193,14 @@ export function WorkItemList() {
     if (settingAssignee) {
       if (key.escape) {
         setSettingAssignee(false);
+        setBulkTargetIds([]);
+      }
+      return;
+    }
+
+    if (settingLabels) {
+      if (key.escape) {
+        setSettingLabels(false);
         setBulkTargetIds([]);
       }
       return;
@@ -647,6 +651,34 @@ export function WorkItemList() {
                       }
                       setSettingAssignee(false);
                       setAssigneeInput('');
+                      setBulkTargetIds([]);
+                      refreshData();
+                    })();
+                  }}
+                />
+              </Box>
+            ) : settingLabels ? (
+              <Box>
+                <Text color="cyan">
+                  Set labels for {bulkTargetIds.length} item
+                  {bulkTargetIds.length > 1 ? 's' : ''} (comma-separated):{' '}
+                </Text>
+                <TextInput
+                  value={labelsInput}
+                  onChange={setLabelsInput}
+                  focus={true}
+                  onSubmit={(value) => {
+                    void (async () => {
+                      const labels = value
+                        .split(',')
+                        .map((l) => l.trim())
+                        .filter(Boolean);
+                      for (const id of bulkTargetIds) {
+                        await backend.cachedUpdateWorkItem(id, { labels });
+                        await queueWrite('update', id);
+                      }
+                      setSettingLabels(false);
+                      setLabelsInput('');
                       setBulkTargetIds([]);
                       refreshData();
                     })();
