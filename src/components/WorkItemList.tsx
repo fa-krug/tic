@@ -65,8 +65,6 @@ export function WorkItemList() {
   const [bulkTargetIds, setBulkTargetIds] = useState<string[]>([]);
 
   // Void workarounds for unused imports/state (will be used in future tasks)
-  void settingAssignee;
-  void assigneeInput;
   void settingLabels;
   void labelsInput;
 
@@ -195,6 +193,14 @@ export function WorkItemList() {
     }
 
     if (showBulkMenu) return;
+
+    if (settingAssignee) {
+      if (key.escape) {
+        setSettingAssignee(false);
+        setBulkTargetIds([]);
+      }
+      return;
+    }
 
     if (isSearching) return;
 
@@ -617,6 +623,31 @@ export function WorkItemList() {
                       setSettingParent(false);
                       setParentInput('');
                       setParentTargetIds([]);
+                      refreshData();
+                    })();
+                  }}
+                />
+              </Box>
+            ) : settingAssignee ? (
+              <Box>
+                <Text color="cyan">
+                  Set assignee for {bulkTargetIds.length} item
+                  {bulkTargetIds.length > 1 ? 's' : ''}:{' '}
+                </Text>
+                <TextInput
+                  value={assigneeInput}
+                  onChange={setAssigneeInput}
+                  focus={true}
+                  onSubmit={(value) => {
+                    void (async () => {
+                      const assignee = value.trim();
+                      for (const id of bulkTargetIds) {
+                        await backend.cachedUpdateWorkItem(id, { assignee });
+                        await queueWrite('update', id);
+                      }
+                      setSettingAssignee(false);
+                      setAssigneeInput('');
+                      setBulkTargetIds([]);
                       refreshData();
                     })();
                   }}
