@@ -314,6 +314,10 @@ export function WorkItemList() {
         return next;
       });
     }
+
+    if (input === 'M') {
+      setMarkedIds(new Set());
+    }
   });
 
   const handleSearchSelect = (item: WorkItem) => {
