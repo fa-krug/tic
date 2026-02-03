@@ -10,13 +10,7 @@ if (process.argv.length > 2) {
   const { backend, syncManager } = await createBackendWithSync(process.cwd());
 
   if (syncManager) {
-    const items = await backend.listWorkItems();
-    if (items.length === 0) {
-      process.stderr.write('Syncing...\n');
-      await syncManager.sync();
-    } else {
-      syncManager.sync().catch(() => {});
-    }
+    syncManager.sync().catch(() => {});
   }
 
   render(<App backend={backend} syncManager={syncManager} />);
