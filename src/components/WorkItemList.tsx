@@ -64,10 +64,8 @@ export function WorkItemList() {
   const [labelsInput, setLabelsInput] = useState('');
   const [bulkTargetIds, setBulkTargetIds] = useState<string[]>([]);
 
-  // Void workarounds for unused imports/state (will be used in Tasks 22-23)
+  // Void workarounds for unused imports/state (will be used in Task 23)
   void PriorityPicker;
-  void TypePicker;
-  void showTypePicker;
   void showPriorityPicker;
   void settingAssignee;
   void assigneeInput;
@@ -495,6 +493,26 @@ export function WorkItemList() {
               }}
               onCancel={() => {
                 setShowStatusPicker(false);
+                setBulkTargetIds([]);
+              }}
+            />
+          )}
+          {showTypePicker && (
+            <TypePicker
+              types={types}
+              onSelect={(type) => {
+                void (async () => {
+                  setShowTypePicker(false);
+                  for (const id of bulkTargetIds) {
+                    await backend.cachedUpdateWorkItem(id, { type });
+                    await queueWrite('update', id);
+                  }
+                  setBulkTargetIds([]);
+                  refreshData();
+                })();
+              }}
+              onCancel={() => {
+                setShowTypePicker(false);
                 setBulkTargetIds([]);
               }}
             />
