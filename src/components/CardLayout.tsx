@@ -41,7 +41,6 @@ export function CardLayout({
   collapsedIds,
   markedIds,
 }: CardLayoutProps) {
-  void markedIds; // Will be used for visual highlighting in subsequent task
   if (treeItems.length === 0) return null;
 
   return (
@@ -49,6 +48,7 @@ export function CardLayout({
       {treeItems.map((treeItem, idx) => {
         const { item, depth, isCrossType, hasChildren } = treeItem;
         const selected = idx === cursor;
+        const marked = markedIds.has(item.id);
         const indent = '  '.repeat(depth);
         const marker = selected ? '>' : ' ';
         const hasDeps =
@@ -71,6 +71,7 @@ export function CardLayout({
             key={`${item.id}-${item.type}`}
             flexDirection="column"
             marginBottom={idx < treeItems.length - 1 ? 1 : 0}
+            {...(marked && !selected ? { backgroundColor: 'cyan' } : {})}
           >
             <Box>
               <Text
