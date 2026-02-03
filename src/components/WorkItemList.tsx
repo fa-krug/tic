@@ -36,9 +36,8 @@ export function WorkItemList() {
   const [parentInput, setParentInput] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [allSearchItems, setAllSearchItems] = useState<WorkItem[]>([]);
-  // Marked items state for bulk operations (setter used in subsequent tasks)
+  // Marked items state for bulk operations
   const [markedIds, setMarkedIds] = useState<Set<string>>(() => new Set());
-  void setMarkedIds; // Will be used for 'm' key toggle in subsequent task
 
   // Marked count for header display (used in subsequent tasks)
   const markedCount = markedIds.size;
@@ -300,6 +299,19 @@ export function WorkItemList() {
     if (input === 'r' && syncManager) {
       void syncManager.sync().then(() => {
         refreshData();
+      });
+    }
+
+    if (input === 'm' && treeItems.length > 0) {
+      const itemId = treeItems[cursor]!.item.id;
+      setMarkedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(itemId)) {
+          next.delete(itemId);
+        } else {
+          next.add(itemId);
+        }
+        return next;
       });
     }
   });
