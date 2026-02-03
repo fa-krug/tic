@@ -40,22 +40,24 @@ describe('getShortcuts', () => {
     expect(allKeys).toContain('tab');
     expect(allKeys).toContain('i');
     expect(allKeys).toContain('r');
-    expect(allKeys).toContain('b');
+    expect(allKeys).toContain('b'); // bulk actions menu (always present)
+    expect(allKeys).toContain('B'); // branch/worktree (git available)
     expect(allKeys).toContain('/');
   });
 
   it('omits capability-dependent shortcuts when not supported', () => {
     const groups = getShortcuts('list', minimalCapabilities, false, false);
     const allKeys = groups.flatMap((g) => g.shortcuts.map((s) => s.key));
-    expect(allKeys).not.toContain('p');
-    expect(allKeys).not.toContain('tab');
-    expect(allKeys).not.toContain('i');
-    expect(allKeys).not.toContain('r');
-    expect(allKeys).not.toContain('b');
+    expect(allKeys).not.toContain('p'); // parent - needs capabilities.fields.parent
+    expect(allKeys).not.toContain('tab'); // type cycling - needs customTypes
+    expect(allKeys).not.toContain('i'); // iteration picker - needs iterations
+    expect(allKeys).not.toContain('r'); // sync - needs syncManager
+    expect(allKeys).not.toContain('B'); // branch/worktree - needs gitAvailable
     // Core shortcuts always present
     expect(allKeys).toContain('enter');
     expect(allKeys).toContain('c');
     expect(allKeys).toContain('q');
+    expect(allKeys).toContain('b'); // bulk actions menu - always present
   });
 
   it('returns form shortcuts', () => {

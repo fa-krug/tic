@@ -307,7 +307,7 @@ export function WorkItemList() {
       })();
     }
 
-    if (input === 'b' && gitAvailable && treeItems.length > 0) {
+    if (input === 'B' && gitAvailable && treeItems.length > 0) {
       const item = treeItems[cursor]!.item;
       const comments = item.comments;
       const config = readConfigSync(process.cwd());
