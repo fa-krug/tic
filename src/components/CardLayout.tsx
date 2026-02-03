@@ -7,6 +7,7 @@ interface CardLayoutProps {
   cursor: number;
   capabilities: BackendCapabilities;
   collapsedIds: Set<string>;
+  markedIds: Set<string>;
 }
 
 export function formatPriority(priority: string | undefined): string {
@@ -38,7 +39,9 @@ export function CardLayout({
   cursor,
   capabilities,
   collapsedIds,
+  markedIds,
 }: CardLayoutProps) {
+  void markedIds; // Will be used for visual highlighting in subsequent task
   if (treeItems.length === 0) return null;
 
   return (
