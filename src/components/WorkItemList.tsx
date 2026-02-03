@@ -49,6 +49,7 @@ export function WorkItemList() {
   // Marked items state for bulk operations
   const [markedIds, setMarkedIds] = useState<Set<string>>(() => new Set());
   const [deleteTargetIds, setDeleteTargetIds] = useState<string[]>([]);
+  const [parentTargetIds, setParentTargetIds] = useState<string[]>([]);
 
   // Marked count for header display
   const markedCount = markedIds.size;
@@ -308,9 +309,18 @@ export function WorkItemList() {
       treeItems.length > 0 &&
       !settingParent
     ) {
-      setSettingParent(true);
-      const currentParent = treeItems[cursor]!.item.parent;
-      setParentInput(currentParent !== null ? String(currentParent) : '');
+      const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+      if (targetIds.length > 0) {
+        setParentTargetIds(targetIds);
+        setSettingParent(true);
+        // For single item, prefill current parent
+        if (targetIds.length === 1) {
+          const item = treeItems.find((t) => t.item.id === targetIds[0]);
+          setParentInput(item?.item.parent ?? '');
+        } else {
+          setParentInput('');
+        }
+      }
     }
 
     if (key.tab && capabilities.customTypes && types.length > 0) {
@@ -445,21 +455,25 @@ export function WorkItemList() {
           <Box marginTop={1}>
             {capabilities.fields.parent && settingParent ? (
               <Box>
-                <Text color="cyan">Set parent ID (empty to clear): </Text>
+                <Text color="cyan">
+                  Set parent for {parentTargetIds.length} item
+                  {parentTargetIds.length > 1 ? 's' : ''} (empty to clear):{' '}
+                </Text>
                 <TextInput
                   value={parentInput}
                   onChange={setParentInput}
                   focus={true}
                   onSubmit={(value) => {
                     void (async () => {
-                      const item = treeItems[cursor]!.item;
                       const newParent =
                         value.trim() === '' ? null : value.trim();
                       try {
-                        await backend.cachedUpdateWorkItem(item.id, {
-                          parent: newParent,
-                        });
-                        await queueWrite('update', item.id);
+                        for (const id of parentTargetIds) {
+                          await backend.cachedUpdateWorkItem(id, {
+                            parent: newParent,
+                          });
+                          await queueWrite('update', id);
+                        }
                         setWarning('');
                       } catch (e) {
                         setWarning(
@@ -468,6 +482,7 @@ export function WorkItemList() {
                       }
                       setSettingParent(false);
                       setParentInput('');
+                      setParentTargetIds([]);
                       refreshData();
                     })();
                   }}
