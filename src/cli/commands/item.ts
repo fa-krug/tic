@@ -44,7 +44,7 @@ export async function runItemCreate(
 ): Promise<WorkItem> {
   const statuses = await backend.getStatuses();
   const types = await backend.getWorkItemTypes();
-  return backend.createWorkItem({
+  return backend.cachedCreateWorkItem({
     title,
     type: opts.type ?? (types.includes('task') ? 'task' : types[0]!),
     status: opts.status ?? statuses[0]!,
@@ -113,14 +113,14 @@ export async function runItemUpdate(
             .map((d) => d.trim())
             .filter((d) => d.length > 0);
   if (opts.description !== undefined) data.description = opts.description;
-  return backend.updateWorkItem(id, data);
+  return backend.cachedUpdateWorkItem(id, data);
 }
 
 export async function runItemDelete(
   backend: Backend,
   id: string,
 ): Promise<void> {
-  await backend.deleteWorkItem(id);
+  await backend.cachedDeleteWorkItem(id);
 }
 
 export async function runItemOpen(backend: Backend, id: string): Promise<void> {

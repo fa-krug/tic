@@ -228,7 +228,7 @@ export function WorkItemForm() {
       .filter((s) => s.length > 0);
 
     if (selectedWorkItemId !== null) {
-      await backend.updateWorkItem(selectedWorkItemId, {
+      await backend.cachedUpdateWorkItem(selectedWorkItemId, {
         title,
         type,
         status,
@@ -255,7 +255,7 @@ export function WorkItemForm() {
         setNewComment('');
       }
     } else {
-      const created = await backend.createWorkItem({
+      const created = await backend.cachedCreateWorkItem({
         title: title || 'Untitled',
         type,
         status,

@@ -162,7 +162,7 @@ export function WorkItemList() {
     if (confirmDelete) {
       if (input === 'y' || input === 'Y') {
         void (async () => {
-          await backend.deleteWorkItem(treeItems[cursor]!.item.id);
+          await backend.cachedDeleteWorkItem(treeItems[cursor]!.item.id);
           await queueWrite('delete', treeItems[cursor]!.item.id);
           setConfirmDelete(false);
           setCursor((c) => Math.max(0, c - 1));
@@ -403,7 +403,7 @@ export function WorkItemList() {
                       const newParent =
                         value.trim() === '' ? null : value.trim();
                       try {
-                        await backend.updateWorkItem(item.id, {
+                        await backend.cachedUpdateWorkItem(item.id, {
                           parent: newParent,
                         });
                         await queueWrite('update', item.id);
