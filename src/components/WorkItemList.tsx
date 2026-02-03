@@ -69,21 +69,13 @@ export function WorkItemList() {
   void TypePicker;
   void StatusPicker;
   void showStatusPicker;
-  void setShowStatusPicker;
   void showTypePicker;
-  void setShowTypePicker;
   void showPriorityPicker;
-  void setShowPriorityPicker;
   void settingAssignee;
-  void setSettingAssignee;
   void assigneeInput;
-  void setAssigneeInput;
   void settingLabels;
-  void setSettingLabels;
   void labelsInput;
-  void setLabelsInput;
   void bulkTargetIds;
-  void setBulkTargetIds;
 
   // Marked count for header display
   const markedCount = markedIds.size;
@@ -406,8 +398,41 @@ export function WorkItemList() {
   };
 
   const handleBulkAction = (action: BulkAction) => {
-    // Will be implemented in next tasks
-    setWarning(`Bulk action: ${action} (not yet implemented)`);
+    const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+    if (targetIds.length === 0) return;
+    setBulkTargetIds(targetIds);
+
+    switch (action) {
+      case 'status':
+        setShowStatusPicker(true);
+        break;
+      case 'iteration':
+        navigate('iteration-picker');
+        break;
+      case 'parent':
+        setParentTargetIds(targetIds);
+        setSettingParent(true);
+        setParentInput('');
+        break;
+      case 'type':
+        setShowTypePicker(true);
+        break;
+      case 'priority':
+        setShowPriorityPicker(true);
+        break;
+      case 'assignee':
+        setSettingAssignee(true);
+        setAssigneeInput('');
+        break;
+      case 'labels':
+        setSettingLabels(true);
+        setLabelsInput('');
+        break;
+      case 'delete':
+        setDeleteTargetIds(targetIds);
+        setConfirmDelete(true);
+        break;
+    }
   };
 
   const typeLabel = activeType
