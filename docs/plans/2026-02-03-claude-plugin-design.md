@@ -268,3 +268,50 @@ npm install -D @semantic-release/exec @semantic-release/git
 3. `@semantic-release/npm` publishes to npm
 4. `@semantic-release/git` commits plugin.json update
 5. `@semantic-release/github` creates GitHub release
+
+## Plugin Updates
+
+### How Claude Code Handles Updates
+
+Claude Code tracks installed plugins in `~/.claude/plugins/installed_plugins.json` with:
+- `version` — semantic version or git commit SHA
+- `gitCommitSha` — pinned commit at install time
+- `lastUpdated` — timestamp of last update check
+
+**Update mechanisms:**
+
+| Method | Command/Setting |
+|--------|-----------------|
+| Manual | `claude plugin update tic` |
+| Auto-update | Enable per-marketplace in Claude Code settings (v2.0.70+) |
+
+A restart is required after updates to apply changes.
+
+### Version Detection
+
+Claude Code compares the installed `gitCommitSha` against the marketplace's current HEAD. When using semantic versioning (our approach), it reads the version from `plugin.json` in the marketplace.
+
+This is why syncing `plugin.json` version on release matters — it enables proper version detection and update notifications.
+
+### User Update Flow
+
+```bash
+# Manual update
+claude plugin update tic
+
+# Or enable auto-update in Claude Code settings for the tic marketplace
+```
+
+### README Update Section
+
+Add to the Claude Code Integration section:
+
+```markdown
+### Updating
+
+```bash
+claude plugin update tic
+```
+
+Or enable auto-updates for the tic marketplace in Claude Code settings.
+```
