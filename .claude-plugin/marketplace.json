@@ -1,0 +1,14 @@
+{
+  "name": "tic",
+  "description": "Issue tracking plugin for Claude Code",
+  "owner": {
+    "name": "Sascha Krug"
+  },
+  "plugins": [
+    {
+      "name": "tic",
+      "description": "Issue tracking skills and MCP server",
+      "source": "./"
+    }
+  ]
+}
