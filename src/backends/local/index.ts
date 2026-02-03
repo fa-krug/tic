@@ -90,6 +90,10 @@ export class LocalBackend extends BaseBackend {
     return this.getAssigneesFromCache();
   }
 
+  async getLabels(): Promise<string[]> {
+    return this.getLabelsFromCache();
+  }
+
   // eslint-disable-next-line @typescript-eslint/require-await
   async getCurrentIteration(): Promise<string> {
     return this.config.current_iteration;

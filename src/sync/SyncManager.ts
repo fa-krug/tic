@@ -131,7 +131,11 @@ export class SyncManager {
         return entry.itemId;
       }
       case 'delete': {
-        await this.remote.deleteWorkItem(entry.itemId);
+        // Items with local- prefix were never synced to remote, nothing to delete.
+        // Return successfully so the entry is removed from the queue.
+        if (!entry.itemId.startsWith('local-')) {
+          await this.remote.deleteWorkItem(entry.itemId);
+        }
         return entry.itemId;
       }
       case 'comment': {

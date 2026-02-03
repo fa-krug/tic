@@ -31,6 +31,7 @@ function createMockRemote(items: WorkItem[] = []): Backend {
     getIterations: async () => ['default'],
     getWorkItemTypes: async () => ['epic', 'issue', 'task'],
     getAssignees: async () => [],
+    getLabels: async () => [],
     getCurrentIteration: async () => 'default',
     setCurrentIteration: vi.fn(async () => {}),
     listWorkItems: async () => [...store.values()],

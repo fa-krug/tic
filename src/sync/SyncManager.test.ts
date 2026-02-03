@@ -35,6 +35,8 @@ function createMockRemote(items: WorkItem[] = []): Backend {
     // eslint-disable-next-line @typescript-eslint/require-await
     getAssignees: async () => [],
     // eslint-disable-next-line @typescript-eslint/require-await
+    getLabels: async () => [],
+    // eslint-disable-next-line @typescript-eslint/require-await
     getCurrentIteration: async () => 'default',
     setCurrentIteration: vi.fn(async () => {}),
     // eslint-disable-next-line @typescript-eslint/require-await
@@ -241,6 +243,21 @@ describe('SyncManager push phase', () => {
     const result = await manager.pushPending();
     expect(result.pushed).toBe(1);
     expect((await queueStore.read()).pending).toHaveLength(0);
+  });
+
+  it('skips remote delete for local- prefixed IDs and removes entry from queue', async () => {
+    const deleteSpy = vi.spyOn(remote, 'deleteWorkItem');
+    await queueStore.append({
+      action: 'delete',
+      itemId: 'local-6',
+      timestamp: new Date().toISOString(),
+    });
+
+    const result = await manager.pushPending();
+    expect(result.pushed).toBe(1);
+    expect(result.failed).toBe(0);
+    expect((await queueStore.read()).pending).toHaveLength(0);
+    expect(deleteSpy).not.toHaveBeenCalled();
   });
 
   it('keeps failed entries in queue', async () => {

@@ -50,6 +50,7 @@ class TestBackend extends BaseBackend {
   getIterations = async () => ['sprint-1'];
   getWorkItemTypes = async () => ['task'];
   getAssignees = async () => this.getAssigneesFromCache();
+  getLabels = async () => this.getLabelsFromCache();
   getCurrentIteration = async () => 'sprint-1';
   setCurrentIteration = async () => {};
   getWorkItem = async (id: string) => this.items.find((i) => i.id === id)!;

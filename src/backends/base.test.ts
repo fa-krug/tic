@@ -76,6 +76,10 @@ class TestBackend extends BaseBackend {
     return [];
   }
   // eslint-disable-next-line @typescript-eslint/require-await
+  async getLabels(): Promise<string[]> {
+    return [];
+  }
+  // eslint-disable-next-line @typescript-eslint/require-await
   async getCurrentIteration(): Promise<string> {
     return '';
   }

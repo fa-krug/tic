@@ -29,6 +29,7 @@ export interface Backend {
   getIterations(): Promise<string[]>;
   getWorkItemTypes(): Promise<string[]>;
   getAssignees(): Promise<string[]>;
+  getLabels(): Promise<string[]>;
   getCurrentIteration(): Promise<string>;
   setCurrentIteration(name: string): Promise<void>;
   listWorkItems(iteration?: string): Promise<WorkItem[]>;
@@ -58,6 +59,7 @@ export abstract class BaseBackend implements Backend {
   abstract getIterations(): Promise<string[]>;
   abstract getWorkItemTypes(): Promise<string[]>;
   abstract getAssignees(): Promise<string[]>;
+  abstract getLabels(): Promise<string[]>;
   abstract getCurrentIteration(): Promise<string>;
   abstract setCurrentIteration(name: string): Promise<void>;
   abstract listWorkItems(iteration?: string): Promise<WorkItem[]>;
@@ -100,6 +102,17 @@ export abstract class BaseBackend implements Backend {
       if (item.assignee) assignees.add(item.assignee);
     }
     return [...assignees].sort();
+  }
+
+  protected async getLabelsFromCache(): Promise<string[]> {
+    const items = await this.getCachedItems();
+    const labels = new Set<string>();
+    for (const item of items) {
+      for (const label of item.labels) {
+        labels.add(label);
+      }
+    }
+    return [...labels].sort();
   }
 
   protected onCacheInvalidate(): void {

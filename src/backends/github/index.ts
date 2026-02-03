@@ -148,6 +148,10 @@ export class GitHubBackend extends BaseBackend {
     }
   }
 
+  async getLabels(): Promise<string[]> {
+    return this.getLabelsFromCache();
+  }
+
   // eslint-disable-next-line @typescript-eslint/require-await
   async getIterations(): Promise<string[]> {
     const milestones = this.fetchMilestones();

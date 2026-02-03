@@ -488,14 +488,6 @@ export function WorkItemList() {
   });
   const visibleTreeItems = treeItems.slice(viewport.start, viewport.end);
 
-  if (loading) {
-    return (
-      <Box>
-        <Text dimColor>Loading...</Text>
-      </Box>
-    );
-  }
-
   return (
     <Box flexDirection="column">
       {isSearching && (
@@ -585,6 +577,13 @@ export function WorkItemList() {
               </Text>
               <Text dimColor>{` (${items.length} items)`}</Text>
             </Text>
+            {loading && (
+              <Box marginLeft={1}>
+                <Text color="yellow">
+                  <Spinner type="dots" />
+                </Text>
+              </Box>
+            )}
             {syncStatus && syncStatus.state === 'syncing' ? (
               <Box marginLeft={1}>
                 <Text color="yellow">

@@ -105,6 +105,10 @@ export class AzureDevOpsBackend extends BaseBackend {
     }
   }
 
+  async getLabels(): Promise<string[]> {
+    return this.getLabelsFromCache();
+  }
+
   async getIterations(): Promise<string[]> {
     const iterations = await az<{ path: string }[]>(
       [

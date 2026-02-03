@@ -3,12 +3,14 @@ import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import SelectInput from 'ink-select-input';
 import { AutocompleteInput } from './AutocompleteInput.js';
+import { MultiAutocompleteInput } from './MultiAutocompleteInput.js';
 import { useAppState } from '../app.js';
 import type { Comment, WorkItem } from '../types.js';
 import { SyncQueueStore } from '../sync/queue.js';
 import type { QueueAction } from '../sync/types.js';
 import { useScrollViewport } from '../hooks/useScrollViewport.js';
 import { useBackendData } from '../hooks/useBackendData.js';
+import { openInEditor } from '../editor.js';
 
 type FieldName =
   | 'title'
@@ -68,6 +70,7 @@ export function WorkItemForm() {
     iterations,
     types,
     assignees,
+    labels: labelSuggestions,
     currentIteration,
     items: allItems,
     loading: configLoading,
@@ -184,7 +187,14 @@ export function WorkItemForm() {
           })()
         : '',
     );
-    setDependsOn(existingItem.dependsOn?.join(', ') ?? '');
+    setDependsOn(
+      existingItem.dependsOn
+        ?.map((depId) => {
+          const depItem = allItems.find((i) => i.id === depId);
+          return depItem ? `#${depId} - ${depItem.title}` : depId;
+        })
+        .join(', ') ?? '',
+    );
     setComments(existingItem.comments ?? []);
   }, [existingItem]);
 
@@ -224,7 +234,12 @@ export function WorkItemForm() {
     })();
     const parsedDependsOn = dependsOn
       .split(',')
-      .map((s) => s.trim())
+      .map((s) => {
+        const trimmed = s.trim();
+        if (!trimmed) return '';
+        const match = trimmed.match(/^#(\S+)\s*-\s/);
+        return match ? match[1]! : trimmed;
+      })
       .filter((s) => s.length > 0);
 
     if (selectedWorkItemId !== null) {
@@ -284,6 +299,18 @@ export function WorkItemForm() {
 
   useInput(
     (_input, key) => {
+      // Allow Esc to navigate back even while loading
+      if (key.escape && !editing) {
+        if (!configLoading && !itemLoading && !saving) {
+          void save();
+        }
+        const prev = popWorkItem();
+        if (prev === null) {
+          navigate('list');
+        }
+        return;
+      }
+
       if (configLoading || itemLoading || saving) return;
       if (!editing) {
         if (_input === '?') {
@@ -316,16 +343,17 @@ export function WorkItemForm() {
                 pushWorkItem(targetId);
               })();
             }
+          } else if (currentField === 'description') {
+            // Open external editor for description
+            try {
+              const edited = openInEditor(description);
+              setDescription(edited);
+            } catch {
+              // Editor failed, fall back to inline editing
+              setEditing(true);
+            }
           } else {
             setEditing(true);
-          }
-        }
-
-        if (key.escape) {
-          void save();
-          const prev = popWorkItem();
-          if (prev === null) {
-            navigate('list');
           }
         }
       } else {
@@ -336,13 +364,13 @@ export function WorkItemForm() {
     },
     {
       isActive:
-        !configLoading &&
-        !itemLoading &&
         !saving &&
         (!editing ||
           (!isSelectField &&
             currentField !== 'assignee' &&
-            currentField !== 'parent')),
+            currentField !== 'labels' &&
+            currentField !== 'parent' &&
+            currentField !== 'dependsOn')),
     },
   );
 
@@ -590,24 +618,106 @@ export function WorkItemForm() {
       );
     }
 
-    // Text fields: title, labels, description, dependsOn
-    const textValue =
-      field === 'title'
-        ? title
-        : field === 'labels'
-          ? labels
-          : field === 'dependsOn'
-            ? dependsOn
-            : description;
+    // Description field - opens external editor
+    if (field === 'description') {
+      const lines = description.split('\n');
+      const preview =
+        lines.length > 1
+          ? `${lines[0]}... (${lines.length} lines)`
+          : description || '';
 
-    const textSetter =
-      field === 'title'
-        ? setTitle
-        : field === 'labels'
-          ? setLabels
-          : field === 'dependsOn'
-            ? setDependsOn
-            : setDescription;
+      return (
+        <Box key={field} flexDirection="column">
+          <Box>
+            <Text color={focused ? 'cyan' : undefined}>{cursor} </Text>
+            <Text bold={focused} color={focused ? 'cyan' : undefined}>
+              {label}:{' '}
+            </Text>
+            <Text>
+              {preview || <Text dimColor>(empty)</Text>}
+              {focused && <Text dimColor> [enter opens $EDITOR]</Text>}
+            </Text>
+          </Box>
+        </Box>
+      );
+    }
+
+    if (field === 'dependsOn') {
+      if (isEditing) {
+        return (
+          <Box key={field} flexDirection="column">
+            <Box>
+              <Text color="cyan">{cursor} </Text>
+              <Text bold color="cyan">
+                {label}:{' '}
+              </Text>
+            </Box>
+            <Box marginLeft={4}>
+              <AutocompleteInput
+                value={dependsOn}
+                onChange={setDependsOn}
+                onSubmit={() => {
+                  setEditing(false);
+                }}
+                suggestions={parentSuggestions}
+                focus={true}
+              />
+            </Box>
+          </Box>
+        );
+      }
+
+      return (
+        <Box key={field}>
+          <Text color={focused ? 'cyan' : undefined}>{cursor} </Text>
+          <Text bold={focused} color={focused ? 'cyan' : undefined}>
+            {label}:{' '}
+          </Text>
+          <Text>{dependsOn || <Text dimColor>(empty)</Text>}</Text>
+        </Box>
+      );
+    }
+
+    if (field === 'labels') {
+      if (isEditing) {
+        return (
+          <Box key={field} flexDirection="column">
+            <Box>
+              <Text color="cyan">{cursor} </Text>
+              <Text bold color="cyan">
+                {label}:{' '}
+              </Text>
+            </Box>
+            <Box marginLeft={4}>
+              <MultiAutocompleteInput
+                value={labels}
+                onChange={setLabels}
+                onSubmit={() => {
+                  setEditing(false);
+                }}
+                suggestions={labelSuggestions}
+                focus={true}
+              />
+            </Box>
+          </Box>
+        );
+      }
+
+      return (
+        <Box key={field}>
+          <Text color={focused ? 'cyan' : undefined}>{cursor} </Text>
+          <Text bold={focused} color={focused ? 'cyan' : undefined}>
+            {label}:{' '}
+          </Text>
+          <Text>{labels || <Text dimColor>(empty)</Text>}</Text>
+        </Box>
+      );
+    }
+
+    // Text fields: title
+    const textValue = title;
+
+    const textSetter = setTitle;
 
     if (isEditing) {
       return (
