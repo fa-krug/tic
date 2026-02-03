@@ -39,9 +39,8 @@ export function WorkItemList() {
   // Marked items state for bulk operations
   const [markedIds, setMarkedIds] = useState<Set<string>>(() => new Set());
 
-  // Marked count for header display (used in subsequent tasks)
+  // Marked count for header display
   const markedCount = markedIds.size;
-  void markedCount; // Will be displayed in header in subsequent task
 
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(
     syncManager?.getStatus() ?? null,
@@ -388,6 +387,9 @@ export function WorkItemList() {
             ) : syncStatus ? (
               <Text dimColor> ✓ Synced</Text>
             ) : null}
+            {markedCount > 0 && (
+              <Text color="magenta">{` ● ${markedCount} marked`}</Text>
+            )}
           </Box>
 
           {terminalWidth >= 80 ? (
