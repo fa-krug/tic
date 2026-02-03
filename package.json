@@ -61,13 +61,24 @@
     "vitest": "^4.0.18"
   },
   "release": {
-    "branches": [
-      "main"
-    ],
+    "branches": ["main"],
     "plugins": [
       "@semantic-release/commit-analyzer",
       "@semantic-release/release-notes-generator",
+      [
+        "@semantic-release/exec",
+        {
+          "prepareCmd": "node scripts/sync-plugin-version.js ${nextRelease.version}"
+        }
+      ],
       "@semantic-release/npm",
+      [
+        "@semantic-release/git",
+        {
+          "assets": [".claude-plugin/plugin.json"],
+          "message": "chore(release): sync plugin version to ${nextRelease.version} [skip ci]"
+        }
+      ],
       "@semantic-release/github"
     ]
   }
