@@ -596,11 +596,17 @@ describe('GitHubBackend', () => {
   });
 
   describe('getDependents', () => {
-    it('throws UnsupportedOperationError', async () => {
+    it('returns empty array (dependsOn not supported)', async () => {
       const backend = new GitHubBackend('/repo');
-      await expect(backend.getDependents('1')).rejects.toThrow(
-        'dependsOn is not supported by the GitHubBackend backend',
+      mockGhGraphQL.mockReturnValue(
+        makeListResponse([
+          makeGhIssue({ number: 1 }),
+          makeGhIssue({ number: 2 }),
+        ]),
       );
+
+      const dependents = await backend.getDependents('1');
+      expect(dependents).toEqual([]);
     });
   });
 

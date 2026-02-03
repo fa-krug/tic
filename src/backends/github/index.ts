@@ -95,11 +95,16 @@ interface GetIssueNodeIdResponse {
 export class GitHubBackend extends BaseBackend {
   private cwd: string;
   private ownerRepo: { owner: string; repo: string } | null = null;
+  private cachedMilestones: GhMilestone[] | null = null;
 
   constructor(cwd: string) {
-    super();
+    super(60_000);
     this.cwd = cwd;
     ghExec(['auth', 'status'], cwd);
+  }
+
+  protected override onCacheInvalidate(): void {
+    this.cachedMilestones = null;
   }
 
   getCapabilities(): BackendCapabilities {
@@ -308,17 +313,6 @@ export class GitHubBackend extends BaseBackend {
     };
   }
 
-  override async getChildren(id: string): Promise<WorkItem[]> {
-    return (await this.listWorkItems()).filter((item) => item.parent === id);
-  }
-
-  override async getDependents(id: string): Promise<WorkItem[]> {
-    this.assertSupported(this.getCapabilities().fields.dependsOn, 'dependsOn');
-    return (await this.listWorkItems()).filter((item) =>
-      item.dependsOn.includes(id),
-    );
-  }
-
   getItemUrl(id: string): string {
     const result = gh<{ url: string }>(
       ['issue', 'view', id, '--json', 'url'],
@@ -364,11 +358,13 @@ export class GitHubBackend extends BaseBackend {
   }
 
   private fetchMilestones(): GhMilestone[] {
+    if (this.cachedMilestones) return this.cachedMilestones;
     const { owner, repo } = this.getOwnerRepo();
-    return gh<GhMilestone[]>(
+    this.cachedMilestones = gh<GhMilestone[]>(
       ['api', `repos/${owner}/${repo}/milestones`, '--jq', '.'],
       this.cwd,
     );
+    return this.cachedMilestones;
   }
 
   private fetchOpenMilestones(): GhMilestone[] {
