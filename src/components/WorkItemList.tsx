@@ -64,18 +64,15 @@ export function WorkItemList() {
   const [labelsInput, setLabelsInput] = useState('');
   const [bulkTargetIds, setBulkTargetIds] = useState<string[]>([]);
 
-  // Void workarounds for unused imports/state (will be used in Tasks 21-23)
+  // Void workarounds for unused imports/state (will be used in Tasks 22-23)
   void PriorityPicker;
   void TypePicker;
-  void StatusPicker;
-  void showStatusPicker;
   void showTypePicker;
   void showPriorityPicker;
   void settingAssignee;
   void assigneeInput;
   void settingLabels;
   void labelsInput;
-  void bulkTargetIds;
 
   // Marked count for header display
   const markedCount = markedIds.size;
@@ -87,6 +84,7 @@ export function WorkItemList() {
   const {
     capabilities,
     types,
+    statuses,
     currentIteration: iteration,
     items: allItems,
     loading,
@@ -479,6 +477,26 @@ export function WorkItemList() {
                 handleBulkAction(action);
               }}
               onCancel={() => setShowBulkMenu(false)}
+            />
+          )}
+          {showStatusPicker && (
+            <StatusPicker
+              statuses={statuses}
+              onSelect={(status) => {
+                void (async () => {
+                  setShowStatusPicker(false);
+                  for (const id of bulkTargetIds) {
+                    await backend.cachedUpdateWorkItem(id, { status });
+                    await queueWrite('update', id);
+                  }
+                  setBulkTargetIds([]);
+                  refreshData();
+                })();
+              }}
+              onCancel={() => {
+                setShowStatusPicker(false);
+                setBulkTargetIds([]);
+              }}
             />
           )}
           <Box marginBottom={1}>
