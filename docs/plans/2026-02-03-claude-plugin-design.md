@@ -198,3 +198,73 @@ Auto-installs tic on first use. Users don't need a separate `npm install -g` ste
 ### Why remove detailed tool table from README?
 
 The tool documentation moves into skills where Claude actually reads it. README stays focused on human quick-start.
+
+## Version Sync on Release
+
+The plugin version in `.claude-plugin/plugin.json` must stay in sync with the npm package version.
+
+### Approach
+
+Add `@semantic-release/exec` to run a script that updates plugin.json before committing:
+
+**package.json release config:**
+
+```json
+{
+  "release": {
+    "branches": ["main"],
+    "plugins": [
+      "@semantic-release/commit-analyzer",
+      "@semantic-release/release-notes-generator",
+      [
+        "@semantic-release/exec",
+        {
+          "prepareCmd": "node scripts/sync-plugin-version.js ${nextRelease.version}"
+        }
+      ],
+      "@semantic-release/npm",
+      [
+        "@semantic-release/git",
+        {
+          "assets": [".claude-plugin/plugin.json"],
+          "message": "chore(release): sync plugin version to ${nextRelease.version} [skip ci]"
+        }
+      ],
+      "@semantic-release/github"
+    ]
+  }
+}
+```
+
+**scripts/sync-plugin-version.js:**
+
+```javascript
+#!/usr/bin/env node
+import { readFileSync, writeFileSync } from 'fs';
+
+const version = process.argv[2];
+if (!version) {
+  console.error('Usage: sync-plugin-version.js <version>');
+  process.exit(1);
+}
+
+const pluginPath = '.claude-plugin/plugin.json';
+const plugin = JSON.parse(readFileSync(pluginPath, 'utf8'));
+plugin.version = version;
+writeFileSync(pluginPath, JSON.stringify(plugin, null, 2) + '\n');
+console.log(`Updated ${pluginPath} to version ${version}`);
+```
+
+### New Dependencies
+
+```bash
+npm install -D @semantic-release/exec @semantic-release/git
+```
+
+### Release Flow
+
+1. semantic-release determines next version from commits
+2. `@semantic-release/exec` runs sync script to update plugin.json
+3. `@semantic-release/npm` publishes to npm
+4. `@semantic-release/git` commits plugin.json update
+5. `@semantic-release/github` creates GitHub release
