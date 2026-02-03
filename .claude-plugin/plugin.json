@@ -1,0 +1,11 @@
+{
+  "name": "tic",
+  "description": "Issue tracking skills for Claude Code",
+  "version": "0.1.0",
+  "author": {
+    "name": "Sascha Krug"
+  },
+  "repository": "https://github.com/fa-krug/tic",
+  "license": "MIT",
+  "keywords": ["issue-tracking", "work-items", "mcp"]
+}
