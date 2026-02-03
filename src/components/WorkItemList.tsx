@@ -22,7 +22,7 @@ import { StatusPicker } from './StatusPicker.js';
 import type { WorkItem } from '../types.js';
 export type { TreeItem } from './buildTree.js';
 
-function getTargetIds(
+export function getTargetIds(
   markedIds: Set<string>,
   cursorItem: { id: string } | undefined,
 ): string[] {
