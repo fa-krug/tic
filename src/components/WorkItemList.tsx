@@ -15,8 +15,13 @@ import { SyncQueueStore } from '../sync/queue.js';
 import type { SyncStatus, QueueAction } from '../sync/types.js';
 import { buildTree, type TreeItem } from './buildTree.js';
 import { SearchOverlay } from './SearchOverlay.js';
+import { BulkMenu, type BulkAction } from './BulkMenu.js';
 import type { WorkItem } from '../types.js';
 export type { TreeItem } from './buildTree.js';
+
+// Temporary: suppress unused import errors until Task 17 adds the render
+void BulkMenu;
+void (undefined as unknown as BulkAction);
 
 function getTargetIds(
   markedIds: Set<string>,
@@ -50,6 +55,7 @@ export function WorkItemList() {
   const [markedIds, setMarkedIds] = useState<Set<string>>(() => new Set());
   const [deleteTargetIds, setDeleteTargetIds] = useState<string[]>([]);
   const [parentTargetIds, setParentTargetIds] = useState<string[]>([]);
+  const [showBulkMenu, setShowBulkMenu] = useState(false);
 
   // Marked count for header display
   const markedCount = markedIds.size;
@@ -173,6 +179,8 @@ export function WorkItemList() {
       }
       return;
     }
+
+    if (showBulkMenu) return;
 
     if (isSearching) return;
 
@@ -352,6 +360,10 @@ export function WorkItemList() {
 
     if (input === 'M') {
       setMarkedIds(new Set());
+    }
+
+    if (input === 'b' && treeItems.length > 0) {
+      setShowBulkMenu(true);
     }
   });
 
