@@ -396,6 +396,7 @@ export function WorkItemList() {
               cursor={viewport.visibleCursor}
               capabilities={capabilities}
               collapsedIds={collapsedIds}
+              markedIds={markedIds}
             />
           ) : (
             <CardLayout

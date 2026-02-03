@@ -8,6 +8,7 @@ interface TableLayoutProps {
   cursor: number;
   capabilities: BackendCapabilities;
   collapsedIds: Set<string>;
+  markedIds: Set<string>;
 }
 
 const colStatus = 14;
@@ -20,7 +21,9 @@ export function TableLayout({
   cursor,
   capabilities,
   collapsedIds,
+  markedIds,
 }: TableLayoutProps) {
+  void markedIds; // Will be used for visual highlighting in Task 6
   const colId = useMemo(() => {
     const maxLen = treeItems.reduce(
       (max, { item }) => Math.max(max, item.id.length),
