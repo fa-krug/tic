@@ -28,9 +28,6 @@ function getTargetIds(
   return cursorItem ? [cursorItem.id] : [];
 }
 
-// Temporary: prevent unused variable error until used by bulk operations
-void getTargetIds;
-
 export function WorkItemList() {
   const {
     backend,
@@ -51,6 +48,7 @@ export function WorkItemList() {
   const [allSearchItems, setAllSearchItems] = useState<WorkItem[]>([]);
   // Marked items state for bulk operations
   const [markedIds, setMarkedIds] = useState<Set<string>>(() => new Set());
+  const [deleteTargetIds, setDeleteTargetIds] = useState<string[]>([]);
 
   // Marked count for header display
   const markedCount = markedIds.size;
@@ -180,14 +178,25 @@ export function WorkItemList() {
     if (confirmDelete) {
       if (input === 'y' || input === 'Y') {
         void (async () => {
-          await backend.cachedDeleteWorkItem(treeItems[cursor]!.item.id);
-          await queueWrite('delete', treeItems[cursor]!.item.id);
+          for (const id of deleteTargetIds) {
+            await backend.cachedDeleteWorkItem(id);
+            await queueWrite('delete', id);
+          }
           setConfirmDelete(false);
+          setDeleteTargetIds([]);
+          setMarkedIds((prev) => {
+            const next = new Set(prev);
+            for (const id of deleteTargetIds) {
+              next.delete(id);
+            }
+            return next;
+          });
           setCursor((c) => Math.max(0, c - 1));
           refreshData();
         })();
       } else {
         setConfirmDelete(false);
+        setDeleteTargetIds([]);
       }
       return;
     }
@@ -251,7 +260,11 @@ export function WorkItemList() {
     }
 
     if (input === 'd' && treeItems.length > 0) {
-      setConfirmDelete(true);
+      const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+      if (targetIds.length > 0) {
+        setDeleteTargetIds(targetIds);
+        setConfirmDelete(true);
+      }
     }
 
     if (input === 'o' && treeItems.length > 0) {
@@ -462,7 +475,8 @@ export function WorkItemList() {
               </Box>
             ) : confirmDelete ? (
               <Text color="red">
-                Delete item #{treeItems[cursor]?.item.id}? (y/n)
+                Delete {deleteTargetIds.length} item
+                {deleteTargetIds.length > 1 ? 's' : ''}? (y/n)
               </Text>
             ) : (
               <Text dimColor>{helpText}</Text>
