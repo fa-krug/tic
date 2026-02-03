@@ -156,66 +156,31 @@ next_id: 1
 
 You can edit these files directly — they're plain text. Customize types, statuses, and iterations by editing `config.yml`.
 
-## MCP Server
-
-tic includes a built-in [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server that exposes your work items to AI assistants like Claude. This lets AI tools read, create, update, and manage your issues without leaving the conversation.
-
-### Starting the Server
+## Claude Code Integration
 
 ```bash
-tic mcp serve
+claude plugin marketplace add fa-krug/tic
+claude plugin install tic
 ```
 
-The server communicates over stdio using the MCP protocol.
+That's it. The plugin installs tic automatically on first use.
 
-### Connecting to Claude Code
+### What Claude Can Do
 
-Add tic as an MCP server in your project:
+- List, search, create, update, and delete work items
+- Navigate parent-child hierarchies and dependencies
+- Add comments and manage iterations
+- Initialize tic in new projects
+
+The plugin auto-detects your backend (GitHub, GitLab, Azure DevOps, or local) and adapts to its capabilities.
+
+### Updating
 
 ```bash
-claude mcp add --scope project --transport stdio tic -- npx tic mcp serve
+claude plugin update tic
 ```
 
-Or create a `.mcp.json` file in your project root:
-
-```json
-{
-  "mcpServers": {
-    "tic": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["tic", "mcp", "serve"]
-    }
-  }
-}
-```
-
-### Available Tools
-
-The MCP server exposes 14 tools:
-
-| Tool | Description |
-|------|-------------|
-| `init_project` | Initialize a new tic project (creates `.tic/` directory) |
-| `get_config` | Get project configuration (statuses, types, iterations) |
-| `list_items` | List work items with optional filters by type, status, or iteration |
-| `show_item` | Show full details of a single work item |
-| `create_item` | Create a new work item with title, type, status, priority, and more |
-| `update_item` | Update any field on an existing work item |
-| `delete_item` | Preview deleting a work item (shows affected children and dependents) |
-| `confirm_delete` | Confirm and execute a previously previewed deletion |
-| `add_comment` | Add a timestamped comment to a work item |
-| `set_iteration` | Set the current active iteration |
-| `search_items` | Search work items by text query across titles and descriptions |
-| `get_children` | Get child items of a specific work item |
-| `get_dependents` | Get items that depend on a specific work item |
-| `get_item_tree` | Get work items as a hierarchical tree structure |
-
-### Safety
-
-Deletion is a two-step process: `delete_item` returns a preview of what will be affected (children that will be unparented, dependents that will lose a dependency), and `confirm_delete` must be called separately to actually remove the item. This prevents accidental data loss when AI tools are managing your issues.
-
-If the server is started in a directory without a `.tic/` project, all tools except `init_project` will return an error asking you to initialize first.
+Or enable auto-updates for the tic marketplace in Claude Code settings.
 
 ## CLI Commands
 
