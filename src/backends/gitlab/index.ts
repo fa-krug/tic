@@ -29,12 +29,17 @@ function parseId(id: string): { type: 'issue' | 'epic'; iid: string } {
 export class GitLabBackend extends BaseBackend {
   private cwd: string;
   private group: string;
+  private cachedIterations: GlIteration[] | null = null;
 
   constructor(cwd: string) {
-    super();
+    super(60_000);
     this.cwd = cwd;
     glabExec(['auth', 'status'], cwd);
     this.group = detectGroup(cwd);
+  }
+
+  protected override onCacheInvalidate(): void {
+    this.cachedIterations = null;
   }
 
   getCapabilities(): BackendCapabilities {
@@ -280,11 +285,13 @@ export class GitLabBackend extends BaseBackend {
   }
 
   private fetchIterations(): GlIteration[] {
+    if (this.cachedIterations) return this.cachedIterations;
     const encodedGroup = encodeURIComponent(this.group);
-    return glab<GlIteration[]>(
+    this.cachedIterations = glab<GlIteration[]>(
       ['api', `groups/${encodedGroup}/iterations`, '--paginate'],
       this.cwd,
     );
+    return this.cachedIterations;
   }
 
   private async createIssue(data: NewWorkItem): Promise<WorkItem> {
