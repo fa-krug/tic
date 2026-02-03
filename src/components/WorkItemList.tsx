@@ -19,10 +19,6 @@ import { BulkMenu, type BulkAction } from './BulkMenu.js';
 import type { WorkItem } from '../types.js';
 export type { TreeItem } from './buildTree.js';
 
-// Temporary: suppress unused import errors until Task 17 adds the render
-void BulkMenu;
-void (undefined as unknown as BulkAction);
-
 function getTargetIds(
   markedIds: Set<string>,
   cursorItem: { id: string } | undefined,
@@ -377,6 +373,11 @@ export function WorkItemList() {
     setIsSearching(false);
   };
 
+  const handleBulkAction = (action: BulkAction) => {
+    // Will be implemented in next tasks
+    setWarning(`Bulk action: ${action} (not yet implemented)`);
+  };
+
   const typeLabel = activeType
     ? activeType.charAt(0).toUpperCase() + activeType.slice(1) + 's'
     : '';
@@ -412,6 +413,17 @@ export function WorkItemList() {
       )}
       {!isSearching && (
         <>
+          {showBulkMenu && (
+            <BulkMenu
+              itemCount={markedIds.size > 0 ? markedIds.size : 1}
+              capabilities={capabilities}
+              onSelect={(action) => {
+                setShowBulkMenu(false);
+                handleBulkAction(action);
+              }}
+              onCancel={() => setShowBulkMenu(false)}
+            />
+          )}
           <Box marginBottom={1}>
             <Text wrap="truncate">
               <Text bold color="cyan">
