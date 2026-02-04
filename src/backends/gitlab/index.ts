@@ -45,6 +45,8 @@ export class GitLabBackend extends BaseBackend {
   private cwd: string;
   private group: string;
   private cachedIterations: GlIteration[] | null = null;
+  /** Maps template slug → original GitLab filename (without .md) */
+  private templateNameCache = new Map<string, string>();
 
   constructor(cwd: string) {
     super(60_000);
@@ -335,11 +337,13 @@ export class GitLabBackend extends BaseBackend {
 
     if (!Array.isArray(items)) return [];
 
+    this.templateNameCache.clear();
     const templates: Template[] = [];
     for (const item of items) {
       if (item.type !== 'blob' || !item.name.endsWith('.md')) continue;
       const name = item.name.replace(/\.md$/, '');
       const slug = slugifyTemplateName(name);
+      this.templateNameCache.set(slug, name);
 
       let description = '';
       try {
@@ -364,9 +368,15 @@ export class GitLabBackend extends BaseBackend {
     return templates;
   }
 
+  /** Resolve a slug to the original GitLab filename (without .md). Falls back to slug. */
+  private resolveTemplateName(slug: string): string {
+    return this.templateNameCache.get(slug) ?? slug;
+  }
+
   // eslint-disable-next-line @typescript-eslint/require-await
   async getTemplate(slug: string): Promise<Template> {
-    const filePath = `${TEMPLATES_DIR}/${slug}.md`;
+    const name = this.resolveTemplateName(slug);
+    const filePath = `${TEMPLATES_DIR}/${name}.md`;
     const encodedPath = encodeURIComponent(filePath);
     const file = glab<GlFileResponse>(
       [
@@ -378,7 +388,7 @@ export class GitLabBackend extends BaseBackend {
       this.cwd,
     );
     const content = Buffer.from(file.content, 'base64').toString('utf-8');
-    return { slug, name: slug, description: content };
+    return { slug, name, description: content };
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
@@ -404,17 +414,19 @@ export class GitLabBackend extends BaseBackend {
       this.cwd,
     );
 
+    this.templateNameCache.set(slug, template.name);
     return { slug, name: template.name, description: content };
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
   async updateTemplate(oldSlug: string, template: Template): Promise<Template> {
     const newSlug = slugifyTemplateName(template.name);
+    const oldName = this.resolveTemplateName(oldSlug);
     const content = template.description ?? '';
 
-    if (oldSlug !== template.name) {
+    if (oldSlug !== newSlug) {
       // Name changed — delete old file and create new one
-      const oldPath = `${TEMPLATES_DIR}/${oldSlug}.md`;
+      const oldPath = `${TEMPLATES_DIR}/${oldName}.md`;
       const encodedOldPath = encodeURIComponent(oldPath);
       try {
         glabExec(
@@ -426,7 +438,7 @@ export class GitLabBackend extends BaseBackend {
             '-f',
             'branch=main',
             '-f',
-            `commit_message=Rename issue template: ${oldSlug} -> ${template.name}`,
+            `commit_message=Rename issue template: ${oldName} -> ${template.name}`,
           ],
           this.cwd,
         );
@@ -451,9 +463,12 @@ export class GitLabBackend extends BaseBackend {
         ],
         this.cwd,
       );
+
+      this.templateNameCache.delete(oldSlug);
+      this.templateNameCache.set(newSlug, template.name);
     } else {
-      // Same name — update in place
-      const filePath = `${TEMPLATES_DIR}/${oldSlug}.md`;
+      // Same slug — update in place
+      const filePath = `${TEMPLATES_DIR}/${oldName}.md`;
       const encodedPath = encodeURIComponent(filePath);
       glabExec(
         [
@@ -466,7 +481,7 @@ export class GitLabBackend extends BaseBackend {
           '-f',
           `content=${content}`,
           '-f',
-          `commit_message=Update issue template: ${oldSlug}`,
+          `commit_message=Update issue template: ${oldName}`,
         ],
         this.cwd,
       );
@@ -477,7 +492,8 @@ export class GitLabBackend extends BaseBackend {
 
   // eslint-disable-next-line @typescript-eslint/require-await
   async deleteTemplate(slug: string): Promise<void> {
-    const filePath = `${TEMPLATES_DIR}/${slug}.md`;
+    const name = this.resolveTemplateName(slug);
+    const filePath = `${TEMPLATES_DIR}/${name}.md`;
     const encodedPath = encodeURIComponent(filePath);
     glabExec(
       [
@@ -488,10 +504,11 @@ export class GitLabBackend extends BaseBackend {
         '-f',
         'branch=main',
         '-f',
-        `commit_message=Delete issue template: ${slug}`,
+        `commit_message=Delete issue template: ${name}`,
       ],
       this.cwd,
     );
+    this.templateNameCache.delete(slug);
   }
 
   private fetchIterations(): GlIteration[] {
