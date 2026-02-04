@@ -41,7 +41,7 @@ export function getShortcuts(
 
       const actions: ShortcutEntry[] = [
         { key: 'enter', description: 'Edit item' },
-        { key: 'c', description: 'Create new item' },
+        { key: 'c', description: 'Create item (template picker if available)' },
         { key: 'd', description: 'Delete item' },
         { key: 'o', description: 'Open in browser' },
         { key: 's', description: 'Status screen' },
@@ -158,6 +158,18 @@ export function getShortcuts(
             { key: 'enter/esc', description: 'Confirm' },
           ],
         },
+        ...(capabilities.templates
+          ? [
+              {
+                label: 'Templates',
+                shortcuts: [
+                  { key: 'enter', description: 'Edit template' },
+                  { key: 'c', description: 'Create template' },
+                  { key: 'd', description: 'Delete template' },
+                ],
+              },
+            ]
+          : []),
       ];
     }
 
