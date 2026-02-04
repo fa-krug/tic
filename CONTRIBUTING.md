@@ -53,6 +53,9 @@ The app uses screen-based routing via React Context (`AppContext` in `src/app.ts
 - `list` — main work item list
 - `form` — create/edit work item
 - `iteration-picker` — select current iteration
+- `settings` — backend selection and Jira configuration
+- `status` — sync status and error details
+- `help` — context-sensitive keyboard shortcut reference
 
 ### Backend Abstraction
 
@@ -68,12 +71,23 @@ The app uses screen-based routing via React Context (`AppContext` in `src/app.ts
 - **GitHub** (`src/backends/github/`) — reads/writes GitHub Issues via the `gh` CLI
 - **GitLab** (`src/backends/gitlab/`) — reads/writes GitLab Issues via the `glab` CLI
 - **Azure DevOps** (`src/backends/ado/`) — reads/writes Azure DevOps Work Items via the `az` CLI
+- **Jira** (`src/backends/jira/`) — reads/writes Jira issues via REST API
 
 ### Components
 
-- **WorkItemList** (`src/components/work-item-list.tsx`) — tree-indented table with keyboard navigation. Handles status cycling, parent assignment, deletion with confirmation, and type/iteration filtering.
-- **WorkItemForm** (`src/components/work-item-form.tsx`) — multi-field form for create/edit. Supports text fields, dropdowns, and read-only relationship display.
-- **IterationPicker** (`src/components/iteration-picker.tsx`) — select from configured iterations.
+- **WorkItemList** (`src/components/WorkItemList.tsx`) — collapsible tree-indented table with keyboard navigation. Supports bulk operations (mark/unmark items), inline property pickers, search overlay, and both table and card layouts (auto-selects based on terminal width).
+- **WorkItemForm** (`src/components/WorkItemForm.tsx`) — multi-field form for create/edit. Supports text fields, dropdowns, autocomplete inputs (assignee, parent, depends-on), multi-autocomplete (labels), external editor for descriptions, and navigable relationship links.
+- **IterationPicker** (`src/components/IterationPicker.tsx`) — select from configured iterations.
+- **Settings** (`src/components/Settings.tsx`) — backend selector with Jira configuration fields.
+- **StatusScreen** (`src/components/StatusScreen.tsx`) — sync status display with error details.
+- **HelpScreen** (`src/components/HelpScreen.tsx`) — context-sensitive keyboard shortcut reference.
+- **SearchOverlay** (`src/components/SearchOverlay.tsx`) — fuzzy search across all work items.
+- **BulkMenu** (`src/components/BulkMenu.tsx`) — action picker for bulk operations on marked items.
+- **AutocompleteInput** (`src/components/AutocompleteInput.tsx`) — single-value fuzzy autocomplete input.
+- **MultiAutocompleteInput** (`src/components/MultiAutocompleteInput.tsx`) — comma-separated multi-value autocomplete (used for labels).
+- **TableLayout** / **CardLayout** (`src/components/TableLayout.tsx`, `src/components/CardLayout.tsx`) — list rendering strategies for wide and narrow terminals.
+- **Header** (`src/components/Header.tsx`) — top-level header bar.
+- **PriorityPicker** / **StatusPicker** / **TypePicker** — inline overlay pickers for bulk property changes.
 
 ### CLI
 

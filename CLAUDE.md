@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**tic** is a terminal UI for issue tracking across multiple backends (GitHub, GitLab, Azure DevOps, local markdown). Built with TypeScript and Ink (React for the terminal). All four backends are implemented.
+**tic** is a terminal UI for issue tracking across multiple backends (GitHub, GitLab, Azure DevOps, Jira, local markdown). Built with TypeScript and Ink (React for the terminal). All five backends are implemented.
 
 ## Commands
 
@@ -46,7 +46,7 @@ Or add `.mcp.json` to the project root:
 
 ### Entry Point & Rendering
 
-`src/index.tsx` is the CLI entry point. It renders `<App>` using Ink's `render()`. The app uses screen-based routing via React Context (`AppContext` in `src/app.tsx`), with screens: `list`, `form`, `iteration-picker`.
+`src/index.tsx` is the CLI entry point. It renders `<App>` using Ink's `render()`. The app uses screen-based routing via React Context (`AppContext` in `src/app.tsx`), with screens: `list`, `form`, `iteration-picker`, `settings`, `status`, `help`.
 
 ### Backend Abstraction
 
@@ -60,14 +60,23 @@ Or add `.mcp.json` to the project root:
 - `GitHubBackend` (`src/backends/github/`) — GitHub Issues via `gh` CLI
 - `GitLabBackend` (`src/backends/gitlab/`) — GitLab Issues via `glab` CLI
 - `AzureDevOpsBackend` (`src/backends/ado/`) — Azure DevOps Work Items via `az` CLI
+- `JiraBackend` (`src/backends/jira/`) — Jira issues via REST API
 
-`src/backends/factory.ts` auto-detects the backend from git remotes (github.com → GitHub, gitlab.com → GitLab, dev.azure.com/visualstudio.com → Azure DevOps, fallback → local). Can be overridden via `backend` in `.tic/config.yml`.
+`src/backends/factory.ts` auto-detects the backend from git remotes (github.com → GitHub, gitlab.com → GitLab, dev.azure.com/visualstudio.com → Azure DevOps, fallback → local). Can be overridden via `backend` in `.tic/config.yml`. Jira is configured via the TUI settings screen.
 
 ### Components
 
-- `WorkItemList` — tree-indented table view with keyboard navigation (arrows, `c` create, `d` delete, `s` cycle status, `p` set parent, `Tab` switch work item type, `i` switch iteration, `q` quit). Shows `⧗` indicator for items with dependencies and warnings when completing items with open children/deps.
-- `WorkItemForm` — multi-field form for create/edit with type dropdown, parent ID field, and comma-separated dependency IDs (field navigation with arrows, Enter to edit, Esc to save and return). Shows read-only relationships section (children, dependents) when editing.
+- `WorkItemList` — collapsible tree-indented table view (or card layout in narrow terminals) with keyboard navigation. Supports bulk operations via mark/unmark (`m`/`M`), inline property pickers (`P` priority, `a` assignee, `l` labels, `t` type), search overlay (`/`), branch/worktree creation (`B`), and a bulk actions menu (`b`). Shows `⧗` indicator for items with dependencies.
+- `WorkItemForm` — multi-field form for create/edit with dropdowns (type, status, iteration, priority), autocomplete inputs (assignee, parent, depends-on), multi-autocomplete (labels), and external `$EDITOR` for descriptions. Navigable relationship links allow drilling into related items with a back-stack.
 - `IterationPicker` — select from configured iterations
+- `Settings` — backend selector and Jira configuration
+- `StatusScreen` — sync status and error details
+- `HelpScreen` — context-sensitive keyboard shortcut reference (press `?` from any screen)
+- `SearchOverlay` — fuzzy search across all work items
+- `BulkMenu` — action picker for bulk operations on marked items
+- `AutocompleteInput` / `MultiAutocompleteInput` — fuzzy autocomplete inputs for single and comma-separated multi-value fields
+- `TableLayout` / `CardLayout` — list rendering for wide (≥80 cols) and narrow terminals
+- `PriorityPicker` / `StatusPicker` / `TypePicker` — inline overlay pickers for bulk property changes
 
 ### CLI
 

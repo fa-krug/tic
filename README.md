@@ -1,22 +1,26 @@
 # tic
 
-A terminal UI for issue tracking, built for developers who live in the terminal. Track work items across multiple backends — local markdown files, GitHub Issues, GitLab Issues, and Azure DevOps Work Items.
+A terminal UI for issue tracking, built for developers who live in the terminal. Track work items across multiple backends — local markdown files, GitHub Issues, GitLab Issues, Azure DevOps Work Items, and Jira.
 
 Built with TypeScript and [Ink](https://github.com/vadimdemedes/ink).
 
 ## Features
 
 - **Keyboard-driven TUI** — browse, create, edit, and manage work items without leaving the terminal
-- **Multiple backends** — local markdown, GitHub (via `gh`), GitLab (via `glab`), Azure DevOps (via `az`)
+- **Multiple backends** — local markdown, GitHub (via `gh`), GitLab (via `glab`), Azure DevOps (via `az`), Jira (via REST API)
 - **Automatic backend detection** — selects backend based on git remote, or configure manually
 - **Local markdown storage** — work items stored as markdown files with YAML frontmatter in a `.tic/` directory
 - **CLI commands** — scriptable commands for all operations (`tic item list`, `tic item create`, etc.)
 - **Work item types** — organize by epic, issue, and task (configurable)
 - **Iterations** — group work into sprints or milestones
-- **Parent-child relationships** — build hierarchies with tree-indented views
+- **Parent-child relationships** — build hierarchies with collapsible tree-indented views
 - **Dependencies** — track which items block others, with warnings on premature completion
 - **Priority & assignee** — track who owns what and what's most important
 - **Comments** — add timestamped comments to any work item
+- **Bulk operations** — mark multiple items and change status, type, priority, assignee, labels, or parent in batch
+- **Quick search** — fuzzy search across all work items regardless of type or iteration
+- **External editor** — edit descriptions in your `$EDITOR` (falls back to vi)
+- **Settings screen** — switch backends and configure Jira connection from within the TUI
 - **MCP server** — expose work items to AI assistants via the Model Context Protocol
 
 ## Installation
@@ -39,6 +43,7 @@ For local storage, `tic init` creates a `.tic/` directory to store your work ite
 tic init --backend github
 tic init --backend gitlab
 tic init --backend azure
+tic init --backend jira
 tic init --backend local
 ```
 
@@ -46,39 +51,54 @@ tic init --backend local
 
 ### List View
 
-The main screen shows work items filtered by type and iteration, displayed as a tree that reflects parent-child relationships.
+The main screen shows work items filtered by type and iteration, displayed as a collapsible tree that reflects parent-child relationships. In narrow terminals (< 80 columns) the display switches to a card layout.
 
 | Key | Action |
 |-----|--------|
 | `↑` `↓` | Navigate between items |
+| `←` | Collapse children or jump to parent |
+| `→` | Expand children |
 | `Enter` | Edit selected item |
 | `c` | Create new work item |
-| `d` | Delete selected item (with confirmation) |
-| `s` | Cycle status forward |
+| `d` | Delete item(s) (with confirmation) |
+| `o` | Open item in browser/editor |
+| `s` | Status screen |
+| `/` | Quick search across all items |
 | `p` | Set parent for selected item |
-| `Tab` | Switch work item type (epic / issue / task) |
-| `i` | Switch iteration |
+| `m` | Toggle mark on current item |
+| `M` | Clear all marks |
+| `b` | Bulk actions menu |
+| `P` | Set priority (single or marked items) |
+| `a` | Set assignee (single or marked items) |
+| `l` | Set labels (single or marked items) |
+| `t` | Set type (single or marked items) |
+| `Tab` | Cycle work item type filter (epic / issue / task) |
+| `i` | Iteration picker |
+| `,` | Settings |
+| `B` | Create branch / worktree for item (requires git) |
+| `r` | Sync with remote backend |
+| `?` | Show keyboard shortcuts |
 | `q` | Quit |
 
-The list displays ID, title (tree-indented), status, priority, and assignee. Items with dependencies show a `⧗` indicator.
+The list displays ID, title (tree-indented), status, priority, and assignee. Items with dependencies show a `⧗` indicator. Marked items are highlighted — bulk actions apply to all marked items, or to the cursor item if none are marked.
 
 ### Editing a Work Item
 
 Press `Enter` on an item or `c` to create one. The form has these fields:
 
 - **Title** — name of the work item
-- **Type** — epic, issue, or task
-- **Status** — backlog, todo, in-progress, review, done
-- **Iteration** — which sprint/milestone this belongs to
-- **Priority** — low, medium, high, critical
-- **Assignee** — who owns this
-- **Labels** — comma-separated tags
-- **Parent** — ID of the parent item
-- **Depends On** — comma-separated IDs of items this depends on
-- **Description** — full details (multi-line)
+- **Type** — epic, issue, or task (dropdown)
+- **Status** — backlog, todo, in-progress, review, done (dropdown)
+- **Iteration** — which sprint/milestone this belongs to (dropdown)
+- **Priority** — low, medium, high, critical (dropdown)
+- **Assignee** — who owns this (autocomplete from existing assignees)
+- **Labels** — comma-separated tags (autocomplete from existing labels)
+- **Description** — full details (opens `$EDITOR` on Enter)
+- **Parent** — ID of the parent item (autocomplete from existing items)
+- **Depends On** — comma-separated IDs of items this depends on (autocomplete)
 - **Comments** — add new comments; existing comments shown as read-only
 
-Navigate fields with `↑` `↓`, press `Enter` to edit a field, and `Esc` to save and return to the list.
+Navigate fields with `↑` `↓`, press `Enter` to edit a field, and `Esc` to save and return to the list. Press `?` for help. When editing a related item in the relationships section, pressing `Enter` navigates to that item (and `Esc` navigates back through the stack).
 
 ### Iterations
 
@@ -172,7 +192,7 @@ That's it. The plugin installs tic automatically on first use.
 - Add comments and manage iterations
 - Initialize tic in new projects
 
-The plugin auto-detects your backend (GitHub, GitLab, Azure DevOps, or local) and adapts to its capabilities.
+The plugin auto-detects your backend (GitHub, GitLab, Azure DevOps, Jira, or local) and adapts to its capabilities.
 
 ### Updating
 
@@ -212,8 +232,11 @@ Add `--json` to any command for machine-readable output, or `--quiet` to suppres
 | GitHub Issues | [`gh`](https://cli.github.com/) | `github.com` in git remote |
 | GitLab Issues | [`glab`](https://gitlab.com/gitlab-org/cli) | `gitlab.com` in git remote |
 | Azure DevOps Work Items | [`az`](https://learn.microsoft.com/en-us/cli/azure/) | `dev.azure.com` or `visualstudio.com` in git remote |
+| Jira | REST API | Configured via settings |
 
 Each backend supports a different set of capabilities (types, statuses, iterations, relationships, etc.). The TUI and CLI automatically adapt to show only what the active backend supports.
+
+You can switch backends from within the TUI by pressing `,` to open settings. For Jira, you'll need to configure your site URL, project key, and optionally a board ID.
 
 ### Azure DevOps Authentication
 
