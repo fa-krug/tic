@@ -1,6 +1,6 @@
 {
   "name": "@sascha384/tic",
-  "version": "0.1.0",
+  "version": "1.10.2",
   "description": "Terminal UI for issue tracking",
   "type": "module",
   "bin": {
@@ -64,7 +64,9 @@
     "vitest": "^4.0.18"
   },
   "release": {
-    "branches": ["main"],
+    "branches": [
+      "main"
+    ],
     "plugins": [
       "@semantic-release/commit-analyzer",
       "@semantic-release/release-notes-generator",
@@ -78,7 +80,11 @@
       [
         "@semantic-release/git",
         {
-          "assets": ["package.json", "package-lock.json", ".claude-plugin/plugin.json"],
+          "assets": [
+            "package.json",
+            "package-lock.json",
+            ".claude-plugin/plugin.json"
+          ],
           "message": "chore(release): v${nextRelease.version} [skip ci]"
         }
       ],
