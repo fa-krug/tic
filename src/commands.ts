@@ -64,7 +64,7 @@ const commands: Command[] = [
     id: 'branch',
     label: 'Create branch/worktree',
     category: 'Actions',
-    shortcut: 'B',
+    shortcut: 'b',
     when: (ctx) =>
       ctx.screen === 'list' && ctx.hasSelectedItem && ctx.gitAvailable,
   },
@@ -163,7 +163,7 @@ const commands: Command[] = [
     id: 'bulk-menu',
     label: 'Bulk actions menu',
     category: 'Bulk',
-    shortcut: 'b',
+    shortcut: 'B',
     when: (ctx) => ctx.screen === 'list' && ctx.markedCount > 0,
   },
   // Other

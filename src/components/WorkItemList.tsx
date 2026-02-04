@@ -321,7 +321,7 @@ export function WorkItemList() {
       })();
     }
 
-    if (input === 'B' && gitAvailable && treeItems.length > 0) {
+    if (input === 'b' && gitAvailable && treeItems.length > 0) {
       const item = treeItems[cursor]!.item;
       const comments = item.comments;
       const config = readConfigSync(process.cwd());
@@ -400,7 +400,7 @@ export function WorkItemList() {
       setMarkedIds(new Set());
     }
 
-    if (input === 'b' && treeItems.length > 0) {
+    if (input === 'B' && treeItems.length > 0) {
       setShowBulkMenu(true);
     }
 

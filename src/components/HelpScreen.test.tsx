@@ -40,8 +40,8 @@ describe('getShortcuts', () => {
     expect(allKeys).toContain('tab');
     expect(allKeys).toContain('i');
     expect(allKeys).toContain('r');
-    expect(allKeys).toContain('b'); // bulk actions menu (always present)
-    expect(allKeys).toContain('B'); // branch/worktree (git available)
+    expect(allKeys).toContain('B'); // bulk actions menu (always present)
+    expect(allKeys).toContain('b'); // branch/worktree (git available)
     expect(allKeys).toContain('/');
   });
 
@@ -52,12 +52,12 @@ describe('getShortcuts', () => {
     expect(allKeys).not.toContain('tab'); // type cycling - needs customTypes
     expect(allKeys).not.toContain('i'); // iteration picker - needs iterations
     expect(allKeys).not.toContain('r'); // sync - needs syncManager
-    expect(allKeys).not.toContain('B'); // branch/worktree - needs gitAvailable
+    expect(allKeys).not.toContain('b'); // branch/worktree - needs gitAvailable
     // Core shortcuts always present
     expect(allKeys).toContain('enter');
     expect(allKeys).toContain('c');
     expect(allKeys).toContain('q');
-    expect(allKeys).toContain('b'); // bulk actions menu - always present
+    expect(allKeys).toContain('B'); // bulk actions menu - always present
   });
 
   it('returns form shortcuts', () => {

@@ -53,7 +53,7 @@ export function getShortcuts(
       }
       actions.push({ key: 'm', description: 'Toggle mark' });
       actions.push({ key: 'M', description: 'Clear all marks' });
-      actions.push({ key: 'b', description: 'Bulk actions menu' });
+      actions.push({ key: 'B', description: 'Bulk actions menu' });
       if (capabilities.customTypes) {
         actions.push({ key: 't', description: 'Set type' });
       }
@@ -81,7 +81,7 @@ export function getShortcuts(
         other.push({ key: 'r', description: 'Sync' });
       }
       if (gitAvailable) {
-        other.push({ key: 'B', description: 'Branch / worktree' });
+        other.push({ key: 'b', description: 'Branch / worktree' });
       }
       other.push({ key: 'q', description: 'Quit' });
 
