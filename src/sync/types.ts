@@ -1,4 +1,11 @@
-export type QueueAction = 'create' | 'update' | 'delete' | 'comment';
+export type QueueAction =
+  | 'create'
+  | 'update'
+  | 'delete'
+  | 'comment'
+  | 'template-create'
+  | 'template-update'
+  | 'template-delete';
 
 export interface QueueEntry {
   action: QueueAction;
@@ -6,6 +13,8 @@ export interface QueueEntry {
   timestamp: string;
   /** For comments: the comment body and author */
   commentData?: { author: string; body: string };
+  /** For templates: the template slug */
+  templateSlug?: string;
 }
 
 export interface SyncQueue {

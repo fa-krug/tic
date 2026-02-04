@@ -58,14 +58,18 @@ export function WorkItemForm() {
   const queueWrite = async (
     action: QueueAction,
     itemId: string,
-    commentData?: { author: string; body: string },
+    extra?: {
+      commentData?: { author: string; body: string };
+      templateSlug?: string;
+    },
   ) => {
     if (queueStore) {
       await queueStore.append({
         action,
         itemId,
         timestamp: new Date().toISOString(),
-        ...(commentData ? { commentData } : {}),
+        ...(extra?.commentData ? { commentData: extra.commentData } : {}),
+        ...(extra?.templateSlug ? { templateSlug: extra.templateSlug } : {}),
       });
       syncManager?.pushPending().catch(() => {});
     }
@@ -329,8 +333,14 @@ export function WorkItemForm() {
 
       if (editingTemplateSlug) {
         await backend.updateTemplate(editingTemplateSlug, template);
+        await queueWrite('template-update', template.slug, {
+          templateSlug: template.slug,
+        });
       } else {
         await backend.createTemplate(template);
+        await queueWrite('template-create', template.slug, {
+          templateSlug: template.slug,
+        });
       }
       setFormMode('item');
       setEditingTemplateSlug(null);
@@ -358,8 +368,7 @@ export function WorkItemForm() {
           body: newComment.trim(),
         });
         await queueWrite('comment', selectedWorkItemId, {
-          author: 'me',
-          body: newComment.trim(),
+          commentData: { author: 'me', body: newComment.trim() },
         });
         setComments((prev) => [...prev, added]);
         setNewComment('');
@@ -385,8 +394,7 @@ export function WorkItemForm() {
           body: newComment.trim(),
         });
         await queueWrite('comment', created.id, {
-          author: 'me',
-          body: newComment.trim(),
+          commentData: { author: 'me', body: newComment.trim() },
         });
       }
       setActiveTemplate(null);

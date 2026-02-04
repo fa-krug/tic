@@ -5,6 +5,7 @@ import { useAppState } from '../app.js';
 import { readConfig, writeConfig } from '../backends/local/config.js';
 import type { Config } from '../backends/local/config.js';
 import { VALID_BACKENDS } from '../backends/factory.js';
+import { SyncQueueStore } from '../sync/queue.js';
 import type { Template } from '../types.js';
 
 type NavItem =
@@ -24,11 +25,17 @@ export function Settings() {
     navigate,
     navigateToHelp,
     backend,
+    syncManager,
     setFormMode,
     setEditingTemplateSlug,
     selectWorkItem,
   } = useAppState();
   const root = process.cwd();
+
+  const queueStore = useMemo(() => {
+    if (!syncManager) return null;
+    return new SyncQueueStore(root);
+  }, [syncManager, root]);
 
   const [config, setConfig] = useState<Config | null>(null);
   const [cursor, setCursor] = useState(0);
@@ -129,10 +136,19 @@ export function Settings() {
       if (confirmDeleteTemplate) {
         if (input === 'y' || input === 'Y') {
           if (templateToDelete) {
-            void backend.deleteTemplate(templateToDelete).then(() => {
+            void backend.deleteTemplate(templateToDelete).then(async () => {
               setTemplates((prev) =>
                 prev.filter((t) => t.slug !== templateToDelete),
               );
+              if (queueStore) {
+                await queueStore.append({
+                  action: 'template-delete',
+                  itemId: templateToDelete,
+                  timestamp: new Date().toISOString(),
+                  templateSlug: templateToDelete,
+                });
+                syncManager?.pushPending().catch(() => {});
+              }
             });
           }
           setConfirmDeleteTemplate(false);
@@ -376,15 +392,20 @@ export function Settings() {
 
       {confirmDeleteTemplate && (
         <Box marginTop={1}>
-          <Text color="red">Delete template? (y/n)</Text>
+          <Text color="red">
+            Delete template &quot;
+            {templates.find((t) => t.slug === templateToDelete)?.name ??
+              templateToDelete}
+            &quot;? (y/n)
+          </Text>
         </Box>
       )}
 
       <Box marginTop={1}>
         <Text dimColor>
-          {
-            '↑↓ navigate  enter select  c create template  d delete template  esc back  ? help'
-          }
+          {capabilities.templates
+            ? '↑↓ navigate  enter select  c create template  d delete template  esc back  ? help'
+            : '↑↓ navigate  enter select  esc back  ? help'}
         </Text>
       </Box>
     </Box>

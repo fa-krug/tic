@@ -12,6 +12,10 @@ import {
   writeWorkItem,
   deleteWorkItem as removeWorkItemFile,
 } from '../backends/local/items.js';
+import {
+  writeTemplate,
+  deleteTemplate as removeTemplateFile,
+} from '../backends/local/templates.js';
 
 type StatusListener = (status: SyncStatus) => void;
 
@@ -147,6 +151,20 @@ export class SyncManager {
         }
         return entry.itemId;
       }
+      case 'template-create': {
+        const template = await this.local.getTemplate(entry.templateSlug!);
+        await this.remote.createTemplate(template);
+        return entry.itemId;
+      }
+      case 'template-update': {
+        const template = await this.local.getTemplate(entry.templateSlug!);
+        await this.remote.updateTemplate(entry.templateSlug!, template);
+        return entry.itemId;
+      }
+      case 'template-delete': {
+        await this.remote.deleteTemplate(entry.templateSlug!);
+        return entry.itemId;
+      }
       default:
         return entry.itemId;
     }
@@ -215,6 +233,33 @@ export class SyncManager {
     for (const localId of localIds) {
       if (!remoteIds.has(localId) && !pendingIds.has(localId)) {
         await removeWorkItemFile(root, localId);
+      }
+    }
+
+    // Pull templates if supported by remote
+    const remoteCaps = this.remote.getCapabilities();
+    if (remoteCaps.templates) {
+      const remoteTemplates = await this.remote.listTemplates();
+      const localTemplates = await this.local.listTemplates();
+      const localSlugs = new Set(localTemplates.map((t) => t.slug));
+      const remoteSlugs = new Set(remoteTemplates.map((t) => t.slug));
+
+      // Write/update remote templates locally
+      for (const rt of remoteTemplates) {
+        await writeTemplate(this.local.getRoot(), rt);
+      }
+
+      // Delete local templates not on remote (unless pending in queue)
+      const pendingTemplateSlugs = new Set(
+        (await this.queue.read()).pending
+          .filter((e) => e.action.startsWith('template-'))
+          .map((e) => e.templateSlug)
+          .filter(Boolean),
+      );
+      for (const slug of localSlugs) {
+        if (!remoteSlugs.has(slug) && !pendingTemplateSlugs.has(slug)) {
+          await removeTemplateFile(this.local.getRoot(), slug);
+        }
       }
     }
 
