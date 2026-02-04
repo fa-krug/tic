@@ -3,5 +3,5 @@ export function slugifyTemplateName(name: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, '')
     .replace(/[\s-]+/g, '-')
-    .replace(/-+$/, '');
+    .replace(/^-+|-+$/g, '');
 }

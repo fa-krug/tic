@@ -18,6 +18,10 @@ describe('slugifyTemplateName', () => {
     expect(slugifyTemplateName('Test-')).toBe('test');
   });
 
+  it('trims leading hyphens', () => {
+    expect(slugifyTemplateName('--Test')).toBe('test');
+  });
+
   it('handles empty string', () => {
     expect(slugifyTemplateName('')).toBe('');
   });
