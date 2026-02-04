@@ -47,6 +47,7 @@ export function getShortcuts(
         { key: 's', description: 'Status screen' },
       ];
       actions.push({ key: '/', description: 'Quick search' });
+      actions.push({ key: ':', description: 'Command palette' });
       if (capabilities.fields.parent) {
         actions.push({ key: 'p', description: 'Set parent' });
       }

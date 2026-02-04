@@ -97,4 +97,12 @@ describe('getShortcuts', () => {
     const groups = getShortcuts('help', fullCapabilities, false, false);
     expect(groups).toEqual([]);
   });
+
+  it('includes command palette shortcut on list screen', () => {
+    const groups = getShortcuts('list', fullCapabilities, true, true);
+    const allShortcuts = groups.flatMap((g) => g.shortcuts);
+    const commandPaletteShortcut = allShortcuts.find((s) => s.key === ':');
+    expect(commandPaletteShortcut).toBeDefined();
+    expect(commandPaletteShortcut?.description).toBe('Command palette');
+  });
 });
