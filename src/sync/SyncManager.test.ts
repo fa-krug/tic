@@ -25,6 +25,18 @@ function createMockRemote(items: WorkItem[] = []): Backend {
         parent: true,
         dependsOn: true,
       },
+      templates: false,
+      templateFields: {
+        type: false,
+        status: false,
+        priority: false,
+        assignee: false,
+        labels: false,
+        iteration: false,
+        parent: false,
+        dependsOn: false,
+        description: false,
+      },
     }),
     // eslint-disable-next-line @typescript-eslint/require-await
     getStatuses: async () => ['backlog', 'todo', 'in-progress', 'done'],
@@ -127,6 +139,24 @@ function createMockRemote(items: WorkItem[] = []): Backend {
     },
     getItemUrl: (id: string) => `https://remote/${id}`,
     openItem: vi.fn(async () => {}),
+    // eslint-disable-next-line @typescript-eslint/require-await
+    listTemplates: async () => [],
+    // eslint-disable-next-line @typescript-eslint/require-await
+    getTemplate: async () => {
+      throw new Error('not supported');
+    },
+    // eslint-disable-next-line @typescript-eslint/require-await
+    createTemplate: async () => {
+      throw new Error('not supported');
+    },
+    // eslint-disable-next-line @typescript-eslint/require-await
+    updateTemplate: async () => {
+      throw new Error('not supported');
+    },
+    // eslint-disable-next-line @typescript-eslint/require-await
+    deleteTemplate: async () => {
+      throw new Error('not supported');
+    },
   };
 }
 

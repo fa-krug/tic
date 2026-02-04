@@ -5,6 +5,7 @@ import type {
   NewWorkItem,
   NewComment,
   Comment,
+  Template,
 } from '../../types.js';
 import { readConfig, writeConfig, type Config } from './config.js';
 import {
@@ -14,6 +15,13 @@ import {
   listItemFiles,
   parseWorkItemFile,
 } from './items.js';
+import {
+  listTemplates as listTemplateFiles,
+  readTemplate,
+  writeTemplate,
+  deleteTemplate as removeTemplateFile,
+  slugifyTemplateName,
+} from './templates.js';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -63,6 +71,18 @@ export class LocalBackend extends BaseBackend {
         labels: true,
         parent: true,
         dependsOn: true,
+      },
+      templates: true,
+      templateFields: {
+        type: true,
+        status: true,
+        priority: true,
+        assignee: true,
+        labels: true,
+        iteration: true,
+        parent: true,
+        dependsOn: true,
+        description: true,
       },
     };
   }
@@ -289,5 +309,34 @@ export class LocalBackend extends BaseBackend {
       });
       child.on('error', reject);
     });
+  }
+
+  async listTemplates(): Promise<Template[]> {
+    return listTemplateFiles(this.root);
+  }
+
+  async getTemplate(slug: string): Promise<Template> {
+    return readTemplate(this.root, slug);
+  }
+
+  async createTemplate(template: Template): Promise<Template> {
+    const slug = slugifyTemplateName(template.name);
+    const t = { ...template, slug };
+    await writeTemplate(this.root, t);
+    return t;
+  }
+
+  async updateTemplate(oldSlug: string, template: Template): Promise<Template> {
+    const newSlug = slugifyTemplateName(template.name);
+    if (oldSlug !== newSlug) {
+      await removeTemplateFile(this.root, oldSlug);
+    }
+    const t = { ...template, slug: newSlug };
+    await writeTemplate(this.root, t);
+    return t;
+  }
+
+  async deleteTemplate(slug: string): Promise<void> {
+    await removeTemplateFile(this.root, slug);
   }
 }

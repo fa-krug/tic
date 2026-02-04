@@ -1,4 +1,10 @@
-import type { WorkItem, NewWorkItem, NewComment, Comment } from '../types.js';
+import type {
+  WorkItem,
+  NewWorkItem,
+  NewComment,
+  Comment,
+  Template,
+} from '../types.js';
 import { BackendCache } from './cache.js';
 
 export interface BackendCapabilities {
@@ -13,6 +19,18 @@ export interface BackendCapabilities {
     labels: boolean;
     parent: boolean;
     dependsOn: boolean;
+  };
+  templates: boolean;
+  templateFields: {
+    type: boolean;
+    status: boolean;
+    priority: boolean;
+    assignee: boolean;
+    labels: boolean;
+    iteration: boolean;
+    parent: boolean;
+    dependsOn: boolean;
+    description: boolean;
   };
 }
 
@@ -45,6 +63,11 @@ export interface Backend {
   getDependents(id: string): Promise<WorkItem[]>;
   getItemUrl(id: string): string;
   openItem(id: string): Promise<void>;
+  listTemplates(): Promise<Template[]>;
+  getTemplate(slug: string): Promise<Template>;
+  createTemplate(template: Template): Promise<Template>;
+  updateTemplate(oldSlug: string, template: Template): Promise<Template>;
+  deleteTemplate(slug: string): Promise<void>;
 }
 
 export abstract class BaseBackend implements Backend {
@@ -76,6 +99,14 @@ export abstract class BaseBackend implements Backend {
   ): Promise<Comment>;
   abstract getItemUrl(id: string): string;
   abstract openItem(id: string): Promise<void>;
+  abstract listTemplates(): Promise<Template[]>;
+  abstract getTemplate(slug: string): Promise<Template>;
+  abstract createTemplate(template: Template): Promise<Template>;
+  abstract updateTemplate(
+    oldSlug: string,
+    template: Template,
+  ): Promise<Template>;
+  abstract deleteTemplate(slug: string): Promise<void>;
 
   async getChildren(id: string): Promise<WorkItem[]> {
     const all = await this.getCachedItems();

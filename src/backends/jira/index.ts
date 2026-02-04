@@ -1,10 +1,11 @@
-import { BaseBackend } from '../types.js';
+import { BaseBackend, UnsupportedOperationError } from '../types.js';
 import type { BackendCapabilities } from '../types.js';
 import type {
   WorkItem,
   NewWorkItem,
   NewComment,
   Comment,
+  Template,
 } from '../../types.js';
 import { acli, acliExec } from './acli.js';
 import { readJiraConfig } from './config.js';
@@ -58,6 +59,18 @@ export class JiraBackend extends BaseBackend {
         labels: true,
         parent: true,
         dependsOn: true,
+      },
+      templates: false,
+      templateFields: {
+        type: false,
+        status: false,
+        priority: false,
+        assignee: false,
+        labels: false,
+        iteration: false,
+        parent: false,
+        dependsOn: false,
+        description: false,
       },
     };
   }
@@ -407,6 +420,27 @@ export class JiraBackend extends BaseBackend {
   async openItem(id: string): Promise<void> {
     acliExec(['jira', 'workitem', 'view', id, '--web'], this.cwd);
   }
+
+  /* eslint-disable @typescript-eslint/require-await, @typescript-eslint/no-unused-vars */
+  async listTemplates(): Promise<Template[]> {
+    throw new UnsupportedOperationError('templates', 'JiraBackend');
+  }
+  async getTemplate(_slug: string): Promise<Template> {
+    throw new UnsupportedOperationError('templates', 'JiraBackend');
+  }
+  async createTemplate(_template: Template): Promise<Template> {
+    throw new UnsupportedOperationError('templates', 'JiraBackend');
+  }
+  async updateTemplate(
+    _oldSlug: string,
+    _template: Template,
+  ): Promise<Template> {
+    throw new UnsupportedOperationError('templates', 'JiraBackend');
+  }
+  async deleteTemplate(_slug: string): Promise<void> {
+    throw new UnsupportedOperationError('templates', 'JiraBackend');
+  }
+  /* eslint-enable @typescript-eslint/require-await, @typescript-eslint/no-unused-vars */
 
   private fetchSprints(): JiraSprint[] {
     if (this.cachedSprints) return this.cachedSprints;

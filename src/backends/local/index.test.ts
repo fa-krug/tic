@@ -32,6 +32,18 @@ describe('LocalBackend', () => {
         parent: true,
         dependsOn: true,
       },
+      templates: true,
+      templateFields: {
+        type: true,
+        status: true,
+        priority: true,
+        assignee: true,
+        labels: true,
+        iteration: true,
+        parent: true,
+        dependsOn: true,
+        description: true,
+      },
     });
   });
 

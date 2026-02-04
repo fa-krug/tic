@@ -1,10 +1,11 @@
-import { BaseBackend } from '../types.js';
+import { BaseBackend, UnsupportedOperationError } from '../types.js';
 import type { BackendCapabilities } from '../types.js';
 import type {
   WorkItem,
   NewWorkItem,
   NewComment,
   Comment,
+  Template,
 } from '../../types.js';
 import { gh, ghExec, ghGraphQL } from './gh.js';
 import { mapIssueToWorkItem } from './mappers.js';
@@ -120,6 +121,18 @@ export class GitHubBackend extends BaseBackend {
         labels: true,
         parent: true,
         dependsOn: false,
+      },
+      templates: false,
+      templateFields: {
+        type: false,
+        status: false,
+        priority: false,
+        assignee: false,
+        labels: false,
+        iteration: false,
+        parent: false,
+        dependsOn: false,
+        description: false,
       },
     };
   }
@@ -329,6 +342,27 @@ export class GitHubBackend extends BaseBackend {
   async openItem(id: string): Promise<void> {
     ghExec(['issue', 'view', id, '--web'], this.cwd);
   }
+
+  /* eslint-disable @typescript-eslint/require-await, @typescript-eslint/no-unused-vars */
+  async listTemplates(): Promise<Template[]> {
+    throw new UnsupportedOperationError('templates', 'GitHubBackend');
+  }
+  async getTemplate(_slug: string): Promise<Template> {
+    throw new UnsupportedOperationError('templates', 'GitHubBackend');
+  }
+  async createTemplate(_template: Template): Promise<Template> {
+    throw new UnsupportedOperationError('templates', 'GitHubBackend');
+  }
+  async updateTemplate(
+    _oldSlug: string,
+    _template: Template,
+  ): Promise<Template> {
+    throw new UnsupportedOperationError('templates', 'GitHubBackend');
+  }
+  async deleteTemplate(_slug: string): Promise<void> {
+    throw new UnsupportedOperationError('templates', 'GitHubBackend');
+  }
+  /* eslint-enable @typescript-eslint/require-await, @typescript-eslint/no-unused-vars */
 
   private getIssueNodeId(issueNumber: number): string {
     const { owner, repo } = this.getOwnerRepo();

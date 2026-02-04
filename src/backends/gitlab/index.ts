@@ -1,11 +1,12 @@
 import { execFileSync } from 'node:child_process';
-import { BaseBackend } from '../types.js';
+import { BaseBackend, UnsupportedOperationError } from '../types.js';
 import type { BackendCapabilities } from '../types.js';
 import type {
   WorkItem,
   NewWorkItem,
   NewComment,
   Comment,
+  Template,
 } from '../../types.js';
 import { glab, glabExec } from './glab.js';
 import { detectGroup } from './group.js';
@@ -55,6 +56,18 @@ export class GitLabBackend extends BaseBackend {
         labels: true,
         parent: true,
         dependsOn: false,
+      },
+      templates: true,
+      templateFields: {
+        type: false,
+        status: false,
+        priority: false,
+        assignee: false,
+        labels: false,
+        iteration: false,
+        parent: false,
+        dependsOn: false,
+        description: true,
       },
     };
   }
@@ -287,6 +300,27 @@ export class GitLabBackend extends BaseBackend {
     const url = `https://gitlab.com/groups/${this.group}/-/epics/${iid}`;
     execFileSync('open', [url]);
   }
+
+  /* eslint-disable @typescript-eslint/require-await, @typescript-eslint/no-unused-vars */
+  async listTemplates(): Promise<Template[]> {
+    throw new UnsupportedOperationError('templates', 'GitLabBackend');
+  }
+  async getTemplate(_slug: string): Promise<Template> {
+    throw new UnsupportedOperationError('templates', 'GitLabBackend');
+  }
+  async createTemplate(_template: Template): Promise<Template> {
+    throw new UnsupportedOperationError('templates', 'GitLabBackend');
+  }
+  async updateTemplate(
+    _oldSlug: string,
+    _template: Template,
+  ): Promise<Template> {
+    throw new UnsupportedOperationError('templates', 'GitLabBackend');
+  }
+  async deleteTemplate(_slug: string): Promise<void> {
+    throw new UnsupportedOperationError('templates', 'GitLabBackend');
+  }
+  /* eslint-enable @typescript-eslint/require-await, @typescript-eslint/no-unused-vars */
 
   private fetchIterations(): GlIteration[] {
     if (this.cachedIterations) return this.cachedIterations;

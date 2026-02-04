@@ -1,11 +1,12 @@
 import { execFileSync } from 'node:child_process';
-import { BaseBackend } from '../types.js';
+import { BaseBackend, UnsupportedOperationError } from '../types.js';
 import type { BackendCapabilities } from '../types.js';
 import type {
   WorkItem,
   NewWorkItem,
   NewComment,
   Comment,
+  Template,
 } from '../../types.js';
 import {
   az,
@@ -63,6 +64,18 @@ export class AzureDevOpsBackend extends BaseBackend {
         labels: true,
         parent: true,
         dependsOn: true,
+      },
+      templates: false,
+      templateFields: {
+        type: false,
+        status: false,
+        priority: false,
+        assignee: false,
+        labels: false,
+        iteration: false,
+        parent: false,
+        dependsOn: false,
+        description: false,
       },
     };
   }
@@ -597,4 +610,25 @@ export class AzureDevOpsBackend extends BaseBackend {
     const url = this.getItemUrl(id);
     execFileSync('open', [url]);
   }
+
+  /* eslint-disable @typescript-eslint/require-await, @typescript-eslint/no-unused-vars */
+  async listTemplates(): Promise<Template[]> {
+    throw new UnsupportedOperationError('templates', 'AzureDevOpsBackend');
+  }
+  async getTemplate(_slug: string): Promise<Template> {
+    throw new UnsupportedOperationError('templates', 'AzureDevOpsBackend');
+  }
+  async createTemplate(_template: Template): Promise<Template> {
+    throw new UnsupportedOperationError('templates', 'AzureDevOpsBackend');
+  }
+  async updateTemplate(
+    _oldSlug: string,
+    _template: Template,
+  ): Promise<Template> {
+    throw new UnsupportedOperationError('templates', 'AzureDevOpsBackend');
+  }
+  async deleteTemplate(_slug: string): Promise<void> {
+    throw new UnsupportedOperationError('templates', 'AzureDevOpsBackend');
+  }
+  /* eslint-enable @typescript-eslint/require-await, @typescript-eslint/no-unused-vars */
 }

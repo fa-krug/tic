@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import type { WorkItem, NewWorkItem, Comment } from '../types.js';
+import type { WorkItem, NewWorkItem, Comment, Template } from '../types.js';
 import { BaseBackend } from './types.js';
 import type { BackendCapabilities } from './types.js';
 
@@ -43,6 +43,18 @@ class TestBackend extends BaseBackend {
         parent: true,
         dependsOn: true,
       },
+      templates: true,
+      templateFields: {
+        type: true,
+        status: true,
+        priority: true,
+        assignee: true,
+        labels: true,
+        iteration: true,
+        parent: true,
+        dependsOn: true,
+        description: true,
+      },
     };
   }
 
@@ -81,6 +93,23 @@ class TestBackend extends BaseBackend {
   async deleteWorkItem(id: string): Promise<void> {
     this.items = this.items.filter((i) => i.id !== id);
   }
+
+  async listTemplates(): Promise<Template[]> {
+    return [];
+  }
+  async getTemplate(_slug: string): Promise<Template> {
+    throw new Error('not implemented');
+  }
+  async createTemplate(_template: Template): Promise<Template> {
+    throw new Error('not implemented');
+  }
+  async updateTemplate(
+    _oldSlug: string,
+    _template: Template,
+  ): Promise<Template> {
+    throw new Error('not implemented');
+  }
+  async deleteTemplate(_slug: string): Promise<void> {}
 }
 /* eslint-enable @typescript-eslint/require-await, @typescript-eslint/no-unused-vars */
 

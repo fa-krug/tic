@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import type { WorkItem, NewWorkItem, NewComment, Comment } from '../types.js';
+import type {
+  WorkItem,
+  NewWorkItem,
+  NewComment,
+  Comment,
+  Template,
+} from '../types.js';
 import {
   BaseBackend,
   UnsupportedOperationError,
@@ -19,6 +25,18 @@ const ALL_DISABLED: BackendCapabilities = {
     parent: false,
     dependsOn: false,
   },
+  templates: false,
+  templateFields: {
+    type: false,
+    status: false,
+    priority: false,
+    assignee: false,
+    labels: false,
+    iteration: false,
+    parent: false,
+    dependsOn: false,
+    description: false,
+  },
 };
 
 const ALL_ENABLED: BackendCapabilities = {
@@ -34,9 +52,21 @@ const ALL_ENABLED: BackendCapabilities = {
     parent: true,
     dependsOn: true,
   },
+  templates: true,
+  templateFields: {
+    type: true,
+    status: true,
+    priority: true,
+    assignee: true,
+    labels: true,
+    iteration: true,
+    parent: true,
+    dependsOn: true,
+    description: true,
+  },
 };
 
-/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/require-await */
 class TestBackend extends BaseBackend {
   caps: BackendCapabilities;
 
@@ -59,44 +89,34 @@ class TestBackend extends BaseBackend {
   }
 
   // Abstract method stubs (not under test)
-  // eslint-disable-next-line @typescript-eslint/require-await
   async getStatuses(): Promise<string[]> {
     return [];
   }
-  // eslint-disable-next-line @typescript-eslint/require-await
   async getIterations(): Promise<string[]> {
     return [];
   }
-  // eslint-disable-next-line @typescript-eslint/require-await
   async getWorkItemTypes(): Promise<string[]> {
     return [];
   }
-  // eslint-disable-next-line @typescript-eslint/require-await
   async getAssignees(): Promise<string[]> {
     return [];
   }
-  // eslint-disable-next-line @typescript-eslint/require-await
   async getLabels(): Promise<string[]> {
     return [];
   }
-  // eslint-disable-next-line @typescript-eslint/require-await
   async getCurrentIteration(): Promise<string> {
     return '';
   }
   async setCurrentIteration(_name: string): Promise<void> {}
-  // eslint-disable-next-line @typescript-eslint/require-await
   async listWorkItems(_iteration?: string): Promise<WorkItem[]> {
     return [];
   }
-  // eslint-disable-next-line @typescript-eslint/require-await
   async getWorkItem(_id: string): Promise<WorkItem> {
     throw new Error('not implemented');
   }
-  // eslint-disable-next-line @typescript-eslint/require-await
   async createWorkItem(_data: NewWorkItem): Promise<WorkItem> {
     throw new Error('not implemented');
   }
-  // eslint-disable-next-line @typescript-eslint/require-await
   async updateWorkItem(
     _id: string,
     _data: Partial<WorkItem>,
@@ -104,18 +124,15 @@ class TestBackend extends BaseBackend {
     throw new Error('not implemented');
   }
   async deleteWorkItem(_id: string): Promise<void> {}
-  // eslint-disable-next-line @typescript-eslint/require-await
   async addComment(
     _workItemId: string,
     _comment: NewComment,
   ): Promise<Comment> {
     throw new Error('not implemented');
   }
-  // eslint-disable-next-line @typescript-eslint/require-await
   override async getChildren(_id: string): Promise<WorkItem[]> {
     return [];
   }
-  // eslint-disable-next-line @typescript-eslint/require-await
   override async getDependents(_id: string): Promise<WorkItem[]> {
     return [];
   }
@@ -123,8 +140,24 @@ class TestBackend extends BaseBackend {
     return '';
   }
   async openItem(_id: string): Promise<void> {}
+  async listTemplates(): Promise<Template[]> {
+    return [];
+  }
+  async getTemplate(_slug: string): Promise<Template> {
+    throw new Error('not implemented');
+  }
+  async createTemplate(_template: Template): Promise<Template> {
+    throw new Error('not implemented');
+  }
+  async updateTemplate(
+    _oldSlug: string,
+    _template: Template,
+  ): Promise<Template> {
+    throw new Error('not implemented');
+  }
+  async deleteTemplate(_slug: string): Promise<void> {}
 }
-/* eslint-enable @typescript-eslint/no-unused-vars */
+/* eslint-enable @typescript-eslint/no-unused-vars, @typescript-eslint/require-await */
 
 describe('BaseBackend', () => {
   describe('validateFields', () => {

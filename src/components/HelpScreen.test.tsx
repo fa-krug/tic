@@ -15,6 +15,18 @@ const fullCapabilities: BackendCapabilities = {
     parent: true,
     dependsOn: true,
   },
+  templates: true,
+  templateFields: {
+    type: true,
+    status: true,
+    priority: true,
+    assignee: true,
+    labels: true,
+    iteration: true,
+    parent: true,
+    dependsOn: true,
+    description: true,
+  },
 };
 
 const minimalCapabilities: BackendCapabilities = {
@@ -29,6 +41,18 @@ const minimalCapabilities: BackendCapabilities = {
     labels: false,
     parent: false,
     dependsOn: false,
+  },
+  templates: false,
+  templateFields: {
+    type: false,
+    status: false,
+    priority: false,
+    assignee: false,
+    labels: false,
+    iteration: false,
+    parent: false,
+    dependsOn: false,
+    description: false,
   },
 };
 
