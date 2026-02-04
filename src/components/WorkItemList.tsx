@@ -16,6 +16,12 @@ import type { SyncStatus, QueueAction } from '../sync/types.js';
 import { buildTree, type TreeItem } from './buildTree.js';
 import { SearchOverlay } from './SearchOverlay.js';
 import { BulkMenu, type BulkAction } from './BulkMenu.js';
+import { CommandPalette } from './CommandPalette.js';
+import {
+  getVisibleCommands,
+  type Command,
+  type CommandContext,
+} from '../commands.js';
 import { PriorityPicker } from './PriorityPicker.js';
 import { TypePicker } from './TypePicker.js';
 import { StatusPicker } from './StatusPicker.js';
@@ -63,6 +69,7 @@ export function WorkItemList() {
   const [settingLabels, setSettingLabels] = useState(false);
   const [labelsInput, setLabelsInput] = useState('');
   const [bulkTargetIds, setBulkTargetIds] = useState<string[]>([]);
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
 
   // Marked count for header display
   const markedCount = markedIds.size;
@@ -208,6 +215,8 @@ export function WorkItemList() {
 
     if (isSearching) return;
 
+    if (showCommandPalette) return;
+
     if (confirmDelete) {
       if (input === 'y' || input === 'Y') {
         void (async () => {
@@ -236,6 +245,11 @@ export function WorkItemList() {
 
     if (input === '/') {
       setIsSearching(true);
+      return;
+    }
+
+    if (input === ':') {
+      setShowCommandPalette(true);
       return;
     }
 
@@ -435,6 +449,172 @@ export function WorkItemList() {
     setIsSearching(false);
   };
 
+  const commandContext: CommandContext = {
+    screen: 'list',
+    markedCount: markedIds.size,
+    hasSelectedItem: treeItems.length > 0 && treeItems[cursor] !== undefined,
+    capabilities,
+    types,
+    activeType,
+    hasSyncManager: syncManager !== null,
+    gitAvailable,
+  };
+
+  const paletteCommands = useMemo(
+    () => getVisibleCommands(commandContext),
+    [
+      commandContext.markedCount,
+      commandContext.hasSelectedItem,
+      capabilities,
+      types,
+      activeType,
+      syncManager,
+      gitAvailable,
+    ],
+  );
+
+  const handleCommandSelect = (command: Command) => {
+    setShowCommandPalette(false);
+    switch (command.id) {
+      case 'create':
+        selectWorkItem(null);
+        navigate('form');
+        break;
+      case 'edit':
+        if (treeItems[cursor]) {
+          selectWorkItem(treeItems[cursor].item.id);
+          navigate('form');
+        }
+        break;
+      case 'delete':
+        if (treeItems.length > 0) {
+          const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+          if (targetIds.length > 0) {
+            setDeleteTargetIds(targetIds);
+            setConfirmDelete(true);
+          }
+        }
+        break;
+      case 'open':
+        if (treeItems[cursor]) {
+          void (async () => {
+            await backend.openItem(treeItems[cursor]!.item.id);
+            refreshData();
+          })();
+        }
+        break;
+      case 'branch':
+        if (treeItems[cursor]) {
+          const item = treeItems[cursor].item;
+          const comments = item.comments;
+          const config = readConfigSync(process.cwd());
+          try {
+            const result = beginImplementation(
+              item,
+              comments,
+              { branchMode: config.branchMode ?? 'worktree' },
+              process.cwd(),
+            );
+            setWarning(
+              result.resumed
+                ? `Resumed work on #${item.id}`
+                : `Started work on #${item.id}`,
+            );
+          } catch (e) {
+            setWarning(
+              e instanceof Error ? e.message : 'Failed to start implementation',
+            );
+          }
+          refreshData();
+        }
+        break;
+      case 'sync':
+        if (syncManager) {
+          void syncManager.sync().then(() => refreshData());
+        }
+        break;
+      case 'iterations':
+        navigate('iteration-picker');
+        break;
+      case 'settings':
+        navigate('settings');
+        break;
+      case 'status':
+        navigate('status');
+        break;
+      case 'help':
+        navigateToHelp();
+        break;
+      case 'mark':
+        if (treeItems[cursor]) {
+          const itemId = treeItems[cursor].item.id;
+          setMarkedIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(itemId)) next.delete(itemId);
+            else next.add(itemId);
+            return next;
+          });
+        }
+        break;
+      case 'clear-marks':
+        setMarkedIds(new Set());
+        break;
+      case 'set-priority':
+        {
+          const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+          if (targetIds.length > 0) {
+            setBulkTargetIds(targetIds);
+            setShowPriorityPicker(true);
+          }
+        }
+        break;
+      case 'set-assignee':
+        {
+          const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+          if (targetIds.length > 0) {
+            setBulkTargetIds(targetIds);
+            setSettingAssignee(true);
+            setAssigneeInput('');
+          }
+        }
+        break;
+      case 'set-labels':
+        {
+          const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+          if (targetIds.length > 0) {
+            setBulkTargetIds(targetIds);
+            setSettingLabels(true);
+            setLabelsInput('');
+          }
+        }
+        break;
+      case 'set-type':
+        {
+          const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+          if (targetIds.length > 0) {
+            setBulkTargetIds(targetIds);
+            setShowTypePicker(true);
+          }
+        }
+        break;
+      case 'bulk-menu':
+        setShowBulkMenu(true);
+        break;
+      case 'quit':
+        exit();
+        break;
+      default:
+        // Handle dynamic switch-type commands
+        if (command.id.startsWith('switch-')) {
+          const type = command.id.replace('switch-', '');
+          setActiveType(type);
+          setCursor(0);
+          setWarning('');
+        }
+        break;
+    }
+  };
+
   const handleBulkAction = (action: BulkAction) => {
     const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
     if (targetIds.length === 0) return;
@@ -477,7 +657,8 @@ export function WorkItemList() {
     ? activeType.charAt(0).toUpperCase() + activeType.slice(1) + 's'
     : '';
 
-  const helpText = '↑↓ navigate  enter edit  c create  / search  ? help';
+  const helpText =
+    '↑↓ navigate  enter edit  c create  / search  : commands  ? help';
 
   const isCardMode = terminalWidth < 80;
   const viewport = useScrollViewport({
@@ -509,6 +690,13 @@ export function WorkItemList() {
                 handleBulkAction(action);
               }}
               onCancel={() => setShowBulkMenu(false)}
+            />
+          )}
+          {showCommandPalette && (
+            <CommandPalette
+              commands={paletteCommands}
+              onSelect={handleCommandSelect}
+              onCancel={() => setShowCommandPalette(false)}
             />
           )}
           {showStatusPicker && (
