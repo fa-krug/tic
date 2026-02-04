@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { BaseBackend, UnsupportedOperationError } from '../types.js';
+import { BaseBackend } from '../types.js';
 import type { BackendCapabilities } from '../types.js';
 import type {
   WorkItem,
@@ -10,12 +10,26 @@ import type {
 } from '../../types.js';
 import { glab, glabExec } from './glab.js';
 import { detectGroup } from './group.js';
+import { slugifyTemplateName } from '../local/templates.js';
 import {
   mapIssueToWorkItem,
   mapEpicToWorkItem,
   mapNoteToComment,
 } from './mappers.js';
 import type { GlIssue, GlEpic, GlNote, GlIteration } from './mappers.js';
+
+interface GlTreeItem {
+  name: string;
+  path: string;
+  type: string;
+}
+
+interface GlFileResponse {
+  content: string; // base64 encoded
+  encoding: string;
+}
+
+const TEMPLATES_DIR = '.gitlab/issue_templates';
 
 function parseId(id: string): { type: 'issue' | 'epic'; iid: string } {
   const match = id.match(/^(issue|epic)-(\d+)$/);
@@ -301,26 +315,184 @@ export class GitLabBackend extends BaseBackend {
     execFileSync('open', [url]);
   }
 
-  /* eslint-disable @typescript-eslint/require-await, @typescript-eslint/no-unused-vars */
+  // eslint-disable-next-line @typescript-eslint/require-await
   async listTemplates(): Promise<Template[]> {
-    throw new UnsupportedOperationError('templates', 'GitLabBackend');
+    let items: GlTreeItem[];
+    try {
+      items = glab<GlTreeItem[]>(
+        [
+          'api',
+          'projects/:fullpath/repository/tree',
+          '--paginate',
+          '-f',
+          `path=${TEMPLATES_DIR}`,
+        ],
+        this.cwd,
+      );
+    } catch {
+      return [];
+    }
+
+    if (!Array.isArray(items)) return [];
+
+    const templates: Template[] = [];
+    for (const item of items) {
+      if (item.type !== 'blob' || !item.name.endsWith('.md')) continue;
+      const name = item.name.replace(/\.md$/, '');
+      const slug = slugifyTemplateName(name);
+
+      let description = '';
+      try {
+        const encodedPath = encodeURIComponent(item.path);
+        const file = glab<GlFileResponse>(
+          [
+            'api',
+            `projects/:fullpath/repository/files/${encodedPath}`,
+            '-f',
+            'ref=HEAD',
+          ],
+          this.cwd,
+        );
+        description = Buffer.from(file.content, 'base64').toString('utf-8');
+      } catch {
+        // If file read fails, leave description empty
+      }
+
+      templates.push({ slug, name, description });
+    }
+
+    return templates;
   }
-  async getTemplate(_slug: string): Promise<Template> {
-    throw new UnsupportedOperationError('templates', 'GitLabBackend');
+
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async getTemplate(slug: string): Promise<Template> {
+    const filePath = `${TEMPLATES_DIR}/${slug}.md`;
+    const encodedPath = encodeURIComponent(filePath);
+    const file = glab<GlFileResponse>(
+      [
+        'api',
+        `projects/:fullpath/repository/files/${encodedPath}`,
+        '-f',
+        'ref=HEAD',
+      ],
+      this.cwd,
+    );
+    const content = Buffer.from(file.content, 'base64').toString('utf-8');
+    return { slug, name: slug, description: content };
   }
-  async createTemplate(_template: Template): Promise<Template> {
-    throw new UnsupportedOperationError('templates', 'GitLabBackend');
+
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async createTemplate(template: Template): Promise<Template> {
+    const slug = slugifyTemplateName(template.name);
+    const filePath = `${TEMPLATES_DIR}/${template.name}.md`;
+    const encodedPath = encodeURIComponent(filePath);
+    const content = template.description ?? '';
+
+    glabExec(
+      [
+        'api',
+        `projects/:fullpath/repository/files/${encodedPath}`,
+        '-X',
+        'POST',
+        '-f',
+        'branch=main',
+        '-f',
+        `content=${content}`,
+        '-f',
+        `commit_message=Add issue template: ${template.name}`,
+      ],
+      this.cwd,
+    );
+
+    return { slug, name: template.name, description: content };
   }
-  async updateTemplate(
-    _oldSlug: string,
-    _template: Template,
-  ): Promise<Template> {
-    throw new UnsupportedOperationError('templates', 'GitLabBackend');
+
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async updateTemplate(oldSlug: string, template: Template): Promise<Template> {
+    const newSlug = slugifyTemplateName(template.name);
+    const content = template.description ?? '';
+
+    if (oldSlug !== template.name) {
+      // Name changed — delete old file and create new one
+      const oldPath = `${TEMPLATES_DIR}/${oldSlug}.md`;
+      const encodedOldPath = encodeURIComponent(oldPath);
+      try {
+        glabExec(
+          [
+            'api',
+            `projects/:fullpath/repository/files/${encodedOldPath}`,
+            '-X',
+            'DELETE',
+            '-f',
+            'branch=main',
+            '-f',
+            `commit_message=Rename issue template: ${oldSlug} -> ${template.name}`,
+          ],
+          this.cwd,
+        );
+      } catch {
+        // Old file may not exist; continue with create
+      }
+
+      const newPath = `${TEMPLATES_DIR}/${template.name}.md`;
+      const encodedNewPath = encodeURIComponent(newPath);
+      glabExec(
+        [
+          'api',
+          `projects/:fullpath/repository/files/${encodedNewPath}`,
+          '-X',
+          'POST',
+          '-f',
+          'branch=main',
+          '-f',
+          `content=${content}`,
+          '-f',
+          `commit_message=Add issue template: ${template.name}`,
+        ],
+        this.cwd,
+      );
+    } else {
+      // Same name — update in place
+      const filePath = `${TEMPLATES_DIR}/${oldSlug}.md`;
+      const encodedPath = encodeURIComponent(filePath);
+      glabExec(
+        [
+          'api',
+          `projects/:fullpath/repository/files/${encodedPath}`,
+          '-X',
+          'PUT',
+          '-f',
+          'branch=main',
+          '-f',
+          `content=${content}`,
+          '-f',
+          `commit_message=Update issue template: ${oldSlug}`,
+        ],
+        this.cwd,
+      );
+    }
+
+    return { slug: newSlug, name: template.name, description: content };
   }
-  async deleteTemplate(_slug: string): Promise<void> {
-    throw new UnsupportedOperationError('templates', 'GitLabBackend');
+
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async deleteTemplate(slug: string): Promise<void> {
+    const filePath = `${TEMPLATES_DIR}/${slug}.md`;
+    const encodedPath = encodeURIComponent(filePath);
+    glabExec(
+      [
+        'api',
+        `projects/:fullpath/repository/files/${encodedPath}`,
+        '-X',
+        'DELETE',
+        '-f',
+        'branch=main',
+        '-f',
+        `commit_message=Delete issue template: ${slug}`,
+      ],
+      this.cwd,
+    );
   }
-  /* eslint-enable @typescript-eslint/require-await, @typescript-eslint/no-unused-vars */
 
   private fetchIterations(): GlIteration[] {
     if (this.cachedIterations) return this.cachedIterations;
