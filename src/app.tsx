@@ -9,6 +9,7 @@ import { HelpScreen } from './components/HelpScreen.js';
 import { Header } from './components/Header.js';
 import type { Backend } from './backends/types.js';
 import type { SyncManager } from './sync/SyncManager.js';
+import type { Template } from './types.js';
 
 export type Screen =
   | 'list'
@@ -28,6 +29,8 @@ interface AppState {
   navigate: (screen: Screen) => void;
   selectWorkItem: (id: string | null) => void;
   setActiveType: (type: string | null) => void;
+  activeTemplate: Template | null;
+  setActiveTemplate: (template: Template | null) => void;
   pushWorkItem: (id: string) => void;
   popWorkItem: () => string | null;
   navigateToHelp: () => void;
@@ -52,6 +55,7 @@ export function App({
     null,
   );
   const [activeType, setActiveType] = useState<string | null>(null);
+  const [activeTemplate, setActiveTemplate] = useState<Template | null>(null);
   const [navigationStack, setNavigationStack] = useState<string[]>([]);
   const [previousScreen, setPreviousScreen] = useState<Screen>('list');
 
@@ -96,6 +100,8 @@ export function App({
     navigate: navigateWithStackClear,
     selectWorkItem: setSelectedWorkItemId,
     setActiveType,
+    activeTemplate,
+    setActiveTemplate,
     pushWorkItem,
     popWorkItem,
     navigateToHelp,

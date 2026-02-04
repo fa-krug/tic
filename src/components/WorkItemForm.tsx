@@ -39,6 +39,8 @@ export function WorkItemForm() {
     navigateToHelp,
     selectedWorkItemId,
     activeType,
+    activeTemplate,
+    setActiveTemplate,
     pushWorkItem,
     popWorkItem,
   } = useAppState();
@@ -198,6 +200,25 @@ export function WorkItemForm() {
     setComments(existingItem.comments ?? []);
   }, [existingItem]);
 
+  // Prefill from template (create mode only)
+  useEffect(() => {
+    if (selectedWorkItemId !== null || !activeTemplate) return;
+    if (activeTemplate.type != null) setType(activeTemplate.type);
+    if (activeTemplate.status != null) setStatus(activeTemplate.status);
+    if (activeTemplate.priority != null) setPriority(activeTemplate.priority);
+    if (activeTemplate.assignee != null) setAssignee(activeTemplate.assignee);
+    if (activeTemplate.labels != null)
+      setLabels(activeTemplate.labels.join(', '));
+    if (activeTemplate.iteration != null)
+      setIteration(activeTemplate.iteration);
+    if (activeTemplate.description != null)
+      setDescription(activeTemplate.description);
+    if (activeTemplate.parent != null)
+      setParentId(String(activeTemplate.parent));
+    if (activeTemplate.dependsOn != null)
+      setDependsOn(activeTemplate.dependsOn.join(', '));
+  }, [activeTemplate, selectedWorkItemId]);
+
   const parentSuggestions = useMemo(() => {
     return allItems
       .filter((item) => item.id !== selectedWorkItemId)
@@ -294,6 +315,7 @@ export function WorkItemForm() {
           body: newComment.trim(),
         });
       }
+      setActiveTemplate(null);
     }
   }
 

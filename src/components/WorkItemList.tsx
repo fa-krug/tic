@@ -23,9 +23,11 @@ import {
   type CommandContext,
 } from '../commands.js';
 import { PriorityPicker } from './PriorityPicker.js';
+import { TemplatePicker } from './TemplatePicker.js';
 import { TypePicker } from './TypePicker.js';
 import { StatusPicker } from './StatusPicker.js';
 import type { WorkItem } from '../types.js';
+import type { Template } from '../types.js';
 export type { TreeItem } from './buildTree.js';
 
 export function getTargetIds(
@@ -47,6 +49,7 @@ export function WorkItemList() {
     selectWorkItem,
     activeType,
     setActiveType,
+    setActiveTemplate,
   } = useAppState();
   const { exit } = useApp();
   const [cursor, setCursor] = useState(0);
@@ -70,6 +73,8 @@ export function WorkItemList() {
   const [labelsInput, setLabelsInput] = useState('');
   const [bulkTargetIds, setBulkTargetIds] = useState<string[]>([]);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  const [templates, setTemplates] = useState<Template[]>([]);
 
   // Marked count for header display
   const markedCount = markedIds.size;
@@ -98,6 +103,12 @@ export function WorkItemList() {
     };
     syncManager.onStatusChange(cb);
   }, [syncManager, refreshData]);
+
+  useEffect(() => {
+    if (capabilities.templates) {
+      void backend.listTemplates().then(setTemplates);
+    }
+  }, [backend, capabilities.templates]);
 
   const queueStore = useMemo(() => {
     if (!syncManager) return null;
@@ -217,6 +228,8 @@ export function WorkItemList() {
 
     if (showCommandPalette) return;
 
+    if (showTemplatePicker) return;
+
     if (confirmDelete) {
       if (input === 'y' || input === 'Y') {
         void (async () => {
@@ -302,8 +315,13 @@ export function WorkItemList() {
     if (input === ',') navigate('settings');
 
     if (input === 'c') {
-      selectWorkItem(null);
-      navigate('form');
+      if (capabilities.templates && templates.length > 0) {
+        setShowTemplatePicker(true);
+      } else {
+        setActiveTemplate(null);
+        selectWorkItem(null);
+        navigate('form');
+      }
     }
 
     if (input === 'd' && treeItems.length > 0) {
@@ -755,6 +773,20 @@ export function WorkItemList() {
               onCancel={() => {
                 setShowPriorityPicker(false);
                 setBulkTargetIds([]);
+              }}
+            />
+          )}
+          {showTemplatePicker && (
+            <TemplatePicker
+              templates={templates}
+              onSelect={(template) => {
+                setShowTemplatePicker(false);
+                setActiveTemplate(template);
+                selectWorkItem(null);
+                navigate('form');
+              }}
+              onCancel={() => {
+                setShowTemplatePicker(false);
               }}
             />
           )}
