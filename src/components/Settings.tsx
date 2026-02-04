@@ -5,10 +5,13 @@ import { useAppState } from '../app.js';
 import { readConfig, writeConfig } from '../backends/local/config.js';
 import type { Config } from '../backends/local/config.js';
 import { VALID_BACKENDS } from '../backends/factory.js';
+import type { Template } from '../types.js';
 
 type NavItem =
   | { kind: 'backend'; backend: string }
-  | { kind: 'jira-field'; field: 'site' | 'project' | 'boardId' };
+  | { kind: 'jira-field'; field: 'site' | 'project' | 'boardId' }
+  | { kind: 'template-header' }
+  | { kind: 'template'; slug: string; name: string };
 
 const JIRA_FIELDS = ['site', 'project', 'boardId'] as const;
 
@@ -17,7 +20,14 @@ function isAvailable(b: string): boolean {
 }
 
 export function Settings() {
-  const { navigate, navigateToHelp } = useAppState();
+  const {
+    navigate,
+    navigateToHelp,
+    backend,
+    setFormMode,
+    setEditingTemplateSlug,
+    selectWorkItem,
+  } = useAppState();
   const root = process.cwd();
 
   const [config, setConfig] = useState<Config | null>(null);
@@ -27,9 +37,21 @@ export function Settings() {
   const [jiraProject, setJiraProject] = useState('');
   const [jiraBoardId, setJiraBoardId] = useState('');
 
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [confirmDeleteTemplate, setConfirmDeleteTemplate] = useState(false);
+  const [templateToDelete, setTemplateToDelete] = useState<string | null>(null);
+
+  const capabilities = backend.getCapabilities();
+
   useEffect(() => {
     void readConfig(root).then(setConfig);
   }, [root]);
+
+  useEffect(() => {
+    if (capabilities.templates) {
+      void backend.listTemplates().then(setTemplates);
+    }
+  }, [backend, capabilities.templates]);
 
   // Initialize cursor and jira fields when config loads
   useEffect(() => {
@@ -52,7 +74,7 @@ export function Settings() {
     }
   }, [config]);
 
-  // Build navigable items list — backends + conditional jira fields
+  // Build navigable items list — backends + conditional jira fields + templates
   const navItems: NavItem[] = useMemo(() => {
     const items: NavItem[] = VALID_BACKENDS.map((b) => ({
       kind: 'backend' as const,
@@ -72,8 +94,14 @@ export function Settings() {
         );
       }
     }
+    if (capabilities.templates) {
+      items.push({ kind: 'template-header' });
+      for (const t of templates) {
+        items.push({ kind: 'template', slug: t.slug, name: t.name });
+      }
+    }
     return items;
-  }, [config?.backend]);
+  }, [config?.backend, capabilities.templates, templates]);
 
   // Clamp cursor when navItems shrinks (e.g. switching away from jira)
   useEffect(() => {
@@ -98,6 +126,24 @@ export function Settings() {
     (input, key) => {
       if (!config) return;
 
+      if (confirmDeleteTemplate) {
+        if (input === 'y' || input === 'Y') {
+          if (templateToDelete) {
+            void backend.deleteTemplate(templateToDelete).then(() => {
+              setTemplates((prev) =>
+                prev.filter((t) => t.slug !== templateToDelete),
+              );
+            });
+          }
+          setConfirmDeleteTemplate(false);
+          setTemplateToDelete(null);
+        } else {
+          setConfirmDeleteTemplate(false);
+          setTemplateToDelete(null);
+        }
+        return;
+      }
+
       if (input === '?') {
         navigateToHelp();
         return;
@@ -109,10 +155,27 @@ export function Settings() {
       }
 
       if (key.upArrow) {
-        setCursor((c) => Math.max(0, c - 1));
+        setCursor((c) => {
+          let next = c - 1;
+          // Skip template-header
+          while (next >= 0 && navItems[next]?.kind === 'template-header') {
+            next--;
+          }
+          return Math.max(0, next);
+        });
       }
       if (key.downArrow) {
-        setCursor((c) => Math.min(navItems.length - 1, c + 1));
+        setCursor((c) => {
+          let next = c + 1;
+          // Skip template-header
+          while (
+            next < navItems.length &&
+            navItems[next]?.kind === 'template-header'
+          ) {
+            next++;
+          }
+          return Math.min(navItems.length - 1, next);
+        });
       }
 
       if (key.return) {
@@ -132,6 +195,26 @@ export function Settings() {
           }
         } else if (item.kind === 'jira-field') {
           setEditing(true);
+        } else if (item.kind === 'template') {
+          setFormMode('template');
+          setEditingTemplateSlug(item.slug);
+          selectWorkItem(null);
+          navigate('form');
+        }
+      }
+
+      if (input === 'c' && capabilities.templates) {
+        setFormMode('template');
+        setEditingTemplateSlug(null);
+        selectWorkItem(null);
+        navigate('form');
+      }
+
+      if (input === 'd') {
+        const item = navItems[cursor];
+        if (item && item.kind === 'template') {
+          setTemplateToDelete(item.slug);
+          setConfirmDeleteTemplate(true);
         }
       }
     },
@@ -189,6 +272,10 @@ export function Settings() {
               </Text>
             </Box>
           );
+        }
+
+        if (item.kind === 'template-header' || item.kind === 'template') {
+          return null; // rendered separately below
         }
 
         // Jira config field
@@ -262,8 +349,43 @@ export function Settings() {
         </Box>
       </Box>
 
+      {capabilities.templates && (
+        <Box marginTop={1} flexDirection="column">
+          <Text bold>Templates:</Text>
+          {navItems.map((item, idx) => {
+            if (item.kind !== 'template') return null;
+            const focused = idx === cursor;
+            return (
+              <Box key={`tmpl-${item.slug}`} marginLeft={2}>
+                <Text color={focused ? 'cyan' : undefined}>
+                  {focused ? '>' : ' '}{' '}
+                </Text>
+                <Text bold={focused} color={focused ? 'cyan' : undefined}>
+                  {item.name}
+                </Text>
+              </Box>
+            );
+          })}
+          {templates.length === 0 && (
+            <Box marginLeft={2}>
+              <Text dimColor>(no templates — press c to create)</Text>
+            </Box>
+          )}
+        </Box>
+      )}
+
+      {confirmDeleteTemplate && (
+        <Box marginTop={1}>
+          <Text color="red">Delete template? (y/n)</Text>
+        </Box>
+      )}
+
       <Box marginTop={1}>
-        <Text dimColor>{'↑↓ navigate  enter select  esc back  ? help'}</Text>
+        <Text dimColor>
+          {
+            '↑↓ navigate  enter select  c create template  d delete template  esc back  ? help'
+          }
+        </Text>
       </Box>
     </Box>
   );

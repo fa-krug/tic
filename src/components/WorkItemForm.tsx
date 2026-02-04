@@ -5,12 +5,13 @@ import SelectInput from 'ink-select-input';
 import { AutocompleteInput } from './AutocompleteInput.js';
 import { MultiAutocompleteInput } from './MultiAutocompleteInput.js';
 import { useAppState } from '../app.js';
-import type { Comment, WorkItem } from '../types.js';
+import type { Comment, WorkItem, Template } from '../types.js';
 import { SyncQueueStore } from '../sync/queue.js';
 import type { QueueAction } from '../sync/types.js';
 import { useScrollViewport } from '../hooks/useScrollViewport.js';
 import { useBackendData } from '../hooks/useBackendData.js';
 import { openInEditor } from '../editor.js';
+import { slugifyTemplateName } from '../backends/local/templates.js';
 
 type FieldName =
   | 'title'
@@ -41,6 +42,10 @@ export function WorkItemForm() {
     activeType,
     activeTemplate,
     setActiveTemplate,
+    formMode,
+    setFormMode,
+    editingTemplateSlug,
+    setEditingTemplateSlug,
     pushWorkItem,
     popWorkItem,
   } = useAppState();
@@ -126,6 +131,21 @@ export function WorkItemForm() {
   }, [selectedWorkItemId, backend, capabilities.relationships]);
 
   const fields = useMemo(() => {
+    if (formMode === 'template') {
+      const tf = capabilities.templateFields;
+      const all: FieldName[] = ['title'];
+      if (tf.type) all.push('type');
+      if (tf.status) all.push('status');
+      if (tf.iteration) all.push('iteration');
+      if (tf.priority) all.push('priority');
+      if (tf.assignee) all.push('assignee');
+      if (tf.labels) all.push('labels');
+      if (tf.description) all.push('description');
+      if (tf.parent) all.push('parent');
+      if (tf.dependsOn) all.push('dependsOn');
+      return all;
+    }
+
     const all: FieldName[] = ['title'];
     if (capabilities.customTypes) all.push('type');
     all.push('status');
@@ -151,7 +171,14 @@ export function WorkItemForm() {
     }
 
     return all;
-  }, [capabilities, selectedWorkItemId, existingItem, children, dependents]);
+  }, [
+    formMode,
+    capabilities,
+    selectedWorkItemId,
+    existingItem,
+    children,
+    dependents,
+  ]);
 
   const [title, setTitle] = useState('');
   const [type, setType] = useState(activeType ?? types[0] ?? '');
@@ -219,6 +246,28 @@ export function WorkItemForm() {
       setDependsOn(activeTemplate.dependsOn.join(', '));
   }, [activeTemplate, selectedWorkItemId]);
 
+  // Load existing template for editing
+  useEffect(() => {
+    if (formMode !== 'template' || !editingTemplateSlug) return;
+    let cancelled = false;
+    void backend.getTemplate(editingTemplateSlug).then((t) => {
+      if (cancelled) return;
+      setTitle(t.name);
+      if (t.type != null) setType(t.type);
+      if (t.status != null) setStatus(t.status);
+      if (t.priority != null) setPriority(t.priority);
+      if (t.assignee != null) setAssignee(t.assignee);
+      if (t.labels != null) setLabels(t.labels.join(', '));
+      if (t.iteration != null) setIteration(t.iteration);
+      if (t.description != null) setDescription(t.description);
+      if (t.parent != null) setParentId(String(t.parent));
+      if (t.dependsOn != null) setDependsOn(t.dependsOn.join(', '));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [formMode, editingTemplateSlug, backend]);
+
   const parentSuggestions = useMemo(() => {
     return allItems
       .filter((item) => item.id !== selectedWorkItemId)
@@ -262,6 +311,31 @@ export function WorkItemForm() {
         return match ? match[1]! : trimmed;
       })
       .filter((s) => s.length > 0);
+
+    if (formMode === 'template') {
+      const template: Template = {
+        slug: editingTemplateSlug ?? slugifyTemplateName(title),
+        name: title || 'Untitled Template',
+      };
+      if (type) template.type = type;
+      if (status) template.status = status;
+      if (priority !== 'medium') template.priority = priority;
+      if (assignee) template.assignee = assignee;
+      if (parsedLabels.length > 0) template.labels = parsedLabels;
+      if (iteration) template.iteration = iteration;
+      if (description) template.description = description;
+      if (parsedParent) template.parent = parsedParent;
+      if (parsedDependsOn.length > 0) template.dependsOn = parsedDependsOn;
+
+      if (editingTemplateSlug) {
+        await backend.updateTemplate(editingTemplateSlug, template);
+      } else {
+        await backend.createTemplate(template);
+      }
+      setFormMode('item');
+      setEditingTemplateSlug(null);
+      return;
+    }
 
     if (selectedWorkItemId !== null) {
       await backend.cachedUpdateWorkItem(selectedWorkItemId, {
@@ -326,9 +400,15 @@ export function WorkItemForm() {
         if (!configLoading && !itemLoading && !saving) {
           void save();
         }
-        const prev = popWorkItem();
-        if (prev === null) {
-          navigate('list');
+        if (formMode === 'template') {
+          setFormMode('item');
+          setEditingTemplateSlug(null);
+          navigate('settings');
+        } else {
+          const prev = popWorkItem();
+          if (prev === null) {
+            navigate('list');
+          }
         }
         return;
       }
@@ -481,7 +561,10 @@ export function WorkItemForm() {
   function renderField(field: FieldName, index: number) {
     const focused = index === focusedField;
     const isEditing = focused && editing;
-    const label = field.charAt(0).toUpperCase() + field.slice(1);
+    const label =
+      formMode === 'template' && field === 'title'
+        ? 'Name'
+        : field.charAt(0).toUpperCase() + field.slice(1);
     const cursor = focused ? '>' : ' ';
 
     if (field === 'comments') {
@@ -816,8 +899,16 @@ export function WorkItemForm() {
     );
   }
 
-  const mode = selectedWorkItemId !== null ? 'Edit' : 'Create';
-  const typeLabel = type.charAt(0).toUpperCase() + type.slice(1);
+  const mode =
+    formMode === 'template'
+      ? editingTemplateSlug
+        ? 'Edit Template'
+        : 'Create Template'
+      : selectedWorkItemId !== null
+        ? 'Edit'
+        : 'Create';
+  const typeLabel =
+    formMode === 'template' ? '' : type.charAt(0).toUpperCase() + type.slice(1);
 
   const isFieldVisible = (index: number) =>
     index >= viewport.start && index < viewport.end;
@@ -826,8 +917,11 @@ export function WorkItemForm() {
     <Box flexDirection="column">
       <Box marginBottom={1}>
         <Text bold color="cyan">
-          {mode} {typeLabel}
-          {selectedWorkItemId !== null ? ` #${selectedWorkItemId}` : ''}
+          {mode}
+          {typeLabel ? ` ${typeLabel}` : ''}
+          {formMode !== 'template' && selectedWorkItemId !== null
+            ? ` #${selectedWorkItemId}`
+            : ''}
         </Text>
       </Box>
 

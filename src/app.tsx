@@ -31,6 +31,10 @@ interface AppState {
   setActiveType: (type: string | null) => void;
   activeTemplate: Template | null;
   setActiveTemplate: (template: Template | null) => void;
+  formMode: 'item' | 'template';
+  setFormMode: (mode: 'item' | 'template') => void;
+  editingTemplateSlug: string | null;
+  setEditingTemplateSlug: (slug: string | null) => void;
   pushWorkItem: (id: string) => void;
   popWorkItem: () => string | null;
   navigateToHelp: () => void;
@@ -56,6 +60,10 @@ export function App({
   );
   const [activeType, setActiveType] = useState<string | null>(null);
   const [activeTemplate, setActiveTemplate] = useState<Template | null>(null);
+  const [formMode, setFormMode] = useState<'item' | 'template'>('item');
+  const [editingTemplateSlug, setEditingTemplateSlug] = useState<string | null>(
+    null,
+  );
   const [navigationStack, setNavigationStack] = useState<string[]>([]);
   const [previousScreen, setPreviousScreen] = useState<Screen>('list');
 
@@ -102,6 +110,10 @@ export function App({
     setActiveType,
     activeTemplate,
     setActiveTemplate,
+    formMode,
+    setFormMode,
+    editingTemplateSlug,
+    setEditingTemplateSlug,
     pushWorkItem,
     popWorkItem,
     navigateToHelp,

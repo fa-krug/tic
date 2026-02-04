@@ -26,8 +26,7 @@ import { PriorityPicker } from './PriorityPicker.js';
 import { TemplatePicker } from './TemplatePicker.js';
 import { TypePicker } from './TypePicker.js';
 import { StatusPicker } from './StatusPicker.js';
-import type { WorkItem } from '../types.js';
-import type { Template } from '../types.js';
+import type { WorkItem, Template } from '../types.js';
 export type { TreeItem } from './buildTree.js';
 
 export function getTargetIds(
@@ -50,6 +49,7 @@ export function WorkItemList() {
     activeType,
     setActiveType,
     setActiveTemplate,
+    setFormMode,
   } = useAppState();
   const { exit } = useApp();
   const [cursor, setCursor] = useState(0);
@@ -306,6 +306,7 @@ export function WorkItemList() {
     }
 
     if (key.return && treeItems.length > 0) {
+      setFormMode('item');
       selectWorkItem(treeItems[cursor]!.item.id);
       navigate('form');
     }
@@ -318,6 +319,7 @@ export function WorkItemList() {
       if (capabilities.templates && templates.length > 0) {
         setShowTemplatePicker(true);
       } else {
+        setFormMode('item');
         setActiveTemplate(null);
         selectWorkItem(null);
         navigate('form');
@@ -781,6 +783,7 @@ export function WorkItemList() {
               templates={templates}
               onSelect={(template) => {
                 setShowTemplatePicker(false);
+                setFormMode('item');
                 setActiveTemplate(template);
                 selectWorkItem(null);
                 navigate('form');
