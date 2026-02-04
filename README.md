@@ -197,7 +197,7 @@ The plugin auto-detects your backend (GitHub, GitLab, Azure DevOps, Jira, or loc
 ### Updating
 
 ```bash
-claude plugin update tic
+claude plugin update tic@tic
 ```
 
 Or enable auto-updates for the tic marketplace in Claude Code settings.
