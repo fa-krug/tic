@@ -1,4 +1,5 @@
 import { Command } from 'commander';
+import { VERSION } from '../version.js';
 import {
   createBackend as createBackendFromConfig,
   createBackendWithSync,
@@ -151,7 +152,7 @@ function handleError(err: unknown, json?: boolean): never {
 
 export function createProgram(): Command {
   const program = new Command();
-  program.name('tic').version('0.1.0').description('Terminal issue tracker');
+  program.name('tic').version(VERSION).description('Terminal issue tracker');
 
   const caps = tryGetCapabilities();
 

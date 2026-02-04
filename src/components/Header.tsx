@@ -1,8 +1,7 @@
 import { Box, Text } from 'ink';
 import { readConfigSync } from '../backends/local/config.js';
 import os from 'node:os';
-
-const VERSION = '0.1.0';
+import { VERSION } from '../version.js';
 
 const BACKEND_LABELS: Record<string, string> = {
   local: 'Local',

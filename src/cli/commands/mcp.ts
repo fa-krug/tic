@@ -1,3 +1,4 @@
+import { VERSION } from '../../version.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
@@ -697,7 +698,7 @@ export async function startMcpServer(): Promise<void> {
   const root = process.cwd();
   const server = new McpServer({
     name: 'tic',
-    version: '0.1.0',
+    version: VERSION,
   });
 
   let backend: Backend | null = null;
