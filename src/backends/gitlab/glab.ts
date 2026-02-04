@@ -6,7 +6,11 @@ export function glab<T>(args: string[], cwd: string): T {
     encoding: 'utf-8',
     stdio: ['pipe', 'pipe', 'pipe'],
   });
-  return JSON.parse(result) as T;
+  const trimmed = result.trim();
+  if (!trimmed || (!trimmed.startsWith('[') && !trimmed.startsWith('{'))) {
+    return [] as unknown as T;
+  }
+  return JSON.parse(trimmed) as T;
 }
 
 export function glabExec(args: string[], cwd: string): string {
