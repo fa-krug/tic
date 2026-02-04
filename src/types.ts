@@ -39,3 +39,17 @@ export interface NewComment {
   author: string;
   body: string;
 }
+
+export interface Template {
+  slug: string;
+  name: string;
+  type?: string;
+  status?: string;
+  priority?: 'low' | 'medium' | 'high' | 'critical';
+  assignee?: string;
+  labels?: string[];
+  iteration?: string;
+  parent?: string | null;
+  dependsOn?: string[];
+  description?: string;
+}
