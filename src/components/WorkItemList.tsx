@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
 import Spinner from 'ink-spinner';
-import TextInput from 'ink-text-input';
+
 import { useAppState } from '../app.js';
 import { isGitRepo } from '../git.js';
 import { beginImplementation } from '../implement.js';
@@ -26,6 +26,8 @@ import { PriorityPicker } from './PriorityPicker.js';
 import { TemplatePicker } from './TemplatePicker.js';
 import { TypePicker } from './TypePicker.js';
 import { StatusPicker } from './StatusPicker.js';
+import { AutocompleteInput } from './AutocompleteInput.js';
+import { MultiAutocompleteInput } from './MultiAutocompleteInput.js';
 import type { WorkItem, Template } from '../types.js';
 export type { TreeItem } from './buildTree.js';
 
@@ -89,6 +91,8 @@ export function WorkItemList() {
     capabilities,
     types,
     statuses,
+    assignees,
+    labels: labelSuggestions,
     currentIteration: iteration,
     items: allItems,
     loading,
@@ -149,6 +153,11 @@ export function WorkItemList() {
         ? buildTree(items, allItems, activeType ?? '')
         : buildTree(items, items, activeType ?? ''),
     [items, allItems, activeType, capabilities.relationships],
+  );
+
+  const parentSuggestions = useMemo(
+    () => allItems.map((item) => `${item.id} - ${item.title}`),
+    [allItems],
   );
 
   // Collapse state: set of item IDs that are collapsed (collapsed by default)
@@ -875,19 +884,25 @@ export function WorkItemList() {
 
           <Box marginTop={1}>
             {capabilities.fields.parent && settingParent ? (
-              <Box>
+              <Box flexDirection="column">
                 <Text color="cyan">
                   Set parent for {parentTargetIds.length} item
-                  {parentTargetIds.length > 1 ? 's' : ''} (empty to clear):{' '}
+                  {parentTargetIds.length > 1 ? 's' : ''} (empty to clear):
                 </Text>
-                <TextInput
+                <AutocompleteInput
                   value={parentInput}
                   onChange={setParentInput}
                   focus={true}
-                  onSubmit={(value) => {
+                  suggestions={parentSuggestions}
+                  onSubmit={() => {
                     void (async () => {
+                      const raw = parentInput.trim();
                       const newParent =
-                        value.trim() === '' ? null : value.trim();
+                        raw === ''
+                          ? null
+                          : raw.includes(' - ')
+                            ? raw.split(' - ')[0]!.trim()
+                            : raw;
                       try {
                         for (const id of parentTargetIds) {
                           await backend.cachedUpdateWorkItem(id, {
@@ -910,18 +925,19 @@ export function WorkItemList() {
                 />
               </Box>
             ) : settingAssignee ? (
-              <Box>
+              <Box flexDirection="column">
                 <Text color="cyan">
                   Set assignee for {bulkTargetIds.length} item
-                  {bulkTargetIds.length > 1 ? 's' : ''}:{' '}
+                  {bulkTargetIds.length > 1 ? 's' : ''}:
                 </Text>
-                <TextInput
+                <AutocompleteInput
                   value={assigneeInput}
                   onChange={setAssigneeInput}
                   focus={true}
-                  onSubmit={(value) => {
+                  suggestions={assignees}
+                  onSubmit={() => {
                     void (async () => {
-                      const assignee = value.trim();
+                      const assignee = assigneeInput.trim();
                       for (const id of bulkTargetIds) {
                         await backend.cachedUpdateWorkItem(id, { assignee });
                         await queueWrite('update', id);
@@ -935,18 +951,19 @@ export function WorkItemList() {
                 />
               </Box>
             ) : settingLabels ? (
-              <Box>
+              <Box flexDirection="column">
                 <Text color="cyan">
                   Set labels for {bulkTargetIds.length} item
-                  {bulkTargetIds.length > 1 ? 's' : ''} (comma-separated):{' '}
+                  {bulkTargetIds.length > 1 ? 's' : ''} (comma-separated):
                 </Text>
-                <TextInput
+                <MultiAutocompleteInput
                   value={labelsInput}
                   onChange={setLabelsInput}
                   focus={true}
-                  onSubmit={(value) => {
+                  suggestions={labelSuggestions}
+                  onSubmit={() => {
                     void (async () => {
-                      const labels = value
+                      const labels = labelsInput
                         .split(',')
                         .map((l) => l.trim())
                         .filter(Boolean);
