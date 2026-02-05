@@ -104,6 +104,9 @@ export function CardLayout({
                 {capabilities.fields.assignee && formatAssignee(item.assignee)
                   ? '  ' + formatAssignee(item.assignee)
                   : ''}
+                {capabilities.fields.labels && item.labels.length > 0
+                  ? '  ' + item.labels.join(', ')
+                  : ''}
               </Text>
             </Box>
           </Box>
