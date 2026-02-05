@@ -568,36 +568,32 @@ export function Settings() {
       </Box>
 
       {showDefaultTypePicker && (
-        <Box position="absolute" marginTop={2} marginLeft={4}>
-          <DefaultPicker
-            title="Default Type"
-            options={config.types}
-            onSelect={(type) => {
-              config.defaultType = type;
-              void writeConfig(root, config);
-              setConfig({ ...config });
-              setDefaultType(type);
-              setShowDefaultTypePicker(false);
-            }}
-            onCancel={() => setShowDefaultTypePicker(false)}
-          />
-        </Box>
+        <DefaultPicker
+          title="Default Type"
+          options={config.types}
+          onSelect={(type) => {
+            config.defaultType = type;
+            void writeConfig(root, config);
+            setConfig({ ...config });
+            setDefaultType(type);
+            setShowDefaultTypePicker(false);
+          }}
+          onCancel={() => setShowDefaultTypePicker(false)}
+        />
       )}
 
       {showDefaultIterationPicker && (
-        <Box position="absolute" marginTop={2} marginLeft={4}>
-          <DefaultPicker
-            title="Default Iteration"
-            options={config.iterations}
-            onSelect={(iteration) => {
-              config.current_iteration = iteration;
-              void writeConfig(root, config);
-              setConfig({ ...config });
-              setShowDefaultIterationPicker(false);
-            }}
-            onCancel={() => setShowDefaultIterationPicker(false)}
-          />
-        </Box>
+        <DefaultPicker
+          title="Default Iteration"
+          options={config.iterations}
+          onSelect={(iteration) => {
+            config.current_iteration = iteration;
+            void writeConfig(root, config);
+            setConfig({ ...config });
+            setShowDefaultIterationPicker(false);
+          }}
+          onCancel={() => setShowDefaultIterationPicker(false)}
+        />
       )}
 
       {confirmDeleteTemplate && (

@@ -37,7 +37,16 @@ export function DefaultPicker({
           {title}
         </Text>
       </Box>
-      <SelectInput items={items} onSelect={(item) => onSelect(item.value)} />
+      {items.length > 0 ? (
+        <SelectInput
+          items={items}
+          onSelect={(item) => {
+            if (item) onSelect(item.value);
+          }}
+        />
+      ) : (
+        <Text dimColor>(none configured)</Text>
+      )}
       <Box marginTop={1}>
         <Text dimColor>{'↑↓ navigate  enter select  esc cancel'}</Text>
       </Box>
