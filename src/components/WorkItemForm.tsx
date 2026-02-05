@@ -377,7 +377,7 @@ export function WorkItemForm() {
   const [preEditValue, setPreEditValue] = useState<string>('');
   const [showDirtyPrompt, setShowDirtyPrompt] = useState(false);
   const [pendingRelNav, setPendingRelNav] = useState<string | null>(null);
-  const [saving] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setFocusedField(0);
@@ -595,6 +595,23 @@ export function WorkItemForm() {
       if (!editing) {
         if (_input === '?') {
           navigateToHelp();
+          return;
+        }
+
+        // Ctrl+S: save and go back
+        if (key.ctrl && _input === 's') {
+          setSaving(true);
+          void (async () => {
+            await save();
+            if (formMode === 'template') {
+              setFormMode('item');
+              setEditingTemplateSlug(null);
+              navigate('settings');
+            } else {
+              const prev = popWorkItem();
+              if (prev === null) navigate('list');
+            }
+          })();
           return;
         }
 
