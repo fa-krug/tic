@@ -7,12 +7,22 @@ import type { Config } from '../backends/local/config.js';
 import { VALID_BACKENDS } from '../backends/factory.js';
 import { SyncQueueStore } from '../sync/queue.js';
 import type { Template } from '../types.js';
+import { checkForUpdate } from '../update-checker.js';
+import type { UpdateInfo } from '../update-checker.js';
+import { VERSION } from '../version.js';
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 
 type NavItem =
   | { kind: 'backend'; backend: string }
   | { kind: 'jira-field'; field: 'site' | 'project' | 'boardId' }
   | { kind: 'template-header' }
-  | { kind: 'template'; slug: string; name: string };
+  | { kind: 'template'; slug: string; name: string }
+  | { kind: 'updates-header' }
+  | { kind: 'update-now' }
+  | { kind: 'update-check' }
+  | { kind: 'update-toggle' };
 
 const JIRA_FIELDS = ['site', 'project', 'boardId'] as const;
 
@@ -48,6 +58,9 @@ export function Settings() {
   const [confirmDeleteTemplate, setConfirmDeleteTemplate] = useState(false);
   const [templateToDelete, setTemplateToDelete] = useState<string | null>(null);
 
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+  const [updateChecking, setUpdateChecking] = useState(false);
+
   const capabilities = backend.getCapabilities();
 
   useEffect(() => {
@@ -59,6 +72,14 @@ export function Settings() {
       void backend.listTemplates().then(setTemplates);
     }
   }, [backend, capabilities.templates]);
+
+  useEffect(() => {
+    setUpdateChecking(true);
+    void checkForUpdate().then((info) => {
+      setUpdateInfo(info);
+      setUpdateChecking(false);
+    });
+  }, []);
 
   // Initialize cursor and jira fields when config loads
   useEffect(() => {
@@ -107,8 +128,14 @@ export function Settings() {
         items.push({ kind: 'template', slug: t.slug, name: t.name });
       }
     }
+    items.push({ kind: 'updates-header' });
+    if (updateInfo?.updateAvailable) {
+      items.push({ kind: 'update-now' });
+    }
+    items.push({ kind: 'update-check' });
+    items.push({ kind: 'update-toggle' });
     return items;
-  }, [config?.backend, capabilities.templates, templates]);
+  }, [config?.backend, capabilities.templates, templates, updateInfo]);
 
   // Clamp cursor when navItems shrinks (e.g. switching away from jira)
   useEffect(() => {
@@ -173,8 +200,11 @@ export function Settings() {
       if (key.upArrow) {
         setCursor((c) => {
           let next = c - 1;
-          // Skip template-header
-          while (next >= 0 && navItems[next]?.kind === 'template-header') {
+          while (
+            next >= 0 &&
+            (navItems[next]?.kind === 'template-header' ||
+              navItems[next]?.kind === 'updates-header')
+          ) {
             next--;
           }
           return Math.max(0, next);
@@ -183,10 +213,10 @@ export function Settings() {
       if (key.downArrow) {
         setCursor((c) => {
           let next = c + 1;
-          // Skip template-header
           while (
             next < navItems.length &&
-            navItems[next]?.kind === 'template-header'
+            (navItems[next]?.kind === 'template-header' ||
+              navItems[next]?.kind === 'updates-header')
           ) {
             next++;
           }
@@ -216,6 +246,31 @@ export function Settings() {
           setEditingTemplateSlug(item.slug);
           selectWorkItem(null);
           navigate('form');
+        } else if (item.kind === 'update-check') {
+          setUpdateChecking(true);
+          void checkForUpdate().then((info) => {
+            setUpdateInfo(info);
+            setUpdateChecking(false);
+          });
+        } else if (item.kind === 'update-now') {
+          const __filename = fileURLToPath(import.meta.url);
+          const updaterPath = path.join(
+            path.dirname(__filename),
+            '..',
+            'updater.js',
+          );
+          const originalArgs = process.argv.slice(2);
+          spawn('node', [updaterPath, ...originalArgs], {
+            stdio: 'inherit',
+            detached: true,
+          });
+          process.exit(0);
+        } else if (item.kind === 'update-toggle') {
+          if (config) {
+            config.autoUpdate = !(config.autoUpdate !== false);
+            void writeConfig(root, config);
+            setConfig({ ...config });
+          }
         }
       }
 
@@ -290,7 +345,14 @@ export function Settings() {
           );
         }
 
-        if (item.kind === 'template-header' || item.kind === 'template') {
+        if (
+          item.kind === 'template-header' ||
+          item.kind === 'template' ||
+          item.kind === 'updates-header' ||
+          item.kind === 'update-now' ||
+          item.kind === 'update-check' ||
+          item.kind === 'update-toggle'
+        ) {
           return null; // rendered separately below
         }
 
@@ -389,6 +451,70 @@ export function Settings() {
           )}
         </Box>
       )}
+
+      <Box marginTop={1} flexDirection="column">
+        <Text bold>Updates:</Text>
+        <Box marginLeft={2}>
+          <Text dimColor>Current: v{VERSION}</Text>
+        </Box>
+        <Box marginLeft={2}>
+          <Text dimColor>
+            Latest:{' '}
+            {updateChecking
+              ? 'checking...'
+              : updateInfo
+                ? updateInfo.updateAvailable
+                  ? `v${updateInfo.latest}`
+                  : `v${updateInfo.latest} (up to date)`
+                : 'unknown'}
+          </Text>
+        </Box>
+        {navItems.map((item, idx) => {
+          const focused = idx === cursor;
+
+          if (item.kind === 'update-now') {
+            return (
+              <Box key="update-now" marginLeft={2}>
+                <Text color={focused ? 'cyan' : undefined}>
+                  {focused ? '>' : ' '}{' '}
+                </Text>
+                <Text bold={focused} color={focused ? 'cyan' : 'green'}>
+                  Update to v{updateInfo?.latest}
+                </Text>
+              </Box>
+            );
+          }
+
+          if (item.kind === 'update-check') {
+            return (
+              <Box key="update-check" marginLeft={2}>
+                <Text color={focused ? 'cyan' : undefined}>
+                  {focused ? '>' : ' '}{' '}
+                </Text>
+                <Text bold={focused} color={focused ? 'cyan' : undefined}>
+                  {updateChecking ? 'Checking...' : 'Check for updates'}
+                </Text>
+              </Box>
+            );
+          }
+
+          if (item.kind === 'update-toggle') {
+            return (
+              <Box key="update-toggle" marginLeft={2}>
+                <Text color={focused ? 'cyan' : undefined}>
+                  {focused ? '>' : ' '}{' '}
+                </Text>
+                <Text bold={focused} color={focused ? 'cyan' : undefined}>
+                  Auto-check on launch:{' '}
+                  {config?.autoUpdate !== false ? 'on' : 'off'}
+                </Text>
+              </Box>
+            );
+          }
+
+          return null;
+        })}
+      </Box>
 
       {confirmDeleteTemplate && (
         <Box marginTop={1}>
