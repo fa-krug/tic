@@ -51,6 +51,7 @@ export function WorkItemList() {
     setActiveTemplate,
     setFormMode,
     updateInfo,
+    defaultType,
   } = useAppState();
   const { exit } = useApp();
   const [cursor, setCursor] = useState(0);
@@ -132,9 +133,11 @@ export function WorkItemList() {
 
   useEffect(() => {
     if (activeType === null && types.length > 0) {
-      setActiveType(types[0]!);
+      setActiveType(
+        defaultType && types.includes(defaultType) ? defaultType : types[0]!,
+      );
     }
-  }, [activeType, types, setActiveType]);
+  }, [activeType, types, setActiveType, defaultType]);
 
   const items = useMemo(
     () => allItems.filter((item) => item.type === activeType),
