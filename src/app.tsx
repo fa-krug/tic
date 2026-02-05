@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext } from 'react';
+import { useEffect } from 'react';
 import { Box } from 'ink';
 import { WorkItemList } from './components/WorkItemList.js';
 import { WorkItemForm } from './components/WorkItemForm.js';
@@ -9,48 +9,16 @@ import { HelpScreen } from './components/HelpScreen.js';
 import { Header } from './components/Header.js';
 import type { Backend } from './backends/types.js';
 import type { SyncManager } from './sync/SyncManager.js';
-import type { Template } from './types.js';
 import { checkForUpdate } from './update-checker.js';
-import type { UpdateInfo } from './update-checker.js';
 import { useConfigStore } from './stores/configStore.js';
-import { uiStore } from './stores/uiStore.js';
+import {
+  navigationStore,
+  useNavigationStore,
+} from './stores/navigationStore.js';
+import { backendDataStore } from './stores/backendDataStore.js';
 
-export type Screen =
-  | 'list'
-  | 'form'
-  | 'iteration-picker'
-  | 'settings'
-  | 'status'
-  | 'help';
-
-interface AppState {
-  screen: Screen;
-  selectedWorkItemId: string | null;
-  activeType: string | null;
-  backend: Backend;
-  syncManager: SyncManager | null;
-  navigationStack: string[];
-  navigate: (screen: Screen) => void;
-  selectWorkItem: (id: string | null) => void;
-  setActiveType: (type: string | null) => void;
-  activeTemplate: Template | null;
-  setActiveTemplate: (template: Template | null) => void;
-  formMode: 'item' | 'template';
-  setFormMode: (mode: 'item' | 'template') => void;
-  editingTemplateSlug: string | null;
-  setEditingTemplateSlug: (slug: string | null) => void;
-  pushWorkItem: (id: string) => void;
-  popWorkItem: () => string | null;
-  navigateToHelp: () => void;
-  navigateBackFromHelp: () => void;
-  updateInfo: UpdateInfo | null;
-}
-
-export const AppContext = createContext<AppState>(null!);
-
-export function useAppState() {
-  return useContext(AppContext);
-}
+// Re-export Screen type for consumers that need it
+export type { Screen } from './stores/navigationStore.js';
 
 export function App({
   backend,
@@ -59,95 +27,33 @@ export function App({
   backend: Backend;
   syncManager: SyncManager | null;
 }) {
-  const [screen, setScreen] = useState<Screen>('list');
-  const [selectedWorkItemId, setSelectedWorkItemId] = useState<string | null>(
-    null,
-  );
-  const [activeType, setActiveType] = useState<string | null>(null);
-  const [activeTemplate, setActiveTemplate] = useState<Template | null>(null);
-  const [formMode, setFormMode] = useState<'item' | 'template'>('item');
-  const [editingTemplateSlug, setEditingTemplateSlug] = useState<string | null>(
-    null,
-  );
-  const [navigationStack, setNavigationStack] = useState<string[]>([]);
-  const [previousScreen, setPreviousScreen] = useState<Screen>('list');
-  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+  const screen = useNavigationStore((s) => s.screen);
+  const previousScreen = useNavigationStore((s) => s.previousScreen);
   const autoUpdate = useConfigStore((s) => s.config.autoUpdate);
 
+  // Initialize backendDataStore with backend/syncManager
+  useEffect(() => {
+    void backendDataStore.getState().init(backend, syncManager);
+  }, [backend, syncManager]);
+
+  // Update check on mount
   useEffect(() => {
     if (autoUpdate !== false) {
       void checkForUpdate().then((info) => {
-        if (info) setUpdateInfo(info);
+        if (info) navigationStore.getState().setUpdateInfo(info);
       });
     }
   }, [autoUpdate]);
 
-  const pushWorkItem = (id: string) => {
-    if (selectedWorkItemId !== null) {
-      setNavigationStack((stack) => [...stack, selectedWorkItemId]);
-    }
-    setSelectedWorkItemId(id);
-  };
-
-  const popWorkItem = (): string | null => {
-    if (navigationStack.length === 0) return null;
-    const prev = navigationStack[navigationStack.length - 1]!;
-    setNavigationStack((stack) => stack.slice(0, -1));
-    setSelectedWorkItemId(prev);
-    return prev;
-  };
-
-  const navigateWithStackClear = (newScreen: Screen) => {
-    uiStore.getState().reset();
-    if (newScreen !== 'form') {
-      setNavigationStack([]);
-    }
-    setScreen(newScreen);
-  };
-
-  const navigateToHelp = () => {
-    setPreviousScreen(screen);
-    setScreen('help');
-  };
-
-  const navigateBackFromHelp = () => {
-    setScreen(previousScreen);
-  };
-
-  const state: AppState = {
-    screen,
-    selectedWorkItemId,
-    activeType,
-    backend,
-    syncManager,
-    navigationStack,
-    navigate: navigateWithStackClear,
-    selectWorkItem: setSelectedWorkItemId,
-    setActiveType,
-    activeTemplate,
-    setActiveTemplate,
-    formMode,
-    setFormMode,
-    editingTemplateSlug,
-    setEditingTemplateSlug,
-    pushWorkItem,
-    popWorkItem,
-    navigateToHelp,
-    navigateBackFromHelp,
-    updateInfo,
-  };
-
   return (
-    <AppContext.Provider value={state}>
-      <Box flexDirection="column">
-        {screen === 'list' && <Header />}
-        {screen === 'list' && <WorkItemList />}
-        {screen === 'form' && <WorkItemForm />}
-        {screen === 'iteration-picker' && <IterationPicker />}
-        {screen === 'settings' && <Settings />}
-        {screen === 'status' && <StatusScreen />}
-        {screen === 'help' && <HelpScreen sourceScreen={previousScreen} />}
-      </Box>
-    </AppContext.Provider>
+    <Box flexDirection="column">
+      {screen === 'list' && <Header />}
+      {screen === 'list' && <WorkItemList />}
+      {screen === 'form' && <WorkItemForm />}
+      {screen === 'iteration-picker' && <IterationPicker />}
+      {screen === 'settings' && <Settings />}
+      {screen === 'status' && <StatusScreen />}
+      {screen === 'help' && <HelpScreen sourceScreen={previousScreen} />}
+    </Box>
   );
 }
