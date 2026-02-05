@@ -224,9 +224,6 @@ export function WorkItemForm() {
   const isDirty =
     initialSnapshot !== null &&
     !isSnapshotEqual(initialSnapshot, currentValues);
-  // isDirty will be used by later tasks for discard prompts
-  void isDirty;
-
   // Sync form fields when the existing item finishes loading
   useEffect(() => {
     if (!existingItem) return;
@@ -378,7 +375,9 @@ export function WorkItemForm() {
   const [focusedField, setFocusedField] = useState(0);
   const [editing, setEditing] = useState(false);
   const [preEditValue, setPreEditValue] = useState<string>('');
-  const [saving, setSaving] = useState(false);
+  const [showDirtyPrompt, setShowDirtyPrompt] = useState(false);
+  const [pendingRelNav, setPendingRelNav] = useState<string | null>(null);
+  const [saving] = useState(false);
 
   useEffect(() => {
     setFocusedField(0);
@@ -517,20 +516,77 @@ export function WorkItemForm() {
 
   useInput(
     (_input, key) => {
-      // Allow Esc to navigate back even while loading
-      if (key.escape && !editing) {
-        if (!configLoading && !itemLoading && !saving) {
-          void save();
+      // Dirty prompt overlay — capture s/d/esc only
+      if (showDirtyPrompt) {
+        if (_input === 's' && (selectedWorkItemId !== null || title.trim())) {
+          void (async () => {
+            await save();
+            if (pendingRelNav) {
+              pushWorkItem(pendingRelNav);
+              setPendingRelNav(null);
+            } else if (formMode === 'template') {
+              setFormMode('item');
+              setEditingTemplateSlug(null);
+              navigate('settings');
+            } else {
+              const prev = popWorkItem();
+              if (prev === null) navigate('list');
+            }
+          })();
+          setShowDirtyPrompt(false);
+          return;
         }
+        if (_input === 'd') {
+          // Discard: navigate back without saving
+          if (pendingRelNav) {
+            pushWorkItem(pendingRelNav);
+            setPendingRelNav(null);
+          } else if (formMode === 'template') {
+            setFormMode('item');
+            setEditingTemplateSlug(null);
+            navigate('settings');
+          } else {
+            const prev = popWorkItem();
+            if (prev === null) navigate('list');
+          }
+          setShowDirtyPrompt(false);
+          return;
+        }
+        if (key.escape) {
+          setShowDirtyPrompt(false);
+          setPendingRelNav(null);
+          return;
+        }
+        // Ignore all other keys while prompt is showing
+        return;
+      }
+
+      // Esc in navigation mode
+      if (key.escape && !editing) {
+        if (configLoading || itemLoading || saving) {
+          // Allow escape even while loading (no save)
+          if (formMode === 'template') {
+            setFormMode('item');
+            setEditingTemplateSlug(null);
+            navigate('settings');
+          } else {
+            const prev = popWorkItem();
+            if (prev === null) navigate('list');
+          }
+          return;
+        }
+        if (isDirty) {
+          setShowDirtyPrompt(true);
+          return;
+        }
+        // Clean — just go back
         if (formMode === 'template') {
           setFormMode('item');
           setEditingTemplateSlug(null);
           navigate('settings');
         } else {
           const prev = popWorkItem();
-          if (prev === null) {
-            navigate('list');
-          }
+          if (prev === null) navigate('list');
         }
         return;
       }
@@ -561,11 +617,12 @@ export function WorkItemForm() {
               targetId = currentField.slice('rel-dependent-'.length);
             }
             if (targetId) {
-              setSaving(true);
-              void (async () => {
-                await save();
+              if (isDirty) {
+                setPendingRelNav(targetId);
+                setShowDirtyPrompt(true);
+              } else {
                 pushWorkItem(targetId);
-              })();
+              }
             }
           } else if (currentField === 'description') {
             // Open external editor for description
@@ -1166,9 +1223,47 @@ export function WorkItemForm() {
         )}
 
       <Box marginTop={1}>
-        <Text dimColor>
-          {'↑↓ navigate  enter edit field  esc save & back  ? help'}
-        </Text>
+        {showDirtyPrompt ? (
+          <Text>
+            {selectedWorkItemId !== null || title.trim() ? (
+              <Text>
+                Unsaved changes:{' '}
+                <Text color="green" bold>
+                  (s)
+                </Text>
+                <Text>ave </Text>
+                <Text color="red" bold>
+                  (d)
+                </Text>
+                <Text>iscard </Text>
+                <Text color="yellow" bold>
+                  (esc)
+                </Text>
+                <Text> stay</Text>
+              </Text>
+            ) : (
+              <Text>
+                Discard new item?{' '}
+                <Text color="red" bold>
+                  (d)
+                </Text>
+                <Text>iscard </Text>
+                <Text color="yellow" bold>
+                  (esc)
+                </Text>
+                <Text> stay</Text>
+              </Text>
+            )}
+          </Text>
+        ) : (
+          <Text dimColor>
+            {editing
+              ? 'enter confirm  esc revert  ? help'
+              : isDirty
+                ? '↑↓ navigate  enter edit  ctrl+s save & back  esc back (unsaved changes)  ? help'
+                : '↑↓ navigate  enter edit  ctrl+s save & back  esc back  ? help'}
+          </Text>
+        )}
       </Box>
     </Box>
   );
