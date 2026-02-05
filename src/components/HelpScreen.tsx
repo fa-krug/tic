@@ -109,20 +109,30 @@ export function getShortcuts(
           shortcuts: [
             {
               key: 'enter',
-              description: 'Edit field / open related item',
+              description:
+                'Edit field / open $EDITOR (description) / navigate to related item',
             },
             {
               key: 'esc',
-              description: 'Confirm edit (text) or cancel (select)',
+              description: 'revert field to previous value (in edit mode)',
+            },
+            {
+              key: 'enter/select',
+              description: 'Confirm field value',
             },
           ],
         },
         {
-          label: 'Save',
+          label: 'Save & Exit',
           shortcuts: [
             {
+              key: 'ctrl+s',
+              description: 'Save and go back',
+            },
+            {
               key: 'esc',
-              description: 'Save and go back (in navigation mode)',
+              description:
+                'Go back (prompts to save/discard if unsaved changes)',
             },
           ],
         },
