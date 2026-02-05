@@ -11,7 +11,10 @@ export function IterationPicker() {
     loading,
   } = useBackendData(backend);
 
-  useInput((input) => {
+  useInput((input, key) => {
+    if (key.escape) {
+      navigate('list');
+    }
     if (input === '?') {
       navigateToHelp();
     }
