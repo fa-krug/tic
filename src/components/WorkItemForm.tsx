@@ -12,6 +12,11 @@ import { useScrollViewport } from '../hooks/useScrollViewport.js';
 import { useBackendData } from '../hooks/useBackendData.js';
 import { openInEditor } from '../editor.js';
 import { slugifyTemplateName } from '../backends/local/templates.js';
+import {
+  createSnapshot,
+  isSnapshotEqual,
+  type FormSnapshot,
+} from './formSnapshot.js';
 
 type FieldName =
   | 'title'
@@ -199,6 +204,29 @@ export function WorkItemForm() {
   const [newComment, setNewComment] = useState('');
   const [comments, setComments] = useState<Comment[]>([]);
 
+  const [initialSnapshot, setInitialSnapshot] = useState<FormSnapshot | null>(
+    null,
+  );
+
+  const currentValues = createSnapshot({
+    title,
+    type,
+    status,
+    iteration,
+    priority,
+    assignee,
+    labels,
+    description,
+    parentId,
+    dependsOn,
+    newComment,
+  });
+  const isDirty =
+    initialSnapshot !== null &&
+    !isSnapshotEqual(initialSnapshot, currentValues);
+  // isDirty will be used by later tasks for discard prompts
+  void isDirty;
+
   // Sync form fields when the existing item finishes loading
   useEffect(() => {
     if (!existingItem) return;
@@ -229,6 +257,35 @@ export function WorkItemForm() {
         .join(', ') ?? '',
     );
     setComments(existingItem.comments ?? []);
+    setInitialSnapshot(
+      createSnapshot({
+        title: existingItem.title,
+        type: existingItem.type,
+        status: existingItem.status,
+        iteration: existingItem.iteration,
+        priority: existingItem.priority ?? 'medium',
+        assignee: existingItem.assignee ?? '',
+        labels: existingItem.labels.join(', '),
+        description: existingItem.description ?? '',
+        parentId:
+          existingItem.parent !== null && existingItem.parent !== undefined
+            ? (() => {
+                const pi = allItems.find((i) => i.id === existingItem.parent);
+                return pi
+                  ? `#${existingItem.parent} - ${pi.title}`
+                  : String(existingItem.parent);
+              })()
+            : '',
+        dependsOn:
+          existingItem.dependsOn
+            ?.map((depId) => {
+              const depItem = allItems.find((i) => i.id === depId);
+              return depItem ? `#${depId} - ${depItem.title}` : depId;
+            })
+            .join(', ') ?? '',
+        newComment: '',
+      }),
+    );
   }, [existingItem]);
 
   // Prefill from template (create mode only)
@@ -250,6 +307,31 @@ export function WorkItemForm() {
       setDependsOn(activeTemplate.dependsOn.join(', '));
   }, [activeTemplate, selectedWorkItemId]);
 
+  // Capture initial snapshot for new items once config finishes loading
+  useEffect(() => {
+    if (
+      selectedWorkItemId !== null ||
+      configLoading ||
+      initialSnapshot !== null
+    )
+      return;
+    setInitialSnapshot(
+      createSnapshot({
+        title,
+        type,
+        status,
+        iteration,
+        priority,
+        assignee,
+        labels,
+        description,
+        parentId,
+        dependsOn,
+        newComment,
+      }),
+    );
+  }, [selectedWorkItemId, configLoading]);
+
   // Load existing template for editing
   useEffect(() => {
     if (formMode !== 'template' || !editingTemplateSlug) return;
@@ -266,6 +348,21 @@ export function WorkItemForm() {
       if (t.description != null) setDescription(t.description);
       if (t.parent != null) setParentId(String(t.parent));
       if (t.dependsOn != null) setDependsOn(t.dependsOn.join(', '));
+      setInitialSnapshot(
+        createSnapshot({
+          title: t.name,
+          type: t.type ?? type,
+          status: t.status ?? status,
+          iteration: t.iteration ?? iteration,
+          priority: t.priority ?? priority,
+          assignee: t.assignee ?? assignee,
+          labels: t.labels != null ? t.labels.join(', ') : labels,
+          description: t.description ?? description,
+          parentId: t.parent != null ? String(t.parent) : parentId,
+          dependsOn: t.dependsOn != null ? t.dependsOn.join(', ') : dependsOn,
+          newComment: '',
+        }),
+      );
     });
     return () => {
       cancelled = true;
@@ -399,6 +496,22 @@ export function WorkItemForm() {
       }
       setActiveTemplate(null);
     }
+
+    setInitialSnapshot(
+      createSnapshot({
+        title,
+        type,
+        status,
+        iteration,
+        priority,
+        assignee,
+        labels,
+        description,
+        parentId,
+        dependsOn,
+        newComment: '',
+      }),
+    );
   }
 
   useInput(
