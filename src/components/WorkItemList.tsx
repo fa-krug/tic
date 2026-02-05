@@ -198,6 +198,14 @@ export function WorkItemList() {
     };
   }, [isSearching, backend]);
 
+  const isCardMode = terminalWidth < 80;
+  const viewport = useScrollViewport({
+    totalItems: treeItems.length,
+    cursor,
+    chromeLines: 6, // title+margin (2) + table header (1) + help bar margin+text (2) + warning (1)
+    linesPerItem: isCardMode ? 3 : 1,
+  });
+
   useInput((input, key) => {
     if (settingParent) {
       if (key.escape) {
@@ -277,6 +285,22 @@ export function WorkItemList() {
     }
     if (key.downArrow) {
       setCursor((c) => Math.min(treeItems.length - 1, c + 1));
+      setWarning('');
+    }
+    if (key.pageUp) {
+      setCursor((c) => Math.max(0, c - viewport.maxVisible));
+      setWarning('');
+    }
+    if (key.pageDown) {
+      setCursor((c) => Math.min(treeItems.length - 1, c + viewport.maxVisible));
+      setWarning('');
+    }
+    if (key.home) {
+      setCursor(0);
+      setWarning('');
+    }
+    if (key.end) {
+      setCursor(treeItems.length - 1);
       setWarning('');
     }
 
@@ -678,15 +702,8 @@ export function WorkItemList() {
     : '';
 
   const helpText =
-    '↑↓ navigate  enter edit  c create  / search  : commands  ? help';
+    '↑↓ navigate  pgup/dn page  home/end jump  enter edit  c create  ? help';
 
-  const isCardMode = terminalWidth < 80;
-  const viewport = useScrollViewport({
-    totalItems: treeItems.length,
-    cursor,
-    chromeLines: 6, // title+margin (2) + table header (1) + help bar margin+text (2) + warning (1)
-    linesPerItem: isCardMode ? 3 : 1,
-  });
   const visibleTreeItems = treeItems.slice(viewport.start, viewport.end);
 
   return (

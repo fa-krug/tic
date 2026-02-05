@@ -33,6 +33,8 @@ export function getShortcuts(
     case 'list': {
       const nav: ShortcutEntry[] = [
         { key: '\u2191/\u2193', description: 'Navigate items' },
+        { key: 'pgup/pgdn', description: 'Page up / page down' },
+        { key: 'home/end', description: 'Jump to first / last item' },
       ];
       if (capabilities.relationships) {
         nav.push({ key: '\u2190', description: 'Collapse or jump to parent' });
