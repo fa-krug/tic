@@ -11,6 +11,7 @@ import {
 import { LocalBackend } from './local/index.js';
 import { SyncManager } from '../sync/SyncManager.js';
 import { writeConfig, defaultConfig } from './local/config.js';
+import { configStore } from '../stores/configStore.js';
 
 describe('VALID_BACKENDS', () => {
   it('contains the five known backends', () => {
@@ -41,6 +42,7 @@ describe('createBackend', () => {
   });
 
   afterEach(() => {
+    configStore.getState().destroy();
     fs.rmSync(tmpDir, { recursive: true });
   });
 
@@ -115,6 +117,7 @@ describe('createBackendWithSync', () => {
   });
 
   afterEach(() => {
+    configStore.getState().destroy();
     fs.rmSync(tmpDir, { recursive: true });
   });
 

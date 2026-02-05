@@ -5,7 +5,7 @@ import { GitHubBackend } from './github/index.js';
 import { GitLabBackend } from './gitlab/index.js';
 import { AzureDevOpsBackend } from './ado/index.js';
 import { JiraBackend } from './jira/index.js';
-import { readConfig } from './local/config.js';
+import { configStore } from '../stores/configStore.js';
 import { SyncManager } from '../sync/SyncManager.js';
 import { SyncQueueStore } from '../sync/queue.js';
 
@@ -40,8 +40,10 @@ export function detectBackend(root: string): BackendType {
 }
 
 export async function createBackend(root: string): Promise<Backend> {
-  const config = await readConfig(root);
-  const backend = config.backend ?? 'local';
+  if (!configStore.getState().loaded) {
+    await configStore.getState().init(root);
+  }
+  const backend = configStore.getState().config.backend ?? 'local';
 
   switch (backend) {
     case 'local':
@@ -69,8 +71,10 @@ export interface BackendSetup {
 export async function createBackendWithSync(
   root: string,
 ): Promise<BackendSetup> {
-  const config = await readConfig(root);
-  const backendType = config.backend ?? 'local';
+  if (!configStore.getState().loaded) {
+    await configStore.getState().init(root);
+  }
+  const backendType = configStore.getState().config.backend ?? 'local';
 
   const local = await LocalBackend.create(root, {
     tempIds: backendType !== 'local',

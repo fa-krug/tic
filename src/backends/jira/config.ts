@@ -1,3 +1,4 @@
+import { configStore } from '../../stores/configStore.js';
 import { readConfig } from '../local/config.js';
 
 export interface JiraConfig {
@@ -7,7 +8,10 @@ export interface JiraConfig {
 }
 
 export async function readJiraConfig(root: string): Promise<JiraConfig> {
-  const config = await readConfig(root);
+  // Use config store if loaded (TUI), fall back to disk read (CLI/MCP)
+  const config = configStore.getState().loaded
+    ? configStore.getState().config
+    : await readConfig(root);
   if (!config.jira) {
     throw new Error(
       'Jira backend requires "jira" configuration in .tic/config.yml',
