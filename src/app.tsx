@@ -13,6 +13,7 @@ import type { Template } from './types.js';
 import { checkForUpdate } from './update-checker.js';
 import type { UpdateInfo } from './update-checker.js';
 import { useConfigStore } from './stores/configStore.js';
+import { uiStore } from './stores/uiStore.js';
 
 export type Screen =
   | 'list'
@@ -97,6 +98,7 @@ export function App({
   };
 
   const navigateWithStackClear = (newScreen: Screen) => {
+    uiStore.getState().reset();
     if (newScreen !== 'form') {
       setNavigationStack([]);
     }
