@@ -3,6 +3,7 @@ import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import { useAppState } from '../app.js';
 import { useConfigStore, configStore } from '../stores/configStore.js';
+import { uiStore, useUIStore } from '../stores/uiStore.js';
 import { VALID_BACKENDS } from '../backends/factory.js';
 import type { BackendType } from '../backends/factory.js';
 import { checkAllBackendAvailability } from '../backends/availability.js';
@@ -53,20 +54,17 @@ export function Settings() {
   const configLoaded = useConfigStore((s) => s.loaded);
 
   const [cursor, setCursor] = useState(0);
-  const [editing, setEditing] = useState(false);
   const [jiraSite, setJiraSite] = useState('');
   const [jiraProject, setJiraProject] = useState('');
   const [jiraBoardId, setJiraBoardId] = useState('');
 
   const [templates, setTemplates] = useState<Template[]>([]);
-  const [confirmDeleteTemplate, setConfirmDeleteTemplate] = useState(false);
-  const [templateToDelete, setTemplateToDelete] = useState<string | null>(null);
 
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [updateChecking, setUpdateChecking] = useState(false);
-  const [showDefaultTypePicker, setShowDefaultTypePicker] = useState(false);
-  const [showDefaultIterationPicker, setShowDefaultIterationPicker] =
-    useState(false);
+
+  const activeOverlay = useUIStore((s) => s.activeOverlay);
+  const { openOverlay, closeOverlay } = uiStore.getState();
 
   const [availability, setAvailability] = useState<
     Record<BackendType, AvailabilityStatus>
@@ -184,37 +182,34 @@ export function Settings() {
     });
   }
 
+  // Delete template confirmation handler
+  useInput(
+    (input) => {
+      if (activeOverlay?.type !== 'delete-template-confirm') return;
+      if (input === 'y' || input === 'Y') {
+        const slug = activeOverlay.templateSlug;
+        void backend.deleteTemplate(slug).then(async () => {
+          setTemplates((prev) => prev.filter((t) => t.slug !== slug));
+          if (queueStore) {
+            await queueStore.append({
+              action: 'template-delete',
+              itemId: slug,
+              timestamp: new Date().toISOString(),
+              templateSlug: slug,
+            });
+            syncManager?.pushPending().catch(() => {});
+          }
+        });
+      }
+      closeOverlay();
+    },
+    { isActive: activeOverlay?.type === 'delete-template-confirm' },
+  );
+
   // Navigation mode input handler
   useInput(
     (input, key) => {
       if (!configLoaded) return;
-
-      if (confirmDeleteTemplate) {
-        if (input === 'y' || input === 'Y') {
-          if (templateToDelete) {
-            void backend.deleteTemplate(templateToDelete).then(async () => {
-              setTemplates((prev) =>
-                prev.filter((t) => t.slug !== templateToDelete),
-              );
-              if (queueStore) {
-                await queueStore.append({
-                  action: 'template-delete',
-                  itemId: templateToDelete,
-                  timestamp: new Date().toISOString(),
-                  templateSlug: templateToDelete,
-                });
-                syncManager?.pushPending().catch(() => {});
-              }
-            });
-          }
-          setConfirmDeleteTemplate(false);
-          setTemplateToDelete(null);
-        } else {
-          setConfirmDeleteTemplate(false);
-          setTemplateToDelete(null);
-        }
-        return;
-      }
 
       if (input === '?') {
         navigateToHelp();
@@ -268,16 +263,16 @@ export function Settings() {
             setCursor(jiraIdx + 1);
           }
         } else if (item.kind === 'jira-field') {
-          setEditing(true);
+          openOverlay({ type: 'settings-edit' });
         } else if (item.kind === 'template') {
           setFormMode('template');
           setEditingTemplateSlug(item.slug);
           selectWorkItem(null);
           navigate('form');
         } else if (item.kind === 'default-type') {
-          setShowDefaultTypePicker(true);
+          openOverlay({ type: 'default-type-picker' });
         } else if (item.kind === 'default-iteration') {
-          setShowDefaultIterationPicker(true);
+          openOverlay({ type: 'default-iteration-picker' });
         } else if (item.kind === 'update-check') {
           setUpdateChecking(true);
           void checkForUpdate().then((info) => {
@@ -314,26 +309,25 @@ export function Settings() {
       if (input === 'd') {
         const item = navItems[cursor];
         if (item && item.kind === 'template') {
-          setTemplateToDelete(item.slug);
-          setConfirmDeleteTemplate(true);
+          openOverlay({
+            type: 'delete-template-confirm',
+            templateSlug: item.slug,
+          });
         }
       }
     },
-    {
-      isActive:
-        !editing && !showDefaultTypePicker && !showDefaultIterationPicker,
-    },
+    { isActive: activeOverlay === null },
   );
 
   // Edit mode input handler — only captures Esc to exit editing
   useInput(
     (_input, key) => {
       if (key.escape) {
-        setEditing(false);
+        closeOverlay();
         saveJiraConfig();
       }
     },
-    { isActive: editing },
+    { isActive: activeOverlay?.type === 'settings-edit' },
   );
 
   if (!configLoaded) {
@@ -413,7 +407,7 @@ export function Settings() {
               ? setJiraProject
               : setJiraBoardId;
         const required = field !== 'boardId';
-        const isEditing = focused && editing;
+        const isEditing = focused && activeOverlay?.type === 'settings-edit';
 
         return (
           <Box key={`jira-${field}`} marginLeft={4}>
@@ -430,7 +424,7 @@ export function Settings() {
                   onChange={setter}
                   focus={true}
                   onSubmit={() => {
-                    setEditing(false);
+                    closeOverlay();
                     saveJiraConfig();
                   }}
                 />
@@ -561,19 +555,19 @@ export function Settings() {
         })}
       </Box>
 
-      {showDefaultTypePicker && (
+      {activeOverlay?.type === 'default-type-picker' && (
         <DefaultPicker
           title="Default Type"
           options={config.types}
           onSelect={(type) => {
             void configStore.getState().update({ defaultType: type });
-            setShowDefaultTypePicker(false);
+            closeOverlay();
           }}
-          onCancel={() => setShowDefaultTypePicker(false)}
+          onCancel={() => closeOverlay()}
         />
       )}
 
-      {showDefaultIterationPicker && (
+      {activeOverlay?.type === 'default-iteration-picker' && (
         <DefaultPicker
           title="Default Iteration"
           options={config.iterations}
@@ -581,18 +575,18 @@ export function Settings() {
             void configStore
               .getState()
               .update({ current_iteration: iteration });
-            setShowDefaultIterationPicker(false);
+            closeOverlay();
           }}
-          onCancel={() => setShowDefaultIterationPicker(false)}
+          onCancel={() => closeOverlay()}
         />
       )}
 
-      {confirmDeleteTemplate && (
+      {activeOverlay?.type === 'delete-template-confirm' && (
         <Box marginTop={1}>
           <Text color="red">
             Delete template &quot;
-            {templates.find((t) => t.slug === templateToDelete)?.name ??
-              templateToDelete}
+            {templates.find((t) => t.slug === activeOverlay.templateSlug)
+              ?.name ?? activeOverlay.templateSlug}
             &quot;? (y/n)
           </Text>
         </Box>
