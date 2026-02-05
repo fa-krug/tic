@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
 import Spinner from 'ink-spinner';
 
@@ -10,9 +10,12 @@ import { TableLayout } from './TableLayout.js';
 import { CardLayout } from './CardLayout.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { useScrollViewport } from '../hooks/useScrollViewport.js';
-import { useBackendData } from '../hooks/useBackendData.js';
+import {
+  useBackendDataStore,
+  backendDataStore,
+} from '../stores/backendDataStore.js';
 import { SyncQueueStore } from '../sync/queue.js';
-import type { SyncStatus, QueueAction } from '../sync/types.js';
+import type { QueueAction } from '../sync/types.js';
 import { buildTree, type TreeItem } from './buildTree.js';
 import { SearchOverlay } from './SearchOverlay.js';
 import { BulkMenu, type BulkAction } from './BulkMenu.js';
@@ -84,32 +87,19 @@ export function WorkItemList() {
   // Marked count for header display
   const markedCount = markedIds.size;
 
-  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(
-    syncManager?.getStatus() ?? null,
-  );
+  const syncStatus = useBackendDataStore((s) => s.syncStatus);
 
-  const {
-    capabilities,
-    types,
-    statuses,
-    assignees,
-    labels: labelSuggestions,
-    currentIteration: iteration,
-    items: allItems,
-    loading,
-    refresh: refreshData,
-  } = useBackendData(backend);
-
-  useEffect(() => {
-    if (!syncManager) return;
-    const cb = (status: SyncStatus) => {
-      setSyncStatus(status);
-      if (status.state === 'idle') {
-        refreshData();
-      }
-    };
-    syncManager.onStatusChange(cb);
-  }, [syncManager, refreshData]);
+  const capabilities = useBackendDataStore((s) => s.capabilities);
+  const types = useBackendDataStore((s) => s.types);
+  const statuses = useBackendDataStore((s) => s.statuses);
+  const assignees = useBackendDataStore((s) => s.assignees);
+  const labelSuggestions = useBackendDataStore((s) => s.labels);
+  const iteration = useBackendDataStore((s) => s.currentIteration);
+  const allItems = useBackendDataStore((s) => s.items);
+  const loading = useBackendDataStore((s) => s.loading);
+  const refreshData = useCallback(() => {
+    void backendDataStore.getState().refresh();
+  }, []);
 
   useEffect(() => {
     if (capabilities.templates) {
