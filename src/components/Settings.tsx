@@ -5,6 +5,8 @@ import { useAppState } from '../app.js';
 import { readConfig, writeConfig } from '../backends/local/config.js';
 import type { Config } from '../backends/local/config.js';
 import { VALID_BACKENDS } from '../backends/factory.js';
+import type { BackendType } from '../backends/factory.js';
+import { checkAllBackendAvailability } from '../backends/availability.js';
 import { SyncQueueStore } from '../sync/queue.js';
 import type { Template } from '../types.js';
 import { checkForUpdate } from '../update-checker.js';
@@ -26,9 +28,7 @@ type NavItem =
 
 const JIRA_FIELDS = ['site', 'project', 'boardId'] as const;
 
-function isAvailable(b: string): boolean {
-  return b === 'local' || b === 'github' || b === 'jira';
-}
+type AvailabilityStatus = 'checking' | 'available' | 'unavailable';
 
 export function Settings() {
   const {
@@ -61,11 +61,34 @@ export function Settings() {
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [updateChecking, setUpdateChecking] = useState(false);
 
+  const [availability, setAvailability] = useState<
+    Record<BackendType, AvailabilityStatus>
+  >({
+    local: 'available',
+    github: 'checking',
+    gitlab: 'checking',
+    azure: 'checking',
+    jira: 'available',
+  });
+
   const capabilities = backend.getCapabilities();
 
   useEffect(() => {
     void readConfig(root).then(setConfig);
   }, [root]);
+
+  useEffect(() => {
+    void checkAllBackendAvailability().then((results) => {
+      setAvailability(
+        Object.fromEntries(
+          Object.entries(results).map(([b, ok]) => [
+            b,
+            ok ? 'available' : 'unavailable',
+          ]),
+        ) as Record<BackendType, AvailabilityStatus>,
+      );
+    });
+  }, []);
 
   useEffect(() => {
     if (capabilities.templates) {
@@ -227,7 +250,7 @@ export function Settings() {
       if (key.return) {
         const item = navItems[cursor]!;
         if (item.kind === 'backend') {
-          if (!isAvailable(item.backend)) return;
+          if (availability[item.backend as BackendType] !== 'available') return;
           config.backend = item.backend;
           if (item.backend === 'jira' && !config.jira) {
             config.jira = { site: jiraSite, project: jiraProject };
@@ -324,9 +347,9 @@ export function Settings() {
         const focused = idx === cursor;
 
         if (item.kind === 'backend') {
-          const b = item.backend;
+          const b = item.backend as BackendType;
           const isCurrent = b === config.backend;
-          const available = isAvailable(b);
+          const status = availability[b];
           return (
             <Box key={b}>
               <Text color={focused ? 'cyan' : undefined}>
@@ -335,11 +358,12 @@ export function Settings() {
               <Text
                 color={focused ? 'cyan' : undefined}
                 bold={focused}
-                dimColor={!available}
+                dimColor={status !== 'available'}
               >
                 {b}
                 {isCurrent ? ' (current)' : ''}
-                {!available ? ' (not yet available)' : ''}
+                {status === 'checking' ? ' (checking...)' : ''}
+                {status === 'unavailable' ? ' (not available)' : ''}
               </Text>
             </Box>
           );
