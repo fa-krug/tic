@@ -25,9 +25,16 @@ export function TemplatePicker({
   ];
 
   return (
-    <Box flexDirection="column">
+    <Box
+      flexDirection="column"
+      borderStyle="round"
+      borderColor="cyan"
+      paddingX={1}
+    >
       <Box marginBottom={1}>
-        <Text bold>Select Template</Text>
+        <Text bold color="cyan">
+          Select Template
+        </Text>
       </Box>
       <SelectInput
         items={items}

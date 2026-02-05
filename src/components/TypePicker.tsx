@@ -20,9 +20,16 @@ export function TypePicker({ types, onSelect, onCancel }: TypePickerProps) {
   }));
 
   return (
-    <Box flexDirection="column">
+    <Box
+      flexDirection="column"
+      borderStyle="round"
+      borderColor="cyan"
+      paddingX={1}
+    >
       <Box marginBottom={1}>
-        <Text bold>Set Type</Text>
+        <Text bold color="cyan">
+          Set Type
+        </Text>
       </Box>
       <SelectInput items={items} onSelect={(item) => onSelect(item.value)} />
       <Box marginTop={1}>

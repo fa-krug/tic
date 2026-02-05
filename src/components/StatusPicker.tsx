@@ -24,9 +24,16 @@ export function StatusPicker({
   }));
 
   return (
-    <Box flexDirection="column">
+    <Box
+      flexDirection="column"
+      borderStyle="round"
+      borderColor="cyan"
+      paddingX={1}
+    >
       <Box marginBottom={1}>
-        <Text bold>Set Status</Text>
+        <Text bold color="cyan">
+          Set Status
+        </Text>
       </Box>
       <SelectInput items={items} onSelect={(item) => onSelect(item.value)} />
       <Box marginTop={1}>

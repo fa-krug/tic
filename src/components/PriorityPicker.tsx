@@ -24,9 +24,16 @@ export function PriorityPicker({ onSelect, onCancel }: PriorityPickerProps) {
   });
 
   return (
-    <Box flexDirection="column">
+    <Box
+      flexDirection="column"
+      borderStyle="round"
+      borderColor="cyan"
+      paddingX={1}
+    >
       <Box marginBottom={1}>
-        <Text bold>Set Priority</Text>
+        <Text bold color="cyan">
+          Set Priority
+        </Text>
       </Box>
       <SelectInput
         items={PRIORITIES}
