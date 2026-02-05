@@ -706,7 +706,7 @@ export function WorkItemList() {
     : '';
 
   const helpText =
-    '↑↓ navigate  pgup/dn page  home/end jump  enter edit  c create  ? help';
+    '↑↓ navigate  ←→ expand/collapse  enter edit  c create  , settings  ? help';
 
   const visibleTreeItems = treeItems.slice(viewport.start, viewport.end);
 
