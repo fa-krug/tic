@@ -50,6 +50,7 @@ export function WorkItemList() {
     setActiveType,
     setActiveTemplate,
     setFormMode,
+    updateInfo,
   } = useAppState();
   const { exit } = useApp();
   const [cursor, setCursor] = useState(0);
@@ -972,6 +973,18 @@ export function WorkItemList() {
               <Text color="yellow">⚠ {warning}</Text>
             </Box>
           )}
+          {updateInfo?.updateAvailable &&
+            !confirmDelete &&
+            !settingParent &&
+            !settingAssignee &&
+            !settingLabels && (
+              <Box>
+                <Text color="yellow">
+                  Update available: {updateInfo.current} → {updateInfo.latest}{' '}
+                  Press , to update in Settings
+                </Text>
+              </Box>
+            )}
         </>
       )}
     </Box>
