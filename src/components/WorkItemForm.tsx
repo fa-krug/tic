@@ -9,7 +9,7 @@ import type { Comment, WorkItem, Template } from '../types.js';
 import { SyncQueueStore } from '../sync/queue.js';
 import type { QueueAction } from '../sync/types.js';
 import { useScrollViewport } from '../hooks/useScrollViewport.js';
-import { useBackendData } from '../hooks/useBackendData.js';
+import { useBackendDataStore } from '../stores/backendDataStore.js';
 import { openInEditor } from '../editor.js';
 import { slugifyTemplateName } from '../backends/local/templates.js';
 import {
@@ -80,17 +80,15 @@ export function WorkItemForm() {
     }
   };
 
-  const {
-    capabilities,
-    statuses,
-    iterations,
-    types,
-    assignees,
-    labels: labelSuggestions,
-    currentIteration,
-    items: allItems,
-    loading: configLoading,
-  } = useBackendData(backend);
+  const capabilities = useBackendDataStore((s) => s.capabilities);
+  const statuses = useBackendDataStore((s) => s.statuses);
+  const iterations = useBackendDataStore((s) => s.iterations);
+  const types = useBackendDataStore((s) => s.types);
+  const assignees = useBackendDataStore((s) => s.assignees);
+  const labelSuggestions = useBackendDataStore((s) => s.labels);
+  const currentIteration = useBackendDataStore((s) => s.currentIteration);
+  const allItems = useBackendDataStore((s) => s.items);
+  const configLoading = useBackendDataStore((s) => s.loading);
 
   const [existingItem, setExistingItem] = useState<WorkItem | null>(null);
   const [children, setChildren] = useState<WorkItem[]>([]);
