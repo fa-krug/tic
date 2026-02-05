@@ -1,4 +1,4 @@
-import { useState, createContext, useContext } from 'react';
+import { useState, useEffect, createContext, useContext } from 'react';
 import { Box } from 'ink';
 import { WorkItemList } from './components/WorkItemList.js';
 import { WorkItemForm } from './components/WorkItemForm.js';
@@ -10,6 +10,9 @@ import { Header } from './components/Header.js';
 import type { Backend } from './backends/types.js';
 import type { SyncManager } from './sync/SyncManager.js';
 import type { Template } from './types.js';
+import { checkForUpdate } from './update-checker.js';
+import type { UpdateInfo } from './update-checker.js';
+import { readConfigSync } from './backends/local/config.js';
 
 export type Screen =
   | 'list'
@@ -39,6 +42,7 @@ interface AppState {
   popWorkItem: () => string | null;
   navigateToHelp: () => void;
   navigateBackFromHelp: () => void;
+  updateInfo: UpdateInfo | null;
 }
 
 export const AppContext = createContext<AppState>(null!);
@@ -66,6 +70,16 @@ export function App({
   );
   const [navigationStack, setNavigationStack] = useState<string[]>([]);
   const [previousScreen, setPreviousScreen] = useState<Screen>('list');
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+
+  useEffect(() => {
+    const config = readConfigSync(process.cwd());
+    if (config.autoUpdate !== false) {
+      void checkForUpdate().then((info) => {
+        if (info) setUpdateInfo(info);
+      });
+    }
+  }, []);
 
   const pushWorkItem = (id: string) => {
     if (selectedWorkItemId !== null) {
@@ -118,6 +132,7 @@ export function App({
     popWorkItem,
     navigateToHelp,
     navigateBackFromHelp,
+    updateInfo,
   };
 
   return (
