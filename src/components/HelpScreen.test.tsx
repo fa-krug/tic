@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getShortcuts } from './HelpScreen.js';
+import { getShortcuts, flattenGroups } from './HelpScreen.js';
 import type { BackendCapabilities } from '../backends/types.js';
 
 const fullCapabilities: BackendCapabilities = {
@@ -143,5 +143,47 @@ describe('getShortcuts', () => {
     const commandPaletteShortcut = allShortcuts.find((s) => s.key === ':');
     expect(commandPaletteShortcut).toBeDefined();
     expect(commandPaletteShortcut?.description).toBe('Command palette');
+  });
+});
+
+describe('flattenGroups', () => {
+  it('flattens groups into header + shortcut lines with gaps between groups', () => {
+    const groups = [
+      {
+        label: 'Navigation',
+        shortcuts: [{ key: '↑/↓', description: 'Navigate' }],
+      },
+      {
+        label: 'Actions',
+        shortcuts: [
+          { key: 'enter', description: 'Edit' },
+          { key: 'd', description: 'Delete' },
+        ],
+      },
+    ];
+    const lines = flattenGroups(groups);
+    expect(lines).toEqual([
+      { type: 'header', label: 'Navigation' },
+      { type: 'shortcut', key: '↑/↓', description: 'Navigate' },
+      { type: 'gap' },
+      { type: 'header', label: 'Actions' },
+      { type: 'shortcut', key: 'enter', description: 'Edit' },
+      { type: 'shortcut', key: 'd', description: 'Delete' },
+    ]);
+  });
+
+  it('returns empty array for empty groups', () => {
+    expect(flattenGroups([])).toEqual([]);
+  });
+
+  it('does not add gap before first group', () => {
+    const groups = [
+      {
+        label: 'Only',
+        shortcuts: [{ key: 'q', description: 'Quit' }],
+      },
+    ];
+    const lines = flattenGroups(groups);
+    expect(lines[0]).toEqual({ type: 'header', label: 'Only' });
   });
 });

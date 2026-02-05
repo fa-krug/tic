@@ -1,9 +1,10 @@
-import { useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { useAppState } from '../app.js';
 import type { Screen } from '../app.js';
 import { isGitRepo } from '../git.js';
 import type { BackendCapabilities } from '../backends/types.js';
+import { useTerminalSize } from '../hooks/useTerminalSize.js';
 
 interface ShortcutEntry {
   key: string;
@@ -202,10 +203,30 @@ export function getShortcuts(
   }
 }
 
+export type LineEntry =
+  | { type: 'header'; label: string }
+  | { type: 'shortcut'; key: string; description: string }
+  | { type: 'gap' };
+
+export function flattenGroups(groups: ShortcutGroup[]): LineEntry[] {
+  const lines: LineEntry[] = [];
+  for (const group of groups) {
+    if (lines.length > 0) {
+      lines.push({ type: 'gap' });
+    }
+    lines.push({ type: 'header', label: group.label });
+    for (const s of group.shortcuts) {
+      lines.push({ type: 'shortcut', key: s.key, description: s.description });
+    }
+  }
+  return lines;
+}
+
 export function HelpScreen({ sourceScreen }: { sourceScreen: Screen }) {
   const { backend, syncManager, navigateBackFromHelp } = useAppState();
   const capabilities = backend.getCapabilities();
   const gitAvailable = useMemo(() => isGitRepo(process.cwd()), []);
+  const { height } = useTerminalSize();
 
   const groups = getShortcuts(
     sourceScreen,
@@ -214,11 +235,32 @@ export function HelpScreen({ sourceScreen }: { sourceScreen: Screen }) {
     syncManager !== null,
   );
 
+  const lines = useMemo(() => flattenGroups(groups), [groups]);
+
+  // chrome: title(1) + margin(1) + footer(1) + margin(1) = 4
+  const chromeLines = 4;
+  const maxVisible = Math.max(1, height - chromeLines);
+  const needsScroll = lines.length > maxVisible;
+  const maxScroll = Math.max(0, lines.length - maxVisible);
+
+  const [scrollOffset, setScrollOffset] = useState(0);
+
   useInput((_input, key) => {
     if (key.escape) {
       navigateBackFromHelp();
+      return;
+    }
+    if (key.upArrow) {
+      setScrollOffset((o) => Math.max(0, o - 1));
+    }
+    if (key.downArrow) {
+      setScrollOffset((o) => Math.min(maxScroll, o + 1));
     }
   });
+
+  const visibleLines = needsScroll
+    ? lines.slice(scrollOffset, scrollOffset + maxVisible)
+    : lines;
 
   const title = SCREEN_LABELS[sourceScreen] ?? 'Help';
 
@@ -230,22 +272,33 @@ export function HelpScreen({ sourceScreen }: { sourceScreen: Screen }) {
         </Text>
       </Box>
 
-      {groups.map((group) => (
-        <Box key={group.label} flexDirection="column" marginBottom={1}>
-          <Text bold>{group.label}:</Text>
-          {group.shortcuts.map((shortcut) => (
-            <Box key={shortcut.key} marginLeft={2}>
-              <Box width={12}>
-                <Text color="cyan">{shortcut.key}</Text>
-              </Box>
-              <Text>{shortcut.description}</Text>
+      {visibleLines.map((line, idx) => {
+        if (line.type === 'gap') {
+          return <Box key={idx} height={1} />;
+        }
+        if (line.type === 'header') {
+          return (
+            <Text key={idx} bold>
+              {line.label}:
+            </Text>
+          );
+        }
+        return (
+          <Box key={idx} marginLeft={2}>
+            <Box width={12}>
+              <Text color="cyan">{line.key}</Text>
             </Box>
-          ))}
-        </Box>
-      ))}
+            <Text>{line.description}</Text>
+          </Box>
+        );
+      })}
 
       <Box marginTop={1}>
-        <Text dimColor>esc: back</Text>
+        <Text dimColor>
+          {needsScroll
+            ? `↑↓ scroll (${scrollOffset + 1}-${Math.min(scrollOffset + maxVisible, lines.length)} of ${lines.length})  esc: back`
+            : 'esc: back'}
+        </Text>
       </Box>
     </Box>
   );
