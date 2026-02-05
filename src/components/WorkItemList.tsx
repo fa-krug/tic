@@ -6,6 +6,7 @@ import { useAppState } from '../app.js';
 import { isGitRepo } from '../git.js';
 import { beginImplementation } from '../implement.js';
 import { useConfigStore } from '../stores/configStore.js';
+import { uiStore, useUIStore } from '../stores/uiStore.js';
 import { TableLayout } from './TableLayout.js';
 import { CardLayout } from './CardLayout.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
@@ -61,28 +62,19 @@ export function WorkItemList() {
   const branchMode = useConfigStore((s) => s.config.branchMode ?? 'worktree');
   const { exit } = useApp();
   const [cursor, setCursor] = useState(0);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const [warning, setWarning] = useState('');
-  const [settingParent, setSettingParent] = useState(false);
   const [parentInput, setParentInput] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
   const [allSearchItems, setAllSearchItems] = useState<WorkItem[]>([]);
   // Marked items state for bulk operations
   const [markedIds, setMarkedIds] = useState<Set<string>>(() => new Set());
-  const [deleteTargetIds, setDeleteTargetIds] = useState<string[]>([]);
-  const [parentTargetIds, setParentTargetIds] = useState<string[]>([]);
-  const [showBulkMenu, setShowBulkMenu] = useState(false);
-  const [showStatusPicker, setShowStatusPicker] = useState(false);
-  const [showTypePicker, setShowTypePicker] = useState(false);
-  const [showPriorityPicker, setShowPriorityPicker] = useState(false);
-  const [settingAssignee, setSettingAssignee] = useState(false);
   const [assigneeInput, setAssigneeInput] = useState('');
-  const [settingLabels, setSettingLabels] = useState(false);
   const [labelsInput, setLabelsInput] = useState('');
-  const [bulkTargetIds, setBulkTargetIds] = useState<string[]>([]);
-  const [showCommandPalette, setShowCommandPalette] = useState(false);
-  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [templates, setTemplates] = useState<Template[]>([]);
+
+  // UI overlay state from store
+  const activeOverlay = useUIStore((s) => s.activeOverlay);
+  const warning = useUIStore((s) => s.warning);
+  const { openOverlay, closeOverlay, setWarning, clearWarning } =
+    uiStore.getState();
 
   // Marked count for header display
   const markedCount = markedIds.size;
@@ -192,7 +184,7 @@ export function WorkItemList() {
   }, [treeItems.length]);
 
   useEffect(() => {
-    if (!isSearching) return;
+    if (activeOverlay?.type !== 'search') return;
     let cancelled = false;
     void backend.listWorkItems().then((items) => {
       if (!cancelled) setAllSearchItems(items);
@@ -200,7 +192,7 @@ export function WorkItemList() {
     return () => {
       cancelled = true;
     };
-  }, [isSearching, backend]);
+  }, [activeOverlay?.type, backend]);
 
   const isCardMode = terminalWidth < 80;
   const viewport = useScrollViewport({
@@ -210,50 +202,36 @@ export function WorkItemList() {
     linesPerItem: isCardMode ? 3 : 1,
   });
 
-  useInput((input, key) => {
-    if (settingParent) {
+  // Block 1: Overlay escape handlers for inline inputs
+  useInput(
+    (_input, key) => {
       if (key.escape) {
-        setSettingParent(false);
+        closeOverlay();
       }
-      return;
-    }
+    },
+    {
+      isActive:
+        activeOverlay?.type === 'parent-input' ||
+        activeOverlay?.type === 'assignee-input' ||
+        activeOverlay?.type === 'labels-input',
+    },
+  );
 
-    if (showBulkMenu) return;
-
-    if (settingAssignee) {
-      if (key.escape) {
-        setSettingAssignee(false);
-        setBulkTargetIds([]);
-      }
-      return;
-    }
-
-    if (settingLabels) {
-      if (key.escape) {
-        setSettingLabels(false);
-        setBulkTargetIds([]);
-      }
-      return;
-    }
-
-    if (isSearching) return;
-
-    if (showCommandPalette) return;
-
-    if (showTemplatePicker) return;
-
-    if (confirmDelete) {
+  // Block 2: Delete confirmation handler
+  useInput(
+    (input) => {
+      if (activeOverlay?.type !== 'delete-confirm') return;
       if (input === 'y' || input === 'Y') {
+        const targetIds = activeOverlay.targetIds;
         void (async () => {
-          for (const id of deleteTargetIds) {
+          for (const id of targetIds) {
             await backend.cachedDeleteWorkItem(id);
             await queueWrite('delete', id);
           }
-          setConfirmDelete(false);
-          setDeleteTargetIds([]);
+          closeOverlay();
           setMarkedIds((prev) => {
             const next = new Set(prev);
-            for (const id of deleteTargetIds) {
+            for (const id of targetIds) {
               next.delete(id);
             }
             return next;
@@ -262,238 +240,247 @@ export function WorkItemList() {
           refreshData();
         })();
       } else {
-        setConfirmDelete(false);
-        setDeleteTargetIds([]);
+        closeOverlay();
       }
-      return;
-    }
+    },
+    { isActive: activeOverlay?.type === 'delete-confirm' },
+  );
 
-    if (input === '/') {
-      setIsSearching(true);
-      return;
-    }
-
-    if (input === ':') {
-      setShowCommandPalette(true);
-      return;
-    }
-
-    if (input === '?') {
-      navigateToHelp();
-      return;
-    }
-
-    if (key.upArrow) {
-      setCursor((c) => Math.max(0, c - 1));
-      setWarning('');
-    }
-    if (key.downArrow) {
-      setCursor((c) => Math.min(treeItems.length - 1, c + 1));
-      setWarning('');
-    }
-    if (key.pageUp) {
-      setCursor((c) => Math.max(0, c - viewport.maxVisible));
-      setWarning('');
-    }
-    if (key.pageDown) {
-      setCursor((c) => Math.min(treeItems.length - 1, c + viewport.maxVisible));
-      setWarning('');
-    }
-    if (key.home) {
-      setCursor(0);
-      setWarning('');
-    }
-    if (key.end) {
-      setCursor(treeItems.length - 1);
-      setWarning('');
-    }
-
-    if (key.rightArrow && treeItems.length > 0) {
-      const current = treeItems[cursor];
-      if (current && current.hasChildren && collapsedIds.has(current.item.id)) {
-        setExpandedIds((prev) => new Set(prev).add(current.item.id));
+  // Block 3: Main input handler — only active when no overlay is open
+  useInput(
+    (input, key) => {
+      if (input === '/') {
+        openOverlay({ type: 'search' });
+        return;
       }
-    }
 
-    if (key.leftArrow && treeItems.length > 0) {
-      const current = treeItems[cursor];
-      if (current) {
-        if (current.hasChildren && !collapsedIds.has(current.item.id)) {
-          setExpandedIds((prev) => {
-            const next = new Set(prev);
-            next.delete(current.item.id);
-            return next;
-          });
-        } else if (current.depth > 0 && current.item.parent) {
-          const parentIdx = treeItems.findIndex(
-            (t) => t.item.id === current.item.parent,
-          );
-          if (parentIdx >= 0) setCursor(parentIdx);
+      if (input === ':') {
+        openOverlay({ type: 'command-palette' });
+        return;
+      }
+
+      if (input === '?') {
+        navigateToHelp();
+        return;
+      }
+
+      if (key.upArrow) {
+        setCursor((c) => Math.max(0, c - 1));
+        clearWarning();
+      }
+      if (key.downArrow) {
+        setCursor((c) => Math.min(treeItems.length - 1, c + 1));
+        clearWarning();
+      }
+      if (key.pageUp) {
+        setCursor((c) => Math.max(0, c - viewport.maxVisible));
+        clearWarning();
+      }
+      if (key.pageDown) {
+        setCursor((c) =>
+          Math.min(treeItems.length - 1, c + viewport.maxVisible),
+        );
+        clearWarning();
+      }
+      if (key.home) {
+        setCursor(0);
+        clearWarning();
+      }
+      if (key.end) {
+        setCursor(treeItems.length - 1);
+        clearWarning();
+      }
+
+      if (key.rightArrow && treeItems.length > 0) {
+        const current = treeItems[cursor];
+        if (
+          current &&
+          current.hasChildren &&
+          collapsedIds.has(current.item.id)
+        ) {
+          setExpandedIds((prev) => new Set(prev).add(current.item.id));
         }
       }
-    }
 
-    if (key.return && treeItems.length > 0) {
-      setFormMode('item');
-      selectWorkItem(treeItems[cursor]!.item.id);
-      navigate('form');
-    }
+      if (key.leftArrow && treeItems.length > 0) {
+        const current = treeItems[cursor];
+        if (current) {
+          if (current.hasChildren && !collapsedIds.has(current.item.id)) {
+            setExpandedIds((prev) => {
+              const next = new Set(prev);
+              next.delete(current.item.id);
+              return next;
+            });
+          } else if (current.depth > 0 && current.item.parent) {
+            const parentIdx = treeItems.findIndex(
+              (t) => t.item.id === current.item.parent,
+            );
+            if (parentIdx >= 0) setCursor(parentIdx);
+          }
+        }
+      }
 
-    if (input === 'q') exit();
-    if (input === 'i' && capabilities.iterations) navigate('iteration-picker');
-    if (input === ',') navigate('settings');
-
-    if (input === 'c') {
-      if (capabilities.templates && templates.length > 0) {
-        setShowTemplatePicker(true);
-      } else {
+      if (key.return && treeItems.length > 0) {
         setFormMode('item');
-        setActiveTemplate(null);
-        selectWorkItem(null);
+        selectWorkItem(treeItems[cursor]!.item.id);
         navigate('form');
       }
-    }
 
-    if (input === 'd' && treeItems.length > 0) {
-      const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
-      if (targetIds.length > 0) {
-        setDeleteTargetIds(targetIds);
-        setConfirmDelete(true);
-      }
-    }
+      if (input === 'q') exit();
+      if (input === 'i' && capabilities.iterations)
+        navigate('iteration-picker');
+      if (input === ',') navigate('settings');
 
-    if (input === 'o' && treeItems.length > 0) {
-      void (async () => {
-        await backend.openItem(treeItems[cursor]!.item.id);
-        refreshData();
-      })();
-    }
-
-    if (input === 'b' && gitAvailable && treeItems.length > 0) {
-      const item = treeItems[cursor]!.item;
-      const comments = item.comments;
-      try {
-        const result = beginImplementation(
-          item,
-          comments,
-          { branchMode },
-          process.cwd(),
-        );
-        setWarning(
-          result.resumed
-            ? `Resumed work on #${item.id}`
-            : `Started work on #${item.id}`,
-        );
-      } catch (e) {
-        setWarning(
-          e instanceof Error ? e.message : 'Failed to start implementation',
-        );
-      }
-      refreshData();
-    }
-
-    if (input === 's') {
-      navigate('status');
-    }
-
-    if (
-      input === 'p' &&
-      capabilities.fields.parent &&
-      treeItems.length > 0 &&
-      !settingParent
-    ) {
-      const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
-      if (targetIds.length > 0) {
-        setParentTargetIds(targetIds);
-        setSettingParent(true);
-        // For single item, prefill current parent
-        if (targetIds.length === 1) {
-          const item = treeItems.find((t) => t.item.id === targetIds[0]);
-          setParentInput(item?.item.parent ?? '');
+      if (input === 'c') {
+        if (capabilities.templates && templates.length > 0) {
+          openOverlay({ type: 'template-picker' });
         } else {
-          setParentInput('');
+          setFormMode('item');
+          setActiveTemplate(null);
+          selectWorkItem(null);
+          navigate('form');
         }
       }
-    }
 
-    if (key.tab && capabilities.customTypes && types.length > 0) {
-      const currentIdx = types.indexOf(activeType ?? '');
-      const nextType = types[(currentIdx + 1) % types.length]!;
-      setActiveType(nextType);
-      setCursor(0);
-      setWarning('');
-    }
-
-    if (input === 'r' && syncManager) {
-      void syncManager.sync().then(() => {
-        refreshData();
-      });
-    }
-
-    if (input === 'm' && treeItems.length > 0) {
-      const itemId = treeItems[cursor]!.item.id;
-      setMarkedIds((prev) => {
-        const next = new Set(prev);
-        if (next.has(itemId)) {
-          next.delete(itemId);
-        } else {
-          next.add(itemId);
+      if (input === 'd' && treeItems.length > 0) {
+        const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+        if (targetIds.length > 0) {
+          openOverlay({ type: 'delete-confirm', targetIds });
         }
-        return next;
-      });
-    }
-
-    if (input === 'M') {
-      setMarkedIds(new Set());
-    }
-
-    if (input === 'B' && treeItems.length > 0) {
-      setShowBulkMenu(true);
-    }
-
-    if (input === 'P' && capabilities.fields.priority && treeItems.length > 0) {
-      const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
-      if (targetIds.length > 0) {
-        setBulkTargetIds(targetIds);
-        setShowPriorityPicker(true);
       }
-    }
 
-    if (input === 'a' && capabilities.fields.assignee && treeItems.length > 0) {
-      const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
-      if (targetIds.length > 0) {
-        setBulkTargetIds(targetIds);
-        setSettingAssignee(true);
-        setAssigneeInput('');
+      if (input === 'o' && treeItems.length > 0) {
+        void (async () => {
+          await backend.openItem(treeItems[cursor]!.item.id);
+          refreshData();
+        })();
       }
-    }
 
-    if (input === 'l' && capabilities.fields.labels && treeItems.length > 0) {
-      const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
-      if (targetIds.length > 0) {
-        setBulkTargetIds(targetIds);
-        setSettingLabels(true);
-        setLabelsInput('');
+      if (input === 'b' && gitAvailable && treeItems.length > 0) {
+        const item = treeItems[cursor]!.item;
+        const comments = item.comments;
+        try {
+          const result = beginImplementation(
+            item,
+            comments,
+            { branchMode },
+            process.cwd(),
+          );
+          setWarning(
+            result.resumed
+              ? `Resumed work on #${item.id}`
+              : `Started work on #${item.id}`,
+          );
+        } catch (e) {
+          setWarning(
+            e instanceof Error ? e.message : 'Failed to start implementation',
+          );
+        }
+        refreshData();
       }
-    }
 
-    if (input === 't' && capabilities.customTypes && treeItems.length > 0) {
-      const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
-      if (targetIds.length > 0) {
-        setBulkTargetIds(targetIds);
-        setShowTypePicker(true);
+      if (input === 's') {
+        navigate('status');
       }
-    }
-  });
+
+      if (input === 'p' && capabilities.fields.parent && treeItems.length > 0) {
+        const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+        if (targetIds.length > 0) {
+          openOverlay({ type: 'parent-input', targetIds });
+          // For single item, prefill current parent
+          if (targetIds.length === 1) {
+            const item = treeItems.find((t) => t.item.id === targetIds[0]);
+            setParentInput(item?.item.parent ?? '');
+          } else {
+            setParentInput('');
+          }
+        }
+      }
+
+      if (key.tab && capabilities.customTypes && types.length > 0) {
+        const currentIdx = types.indexOf(activeType ?? '');
+        const nextType = types[(currentIdx + 1) % types.length]!;
+        setActiveType(nextType);
+        setCursor(0);
+        clearWarning();
+      }
+
+      if (input === 'r' && syncManager) {
+        void syncManager.sync().then(() => {
+          refreshData();
+        });
+      }
+
+      if (input === 'm' && treeItems.length > 0) {
+        const itemId = treeItems[cursor]!.item.id;
+        setMarkedIds((prev) => {
+          const next = new Set(prev);
+          if (next.has(itemId)) {
+            next.delete(itemId);
+          } else {
+            next.add(itemId);
+          }
+          return next;
+        });
+      }
+
+      if (input === 'M') {
+        setMarkedIds(new Set());
+      }
+
+      if (input === 'B' && treeItems.length > 0) {
+        openOverlay({ type: 'bulk-menu' });
+      }
+
+      if (
+        input === 'P' &&
+        capabilities.fields.priority &&
+        treeItems.length > 0
+      ) {
+        const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+        if (targetIds.length > 0) {
+          openOverlay({ type: 'priority-picker', targetIds });
+        }
+      }
+
+      if (
+        input === 'a' &&
+        capabilities.fields.assignee &&
+        treeItems.length > 0
+      ) {
+        const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+        if (targetIds.length > 0) {
+          openOverlay({ type: 'assignee-input', targetIds });
+          setAssigneeInput('');
+        }
+      }
+
+      if (input === 'l' && capabilities.fields.labels && treeItems.length > 0) {
+        const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+        if (targetIds.length > 0) {
+          openOverlay({ type: 'labels-input', targetIds });
+          setLabelsInput('');
+        }
+      }
+
+      if (input === 't' && capabilities.customTypes && treeItems.length > 0) {
+        const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+        if (targetIds.length > 0) {
+          openOverlay({ type: 'type-picker', targetIds });
+        }
+      }
+    },
+    { isActive: activeOverlay === null },
+  );
 
   const handleSearchSelect = (item: WorkItem) => {
-    setIsSearching(false);
+    closeOverlay();
     selectWorkItem(item.id);
     navigate('form');
   };
 
   const handleSearchCancel = () => {
-    setIsSearching(false);
+    closeOverlay();
   };
 
   const commandContext: CommandContext = {
@@ -521,7 +508,7 @@ export function WorkItemList() {
   );
 
   const handleCommandSelect = (command: Command) => {
-    setShowCommandPalette(false);
+    closeOverlay();
     switch (command.id) {
       case 'create':
         selectWorkItem(null);
@@ -537,8 +524,7 @@ export function WorkItemList() {
         if (treeItems.length > 0) {
           const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
           if (targetIds.length > 0) {
-            setDeleteTargetIds(targetIds);
-            setConfirmDelete(true);
+            openOverlay({ type: 'delete-confirm', targetIds });
           }
         }
         break;
@@ -609,8 +595,7 @@ export function WorkItemList() {
         {
           const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
           if (targetIds.length > 0) {
-            setBulkTargetIds(targetIds);
-            setShowPriorityPicker(true);
+            openOverlay({ type: 'priority-picker', targetIds });
           }
         }
         break;
@@ -618,8 +603,7 @@ export function WorkItemList() {
         {
           const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
           if (targetIds.length > 0) {
-            setBulkTargetIds(targetIds);
-            setSettingAssignee(true);
+            openOverlay({ type: 'assignee-input', targetIds });
             setAssigneeInput('');
           }
         }
@@ -628,8 +612,7 @@ export function WorkItemList() {
         {
           const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
           if (targetIds.length > 0) {
-            setBulkTargetIds(targetIds);
-            setSettingLabels(true);
+            openOverlay({ type: 'labels-input', targetIds });
             setLabelsInput('');
           }
         }
@@ -638,13 +621,12 @@ export function WorkItemList() {
         {
           const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
           if (targetIds.length > 0) {
-            setBulkTargetIds(targetIds);
-            setShowTypePicker(true);
+            openOverlay({ type: 'type-picker', targetIds });
           }
         }
         break;
       case 'bulk-menu':
-        setShowBulkMenu(true);
+        openOverlay({ type: 'bulk-menu' });
         break;
       case 'quit':
         exit();
@@ -655,7 +637,7 @@ export function WorkItemList() {
           const type = command.id.replace('switch-', '');
           setActiveType(type);
           setCursor(0);
-          setWarning('');
+          clearWarning();
         }
         break;
     }
@@ -664,37 +646,34 @@ export function WorkItemList() {
   const handleBulkAction = (action: BulkAction) => {
     const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
     if (targetIds.length === 0) return;
-    setBulkTargetIds(targetIds);
 
     switch (action) {
       case 'status':
-        setShowStatusPicker(true);
+        openOverlay({ type: 'status-picker', targetIds });
         break;
       case 'iteration':
         navigate('iteration-picker');
         break;
       case 'parent':
-        setParentTargetIds(targetIds);
-        setSettingParent(true);
+        openOverlay({ type: 'parent-input', targetIds });
         setParentInput('');
         break;
       case 'type':
-        setShowTypePicker(true);
+        openOverlay({ type: 'type-picker', targetIds });
         break;
       case 'priority':
-        setShowPriorityPicker(true);
+        openOverlay({ type: 'priority-picker', targetIds });
         break;
       case 'assignee':
-        setSettingAssignee(true);
+        openOverlay({ type: 'assignee-input', targetIds });
         setAssigneeInput('');
         break;
       case 'labels':
-        setSettingLabels(true);
+        openOverlay({ type: 'labels-input', targetIds });
         setLabelsInput('');
         break;
       case 'delete':
-        setDeleteTargetIds(targetIds);
-        setConfirmDelete(true);
+        openOverlay({ type: 'delete-confirm', targetIds });
         break;
     }
   };
@@ -710,7 +689,7 @@ export function WorkItemList() {
 
   return (
     <Box flexDirection="column">
-      {isSearching && (
+      {activeOverlay?.type === 'search' && (
         <SearchOverlay
           items={allSearchItems}
           currentIteration={iteration}
@@ -718,98 +697,90 @@ export function WorkItemList() {
           onCancel={handleSearchCancel}
         />
       )}
-      {!isSearching && (
+      {activeOverlay?.type !== 'search' && (
         <>
-          {showBulkMenu && (
+          {activeOverlay?.type === 'bulk-menu' && (
             <BulkMenu
               itemCount={markedIds.size > 0 ? markedIds.size : 1}
               capabilities={capabilities}
               onSelect={(action) => {
-                setShowBulkMenu(false);
+                closeOverlay();
                 handleBulkAction(action);
               }}
-              onCancel={() => setShowBulkMenu(false)}
+              onCancel={() => closeOverlay()}
             />
           )}
-          {showCommandPalette && (
+          {activeOverlay?.type === 'command-palette' && (
             <CommandPalette
               commands={paletteCommands}
               onSelect={handleCommandSelect}
-              onCancel={() => setShowCommandPalette(false)}
+              onCancel={() => closeOverlay()}
             />
           )}
-          {showStatusPicker && (
+          {activeOverlay?.type === 'status-picker' && (
             <StatusPicker
               statuses={statuses}
               onSelect={(status) => {
+                const targetIds = (activeOverlay as { targetIds: string[] })
+                  .targetIds;
+                closeOverlay();
                 void (async () => {
-                  setShowStatusPicker(false);
-                  for (const id of bulkTargetIds) {
+                  for (const id of targetIds) {
                     await backend.cachedUpdateWorkItem(id, { status });
                     await queueWrite('update', id);
                   }
-                  setBulkTargetIds([]);
                   refreshData();
                 })();
               }}
-              onCancel={() => {
-                setShowStatusPicker(false);
-                setBulkTargetIds([]);
-              }}
+              onCancel={() => closeOverlay()}
             />
           )}
-          {showTypePicker && (
+          {activeOverlay?.type === 'type-picker' && (
             <TypePicker
               types={types}
               onSelect={(type) => {
+                const targetIds = (activeOverlay as { targetIds: string[] })
+                  .targetIds;
+                closeOverlay();
                 void (async () => {
-                  setShowTypePicker(false);
-                  for (const id of bulkTargetIds) {
+                  for (const id of targetIds) {
                     await backend.cachedUpdateWorkItem(id, { type });
                     await queueWrite('update', id);
                   }
-                  setBulkTargetIds([]);
                   refreshData();
                 })();
               }}
-              onCancel={() => {
-                setShowTypePicker(false);
-                setBulkTargetIds([]);
-              }}
+              onCancel={() => closeOverlay()}
             />
           )}
-          {showPriorityPicker && (
+          {activeOverlay?.type === 'priority-picker' && (
             <PriorityPicker
               onSelect={(priority) => {
+                const targetIds = (activeOverlay as { targetIds: string[] })
+                  .targetIds;
+                closeOverlay();
                 void (async () => {
-                  setShowPriorityPicker(false);
-                  for (const id of bulkTargetIds) {
+                  for (const id of targetIds) {
                     await backend.cachedUpdateWorkItem(id, { priority });
                     await queueWrite('update', id);
                   }
-                  setBulkTargetIds([]);
                   refreshData();
                 })();
               }}
-              onCancel={() => {
-                setShowPriorityPicker(false);
-                setBulkTargetIds([]);
-              }}
+              onCancel={() => closeOverlay()}
             />
           )}
-          {showTemplatePicker && (
+          {activeOverlay?.type === 'template-picker' && (
             <TemplatePicker
               templates={templates}
               onSelect={(template) => {
-                setShowTemplatePicker(false);
+                closeOverlay();
                 setFormMode('item');
                 setActiveTemplate(template);
                 selectWorkItem(null);
                 navigate('form');
               }}
-              onCancel={() => {
-                setShowTemplatePicker(false);
-              }}
+              onCancel={() => closeOverlay()}
             />
           )}
           <Box marginBottom={1}>
@@ -872,11 +843,12 @@ export function WorkItemList() {
           )}
 
           <Box marginTop={1}>
-            {capabilities.fields.parent && settingParent ? (
+            {activeOverlay?.type === 'parent-input' ? (
               <Box flexDirection="column">
                 <Text color="cyan">
-                  Set parent for {parentTargetIds.length} item
-                  {parentTargetIds.length > 1 ? 's' : ''} (empty to clear):
+                  Set parent for {activeOverlay.targetIds.length} item
+                  {activeOverlay.targetIds.length > 1 ? 's' : ''} (empty to
+                  clear):
                 </Text>
                 <AutocompleteInput
                   value={parentInput}
@@ -884,6 +856,8 @@ export function WorkItemList() {
                   focus={true}
                   suggestions={parentSuggestions}
                   onSubmit={() => {
+                    const targetIds = (activeOverlay as { targetIds: string[] })
+                      .targetIds;
                     void (async () => {
                       const raw = parentInput.trim();
                       const newParent =
@@ -893,31 +867,30 @@ export function WorkItemList() {
                             ? raw.split(' - ')[0]!.trim()
                             : raw;
                       try {
-                        for (const id of parentTargetIds) {
+                        for (const id of targetIds) {
                           await backend.cachedUpdateWorkItem(id, {
                             parent: newParent,
                           });
                           await queueWrite('update', id);
                         }
-                        setWarning('');
+                        clearWarning();
                       } catch (e) {
                         setWarning(
                           e instanceof Error ? e.message : 'Invalid parent',
                         );
                       }
-                      setSettingParent(false);
+                      closeOverlay();
                       setParentInput('');
-                      setParentTargetIds([]);
                       refreshData();
                     })();
                   }}
                 />
               </Box>
-            ) : settingAssignee ? (
+            ) : activeOverlay?.type === 'assignee-input' ? (
               <Box flexDirection="column">
                 <Text color="cyan">
-                  Set assignee for {bulkTargetIds.length} item
-                  {bulkTargetIds.length > 1 ? 's' : ''}:
+                  Set assignee for {activeOverlay.targetIds.length} item
+                  {activeOverlay.targetIds.length > 1 ? 's' : ''}:
                 </Text>
                 <AutocompleteInput
                   value={assigneeInput}
@@ -925,25 +898,27 @@ export function WorkItemList() {
                   focus={true}
                   suggestions={assignees}
                   onSubmit={() => {
+                    const targetIds = (activeOverlay as { targetIds: string[] })
+                      .targetIds;
+                    closeOverlay();
                     void (async () => {
                       const assignee = assigneeInput.trim();
-                      for (const id of bulkTargetIds) {
+                      for (const id of targetIds) {
                         await backend.cachedUpdateWorkItem(id, { assignee });
                         await queueWrite('update', id);
                       }
-                      setSettingAssignee(false);
                       setAssigneeInput('');
-                      setBulkTargetIds([]);
                       refreshData();
                     })();
                   }}
                 />
               </Box>
-            ) : settingLabels ? (
+            ) : activeOverlay?.type === 'labels-input' ? (
               <Box flexDirection="column">
                 <Text color="cyan">
-                  Set labels for {bulkTargetIds.length} item
-                  {bulkTargetIds.length > 1 ? 's' : ''} (comma-separated):
+                  Set labels for {activeOverlay.targetIds.length} item
+                  {activeOverlay.targetIds.length > 1 ? 's' : ''}{' '}
+                  (comma-separated):
                 </Text>
                 <MultiAutocompleteInput
                   value={labelsInput}
@@ -951,27 +926,33 @@ export function WorkItemList() {
                   focus={true}
                   suggestions={labelSuggestions}
                   onSubmit={() => {
+                    const targetIds = (activeOverlay as { targetIds: string[] })
+                      .targetIds;
+                    closeOverlay();
                     void (async () => {
                       const labels = labelsInput
                         .split(',')
                         .map((l) => l.trim())
                         .filter(Boolean);
-                      for (const id of bulkTargetIds) {
+                      for (const id of targetIds) {
                         await backend.cachedUpdateWorkItem(id, { labels });
                         await queueWrite('update', id);
                       }
-                      setSettingLabels(false);
                       setLabelsInput('');
-                      setBulkTargetIds([]);
                       refreshData();
                     })();
                   }}
                 />
               </Box>
-            ) : confirmDelete ? (
+            ) : activeOverlay?.type === 'delete-confirm' ? (
               <Text color="red">
-                Delete {deleteTargetIds.length} item
-                {deleteTargetIds.length > 1 ? 's' : ''}? (y/n)
+                Delete{' '}
+                {(activeOverlay as { targetIds: string[] }).targetIds.length}{' '}
+                item
+                {(activeOverlay as { targetIds: string[] }).targetIds.length > 1
+                  ? 's'
+                  : ''}
+                ? (y/n)
               </Text>
             ) : (
               <Text dimColor>{helpText}</Text>
@@ -982,18 +963,14 @@ export function WorkItemList() {
               <Text color="yellow">⚠ {warning}</Text>
             </Box>
           )}
-          {updateInfo?.updateAvailable &&
-            !confirmDelete &&
-            !settingParent &&
-            !settingAssignee &&
-            !settingLabels && (
-              <Box>
-                <Text color="yellow">
-                  Update available: {updateInfo.current} → {updateInfo.latest}{' '}
-                  Press , to update in Settings
-                </Text>
-              </Box>
-            )}
+          {updateInfo?.updateAvailable && activeOverlay === null && (
+            <Box>
+              <Text color="yellow">
+                Update available: {updateInfo.current} → {updateInfo.latest}{' '}
+                Press , to update in Settings
+              </Text>
+            </Box>
+          )}
         </>
       )}
     </Box>
