@@ -377,6 +377,7 @@ export function WorkItemForm() {
 
   const [focusedField, setFocusedField] = useState(0);
   const [editing, setEditing] = useState(false);
+  const [preEditValue, setPreEditValue] = useState<string>('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -576,11 +577,54 @@ export function WorkItemForm() {
               setEditing(true);
             }
           } else {
+            // Capture current value before editing for revert on Esc
+            const fieldValue = (() => {
+              switch (currentField) {
+                case 'title':
+                  return title;
+                case 'assignee':
+                  return assignee;
+                case 'labels':
+                  return labels;
+                case 'parent':
+                  return parentId;
+                case 'dependsOn':
+                  return dependsOn;
+                case 'comments':
+                  return newComment;
+                default:
+                  return '';
+              }
+            })();
+            setPreEditValue(fieldValue);
             setEditing(true);
           }
         }
       } else {
         if (key.escape) {
+          // Revert field to value before editing started
+          switch (currentField) {
+            case 'title':
+              setTitle(preEditValue);
+              break;
+            case 'assignee':
+              setAssignee(preEditValue);
+              break;
+            case 'labels':
+              setLabels(preEditValue);
+              break;
+            case 'parent':
+              setParentId(preEditValue);
+              break;
+            case 'dependsOn':
+              setDependsOn(preEditValue);
+              break;
+            case 'comments':
+              setNewComment(preEditValue);
+              break;
+            // Select fields (type, status, iteration, priority) already
+            // require Enter to confirm, so Esc naturally discards
+          }
           setEditing(false);
         }
       }
