@@ -1,15 +1,16 @@
 import { Box, Text, useInput } from 'ink';
 import SelectInput from 'ink-select-input';
 import { useAppState } from '../app.js';
-import { useBackendData } from '../hooks/useBackendData.js';
+import {
+  useBackendDataStore,
+  backendDataStore,
+} from '../stores/backendDataStore.js';
 
 export function IterationPicker() {
   const { backend, navigate, navigateToHelp } = useAppState();
-  const {
-    iterations,
-    currentIteration: current,
-    loading,
-  } = useBackendData(backend);
+  const iterations = useBackendDataStore((s) => s.iterations);
+  const current = useBackendDataStore((s) => s.currentIteration);
+  const loading = useBackendDataStore((s) => s.loading);
 
   useInput((input, key) => {
     if (key.escape) {
@@ -44,6 +45,7 @@ export function IterationPicker() {
         onSelect={(item) => {
           void (async () => {
             await backend.setCurrentIteration(item.value);
+            await backendDataStore.getState().refresh();
             navigate('list');
           })();
         }}
