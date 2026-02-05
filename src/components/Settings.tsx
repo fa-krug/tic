@@ -15,6 +15,7 @@ import { VERSION } from '../version.js';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { DefaultPicker } from './DefaultPicker.js';
 
 type NavItem =
   | { kind: 'backend'; backend: string }
@@ -41,8 +42,6 @@ export function Settings() {
     setFormMode,
     setEditingTemplateSlug,
     selectWorkItem,
-    // @ts-expect-error -- Used in Task 5 picker overlays
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     setDefaultType,
   } = useAppState();
   const root = process.cwd();
@@ -567,6 +566,39 @@ export function Settings() {
           return null;
         })}
       </Box>
+
+      {showDefaultTypePicker && (
+        <Box position="absolute" marginTop={2} marginLeft={4}>
+          <DefaultPicker
+            title="Default Type"
+            options={config.types}
+            onSelect={(type) => {
+              config.defaultType = type;
+              void writeConfig(root, config);
+              setConfig({ ...config });
+              setDefaultType(type);
+              setShowDefaultTypePicker(false);
+            }}
+            onCancel={() => setShowDefaultTypePicker(false)}
+          />
+        </Box>
+      )}
+
+      {showDefaultIterationPicker && (
+        <Box position="absolute" marginTop={2} marginLeft={4}>
+          <DefaultPicker
+            title="Default Iteration"
+            options={config.iterations}
+            onSelect={(iteration) => {
+              config.current_iteration = iteration;
+              void writeConfig(root, config);
+              setConfig({ ...config });
+              setShowDefaultIterationPicker(false);
+            }}
+            onCancel={() => setShowDefaultIterationPicker(false)}
+          />
+        </Box>
+      )}
 
       {confirmDeleteTemplate && (
         <Box marginTop={1}>
