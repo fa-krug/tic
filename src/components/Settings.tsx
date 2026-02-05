@@ -2,8 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import { useAppState } from '../app.js';
-import { readConfig, writeConfig } from '../backends/local/config.js';
-import type { Config } from '../backends/local/config.js';
+import { useConfigStore, configStore } from '../stores/configStore.js';
 import { VALID_BACKENDS } from '../backends/factory.js';
 import type { BackendType } from '../backends/factory.js';
 import { checkAllBackendAvailability } from '../backends/availability.js';
@@ -50,7 +49,9 @@ export function Settings() {
     return new SyncQueueStore(root);
   }, [syncManager, root]);
 
-  const [config, setConfig] = useState<Config | null>(null);
+  const config = useConfigStore((s) => s.config);
+  const configLoaded = useConfigStore((s) => s.loaded);
+
   const [cursor, setCursor] = useState(0);
   const [editing, setEditing] = useState(false);
   const [jiraSite, setJiraSite] = useState('');
@@ -78,10 +79,6 @@ export function Settings() {
   });
 
   const capabilities = backend.getCapabilities();
-
-  useEffect(() => {
-    void readConfig(root).then(setConfig);
-  }, [root]);
 
   useEffect(() => {
     void checkAllBackendAvailability().then((results) => {
@@ -112,7 +109,7 @@ export function Settings() {
 
   // Initialize cursor and jira fields when config loads
   useEffect(() => {
-    if (config) {
+    if (configLoaded) {
       setCursor(
         Math.max(
           0,
@@ -129,7 +126,7 @@ export function Settings() {
         );
       }
     }
-  }, [config]);
+  }, [config, configLoaded]);
 
   // Build navigable items list — backends + conditional jira fields + templates
   const navItems: NavItem[] = useMemo(() => {
@@ -174,22 +171,23 @@ export function Settings() {
   }, [navItems.length]);
 
   function saveJiraConfig() {
-    if (!config) return;
+    if (!configLoaded) return;
     const boardIdNum = parseInt(jiraBoardId.trim(), 10);
-    config.jira = {
-      site: jiraSite.trim(),
-      project: jiraProject.trim(),
-      ...(jiraBoardId.trim() && !isNaN(boardIdNum)
-        ? { boardId: boardIdNum }
-        : {}),
-    };
-    void writeConfig(root, config);
+    void configStore.getState().update({
+      jira: {
+        site: jiraSite.trim(),
+        project: jiraProject.trim(),
+        ...(jiraBoardId.trim() && !isNaN(boardIdNum)
+          ? { boardId: boardIdNum }
+          : {}),
+      },
+    });
   }
 
   // Navigation mode input handler
   useInput(
     (input, key) => {
-      if (!config) return;
+      if (!configLoaded) return;
 
       if (confirmDeleteTemplate) {
         if (input === 'y' || input === 'Y') {
@@ -259,12 +257,11 @@ export function Settings() {
         const item = navItems[cursor]!;
         if (item.kind === 'backend') {
           if (availability[item.backend as BackendType] !== 'available') return;
-          config.backend = item.backend;
+          const updates: Partial<typeof config> = { backend: item.backend };
           if (item.backend === 'jira' && !config.jira) {
-            config.jira = { site: jiraSite, project: jiraProject };
+            updates.jira = { site: jiraSite, project: jiraProject };
           }
-          void writeConfig(root, config);
-          setConfig({ ...config });
+          void configStore.getState().update(updates);
           // Auto-advance cursor to first jira field
           if (item.backend === 'jira') {
             const jiraIdx = VALID_BACKENDS.indexOf('jira');
@@ -301,11 +298,9 @@ export function Settings() {
           });
           process.exit(0);
         } else if (item.kind === 'update-toggle') {
-          if (config) {
-            config.autoUpdate = !(config.autoUpdate !== false);
-            void writeConfig(root, config);
-            setConfig({ ...config });
-          }
+          void configStore
+            .getState()
+            .update({ autoUpdate: !(config.autoUpdate !== false) });
         }
       }
 
@@ -341,7 +336,7 @@ export function Settings() {
     { isActive: editing },
   );
 
-  if (!config) {
+  if (!configLoaded) {
     return (
       <Box>
         <Text dimColor>Loading...</Text>
@@ -571,9 +566,7 @@ export function Settings() {
           title="Default Type"
           options={config.types}
           onSelect={(type) => {
-            config.defaultType = type;
-            void writeConfig(root, config);
-            setConfig({ ...config });
+            void configStore.getState().update({ defaultType: type });
             setShowDefaultTypePicker(false);
           }}
           onCancel={() => setShowDefaultTypePicker(false)}
@@ -585,9 +578,9 @@ export function Settings() {
           title="Default Iteration"
           options={config.iterations}
           onSelect={(iteration) => {
-            config.current_iteration = iteration;
-            void writeConfig(root, config);
-            setConfig({ ...config });
+            void configStore
+              .getState()
+              .update({ current_iteration: iteration });
             setShowDefaultIterationPicker(false);
           }}
           onCancel={() => setShowDefaultIterationPicker(false)}
