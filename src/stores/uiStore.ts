@@ -45,3 +45,10 @@ export const uiStore = createStore<UIStoreState>((set) => ({
 export function useUIStore<T>(selector: (state: UIStoreState) => T): T {
   return useStore(uiStore, selector);
 }
+
+/** Type guard: returns targetIds if the current overlay carries them, else empty array. */
+export function getOverlayTargetIds(): string[] {
+  const overlay = uiStore.getState().activeOverlay;
+  if (overlay && 'targetIds' in overlay) return overlay.targetIds;
+  return [];
+}

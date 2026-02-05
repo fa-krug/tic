@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { uiStore } from './uiStore.js';
+import { uiStore, getOverlayTargetIds } from './uiStore.js';
 
 describe('uiStore', () => {
   beforeEach(() => {
@@ -59,6 +59,22 @@ describe('uiStore', () => {
     uiStore.getState().reset();
     expect(uiStore.getState().activeOverlay).toBeNull();
     expect(uiStore.getState().warning).toBe('');
+  });
+
+  it('getOverlayTargetIds returns targetIds when overlay has them', () => {
+    uiStore
+      .getState()
+      .openOverlay({ type: 'priority-picker', targetIds: ['1', '2'] });
+    expect(getOverlayTargetIds()).toEqual(['1', '2']);
+  });
+
+  it('getOverlayTargetIds returns empty array when overlay has no targetIds', () => {
+    uiStore.getState().openOverlay({ type: 'search' });
+    expect(getOverlayTargetIds()).toEqual([]);
+  });
+
+  it('getOverlayTargetIds returns empty array when no overlay', () => {
+    expect(getOverlayTargetIds()).toEqual([]);
   });
 
   it('opens settings overlay with templateSlug', () => {

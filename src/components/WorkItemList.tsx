@@ -6,7 +6,7 @@ import { useAppState } from '../app.js';
 import { isGitRepo } from '../git.js';
 import { beginImplementation } from '../implement.js';
 import { useConfigStore } from '../stores/configStore.js';
-import { uiStore, useUIStore } from '../stores/uiStore.js';
+import { uiStore, useUIStore, getOverlayTargetIds } from '../stores/uiStore.js';
 import { TableLayout } from './TableLayout.js';
 import { CardLayout } from './CardLayout.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
@@ -721,8 +721,7 @@ export function WorkItemList() {
             <StatusPicker
               statuses={statuses}
               onSelect={(status) => {
-                const targetIds = (activeOverlay as { targetIds: string[] })
-                  .targetIds;
+                const targetIds = getOverlayTargetIds();
                 closeOverlay();
                 void (async () => {
                   for (const id of targetIds) {
@@ -739,8 +738,7 @@ export function WorkItemList() {
             <TypePicker
               types={types}
               onSelect={(type) => {
-                const targetIds = (activeOverlay as { targetIds: string[] })
-                  .targetIds;
+                const targetIds = getOverlayTargetIds();
                 closeOverlay();
                 void (async () => {
                   for (const id of targetIds) {
@@ -756,8 +754,7 @@ export function WorkItemList() {
           {activeOverlay?.type === 'priority-picker' && (
             <PriorityPicker
               onSelect={(priority) => {
-                const targetIds = (activeOverlay as { targetIds: string[] })
-                  .targetIds;
+                const targetIds = getOverlayTargetIds();
                 closeOverlay();
                 void (async () => {
                   for (const id of targetIds) {
@@ -856,8 +853,7 @@ export function WorkItemList() {
                   focus={true}
                   suggestions={parentSuggestions}
                   onSubmit={() => {
-                    const targetIds = (activeOverlay as { targetIds: string[] })
-                      .targetIds;
+                    const targetIds = getOverlayTargetIds();
                     void (async () => {
                       const raw = parentInput.trim();
                       const newParent =
@@ -898,8 +894,7 @@ export function WorkItemList() {
                   focus={true}
                   suggestions={assignees}
                   onSubmit={() => {
-                    const targetIds = (activeOverlay as { targetIds: string[] })
-                      .targetIds;
+                    const targetIds = getOverlayTargetIds();
                     closeOverlay();
                     void (async () => {
                       const assignee = assigneeInput.trim();
@@ -926,8 +921,7 @@ export function WorkItemList() {
                   focus={true}
                   suggestions={labelSuggestions}
                   onSubmit={() => {
-                    const targetIds = (activeOverlay as { targetIds: string[] })
-                      .targetIds;
+                    const targetIds = getOverlayTargetIds();
                     closeOverlay();
                     void (async () => {
                       const labels = labelsInput
@@ -946,13 +940,8 @@ export function WorkItemList() {
               </Box>
             ) : activeOverlay?.type === 'delete-confirm' ? (
               <Text color="red">
-                Delete{' '}
-                {(activeOverlay as { targetIds: string[] }).targetIds.length}{' '}
-                item
-                {(activeOverlay as { targetIds: string[] }).targetIds.length > 1
-                  ? 's'
-                  : ''}
-                ? (y/n)
+                Delete {activeOverlay.targetIds.length} item
+                {activeOverlay.targetIds.length > 1 ? 's' : ''}? (y/n)
               </Text>
             ) : (
               <Text dimColor>{helpText}</Text>
