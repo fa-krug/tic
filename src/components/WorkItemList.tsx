@@ -5,7 +5,7 @@ import Spinner from 'ink-spinner';
 import { useAppState } from '../app.js';
 import { isGitRepo } from '../git.js';
 import { beginImplementation } from '../implement.js';
-import { readConfigSync } from '../backends/local/config.js';
+import { useConfigStore } from '../stores/configStore.js';
 import { TableLayout } from './TableLayout.js';
 import { CardLayout } from './CardLayout.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
@@ -53,8 +53,9 @@ export function WorkItemList() {
     setActiveTemplate,
     setFormMode,
     updateInfo,
-    defaultType,
   } = useAppState();
+  const defaultType = useConfigStore((s) => s.config.defaultType ?? null);
+  const branchMode = useConfigStore((s) => s.config.branchMode ?? 'worktree');
   const { exit } = useApp();
   const [cursor, setCursor] = useState(0);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -381,12 +382,11 @@ export function WorkItemList() {
     if (input === 'b' && gitAvailable && treeItems.length > 0) {
       const item = treeItems[cursor]!.item;
       const comments = item.comments;
-      const config = readConfigSync(process.cwd());
       try {
         const result = beginImplementation(
           item,
           comments,
-          { branchMode: config.branchMode ?? 'worktree' },
+          { branchMode },
           process.cwd(),
         );
         setWarning(
@@ -564,12 +564,11 @@ export function WorkItemList() {
         if (treeItems[cursor]) {
           const item = treeItems[cursor].item;
           const comments = item.comments;
-          const config = readConfigSync(process.cwd());
           try {
             const result = beginImplementation(
               item,
               comments,
-              { branchMode: config.branchMode ?? 'worktree' },
+              { branchMode },
               process.cwd(),
             );
             setWarning(

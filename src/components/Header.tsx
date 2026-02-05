@@ -1,5 +1,5 @@
 import { Box, Text } from 'ink';
-import { readConfigSync } from '../backends/local/config.js';
+import { useConfigStore } from '../stores/configStore.js';
 import os from 'node:os';
 import { VERSION } from '../version.js';
 
@@ -22,10 +22,9 @@ function shortenPath(fullPath: string): string {
 const ART_LINES = ['        ██', '       ██ ', '  ██  ██  ', '   ████   '];
 
 export function Header() {
-  const root = process.cwd();
-  const config = readConfigSync(root);
-  const backendType = config.backend ?? 'local';
+  const backendType = useConfigStore((s) => s.config.backend ?? 'local');
   const backendLabel = BACKEND_LABELS[backendType] ?? backendType;
+  const root = process.cwd();
   const projectPath = shortenPath(root);
 
   return (

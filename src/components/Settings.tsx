@@ -42,7 +42,6 @@ export function Settings() {
     setFormMode,
     setEditingTemplateSlug,
     selectWorkItem,
-    setDefaultType,
   } = useAppState();
   const root = process.cwd();
 
@@ -575,7 +574,6 @@ export function Settings() {
             config.defaultType = type;
             void writeConfig(root, config);
             setConfig({ ...config });
-            setDefaultType(type);
             setShowDefaultTypePicker(false);
           }}
           onCancel={() => setShowDefaultTypePicker(false)}

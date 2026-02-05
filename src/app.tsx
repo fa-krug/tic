@@ -12,7 +12,7 @@ import type { SyncManager } from './sync/SyncManager.js';
 import type { Template } from './types.js';
 import { checkForUpdate } from './update-checker.js';
 import type { UpdateInfo } from './update-checker.js';
-import { readConfigSync } from './backends/local/config.js';
+import { useConfigStore } from './stores/configStore.js';
 
 export type Screen =
   | 'list'
@@ -43,8 +43,6 @@ interface AppState {
   navigateToHelp: () => void;
   navigateBackFromHelp: () => void;
   updateInfo: UpdateInfo | null;
-  defaultType: string | null;
-  setDefaultType: (type: string | null) => void;
 }
 
 export const AppContext = createContext<AppState>(null!);
@@ -73,19 +71,15 @@ export function App({
   const [navigationStack, setNavigationStack] = useState<string[]>([]);
   const [previousScreen, setPreviousScreen] = useState<Screen>('list');
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
-  const [defaultType, setDefaultType] = useState<string | null>(() => {
-    const config = readConfigSync(process.cwd());
-    return config.defaultType ?? null;
-  });
+  const autoUpdate = useConfigStore((s) => s.config.autoUpdate);
 
   useEffect(() => {
-    const config = readConfigSync(process.cwd());
-    if (config.autoUpdate !== false) {
+    if (autoUpdate !== false) {
       void checkForUpdate().then((info) => {
         if (info) setUpdateInfo(info);
       });
     }
-  }, []);
+  }, [autoUpdate]);
 
   const pushWorkItem = (id: string) => {
     if (selectedWorkItemId !== null) {
@@ -139,8 +133,6 @@ export function App({
     navigateToHelp,
     navigateBackFromHelp,
     updateInfo,
-    defaultType,
-    setDefaultType,
   };
 
   return (
