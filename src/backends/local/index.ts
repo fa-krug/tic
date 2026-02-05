@@ -7,7 +7,7 @@ import type {
   Comment,
   Template,
 } from '../../types.js';
-import { readConfig, writeConfig, type Config } from './config.js';
+import { configStore } from '../../stores/configStore.js';
 import {
   readWorkItem,
   writeWorkItem,
@@ -32,17 +32,11 @@ export interface LocalBackendOptions {
 
 export class LocalBackend extends BaseBackend {
   private root: string;
-  private config: Config;
   private tempIds: boolean;
 
-  private constructor(
-    root: string,
-    config: Config,
-    options?: LocalBackendOptions,
-  ) {
+  private constructor(root: string, options?: LocalBackendOptions) {
     super(0);
     this.root = root;
-    this.config = config;
     this.tempIds = options?.tempIds ?? false;
   }
 
@@ -50,8 +44,10 @@ export class LocalBackend extends BaseBackend {
     root: string,
     options?: LocalBackendOptions,
   ): Promise<LocalBackend> {
-    const config = await readConfig(root);
-    return new LocalBackend(root, config, options);
+    if (!configStore.getState().loaded) {
+      await configStore.getState().init(root);
+    }
+    return new LocalBackend(root, options);
   }
 
   getRoot(): string {
@@ -87,23 +83,19 @@ export class LocalBackend extends BaseBackend {
     };
   }
 
-  private async save(): Promise<void> {
-    await writeConfig(this.root, this.config);
-  }
-
   // eslint-disable-next-line @typescript-eslint/require-await
   async getStatuses(): Promise<string[]> {
-    return this.config.statuses;
+    return configStore.getState().config.statuses;
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
   async getIterations(): Promise<string[]> {
-    return this.config.iterations;
+    return configStore.getState().config.iterations;
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
   async getWorkItemTypes(): Promise<string[]> {
-    return this.config.types;
+    return configStore.getState().config.types;
   }
 
   async getAssignees(): Promise<string[]> {
@@ -116,15 +108,17 @@ export class LocalBackend extends BaseBackend {
 
   // eslint-disable-next-line @typescript-eslint/require-await
   async getCurrentIteration(): Promise<string> {
-    return this.config.current_iteration;
+    return configStore.getState().config.current_iteration;
   }
 
   async setCurrentIteration(name: string): Promise<void> {
-    this.config.current_iteration = name;
-    if (!this.config.iterations.includes(name)) {
-      this.config.iterations.push(name);
-    }
-    await this.save();
+    const config = configStore.getState().config;
+    const iterations = config.iterations.includes(name)
+      ? config.iterations
+      : [...config.iterations, name];
+    await configStore
+      .getState()
+      .update({ current_iteration: name, iterations });
   }
 
   async syncConfigFromRemote(remote: {
@@ -133,11 +127,12 @@ export class LocalBackend extends BaseBackend {
     statuses: string[];
     types: string[];
   }): Promise<void> {
-    this.config.iterations = remote.iterations;
-    this.config.current_iteration = remote.currentIteration;
-    this.config.statuses = remote.statuses;
-    this.config.types = remote.types;
-    await this.save();
+    await configStore.getState().update({
+      iterations: remote.iterations,
+      current_iteration: remote.currentIteration,
+      statuses: remote.statuses,
+      types: remote.types,
+    });
   }
 
   private async validateRelationships(
@@ -222,9 +217,8 @@ export class LocalBackend extends BaseBackend {
   async createWorkItem(data: NewWorkItem): Promise<WorkItem> {
     this.validateFields(data);
     const now = new Date().toISOString();
-    const id = this.tempIds
-      ? `local-${this.config.next_id}`
-      : String(this.config.next_id);
+    const { next_id, iterations } = configStore.getState().config;
+    const id = this.tempIds ? `local-${next_id}` : String(next_id);
     await this.validateRelationships(id, data.parent, data.dependsOn);
     const item: WorkItem = {
       ...data,
@@ -233,11 +227,13 @@ export class LocalBackend extends BaseBackend {
       updated: now,
       comments: [],
     };
-    this.config.next_id = this.config.next_id + 1;
-    if (data.iteration && !this.config.iterations.includes(data.iteration)) {
-      this.config.iterations.push(data.iteration);
-    }
-    await this.save();
+    const newIterations =
+      data.iteration && !iterations.includes(data.iteration)
+        ? [...iterations, data.iteration]
+        : iterations;
+    await configStore
+      .getState()
+      .update({ next_id: next_id + 1, iterations: newIterations });
     await writeWorkItem(this.root, item);
     this.invalidateCache();
     return item;

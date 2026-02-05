@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { LocalBackend } from '../../backends/local/index.js';
+import { configStore } from '../../stores/configStore.js';
 import type { WorkItem, Comment } from '../../types.js';
 import {
   handleInitProject,
@@ -30,6 +31,7 @@ describe('MCP handlers', () => {
   });
 
   afterEach(() => {
+    configStore.getState().destroy();
     fs.rmSync(tmpDir, { recursive: true });
   });
 

@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { LocalBackend } from './index.js';
+import { configStore } from '../../stores/configStore.js';
 
 describe('LocalBackend', () => {
   let tmpDir: string;
@@ -10,10 +11,12 @@ describe('LocalBackend', () => {
 
   beforeEach(async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-test-'));
+    await configStore.getState().init(tmpDir);
     backend = await LocalBackend.create(tmpDir);
   });
 
   afterEach(() => {
+    configStore.getState().destroy();
     fs.rmSync(tmpDir, { recursive: true });
   });
 

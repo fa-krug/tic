@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { LocalBackend } from '../backends/local/index.js';
+import { configStore } from '../stores/configStore.js';
 import { SyncManager } from './SyncManager.js';
 import { SyncQueueStore } from './queue.js';
 import type { Backend } from '../backends/types.js';
@@ -149,6 +150,7 @@ describe('end-to-end sync', () => {
   });
 
   afterEach(() => {
+    configStore.getState().destroy();
     fs.rmSync(tmpDir, { recursive: true });
   });
 

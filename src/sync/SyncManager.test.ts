@@ -5,6 +5,7 @@ import path from 'node:path';
 import { SyncManager } from './SyncManager.js';
 import { SyncQueueStore } from './queue.js';
 import { LocalBackend } from '../backends/local/index.js';
+import { configStore } from '../stores/configStore.js';
 import type { Backend } from '../backends/types.js';
 import type { WorkItem, NewWorkItem, NewComment, Comment } from '../types.js';
 
@@ -177,6 +178,7 @@ describe('SyncManager push phase', () => {
   });
 
   afterEach(() => {
+    configStore.getState().destroy();
     fs.rmSync(tmpDir, { recursive: true });
   });
 
@@ -381,6 +383,7 @@ describe('SyncManager pull phase (via sync)', () => {
   });
 
   afterEach(() => {
+    configStore.getState().destroy();
     fs.rmSync(tmpDir, { recursive: true });
   });
 
@@ -515,6 +518,7 @@ describe('SyncManager status callbacks', () => {
   });
 
   afterEach(() => {
+    configStore.getState().destroy();
     fs.rmSync(tmpDir, { recursive: true });
   });
 

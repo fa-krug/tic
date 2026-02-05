@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { LocalBackend } from '../../backends/local/index.js';
+import { configStore } from '../../stores/configStore.js';
 import { runIterationList, runIterationSet } from '../commands/iteration.js';
 
 describe('iteration commands', () => {
@@ -15,6 +16,7 @@ describe('iteration commands', () => {
   });
 
   afterEach(() => {
+    configStore.getState().destroy();
     fs.rmSync(tmpDir, { recursive: true });
   });
 
