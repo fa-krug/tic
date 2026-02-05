@@ -14,6 +14,7 @@ interface TableLayoutProps {
 const colStatus = 14;
 const colPriority = 10;
 const colAssignee = 12;
+const colLabels = 16;
 const gap = 2;
 
 export function TableLayout({
@@ -60,9 +61,16 @@ export function TableLayout({
           </Box>
         )}
         {capabilities.fields.assignee && (
-          <Box width={colAssignee}>
+          <Box width={colAssignee} marginRight={gap}>
             <Text bold underline>
               Assignee
+            </Text>
+          </Box>
+        )}
+        {capabilities.fields.labels && (
+          <Box width={colLabels}>
+            <Text bold underline>
+              Labels
             </Text>
           </Box>
         )}
@@ -132,7 +140,7 @@ export function TableLayout({
               </Box>
             )}
             {capabilities.fields.assignee && (
-              <Box width={colAssignee} overflowX="hidden">
+              <Box width={colAssignee} marginRight={gap} overflowX="hidden">
                 <Text
                   color={selected ? 'cyan' : undefined}
                   bold={selected}
@@ -140,6 +148,18 @@ export function TableLayout({
                   wrap="truncate"
                 >
                   {item.assignee}
+                </Text>
+              </Box>
+            )}
+            {capabilities.fields.labels && (
+              <Box width={colLabels} overflowX="hidden">
+                <Text
+                  color={selected ? 'cyan' : undefined}
+                  bold={selected}
+                  dimColor={dimmed}
+                  wrap="truncate"
+                >
+                  {item.labels.join(', ')}
                 </Text>
               </Box>
             )}
