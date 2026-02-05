@@ -1,9 +1,9 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { useAppState } from '../app.js';
-import type { SyncStatus } from '../sync/types.js';
 import type { BackendCapabilities } from '../backends/types.js';
 import { useScrollViewport } from '../hooks/useScrollViewport.js';
+import { useBackendDataStore } from '../stores/backendDataStore.js';
 
 function CapabilityLine({
   label,
@@ -29,15 +29,7 @@ export function StatusScreen() {
 
   const backendName = backend.constructor.name.replace(/Backend$/, '');
 
-  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(
-    syncManager?.getStatus() ?? null,
-  );
-
-  useEffect(() => {
-    if (!syncManager) return;
-    const cb = (status: SyncStatus) => setSyncStatus(status);
-    syncManager.onStatusChange(cb);
-  }, [syncManager]);
+  const syncStatus = useBackendDataStore((s) => s.syncStatus);
 
   const errors = syncStatus?.errors ?? [];
   const [scrollOffset, setScrollOffset] = useState(0);
