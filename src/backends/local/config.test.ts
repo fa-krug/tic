@@ -104,6 +104,22 @@ describe('config', () => {
     expect(config.branchMode).toBe('branch');
   });
 
+  it('returns default config with autoUpdate true', async () => {
+    const config = await readConfig(tmpDir);
+    expect(config.autoUpdate).toBe(true);
+  });
+
+  it('reads config with autoUpdate set to false', async () => {
+    const ticDir = path.join(tmpDir, '.tic');
+    fs.mkdirSync(ticDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(ticDir, 'config.yml'),
+      'autoUpdate: false\nstatuses:\n  - open\ncurrent_iteration: v1\niterations:\n  - v1\nnext_id: 1\n',
+    );
+    const config = await readConfig(tmpDir);
+    expect(config.autoUpdate).toBe(false);
+  });
+
   describe('readConfigSync', () => {
     it('returns default config when no config file exists', () => {
       const config = readConfigSync(tmpDir);

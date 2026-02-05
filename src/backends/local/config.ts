@@ -11,6 +11,7 @@ export interface Config {
   iterations: string[];
   next_id: number;
   branchMode: 'worktree' | 'branch';
+  autoUpdate: boolean;
   jira?: {
     site: string;
     project: string;
@@ -26,6 +27,7 @@ export const defaultConfig: Config = {
   iterations: ['default'],
   next_id: 1,
   branchMode: 'worktree',
+  autoUpdate: true,
 };
 
 function configPath(root: string): string {
