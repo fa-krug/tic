@@ -19,6 +19,8 @@ import path from 'node:path';
 type NavItem =
   | { kind: 'backend'; backend: string }
   | { kind: 'jira-field'; field: 'site' | 'project' | 'boardId' }
+  | { kind: 'default-type' }
+  | { kind: 'default-iteration' }
   | { kind: 'template-header' }
   | { kind: 'template'; slug: string; name: string }
   | { kind: 'updates-header' }
@@ -39,6 +41,9 @@ export function Settings() {
     setFormMode,
     setEditingTemplateSlug,
     selectWorkItem,
+    // @ts-expect-error -- Used in Task 5 picker overlays
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    setDefaultType,
   } = useAppState();
   const root = process.cwd();
 
@@ -60,6 +65,9 @@ export function Settings() {
 
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [updateChecking, setUpdateChecking] = useState(false);
+  const [showDefaultTypePicker, setShowDefaultTypePicker] = useState(false);
+  const [showDefaultIterationPicker, setShowDefaultIterationPicker] =
+    useState(false);
 
   const [availability, setAvailability] = useState<
     Record<BackendType, AvailabilityStatus>
@@ -145,6 +153,8 @@ export function Settings() {
         );
       }
     }
+    items.push({ kind: 'default-type' });
+    items.push({ kind: 'default-iteration' });
     if (capabilities.templates) {
       items.push({ kind: 'template-header' });
       for (const t of templates) {
@@ -269,6 +279,10 @@ export function Settings() {
           setEditingTemplateSlug(item.slug);
           selectWorkItem(null);
           navigate('form');
+        } else if (item.kind === 'default-type') {
+          setShowDefaultTypePicker(true);
+        } else if (item.kind === 'default-iteration') {
+          setShowDefaultIterationPicker(true);
         } else if (item.kind === 'update-check') {
           setUpdateChecking(true);
           void checkForUpdate().then((info) => {
@@ -312,7 +326,10 @@ export function Settings() {
         }
       }
     },
-    { isActive: !editing },
+    {
+      isActive:
+        !editing && !showDefaultTypePicker && !showDefaultIterationPicker,
+    },
   );
 
   // Edit mode input handler — only captures Esc to exit editing
@@ -372,6 +389,8 @@ export function Settings() {
         if (
           item.kind === 'template-header' ||
           item.kind === 'template' ||
+          item.kind === 'default-type' ||
+          item.kind === 'default-iteration' ||
           item.kind === 'updates-header' ||
           item.kind === 'update-now' ||
           item.kind === 'update-check' ||
@@ -436,19 +455,28 @@ export function Settings() {
       })}
 
       <Box marginTop={1} flexDirection="column">
-        <Text bold>Project Config:</Text>
-        <Box marginLeft={2}>
-          <Text dimColor>Types: {config.types.join(', ')}</Text>
-        </Box>
-        <Box marginLeft={2}>
-          <Text dimColor>Statuses: {config.statuses.join(', ')}</Text>
-        </Box>
-        <Box marginLeft={2}>
-          <Text dimColor>Iterations: {config.iterations.join(', ')}</Text>
-        </Box>
-        <Box marginLeft={2}>
-          <Text dimColor>Current iteration: {config.current_iteration}</Text>
-        </Box>
+        <Text bold>Defaults:</Text>
+        {navItems.map((item, idx) => {
+          if (item.kind !== 'default-type' && item.kind !== 'default-iteration')
+            return null;
+          const focused = idx === cursor;
+          const label =
+            item.kind === 'default-type' ? 'Default type' : 'Default iteration';
+          const value =
+            item.kind === 'default-type'
+              ? (config.defaultType ?? config.types[0] ?? 'none')
+              : config.current_iteration;
+          return (
+            <Box key={item.kind} marginLeft={2}>
+              <Text color={focused ? 'cyan' : undefined}>
+                {focused ? '>' : ' '}{' '}
+              </Text>
+              <Text bold={focused} color={focused ? 'cyan' : undefined}>
+                {label}: {value}
+              </Text>
+            </Box>
+          );
+        })}
       </Box>
 
       {capabilities.templates && (
