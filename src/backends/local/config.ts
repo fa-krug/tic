@@ -12,6 +12,7 @@ export interface Config {
   next_id: number;
   branchMode: 'worktree' | 'branch';
   autoUpdate: boolean;
+  defaultType?: string;
   jira?: {
     site: string;
     project: string;

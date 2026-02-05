@@ -120,6 +120,22 @@ describe('config', () => {
     expect(config.autoUpdate).toBe(false);
   });
 
+  it('returns default config with no defaultType', async () => {
+    const config = await readConfig(tmpDir);
+    expect(config.defaultType).toBeUndefined();
+  });
+
+  it('reads config with defaultType', async () => {
+    const ticDir = path.join(tmpDir, '.tic');
+    fs.mkdirSync(ticDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(ticDir, 'config.yml'),
+      'defaultType: task\nstatuses:\n  - open\ncurrent_iteration: v1\niterations:\n  - v1\nnext_id: 1\n',
+    );
+    const config = await readConfig(tmpDir);
+    expect(config.defaultType).toBe('task');
+  });
+
   describe('readConfigSync', () => {
     it('returns default config when no config file exists', () => {
       const config = readConfigSync(tmpDir);
