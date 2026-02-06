@@ -12,7 +12,6 @@ export function IterationPicker() {
   const navigateToHelp = useNavigationStore((s) => s.navigateToHelp);
   const iterations = useBackendDataStore((s) => s.iterations);
   const current = useBackendDataStore((s) => s.currentIteration);
-  const loading = useBackendDataStore((s) => s.loading);
 
   useInput((input, key) => {
     if (key.escape) {
@@ -22,14 +21,6 @@ export function IterationPicker() {
       navigateToHelp();
     }
   });
-
-  if (loading) {
-    return (
-      <Box>
-        <Text dimColor>Loading...</Text>
-      </Box>
-    );
-  }
 
   const items = iterations.map((it) => ({
     label: it === current ? `${it} (current)` : it,

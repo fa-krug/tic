@@ -1,6 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
-import Spinner from 'ink-spinner';
 
 import { useNavigationStore } from '../stores/navigationStore.js';
 import { listViewStore, useListViewStore } from '../stores/listViewStore.js';
@@ -16,6 +15,7 @@ import {
   useBackendDataStore,
   backendDataStore,
 } from '../stores/backendDataStore.js';
+import { useShallow } from 'zustand/shallow';
 import { SyncQueueStore } from '../sync/queue.js';
 import type { QueueAction } from '../sync/types.js';
 import { buildTree, type TreeItem } from './buildTree.js';
@@ -47,24 +47,68 @@ export function getTargetIds(
 }
 
 export function WorkItemList() {
-  const backend = useBackendDataStore((s) => s.backend);
-  const syncManager = useBackendDataStore((s) => s.syncManager);
-  const navigate = useNavigationStore((s) => s.navigate);
-  const navigateToHelp = useNavigationStore((s) => s.navigateToHelp);
-  const selectWorkItem = useNavigationStore((s) => s.selectWorkItem);
-  const activeType = useNavigationStore((s) => s.activeType);
-  const setActiveType = useNavigationStore((s) => s.setActiveType);
-  const setActiveTemplate = useNavigationStore((s) => s.setActiveTemplate);
-  const setFormMode = useNavigationStore((s) => s.setFormMode);
-  const updateInfo = useNavigationStore((s) => s.updateInfo);
+  // Backend data store - grouped selector with shallow comparison
+  const {
+    backend,
+    syncManager,
+    capabilities,
+    types,
+    statuses,
+    assignees,
+    labels: labelSuggestions,
+    currentIteration: iteration,
+    items: allItems,
+    loading,
+  } = useBackendDataStore(
+    useShallow((s) => ({
+      backend: s.backend,
+      syncManager: s.syncManager,
+      capabilities: s.capabilities,
+      types: s.types,
+      statuses: s.statuses,
+      assignees: s.assignees,
+      labels: s.labels,
+      currentIteration: s.currentIteration,
+      items: s.items,
+      loading: s.loading,
+    })),
+  );
+
+  // Navigation store - grouped selector with shallow comparison
+  const {
+    navigate,
+    navigateToHelp,
+    selectWorkItem,
+    activeType,
+    setActiveType,
+    setActiveTemplate,
+    setFormMode,
+    updateInfo,
+  } = useNavigationStore(
+    useShallow((s) => ({
+      navigate: s.navigate,
+      navigateToHelp: s.navigateToHelp,
+      selectWorkItem: s.selectWorkItem,
+      activeType: s.activeType,
+      setActiveType: s.setActiveType,
+      setActiveTemplate: s.setActiveTemplate,
+      setFormMode: s.setFormMode,
+      updateInfo: s.updateInfo,
+    })),
+  );
+
   const defaultType = useConfigStore((s) => s.config.defaultType ?? null);
   const branchMode = useConfigStore((s) => s.config.branchMode ?? 'worktree');
   const { exit } = useApp();
 
   // Store selectors for persistent list view state
-  const cursor = useListViewStore((s) => s.cursor);
-  const markedIds = useListViewStore((s) => s.markedIds);
-  const expandedIds = useListViewStore((s) => s.expandedIds);
+  const { cursor, markedIds, expandedIds } = useListViewStore(
+    useShallow((s) => ({
+      cursor: s.cursor,
+      markedIds: s.markedIds,
+      expandedIds: s.expandedIds,
+    })),
+  );
   const {
     setCursor,
     toggleExpanded,
@@ -82,24 +126,17 @@ export function WorkItemList() {
   const [templates, setTemplates] = useState<Template[]>([]);
 
   // UI overlay state from store
-  const activeOverlay = useUIStore((s) => s.activeOverlay);
-  const warning = useUIStore((s) => s.warning);
+  const { activeOverlay, warning } = useUIStore(
+    useShallow((s) => ({
+      activeOverlay: s.activeOverlay,
+      warning: s.warning,
+    })),
+  );
   const { openOverlay, closeOverlay, setWarning, clearWarning } =
     uiStore.getState();
 
   // Marked count for header display
   const markedCount = markedIds.size;
-
-  const syncStatus = useBackendDataStore((s) => s.syncStatus);
-
-  const capabilities = useBackendDataStore((s) => s.capabilities);
-  const types = useBackendDataStore((s) => s.types);
-  const statuses = useBackendDataStore((s) => s.statuses);
-  const assignees = useBackendDataStore((s) => s.assignees);
-  const labelSuggestions = useBackendDataStore((s) => s.labels);
-  const iteration = useBackendDataStore((s) => s.currentIteration);
-  const allItems = useBackendDataStore((s) => s.items);
-  const loading = useBackendDataStore((s) => s.loading);
   const refreshData = useCallback(() => {
     void backendDataStore.getState().refresh();
   }, []);
@@ -776,33 +813,10 @@ export function WorkItemList() {
                 {typeLabel} — {iteration}
               </Text>
               <Text dimColor>{` (${items.length} items)`}</Text>
+              {markedCount > 0 && (
+                <Text color="magenta">{` ● ${markedCount} marked`}</Text>
+              )}
             </Text>
-            {loading && (
-              <Box marginLeft={1}>
-                <Text color="yellow">
-                  <Spinner type="dots" />
-                </Text>
-              </Box>
-            )}
-            {syncStatus && syncStatus.state === 'syncing' ? (
-              <Box marginLeft={1}>
-                <Text color="yellow">
-                  <Spinner type="dots" />
-                </Text>
-                <Text dimColor> Syncing...</Text>
-              </Box>
-            ) : syncStatus && syncStatus.state === 'error' ? (
-              <Text dimColor>
-                {` ⚠ Sync failed (${syncStatus.errors.length} errors)`}
-              </Text>
-            ) : syncStatus && syncStatus.pendingCount > 0 ? (
-              <Text dimColor>{` ↑ ${syncStatus.pendingCount} pending`}</Text>
-            ) : syncStatus ? (
-              <Text dimColor> ✓ Synced</Text>
-            ) : null}
-            {markedCount > 0 && (
-              <Text color="magenta">{` ● ${markedCount} marked`}</Text>
-            )}
           </Box>
 
           {terminalWidth >= 80 ? (
@@ -823,9 +837,14 @@ export function WorkItemList() {
             />
           )}
 
-          {treeItems.length === 0 && (
+          {treeItems.length === 0 && !loading && (
             <Box marginTop={1}>
               <Text dimColor>No {activeType}s in this iteration.</Text>
+            </Box>
+          )}
+          {loading && treeItems.length === 0 && (
+            <Box marginTop={1}>
+              <Text dimColor>Loading...</Text>
             </Box>
           )}
 

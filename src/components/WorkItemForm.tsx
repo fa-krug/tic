@@ -16,6 +16,7 @@ import { SyncQueueStore } from '../sync/queue.js';
 import type { QueueAction } from '../sync/types.js';
 import { useScrollViewport } from '../hooks/useScrollViewport.js';
 import { useBackendDataStore } from '../stores/backendDataStore.js';
+import { useShallow } from 'zustand/shallow';
 import { openInEditor } from '../editor.js';
 import { slugifyTemplateName } from '../backends/local/templates.js';
 import { Breadcrumbs } from './Breadcrumbs.js';
@@ -40,22 +41,65 @@ const SELECT_FIELDS: FieldName[] = ['type', 'status', 'iteration', 'priority'];
 const PRIORITIES = ['low', 'medium', 'high', 'critical'];
 
 export function WorkItemForm() {
-  const backend = useBackendDataStore((s) => s.backend);
-  const syncManager = useBackendDataStore((s) => s.syncManager);
-  const navigate = useNavigationStore((s) => s.navigate);
-  const navigateToHelp = useNavigationStore((s) => s.navigateToHelp);
-  const selectedWorkItemId = useNavigationStore((s) => s.selectedWorkItemId);
-  const activeType = useNavigationStore((s) => s.activeType);
-  const activeTemplate = useNavigationStore((s) => s.activeTemplate);
-  const setActiveTemplate = useNavigationStore((s) => s.setActiveTemplate);
-  const formMode = useNavigationStore((s) => s.formMode);
-  const setFormMode = useNavigationStore((s) => s.setFormMode);
-  const editingTemplateSlug = useNavigationStore((s) => s.editingTemplateSlug);
-  const setEditingTemplateSlug = useNavigationStore(
-    (s) => s.setEditingTemplateSlug,
+  // Backend data store - grouped selector with shallow comparison
+  const {
+    backend,
+    syncManager,
+    capabilities,
+    statuses,
+    iterations,
+    types,
+    assignees,
+    labels: labelSuggestions,
+    currentIteration,
+    items: allItems,
+    loading: configLoading,
+  } = useBackendDataStore(
+    useShallow((s) => ({
+      backend: s.backend,
+      syncManager: s.syncManager,
+      capabilities: s.capabilities,
+      statuses: s.statuses,
+      iterations: s.iterations,
+      types: s.types,
+      assignees: s.assignees,
+      labels: s.labels,
+      currentIteration: s.currentIteration,
+      items: s.items,
+      loading: s.loading,
+    })),
   );
-  const pushWorkItem = useNavigationStore((s) => s.pushWorkItem);
-  const popWorkItem = useNavigationStore((s) => s.popWorkItem);
+
+  // Navigation store - grouped selector with shallow comparison
+  const {
+    navigate,
+    navigateToHelp,
+    selectedWorkItemId,
+    activeType,
+    activeTemplate,
+    setActiveTemplate,
+    formMode,
+    setFormMode,
+    editingTemplateSlug,
+    setEditingTemplateSlug,
+    pushWorkItem,
+    popWorkItem,
+  } = useNavigationStore(
+    useShallow((s) => ({
+      navigate: s.navigate,
+      navigateToHelp: s.navigateToHelp,
+      selectedWorkItemId: s.selectedWorkItemId,
+      activeType: s.activeType,
+      activeTemplate: s.activeTemplate,
+      setActiveTemplate: s.setActiveTemplate,
+      formMode: s.formMode,
+      setFormMode: s.setFormMode,
+      editingTemplateSlug: s.editingTemplateSlug,
+      setEditingTemplateSlug: s.setEditingTemplateSlug,
+      pushWorkItem: s.pushWorkItem,
+      popWorkItem: s.popWorkItem,
+    })),
+  );
 
   const queueStore = useMemo(() => {
     if (!syncManager) return null;
@@ -81,16 +125,6 @@ export function WorkItemForm() {
       syncManager?.pushPending().catch(() => {});
     }
   };
-
-  const capabilities = useBackendDataStore((s) => s.capabilities);
-  const statuses = useBackendDataStore((s) => s.statuses);
-  const iterations = useBackendDataStore((s) => s.iterations);
-  const types = useBackendDataStore((s) => s.types);
-  const assignees = useBackendDataStore((s) => s.assignees);
-  const labelSuggestions = useBackendDataStore((s) => s.labels);
-  const currentIteration = useBackendDataStore((s) => s.currentIteration);
-  const allItems = useBackendDataStore((s) => s.items);
-  const configLoading = useBackendDataStore((s) => s.loading);
 
   // Form stack store for draft persistence
   const currentDraft = useFormStackStore((s) => s.currentDraft());
@@ -1233,10 +1267,14 @@ export function WorkItemForm() {
     chromeLines: 4, // title+margin (2) + help bar margin+text (2)
   });
 
-  if (configLoading || itemLoading) {
+  // Show placeholder when item is still loading
+  if (itemLoading) {
     return (
-      <Box>
-        <Text dimColor>Loading...</Text>
+      <Box flexDirection="column">
+        <Box marginBottom={1}>
+          <Text bold>Loading item...</Text>
+        </Box>
+        <Text dimColor>esc back ? help</Text>
       </Box>
     );
   }

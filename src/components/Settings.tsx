@@ -2,7 +2,10 @@ import { useState, useEffect, useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import { useNavigationStore } from '../stores/navigationStore.js';
-import { useBackendDataStore } from '../stores/backendDataStore.js';
+import {
+  useBackendDataStore,
+  defaultCapabilities,
+} from '../stores/backendDataStore.js';
 import { useConfigStore, configStore } from '../stores/configStore.js';
 import { uiStore, useUIStore } from '../stores/uiStore.js';
 import { VALID_BACKENDS } from '../backends/factory.js';
@@ -77,32 +80,10 @@ export function Settings() {
     jira: 'available',
   });
 
-  const capabilities = backend?.getCapabilities() ?? {
-    relationships: false,
-    customTypes: false,
-    customStatuses: false,
-    iterations: false,
-    comments: false,
-    templates: false,
-    fields: {
-      priority: false,
-      assignee: false,
-      labels: false,
-      parent: false,
-      dependsOn: false,
-    },
-    templateFields: {
-      type: false,
-      status: false,
-      priority: false,
-      assignee: false,
-      labels: false,
-      iteration: false,
-      parent: false,
-      dependsOn: false,
-      description: false,
-    },
-  };
+  const capabilities = useMemo(
+    () => backend?.getCapabilities() ?? defaultCapabilities,
+    [backend],
+  );
 
   useEffect(() => {
     void checkAllBackendAvailability().then((results) => {
@@ -357,12 +338,9 @@ export function Settings() {
     { isActive: activeOverlay?.type === 'settings-edit' },
   );
 
+  // Config is loaded before render, but guard just in case
   if (!configLoaded) {
-    return (
-      <Box>
-        <Text dimColor>Loading...</Text>
-      </Box>
-    );
+    return null;
   }
 
   return (

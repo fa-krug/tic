@@ -5,7 +5,7 @@ import type { WorkItem } from '../types.js';
 import type { SyncStatus } from '../sync/types.js';
 import type { SyncManager } from '../sync/SyncManager.js';
 
-const defaultCapabilities: BackendCapabilities = {
+export const defaultCapabilities: BackendCapabilities = {
   relationships: false,
   customTypes: false,
   customStatuses: false,
@@ -51,7 +51,7 @@ export interface BackendDataStoreState {
   backend: Backend | null;
   syncManager: SyncManager | null;
 
-  init(backend: Backend, syncManager?: SyncManager | null): Promise<void>;
+  init(backend: Backend, syncManager?: SyncManager | null): void;
   refresh(): Promise<void>;
   setSyncStatus(status: SyncStatus): void;
   destroy(): void;
@@ -80,12 +80,13 @@ export const backendDataStore = createStore<BackendDataStoreState>(
     backend: null,
     syncManager: null,
 
-    async init(backend: Backend, syncManager?: SyncManager | null) {
+    init(backend: Backend, syncManager?: SyncManager | null) {
       get().destroy();
 
       currentBackend = backend;
       currentSyncManager = syncManager ?? null;
 
+      // Set backend refs and loading state immediately - UI can render
       set({ backend, syncManager: syncManager ?? null, loading: true });
 
       if (currentSyncManager) {
@@ -97,8 +98,12 @@ export const backendDataStore = createStore<BackendDataStoreState>(
         });
       }
 
-      await get().refresh();
-      set({ loaded: true, loading: false });
+      // Start loading data in background - don't block UI render
+      void get()
+        .refresh()
+        .finally(() => {
+          set({ loaded: true, loading: false });
+        });
     },
 
     async refresh() {

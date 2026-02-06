@@ -12,7 +12,8 @@ if (process.argv.length > 2) {
   await configStore.getState().init(process.cwd());
   const { backend, syncManager } = await createBackendWithSync(process.cwd());
 
-  await backendDataStore.getState().init(backend, syncManager);
+  // Init is non-blocking - UI renders immediately with loading state
+  backendDataStore.getState().init(backend, syncManager);
 
   if (syncManager) {
     syncManager.sync().catch(() => {});

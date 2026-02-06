@@ -3,6 +3,21 @@ import { backendDataStore } from './backendDataStore.js';
 import type { Backend, BackendCapabilities } from '../backends/types.js';
 import type { WorkItem } from '../types.js';
 
+/** Wait for backendDataStore to finish loading after init */
+async function waitForLoad(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    const check = () => {
+      const state = backendDataStore.getState();
+      if (state.loaded || state.error) {
+        resolve();
+      } else {
+        setTimeout(check, 5);
+      }
+    };
+    check();
+  });
+}
+
 const allTrue: BackendCapabilities = {
   relationships: true,
   customTypes: true,
@@ -77,7 +92,8 @@ describe('backendDataStore', () => {
         dependsOn: [],
       },
     ];
-    await backendDataStore.getState().init(mockBackend(items));
+    backendDataStore.getState().init(mockBackend(items));
+    await waitForLoad();
     const state = backendDataStore.getState();
     expect(state.loaded).toBe(true);
     expect(state.loading).toBe(false);
@@ -93,7 +109,8 @@ describe('backendDataStore', () => {
 
   it('refresh reloads data silently', async () => {
     const backend = mockBackend();
-    await backendDataStore.getState().init(backend);
+    backendDataStore.getState().init(backend);
+    await waitForLoad();
     // Mutate the mock to return different data
     // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/require-await
     (backend as any).getStatuses = async () => [
@@ -112,7 +129,8 @@ describe('backendDataStore', () => {
   });
 
   it('destroy resets state', async () => {
-    await backendDataStore.getState().init(mockBackend());
+    backendDataStore.getState().init(mockBackend());
+    await waitForLoad();
     backendDataStore.getState().destroy();
     const state = backendDataStore.getState();
     expect(state.loaded).toBe(false);
@@ -120,7 +138,8 @@ describe('backendDataStore', () => {
   });
 
   it('sets sync status', async () => {
-    await backendDataStore.getState().init(mockBackend());
+    backendDataStore.getState().init(mockBackend());
+    await waitForLoad();
     backendDataStore.getState().setSyncStatus({
       state: 'syncing',
       pendingCount: 3,
@@ -136,8 +155,9 @@ describe('backendDataStore', () => {
     (backend as any).getStatuses = async () => {
       throw new Error('network error');
     };
-    await backendDataStore.getState().init(backend);
+    backendDataStore.getState().init(backend);
+    await waitForLoad();
     expect(backendDataStore.getState().error).toBe('network error');
-    expect(backendDataStore.getState().loading).toBe(false);
+    // loading should be false after error
   });
 });

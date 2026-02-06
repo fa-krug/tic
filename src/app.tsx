@@ -33,7 +33,7 @@ export function App() {
 
   return (
     <Box flexDirection="column">
-      {screen === 'list' && <Header />}
+      <Header />
       {screen === 'list' && <WorkItemList />}
       {screen === 'form' && <WorkItemForm />}
       {screen === 'iteration-picker' && <IterationPicker />}
