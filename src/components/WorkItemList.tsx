@@ -3,6 +3,7 @@ import { Box, Text, useInput, useApp } from 'ink';
 import Spinner from 'ink-spinner';
 
 import { useNavigationStore } from '../stores/navigationStore.js';
+import { listViewStore, useListViewStore } from '../stores/listViewStore.js';
 import { isGitRepo } from '../git.js';
 import { beginImplementation } from '../implement.js';
 import { useConfigStore } from '../stores/configStore.js';
@@ -59,11 +60,23 @@ export function WorkItemList() {
   const defaultType = useConfigStore((s) => s.config.defaultType ?? null);
   const branchMode = useConfigStore((s) => s.config.branchMode ?? 'worktree');
   const { exit } = useApp();
-  const [cursor, setCursor] = useState(0);
+
+  // Store selectors for persistent list view state
+  const cursor = useListViewStore((s) => s.cursor);
+  const markedIds = useListViewStore((s) => s.markedIds);
+  const expandedIds = useListViewStore((s) => s.expandedIds);
+  const {
+    setCursor,
+    toggleExpanded,
+    toggleMarked,
+    clearMarked,
+    clampCursor,
+    removeDeletedItem,
+  } = listViewStore.getState();
+
+  // Local state for inputs and templates
   const [parentInput, setParentInput] = useState('');
   const [allSearchItems, setAllSearchItems] = useState<WorkItem[]>([]);
-  // Marked items state for bulk operations
-  const [markedIds, setMarkedIds] = useState<Set<string>>(() => new Set());
   const [assigneeInput, setAssigneeInput] = useState('');
   const [labelsInput, setLabelsInput] = useState('');
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -144,9 +157,7 @@ export function WorkItemList() {
   // Collapse state: set of item IDs that are collapsed (collapsed by default)
   // Track explicitly expanded items (inverse of collapsed).
   // All parents are collapsed by default; expanding removes from this set.
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(
-    () => new Set<string>(),
-  );
+  // expandedIds comes from listViewStore (imported above)
 
   // Derive collapsedIds: all parents minus explicitly expanded ones
   const collapsedIds = useMemo(() => {
@@ -178,8 +189,8 @@ export function WorkItemList() {
   }, [fullTree, collapsedIds]);
 
   useEffect(() => {
-    setCursor((c) => Math.min(c, Math.max(0, treeItems.length - 1)));
-  }, [treeItems.length]);
+    clampCursor(treeItems.length - 1);
+  }, [treeItems.length, clampCursor]);
 
   useEffect(() => {
     if (activeOverlay?.type !== 'search' || !backend) return;
@@ -228,14 +239,10 @@ export function WorkItemList() {
             await queueWrite('delete', id);
           }
           closeOverlay();
-          setMarkedIds((prev) => {
-            const next = new Set(prev);
-            for (const id of targetIds) {
-              next.delete(id);
-            }
-            return next;
-          });
-          setCursor((c) => Math.max(0, c - 1));
+          for (const id of targetIds) {
+            removeDeletedItem(id);
+          }
+          setCursor(Math.max(0, cursor - 1));
           refreshData();
         })();
       } else {
@@ -264,21 +271,19 @@ export function WorkItemList() {
       }
 
       if (key.upArrow) {
-        setCursor((c) => Math.max(0, c - 1));
+        setCursor(Math.max(0, cursor - 1));
         clearWarning();
       }
       if (key.downArrow) {
-        setCursor((c) => Math.min(treeItems.length - 1, c + 1));
+        setCursor(Math.min(treeItems.length - 1, cursor + 1));
         clearWarning();
       }
       if (key.pageUp) {
-        setCursor((c) => Math.max(0, c - viewport.maxVisible));
+        setCursor(Math.max(0, cursor - viewport.maxVisible));
         clearWarning();
       }
       if (key.pageDown) {
-        setCursor((c) =>
-          Math.min(treeItems.length - 1, c + viewport.maxVisible),
-        );
+        setCursor(Math.min(treeItems.length - 1, cursor + viewport.maxVisible));
         clearWarning();
       }
       if (key.home) {
@@ -297,7 +302,7 @@ export function WorkItemList() {
           current.hasChildren &&
           collapsedIds.has(current.item.id)
         ) {
-          setExpandedIds((prev) => new Set(prev).add(current.item.id));
+          toggleExpanded(current.item.id);
         }
       }
 
@@ -305,11 +310,7 @@ export function WorkItemList() {
         const current = treeItems[cursor];
         if (current) {
           if (current.hasChildren && !collapsedIds.has(current.item.id)) {
-            setExpandedIds((prev) => {
-              const next = new Set(prev);
-              next.delete(current.item.id);
-              return next;
-            });
+            toggleExpanded(current.item.id);
           } else if (current.depth > 0 && current.item.parent) {
             const parentIdx = treeItems.findIndex(
               (t) => t.item.id === current.item.parent,
@@ -412,19 +413,11 @@ export function WorkItemList() {
 
       if (input === 'm' && treeItems.length > 0) {
         const itemId = treeItems[cursor]!.item.id;
-        setMarkedIds((prev) => {
-          const next = new Set(prev);
-          if (next.has(itemId)) {
-            next.delete(itemId);
-          } else {
-            next.add(itemId);
-          }
-          return next;
-        });
+        toggleMarked(itemId);
       }
 
       if (input === 'M') {
-        setMarkedIds(new Set());
+        clearMarked();
       }
 
       if (input === 'B' && treeItems.length > 0) {
@@ -579,16 +572,11 @@ export function WorkItemList() {
       case 'mark':
         if (treeItems[cursor]) {
           const itemId = treeItems[cursor].item.id;
-          setMarkedIds((prev) => {
-            const next = new Set(prev);
-            if (next.has(itemId)) next.delete(itemId);
-            else next.add(itemId);
-            return next;
-          });
+          toggleMarked(itemId);
         }
         break;
       case 'clear-marks':
-        setMarkedIds(new Set());
+        clearMarked();
         break;
       case 'set-priority':
         {
