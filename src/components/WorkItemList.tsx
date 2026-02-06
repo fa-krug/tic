@@ -143,20 +143,33 @@ export function WorkItemList() {
   const [templates, setTemplates] = useState<Template[]>([]);
 
   // UI overlay state from store
-  const { activeOverlay, warning } = useUIStore(
+  const { activeOverlay, warning, toast } = useUIStore(
     useShallow((s) => ({
       activeOverlay: s.activeOverlay,
       warning: s.warning,
+      toast: s.toast,
     })),
   );
-  const { openOverlay, closeOverlay, setWarning, clearWarning } =
-    uiStore.getState();
+  const {
+    openOverlay,
+    closeOverlay,
+    setWarning,
+    clearWarning,
+    setToast,
+    clearToast,
+  } = uiStore.getState();
 
   // Marked count for header display
   const markedCount = markedIds.size;
   const refreshData = useCallback(() => {
     void backendDataStore.getState().refresh();
   }, []);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => clearToast(), 3000);
+    return () => clearTimeout(timer);
+  }, [toast, clearToast]);
 
   useEffect(() => {
     if (capabilities.templates && backend) {
@@ -298,6 +311,11 @@ export function WorkItemList() {
           }
           setCursor(Math.max(0, cursor - 1));
           refreshData();
+          setToast(
+            targetIds.length === 1
+              ? `Item #${targetIds[0]} deleted`
+              : `${targetIds.length} items deleted`,
+          );
         })();
       } else {
         closeOverlay();
@@ -776,6 +794,11 @@ export function WorkItemList() {
                     await queueWrite('update', id);
                   }
                   refreshData();
+                  setToast(
+                    targetIds.length === 1
+                      ? 'Status updated'
+                      : `${targetIds.length} items updated`,
+                  );
                 })();
               }}
               onCancel={() => closeOverlay()}
@@ -794,6 +817,11 @@ export function WorkItemList() {
                     await queueWrite('update', id);
                   }
                   refreshData();
+                  setToast(
+                    targetIds.length === 1
+                      ? 'Type updated'
+                      : `${targetIds.length} items updated`,
+                  );
                 })();
               }}
               onCancel={() => closeOverlay()}
@@ -811,6 +839,11 @@ export function WorkItemList() {
                     await queueWrite('update', id);
                   }
                   refreshData();
+                  setToast(
+                    targetIds.length === 1
+                      ? 'Priority updated'
+                      : `${targetIds.length} items updated`,
+                  );
                 })();
               }}
               onCancel={() => closeOverlay()}
@@ -913,6 +946,11 @@ export function WorkItemList() {
                       closeOverlay();
                       setParentInput('');
                       refreshData();
+                      setToast(
+                        targetIds.length === 1
+                          ? 'Parent updated'
+                          : `${targetIds.length} items updated`,
+                      );
                     })();
                   }}
                 />
@@ -940,6 +978,11 @@ export function WorkItemList() {
                       }
                       setAssigneeInput('');
                       refreshData();
+                      setToast(
+                        targetIds.length === 1
+                          ? 'Assignee updated'
+                          : `${targetIds.length} items updated`,
+                      );
                     })();
                   }}
                 />
@@ -971,6 +1014,11 @@ export function WorkItemList() {
                       }
                       setLabelsInput('');
                       refreshData();
+                      setToast(
+                        targetIds.length === 1
+                          ? 'Labels updated'
+                          : `${targetIds.length} items updated`,
+                      );
                     })();
                   }}
                 />
@@ -980,6 +1028,11 @@ export function WorkItemList() {
                 Delete {activeOverlay.targetIds.length} item
                 {activeOverlay.targetIds.length > 1 ? 's' : ''}? (y/n)
               </Text>
+            ) : toast ? (
+              <Box>
+                <Text color="green">{toast.message}</Text>
+                {positionText && <Text dimColor> {positionText}</Text>}
+              </Box>
             ) : (
               <Box>
                 <Text dimColor>
