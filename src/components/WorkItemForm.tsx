@@ -20,6 +20,7 @@ import { useShallow } from 'zustand/shallow';
 import { openInEditor } from '../editor.js';
 import { slugifyTemplateName } from '../backends/local/templates.js';
 import { Breadcrumbs } from './Breadcrumbs.js';
+import { uiStore } from '../stores/uiStore.js';
 
 type FieldName =
   | 'title'
@@ -496,6 +497,7 @@ export function WorkItemForm() {
           templateSlug: template.slug,
         });
       }
+      uiStore.getState().setToast(`Template "${template.name}" saved`);
       setFormMode('item');
       setEditingTemplateSlug(null);
       return;
@@ -527,6 +529,7 @@ export function WorkItemForm() {
         setComments((prev) => [...prev, added]);
         setNewComment('');
       }
+      uiStore.getState().setToast(`Item #${selectedWorkItemId} updated`);
     } else {
       const created = await backend.cachedCreateWorkItem({
         title: title || 'Untitled',
@@ -551,6 +554,7 @@ export function WorkItemForm() {
           commentData: { author: 'me', body: newComment.trim() },
         });
       }
+      uiStore.getState().setToast(`Item #${created.id} created`);
       setActiveTemplate(null);
     }
 
