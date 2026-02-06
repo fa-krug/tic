@@ -172,6 +172,12 @@ export function WorkItemList() {
   }, [toast, clearToast]);
 
   useEffect(() => {
+    if (!warning) return;
+    const timer = setTimeout(() => clearWarning(), 5000);
+    return () => clearTimeout(timer);
+  }, [warning, clearWarning]);
+
+  useEffect(() => {
     if (capabilities.templates && backend) {
       void backend.listTemplates().then(setTemplates);
     }
