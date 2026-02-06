@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import matter from 'gray-matter';
+import { parseFrontmatter, stringifyFrontmatter } from './frontmatter.js';
 import type { Template } from '../../types.js';
 
 function templatesDir(root: string): string {
@@ -20,8 +20,8 @@ export function slugifyTemplateName(name: string): string {
 }
 
 export function parseTemplateFile(raw: string, slug: string): Template {
-  const parsed = matter(raw);
-  const data = parsed.data as Record<string, unknown>;
+  const parsed = parseFrontmatter(raw);
+  const data = parsed.data;
   const description = parsed.content.trim();
 
   const template: Template = {
@@ -79,7 +79,7 @@ export async function writeTemplate(
     frontmatter['depends_on'] = template.dependsOn;
 
   const body = template.description ?? '';
-  const content = matter.stringify(body, frontmatter);
+  const content = stringifyFrontmatter(body, frontmatter);
   await fs.writeFile(templatePath(root, template.slug), content);
 }
 

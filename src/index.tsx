@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+import module from 'node:module';
+module.enableCompileCache?.();
+
 import { render } from 'ink';
 import { App } from './app.js';
 import { createBackendWithSync } from './backends/factory.js';

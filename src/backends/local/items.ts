@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import matter from 'gray-matter';
+import { parseFrontmatter, stringifyFrontmatter } from './frontmatter.js';
 import type { WorkItem, Comment } from '../../types.js';
 
 function itemsDir(root: string): string {
@@ -79,8 +79,8 @@ export async function readWorkItem(
 }
 
 export function parseWorkItemFile(raw: string): WorkItem {
-  const parsed = matter(raw);
-  const data = parsed.data as Record<string, unknown>;
+  const parsed = parseFrontmatter(raw);
+  const data = parsed.data;
   const { description, comments } = parseComments(parsed.content);
 
   return {
@@ -133,7 +133,7 @@ export async function writeWorkItem(
   }
 
   const body = item.description + serializeComments(item.comments);
-  const content = matter.stringify(body, frontmatter);
+  const content = stringifyFrontmatter(body, frontmatter);
   await fs.writeFile(itemPath(root, item.id), content);
 }
 
