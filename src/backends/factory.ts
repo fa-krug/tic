@@ -1,10 +1,6 @@
 import { execSync } from 'node:child_process';
 import type { Backend } from './types.js';
 import { LocalBackend } from './local/index.js';
-import { GitHubBackend } from './github/index.js';
-import { GitLabBackend } from './gitlab/index.js';
-import { AzureDevOpsBackend } from './ado/index.js';
-import { JiraBackend } from './jira/index.js';
 import { configStore } from '../stores/configStore.js';
 import { SyncManager } from '../sync/SyncManager.js';
 import { SyncQueueStore } from '../sync/queue.js';
@@ -48,14 +44,22 @@ export async function createBackend(root: string): Promise<Backend> {
   switch (backend) {
     case 'local':
       return LocalBackend.create(root);
-    case 'github':
+    case 'github': {
+      const { GitHubBackend } = await import('./github/index.js');
       return new GitHubBackend(root);
-    case 'gitlab':
+    }
+    case 'gitlab': {
+      const { GitLabBackend } = await import('./gitlab/index.js');
       return new GitLabBackend(root);
-    case 'azure':
+    }
+    case 'azure': {
+      const { AzureDevOpsBackend } = await import('./ado/index.js');
       return new AzureDevOpsBackend(root);
-    case 'jira':
+    }
+    case 'jira': {
+      const { JiraBackend } = await import('./jira/index.js');
       return JiraBackend.create(root);
+    }
     default:
       throw new Error(
         `Unknown backend "${backend}". Valid backends: ${VALID_BACKENDS.join(', ')}`,
@@ -86,18 +90,26 @@ export async function createBackendWithSync(
 
   let remote: Backend;
   switch (backendType) {
-    case 'github':
+    case 'github': {
+      const { GitHubBackend } = await import('./github/index.js');
       remote = new GitHubBackend(root);
       break;
-    case 'gitlab':
+    }
+    case 'gitlab': {
+      const { GitLabBackend } = await import('./gitlab/index.js');
       remote = new GitLabBackend(root);
       break;
-    case 'azure':
+    }
+    case 'azure': {
+      const { AzureDevOpsBackend } = await import('./ado/index.js');
       remote = new AzureDevOpsBackend(root);
       break;
-    case 'jira':
+    }
+    case 'jira': {
+      const { JiraBackend } = await import('./jira/index.js');
       remote = await JiraBackend.create(root);
       break;
+    }
     default:
       throw new Error(
         `Unknown backend "${backendType}". Valid backends: ${VALID_BACKENDS.join(', ')}`,

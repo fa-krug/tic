@@ -2,11 +2,11 @@
 import { render } from 'ink';
 import { App } from './app.js';
 import { createBackendWithSync } from './backends/factory.js';
-import { runCli } from './cli/index.js';
 import { configStore } from './stores/configStore.js';
 import { backendDataStore } from './stores/backendDataStore.js';
 
 if (process.argv.length > 2) {
+  const { runCli } = await import('./cli/index.js');
   await runCli(process.argv);
 } else {
   await configStore.getState().init(process.cwd());

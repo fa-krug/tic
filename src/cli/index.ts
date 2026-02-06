@@ -1,36 +1,18 @@
 import { Command } from 'commander';
 import { VERSION } from '../version.js';
-import {
-  createBackend as createBackendFromConfig,
-  createBackendWithSync,
-  detectBackend,
-  VALID_BACKENDS,
-} from '../backends/factory.js';
+import { detectBackend, VALID_BACKENDS } from '../backends/factory.js';
 import type { Backend, BackendCapabilities } from '../backends/types.js';
-import { GitHubBackend } from '../backends/github/index.js';
-import { GitLabBackend } from '../backends/gitlab/index.js';
-import { AzureDevOpsBackend } from '../backends/ado/index.js';
+import { BACKEND_CAPABILITIES } from '../backends/capabilities.js';
 import { readConfigSync } from '../backends/local/config.js';
 import { SyncQueueStore } from '../sync/queue.js';
 import type { SyncManager } from '../sync/SyncManager.js';
 import { formatTsvRow, formatTsvKeyValue, formatJson } from './format.js';
-import { runInit } from './commands/init.js';
-import { runConfigGet, runConfigSet } from './commands/config.js';
-import {
-  runItemList,
-  runItemShow,
-  runItemCreate,
-  runItemUpdate,
-  runItemDelete,
-  runItemOpen,
-  runItemComment,
-  type ItemListOptions,
-  type ItemCreateOptions,
-  type ItemUpdateOptions,
-  type ItemCommentOptions,
+import type {
+  ItemListOptions,
+  ItemCreateOptions,
+  ItemUpdateOptions,
+  ItemCommentOptions,
 } from './commands/item.js';
-import { runIterationList, runIterationSet } from './commands/iteration.js';
-import { startMcpServer } from './commands/mcp.js';
 import type { WorkItem } from '../types.js';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -93,7 +75,8 @@ export function requireTicProject(root: string): void {
 
 async function createBackend(): Promise<Backend> {
   requireTicProject(process.cwd());
-  return createBackendFromConfig(process.cwd());
+  const { createBackend: create } = await import('../backends/factory.js');
+  return create(process.cwd());
 }
 
 async function createBackendAndSync(): Promise<{
@@ -102,6 +85,7 @@ async function createBackendAndSync(): Promise<{
   queueStore: SyncQueueStore | null;
 }> {
   requireTicProject(process.cwd());
+  const { createBackendWithSync } = await import('../backends/factory.js');
   const { backend, syncManager } = await createBackendWithSync(process.cwd());
   const queueStore = syncManager ? new SyncQueueStore(process.cwd()) : null;
   return { backend, syncManager, queueStore };
@@ -112,16 +96,7 @@ function tryGetCapabilities(): BackendCapabilities | null {
     requireTicProject(process.cwd());
     const config = readConfigSync(process.cwd());
     const backendType = config.backend ?? 'local';
-    switch (backendType) {
-      case 'github':
-        return new GitHubBackend(process.cwd()).getCapabilities();
-      case 'gitlab':
-        return new GitLabBackend(process.cwd()).getCapabilities();
-      case 'azure':
-        return new AzureDevOpsBackend(process.cwd()).getCapabilities();
-      default:
-        return null; // local — show all options
-    }
+    return BACKEND_CAPABILITIES[backendType] ?? null;
   } catch {
     return null;
   }
@@ -182,6 +157,7 @@ export function createProgram(): Command {
             `Invalid backend "${backend}". Valid: ${VALID_BACKENDS.join(', ')}`,
           );
         }
+        const { runInit } = await import('./commands/init.js');
         const result = await runInit(process.cwd(), backend);
         if (result.alreadyExists) {
           console.log('Already initialized in .tic/');
@@ -213,6 +189,7 @@ export function createProgram(): Command {
       try {
         const { backend, syncManager } = await createBackendAndSync();
         if (syncManager) await syncManager.sync();
+        const { runItemList } = await import('./commands/item.js');
         const items = await runItemList(backend, opts);
         if (parentOpts.quiet) return;
         if (parentOpts.json) {
@@ -247,6 +224,7 @@ export function createProgram(): Command {
       const parentOpts = program.opts<GlobalOpts>();
       try {
         const backend = await createBackend();
+        const { runItemShow } = await import('./commands/item.js');
         const wi = await runItemShow(backend, idStr);
         output(
           wi,
@@ -266,6 +244,7 @@ export function createProgram(): Command {
       const parentOpts = program.opts<GlobalOpts>();
       try {
         const backend = await createBackend();
+        const { runItemOpen } = await import('./commands/item.js');
         await runItemOpen(backend, idStr);
       } catch (err) {
         handleError(err, parentOpts.json);
@@ -296,6 +275,7 @@ export function createProgram(): Command {
     try {
       const { backend, syncManager, queueStore } = await createBackendAndSync();
       const description = readStdin();
+      const { runItemCreate } = await import('./commands/item.js');
       let wi = await runItemCreate(backend, title, {
         ...opts,
         dependsOn: opts.dependsOn,
@@ -349,6 +329,7 @@ export function createProgram(): Command {
         dependsOn: opts.dependsOn,
         ...(description ? { description } : {}),
       };
+      const { runItemUpdate } = await import('./commands/item.js');
       const wi = await runItemUpdate(backend, idStr, updateOpts);
       if (queueStore && syncManager) {
         await queueStore.append({
@@ -373,6 +354,7 @@ export function createProgram(): Command {
       try {
         const { backend, syncManager, queueStore } =
           await createBackendAndSync();
+        const { runItemDelete } = await import('./commands/item.js');
         await runItemDelete(backend, idStr);
         if (queueStore && syncManager) {
           await queueStore.append({
@@ -406,6 +388,7 @@ export function createProgram(): Command {
         try {
           const { backend, syncManager, queueStore } =
             await createBackendAndSync();
+          const { runItemComment } = await import('./commands/item.js');
           const comment = await runItemComment(backend, idStr, text, opts);
           if (queueStore && syncManager) {
             await queueStore.append({
@@ -440,6 +423,7 @@ export function createProgram(): Command {
         const parentOpts = program.opts<GlobalOpts>();
         try {
           const backend = await createBackend();
+          const { runIterationList } = await import('./commands/iteration.js');
           const result = await runIterationList(backend);
           if (parentOpts.quiet) return;
           if (parentOpts.json) {
@@ -463,6 +447,7 @@ export function createProgram(): Command {
         const parentOpts = program.opts<GlobalOpts>();
         try {
           const backend = await createBackend();
+          const { runIterationSet } = await import('./commands/iteration.js');
           await runIterationSet(backend, name);
           if (!parentOpts.quiet) {
             if (parentOpts.json) {
@@ -490,6 +475,7 @@ export function createProgram(): Command {
       const parentOpts = program.opts<GlobalOpts>();
       try {
         requireTicProject(process.cwd());
+        const { runConfigGet } = await import('./commands/config.js');
         const value = await runConfigGet(process.cwd(), key);
         if (parentOpts.quiet) return;
         if (parentOpts.json) {
@@ -511,6 +497,7 @@ export function createProgram(): Command {
       const parentOpts = program.opts<GlobalOpts>();
       try {
         requireTicProject(process.cwd());
+        const { runConfigSet } = await import('./commands/config.js');
         await runConfigSet(process.cwd(), key, value);
         if (!parentOpts.quiet) {
           if (parentOpts.json) {
@@ -535,6 +522,7 @@ export function createProgram(): Command {
       'Start the MCP server on stdio, exposing 14 tools for work item management',
     )
     .action(async () => {
+      const { startMcpServer } = await import('./commands/mcp.js');
       await startMcpServer();
     });
 
