@@ -7,34 +7,20 @@ import { Settings } from './components/Settings.js';
 import { StatusScreen } from './components/StatusScreen.js';
 import { HelpScreen } from './components/HelpScreen.js';
 import { Header } from './components/Header.js';
-import type { Backend } from './backends/types.js';
-import type { SyncManager } from './sync/SyncManager.js';
 import { checkForUpdate } from './update-checker.js';
 import { useConfigStore } from './stores/configStore.js';
 import {
   navigationStore,
   useNavigationStore,
 } from './stores/navigationStore.js';
-import { backendDataStore } from './stores/backendDataStore.js';
 
 // Re-export Screen type for consumers that need it
 export type { Screen } from './stores/navigationStore.js';
 
-export function App({
-  backend,
-  syncManager,
-}: {
-  backend: Backend;
-  syncManager: SyncManager | null;
-}) {
+export function App() {
   const screen = useNavigationStore((s) => s.screen);
   const previousScreen = useNavigationStore((s) => s.previousScreen);
   const autoUpdate = useConfigStore((s) => s.config.autoUpdate);
-
-  // Initialize backendDataStore with backend/syncManager
-  useEffect(() => {
-    void backendDataStore.getState().init(backend, syncManager);
-  }, [backend, syncManager]);
 
   // Update check on mount
   useEffect(() => {

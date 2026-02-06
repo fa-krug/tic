@@ -18,7 +18,7 @@ if (process.argv.length > 2) {
     syncManager.sync().catch(() => {});
   }
 
-  const app = render(<App backend={backend} syncManager={syncManager} />);
+  const app = render(<App />);
   await app.waitUntilExit();
   backendDataStore.getState().destroy();
   configStore.getState().destroy();
