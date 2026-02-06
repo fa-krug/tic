@@ -5,6 +5,12 @@ import SelectInput from 'ink-select-input';
 import { AutocompleteInput } from './AutocompleteInput.js';
 import { MultiAutocompleteInput } from './MultiAutocompleteInput.js';
 import { useNavigationStore } from '../stores/navigationStore.js';
+import {
+  formStackStore,
+  useFormStackStore,
+  type FormFields,
+  type FormDraft,
+} from '../stores/formStackStore.js';
 import type { Comment, WorkItem, Template } from '../types.js';
 import { SyncQueueStore } from '../sync/queue.js';
 import type { QueueAction } from '../sync/types.js';
@@ -12,11 +18,7 @@ import { useScrollViewport } from '../hooks/useScrollViewport.js';
 import { useBackendDataStore } from '../stores/backendDataStore.js';
 import { openInEditor } from '../editor.js';
 import { slugifyTemplateName } from '../backends/local/templates.js';
-import {
-  createSnapshot,
-  isSnapshotEqual,
-  type FormSnapshot,
-} from './formSnapshot.js';
+import { createSnapshot, type FormSnapshot } from './formSnapshot.js';
 
 type FieldName =
   | 'title'
@@ -89,6 +91,17 @@ export function WorkItemForm() {
   const currentIteration = useBackendDataStore((s) => s.currentIteration);
   const allItems = useBackendDataStore((s) => s.items);
   const configLoading = useBackendDataStore((s) => s.loading);
+
+  // Form stack store for draft persistence
+  const currentDraft = useFormStackStore((s) => s.currentDraft());
+  const showDirtyPrompt = useFormStackStore((s) => s.showDiscardPrompt);
+  const storeIsDirty = useFormStackStore((s) => s.isDirty());
+  const {
+    push: pushDraft,
+    updateFields,
+    setFocusedField: setStoreFocusedField,
+    setShowDiscardPrompt: setStoreShowDiscardPrompt,
+  } = formStackStore.getState();
 
   const [existingItem, setExistingItem] = useState<WorkItem | null>(null);
   const [children, setChildren] = useState<WorkItem[]>([]);
@@ -191,41 +204,90 @@ export function WorkItemForm() {
     dependents,
   ]);
 
-  const [title, setTitle] = useState('');
-  const [type, setType] = useState(activeType ?? types[0] ?? '');
-  const [status, setStatus] = useState(statuses[0] ?? '');
-  const [iteration, setIteration] = useState(currentIteration);
-  const [priority, setPriority] = useState<
-    'low' | 'medium' | 'high' | 'critical'
-  >('medium');
-  const [assignee, setAssignee] = useState('');
-  const [labels, setLabels] = useState('');
-  const [description, setDescription] = useState('');
-  const [parentId, setParentId] = useState('');
-  const [dependsOn, setDependsOn] = useState('');
-  const [newComment, setNewComment] = useState('');
   const [comments, setComments] = useState<Comment[]>([]);
 
-  const [initialSnapshot, setInitialSnapshot] = useState<FormSnapshot | null>(
-    null,
-  );
+  // Derive field values from current draft
+  const title = currentDraft?.fields.title ?? '';
+  const type = currentDraft?.fields.type ?? activeType ?? types[0] ?? '';
+  const status = currentDraft?.fields.status ?? statuses[0] ?? '';
+  const iteration = currentDraft?.fields.iteration ?? currentIteration;
+  const priority = (currentDraft?.fields.priority ?? 'medium') as
+    | 'low'
+    | 'medium'
+    | 'high'
+    | 'critical';
+  const assignee = currentDraft?.fields.assignee ?? '';
+  const labels = currentDraft?.fields.labels ?? '';
+  const description = currentDraft?.fields.description ?? '';
+  const parentId = currentDraft?.fields.parentId ?? '';
+  const dependsOn = currentDraft?.fields.dependsOn ?? '';
+  const newComment = currentDraft?.fields.newComment ?? '';
+  const focusedField = currentDraft?.focusedField ?? 0;
 
-  const currentValues = createSnapshot({
-    title,
-    type,
-    status,
-    iteration,
-    priority,
-    assignee,
-    labels,
-    description,
-    parentId,
-    dependsOn,
-    newComment,
-  });
-  const isDirty =
-    initialSnapshot !== null &&
-    !isSnapshotEqual(initialSnapshot, currentValues);
+  // Use store's dirty detection
+  const isDirty = storeIsDirty;
+
+  // Field setter wrappers that update the store
+  const setTitle = (v: string) => updateFields({ title: v });
+  const setType = (v: string) => updateFields({ type: v });
+  const setStatus = (v: string) => updateFields({ status: v });
+  const setIteration = (v: string) => updateFields({ iteration: v });
+  const setPriority = (v: string) => updateFields({ priority: v });
+  const setAssignee = (v: string) => updateFields({ assignee: v });
+  const setLabels = (v: string) => updateFields({ labels: v });
+  const setDescription = (v: string) => updateFields({ description: v });
+  const setParentId = (v: string) => updateFields({ parentId: v });
+  const setDependsOn = (v: string) => updateFields({ dependsOn: v });
+  const setNewComment = (v: string) => updateFields({ newComment: v });
+  const setFocusedField = (v: number | ((prev: number) => number)) => {
+    if (typeof v === 'function') {
+      const newVal = v(focusedField);
+      setStoreFocusedField(newVal);
+    } else {
+      setStoreFocusedField(v);
+    }
+  };
+  const setShowDirtyPrompt = setStoreShowDiscardPrompt;
+
+  // Stub for backward compatibility with existing lifecycle effects (Part 2 will remove)
+  const initialSnapshot: FormSnapshot | null = currentDraft?.initialSnapshot
+    ? createSnapshot(currentDraft.initialSnapshot)
+    : null;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const setInitialSnapshot = (_s: FormSnapshot | null) => {
+    // No-op: dirty tracking now handled by formStackStore
+    // Part 2 will update lifecycle effects to use pushDraft/updateFields
+  };
+
+  // Initialize form draft when entering form (only if stack is empty)
+  useEffect(() => {
+    if (formStackStore.getState().stack.length > 0) return; // Already has a draft
+
+    const initialFields: FormFields = {
+      title: '',
+      type: activeType ?? types[0] ?? '',
+      status: statuses[0] ?? '',
+      iteration: currentIteration,
+      priority: 'medium',
+      assignee: '',
+      labels: '',
+      description: '',
+      parentId: '',
+      dependsOn: '',
+      newComment: '',
+    };
+
+    const draft: FormDraft = {
+      itemId: selectedWorkItemId,
+      itemTitle: selectedWorkItemId ? `#${selectedWorkItemId}` : '(new)',
+      fields: initialFields,
+      initialSnapshot: { ...initialFields },
+      focusedField: 0,
+    };
+
+    pushDraft(draft);
+  }, []); // Only on mount
+
   // Sync form fields when the existing item finishes loading
   useEffect(() => {
     if (!existingItem) return;
@@ -374,10 +436,8 @@ export function WorkItemForm() {
       .map((item) => `#${item.id} - ${item.title}`);
   }, [allItems, selectedWorkItemId]);
 
-  const [focusedField, setFocusedField] = useState(0);
   const [editing, setEditing] = useState(false);
   const [preEditValue, setPreEditValue] = useState<string>('');
-  const [showDirtyPrompt, setShowDirtyPrompt] = useState(false);
   const [pendingRelNav, setPendingRelNav] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
