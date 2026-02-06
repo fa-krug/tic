@@ -49,6 +49,28 @@ export function getTargetIds(
   return cursorItem ? [cursorItem.id] : [];
 }
 
+export function buildHelpText(availableWidth: number): string {
+  const shortcuts = [
+    { key: '↑↓', label: 'navigate' },
+    { key: '←→', label: 'expand' },
+    { key: 'enter', label: 'edit' },
+    { key: 'c', label: 'create' },
+    { key: 'd', label: 'delete' },
+    { key: '/', label: 'search' },
+    { key: ',', label: 'settings' },
+    { key: '?', label: 'help' },
+  ];
+  const sep = '  ';
+  let result = '';
+  for (const s of shortcuts) {
+    const entry = `${s.key} ${s.label}`;
+    const candidate = result ? result + sep + entry : entry;
+    if (candidate.length > availableWidth) break;
+    result = candidate;
+  }
+  return result;
+}
+
 export function WorkItemList() {
   // Backend data store - split by change frequency for minimal re-renders
 
@@ -701,13 +723,15 @@ export function WorkItemList() {
     ? activeType.charAt(0).toUpperCase() + activeType.slice(1) + 's'
     : '';
 
-  const helpText =
-    '↑↓ navigate  ←→ expand/collapse  enter edit  c create  , settings  ? help';
-
   const visibleTreeItems = useMemo(
     () => treeItems.slice(viewport.start, viewport.end),
     [treeItems, viewport.start, viewport.end],
   );
+
+  const positionText =
+    treeItems.length > viewport.maxVisible
+      ? `${cursor + 1}/${treeItems.length}`
+      : '';
 
   return (
     <Box flexDirection="column">
@@ -954,7 +978,15 @@ export function WorkItemList() {
                 {activeOverlay.targetIds.length > 1 ? 's' : ''}? (y/n)
               </Text>
             ) : (
-              <Text dimColor>{helpText}</Text>
+              <Box>
+                <Text dimColor>
+                  {buildHelpText(
+                    terminalWidth -
+                      (positionText ? positionText.length + 2 : 0),
+                  )}
+                </Text>
+                {positionText && <Text dimColor> {positionText}</Text>}
+              </Box>
             )}
           </Box>
           {warning && (
