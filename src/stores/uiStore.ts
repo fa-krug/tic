@@ -23,23 +23,29 @@ export type ActiveOverlay =
 export interface UIStoreState {
   activeOverlay: ActiveOverlay | null;
   warning: string;
+  toast: { message: string; timestamp: number } | null;
 
   openOverlay: (overlay: ActiveOverlay) => void;
   closeOverlay: () => void;
   setWarning: (msg: string) => void;
   clearWarning: () => void;
+  setToast: (msg: string) => void;
+  clearToast: () => void;
   reset: () => void;
 }
 
 export const uiStore = createStore<UIStoreState>((set) => ({
   activeOverlay: null,
   warning: '',
+  toast: null,
 
   openOverlay: (overlay) => set({ activeOverlay: overlay }),
   closeOverlay: () => set({ activeOverlay: null }),
   setWarning: (msg) => set({ warning: msg }),
   clearWarning: () => set({ warning: '' }),
-  reset: () => set({ activeOverlay: null, warning: '' }),
+  setToast: (msg) => set({ toast: { message: msg, timestamp: Date.now() } }),
+  clearToast: () => set({ toast: null }),
+  reset: () => set({ activeOverlay: null, warning: '', toast: null }),
 }));
 
 export function useUIStore<T>(selector: (state: UIStoreState) => T): T {

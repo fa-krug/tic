@@ -88,4 +88,28 @@ describe('uiStore', () => {
       templateSlug: 'bug-report',
     });
   });
+
+  it('starts with no toast', () => {
+    expect(uiStore.getState().toast).toBeNull();
+  });
+
+  it('sets toast with message and timestamp', () => {
+    uiStore.getState().setToast('Item created');
+    const toast = uiStore.getState().toast;
+    expect(toast).not.toBeNull();
+    expect(toast!.message).toBe('Item created');
+    expect(typeof toast!.timestamp).toBe('number');
+  });
+
+  it('clears toast', () => {
+    uiStore.getState().setToast('Item created');
+    uiStore.getState().clearToast();
+    expect(uiStore.getState().toast).toBeNull();
+  });
+
+  it('reset clears toast', () => {
+    uiStore.getState().setToast('test');
+    uiStore.getState().reset();
+    expect(uiStore.getState().toast).toBeNull();
+  });
 });
