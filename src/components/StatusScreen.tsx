@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
-import { useAppState } from '../app.js';
+import { useNavigationStore } from '../stores/navigationStore.js';
 import type { BackendCapabilities } from '../backends/types.js';
 import { useScrollViewport } from '../hooks/useScrollViewport.js';
 import { useBackendDataStore } from '../stores/backendDataStore.js';
@@ -20,14 +20,44 @@ function CapabilityLine({
 }
 
 export function StatusScreen() {
-  const { backend, syncManager, navigate, navigateToHelp } = useAppState();
+  const backend = useBackendDataStore((s) => s.backend);
+  const syncManager = useBackendDataStore((s) => s.syncManager);
+  const navigate = useNavigationStore((s) => s.navigate);
+  const navigateToHelp = useNavigationStore((s) => s.navigateToHelp);
 
   const capabilities: BackendCapabilities = useMemo(
-    () => backend.getCapabilities(),
+    () =>
+      backend?.getCapabilities() ?? {
+        relationships: false,
+        customTypes: false,
+        customStatuses: false,
+        iterations: false,
+        comments: false,
+        templates: false,
+        fields: {
+          priority: false,
+          assignee: false,
+          labels: false,
+          parent: false,
+          dependsOn: false,
+        },
+        templateFields: {
+          type: false,
+          status: false,
+          priority: false,
+          assignee: false,
+          labels: false,
+          iteration: false,
+          parent: false,
+          dependsOn: false,
+          description: false,
+        },
+      },
     [backend],
   );
 
-  const backendName = backend.constructor.name.replace(/Backend$/, '');
+  const backendName =
+    backend?.constructor.name.replace(/Backend$/, '') ?? 'Unknown';
 
   const syncStatus = useBackendDataStore((s) => s.syncStatus);
 
