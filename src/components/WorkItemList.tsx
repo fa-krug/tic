@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
 import Spinner from 'ink-spinner';
 
-import { useAppState } from '../app.js';
+import { useNavigationStore } from '../stores/navigationStore.js';
 import { isGitRepo } from '../git.js';
 import { beginImplementation } from '../implement.js';
 import { useConfigStore } from '../stores/configStore.js';
@@ -46,18 +46,16 @@ export function getTargetIds(
 }
 
 export function WorkItemList() {
-  const {
-    backend,
-    syncManager,
-    navigate,
-    navigateToHelp,
-    selectWorkItem,
-    activeType,
-    setActiveType,
-    setActiveTemplate,
-    setFormMode,
-    updateInfo,
-  } = useAppState();
+  const backend = useBackendDataStore((s) => s.backend);
+  const syncManager = useBackendDataStore((s) => s.syncManager);
+  const navigate = useNavigationStore((s) => s.navigate);
+  const navigateToHelp = useNavigationStore((s) => s.navigateToHelp);
+  const selectWorkItem = useNavigationStore((s) => s.selectWorkItem);
+  const activeType = useNavigationStore((s) => s.activeType);
+  const setActiveType = useNavigationStore((s) => s.setActiveType);
+  const setActiveTemplate = useNavigationStore((s) => s.setActiveTemplate);
+  const setFormMode = useNavigationStore((s) => s.setFormMode);
+  const updateInfo = useNavigationStore((s) => s.updateInfo);
   const defaultType = useConfigStore((s) => s.config.defaultType ?? null);
   const branchMode = useConfigStore((s) => s.config.branchMode ?? 'worktree');
   const { exit } = useApp();
@@ -94,7 +92,7 @@ export function WorkItemList() {
   }, []);
 
   useEffect(() => {
-    if (capabilities.templates) {
+    if (capabilities.templates && backend) {
       void backend.listTemplates().then(setTemplates);
     }
   }, [backend, capabilities.templates]);
@@ -184,7 +182,7 @@ export function WorkItemList() {
   }, [treeItems.length]);
 
   useEffect(() => {
-    if (activeOverlay?.type !== 'search') return;
+    if (activeOverlay?.type !== 'search' || !backend) return;
     let cancelled = false;
     void backend.listWorkItems().then((items) => {
       if (!cancelled) setAllSearchItems(items);
@@ -223,6 +221,7 @@ export function WorkItemList() {
       if (activeOverlay?.type !== 'delete-confirm') return;
       if (input === 'y' || input === 'Y') {
         const targetIds = activeOverlay.targetIds;
+        if (!backend) return;
         void (async () => {
           for (const id of targetIds) {
             await backend.cachedDeleteWorkItem(id);
@@ -349,7 +348,7 @@ export function WorkItemList() {
         }
       }
 
-      if (input === 'o' && treeItems.length > 0) {
+      if (input === 'o' && treeItems.length > 0 && backend) {
         void (async () => {
           await backend.openItem(treeItems[cursor]!.item.id);
           refreshData();
@@ -529,7 +528,7 @@ export function WorkItemList() {
         }
         break;
       case 'open':
-        if (treeItems[cursor]) {
+        if (treeItems[cursor] && backend) {
           void (async () => {
             await backend.openItem(treeItems[cursor]!.item.id);
             refreshData();
@@ -723,6 +722,7 @@ export function WorkItemList() {
               onSelect={(status) => {
                 const targetIds = getOverlayTargetIds();
                 closeOverlay();
+                if (!backend) return;
                 void (async () => {
                   for (const id of targetIds) {
                     await backend.cachedUpdateWorkItem(id, { status });
@@ -740,6 +740,7 @@ export function WorkItemList() {
               onSelect={(type) => {
                 const targetIds = getOverlayTargetIds();
                 closeOverlay();
+                if (!backend) return;
                 void (async () => {
                   for (const id of targetIds) {
                     await backend.cachedUpdateWorkItem(id, { type });
@@ -756,6 +757,7 @@ export function WorkItemList() {
               onSelect={(priority) => {
                 const targetIds = getOverlayTargetIds();
                 closeOverlay();
+                if (!backend) return;
                 void (async () => {
                   for (const id of targetIds) {
                     await backend.cachedUpdateWorkItem(id, { priority });
@@ -854,6 +856,7 @@ export function WorkItemList() {
                   suggestions={parentSuggestions}
                   onSubmit={() => {
                     const targetIds = getOverlayTargetIds();
+                    if (!backend) return;
                     void (async () => {
                       const raw = parentInput.trim();
                       const newParent =
@@ -896,6 +899,7 @@ export function WorkItemList() {
                   onSubmit={() => {
                     const targetIds = getOverlayTargetIds();
                     closeOverlay();
+                    if (!backend) return;
                     void (async () => {
                       const assignee = assigneeInput.trim();
                       for (const id of targetIds) {
@@ -923,6 +927,7 @@ export function WorkItemList() {
                   onSubmit={() => {
                     const targetIds = getOverlayTargetIds();
                     closeOverlay();
+                    if (!backend) return;
                     void (async () => {
                       const labels = labelsInput
                         .split(',')

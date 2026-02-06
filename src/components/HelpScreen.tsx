@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
-import { useAppState } from '../app.js';
-import type { Screen } from '../app.js';
+import { useNavigationStore, type Screen } from '../stores/navigationStore.js';
+import { useBackendDataStore } from '../stores/backendDataStore.js';
 import { isGitRepo } from '../git.js';
 import type { BackendCapabilities } from '../backends/types.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
@@ -223,8 +223,37 @@ export function flattenGroups(groups: ShortcutGroup[]): LineEntry[] {
 }
 
 export function HelpScreen({ sourceScreen }: { sourceScreen: Screen }) {
-  const { backend, syncManager, navigateBackFromHelp } = useAppState();
-  const capabilities = backend.getCapabilities();
+  const backend = useBackendDataStore((s) => s.backend);
+  const syncManager = useBackendDataStore((s) => s.syncManager);
+  const navigateBackFromHelp = useNavigationStore(
+    (s) => s.navigateBackFromHelp,
+  );
+  const capabilities = backend?.getCapabilities() ?? {
+    relationships: false,
+    customTypes: false,
+    customStatuses: false,
+    iterations: false,
+    comments: false,
+    templates: false,
+    fields: {
+      priority: false,
+      assignee: false,
+      labels: false,
+      parent: false,
+      dependsOn: false,
+    },
+    templateFields: {
+      type: false,
+      status: false,
+      priority: false,
+      assignee: false,
+      labels: false,
+      iteration: false,
+      parent: false,
+      dependsOn: false,
+      description: false,
+    },
+  };
   const gitAvailable = useMemo(() => isGitRepo(process.cwd()), []);
   const { height } = useTerminalSize();
 

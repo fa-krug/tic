@@ -4,7 +4,7 @@ import TextInput from 'ink-text-input';
 import SelectInput from 'ink-select-input';
 import { AutocompleteInput } from './AutocompleteInput.js';
 import { MultiAutocompleteInput } from './MultiAutocompleteInput.js';
-import { useAppState } from '../app.js';
+import { useNavigationStore } from '../stores/navigationStore.js';
 import type { Comment, WorkItem, Template } from '../types.js';
 import { SyncQueueStore } from '../sync/queue.js';
 import type { QueueAction } from '../sync/types.js';
@@ -38,22 +38,22 @@ const SELECT_FIELDS: FieldName[] = ['type', 'status', 'iteration', 'priority'];
 const PRIORITIES = ['low', 'medium', 'high', 'critical'];
 
 export function WorkItemForm() {
-  const {
-    backend,
-    syncManager,
-    navigate,
-    navigateToHelp,
-    selectedWorkItemId,
-    activeType,
-    activeTemplate,
-    setActiveTemplate,
-    formMode,
-    setFormMode,
-    editingTemplateSlug,
-    setEditingTemplateSlug,
-    pushWorkItem,
-    popWorkItem,
-  } = useAppState();
+  const backend = useBackendDataStore((s) => s.backend);
+  const syncManager = useBackendDataStore((s) => s.syncManager);
+  const navigate = useNavigationStore((s) => s.navigate);
+  const navigateToHelp = useNavigationStore((s) => s.navigateToHelp);
+  const selectedWorkItemId = useNavigationStore((s) => s.selectedWorkItemId);
+  const activeType = useNavigationStore((s) => s.activeType);
+  const activeTemplate = useNavigationStore((s) => s.activeTemplate);
+  const setActiveTemplate = useNavigationStore((s) => s.setActiveTemplate);
+  const formMode = useNavigationStore((s) => s.formMode);
+  const setFormMode = useNavigationStore((s) => s.setFormMode);
+  const editingTemplateSlug = useNavigationStore((s) => s.editingTemplateSlug);
+  const setEditingTemplateSlug = useNavigationStore(
+    (s) => s.setEditingTemplateSlug,
+  );
+  const pushWorkItem = useNavigationStore((s) => s.pushWorkItem);
+  const popWorkItem = useNavigationStore((s) => s.popWorkItem);
 
   const queueStore = useMemo(() => {
     if (!syncManager) return null;
@@ -102,6 +102,10 @@ export function WorkItemForm() {
       setChildren([]);
       setDependents([]);
       setParentItem(null);
+      setItemLoading(false);
+      return;
+    }
+    if (!backend) {
       setItemLoading(false);
       return;
     }
@@ -329,7 +333,7 @@ export function WorkItemForm() {
 
   // Load existing template for editing
   useEffect(() => {
-    if (formMode !== 'template' || !editingTemplateSlug) return;
+    if (formMode !== 'template' || !editingTemplateSlug || !backend) return;
     let cancelled = false;
     void backend.getTemplate(editingTemplateSlug).then((t) => {
       if (cancelled) return;
@@ -390,6 +394,8 @@ export function WorkItemForm() {
     currentField?.startsWith('rel-dependent-');
 
   async function save() {
+    if (!backend) return;
+
     const parsedLabels = labels
       .split(',')
       .map((l) => l.trim())

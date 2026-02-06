@@ -47,6 +47,10 @@ export interface BackendDataStoreState {
   error: string | null;
   syncStatus: SyncStatus | null;
 
+  // Backend references
+  backend: Backend | null;
+  syncManager: SyncManager | null;
+
   init(backend: Backend, syncManager?: SyncManager | null): Promise<void>;
   refresh(): Promise<void>;
   setSyncStatus(status: SyncStatus): void;
@@ -73,13 +77,16 @@ export const backendDataStore = createStore<BackendDataStoreState>(
     error: null,
     syncStatus: null,
 
+    backend: null,
+    syncManager: null,
+
     async init(backend: Backend, syncManager?: SyncManager | null) {
       get().destroy();
 
       currentBackend = backend;
       currentSyncManager = syncManager ?? null;
 
-      set({ loading: true });
+      set({ backend, syncManager: syncManager ?? null, loading: true });
 
       if (currentSyncManager) {
         currentSyncManager.onStatusChange((status: SyncStatus) => {
@@ -145,6 +152,8 @@ export const backendDataStore = createStore<BackendDataStoreState>(
         loading: false,
         error: null,
         syncStatus: null,
+        backend: null,
+        syncManager: null,
       });
     },
   }),
