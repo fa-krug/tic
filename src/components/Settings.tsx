@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
-import { useAppState } from '../app.js';
+import { useNavigationStore } from '../stores/navigationStore.js';
+import { useBackendDataStore } from '../stores/backendDataStore.js';
 import { useConfigStore, configStore } from '../stores/configStore.js';
 import { uiStore, useUIStore } from '../stores/uiStore.js';
 import { VALID_BACKENDS } from '../backends/factory.js';
@@ -34,15 +35,15 @@ const JIRA_FIELDS = ['site', 'project', 'boardId'] as const;
 type AvailabilityStatus = 'checking' | 'available' | 'unavailable';
 
 export function Settings() {
-  const {
-    navigate,
-    navigateToHelp,
-    backend,
-    syncManager,
-    setFormMode,
-    setEditingTemplateSlug,
-    selectWorkItem,
-  } = useAppState();
+  const backend = useBackendDataStore((s) => s.backend);
+  const syncManager = useBackendDataStore((s) => s.syncManager);
+  const navigate = useNavigationStore((s) => s.navigate);
+  const navigateToHelp = useNavigationStore((s) => s.navigateToHelp);
+  const setFormMode = useNavigationStore((s) => s.setFormMode);
+  const setEditingTemplateSlug = useNavigationStore(
+    (s) => s.setEditingTemplateSlug,
+  );
+  const selectWorkItem = useNavigationStore((s) => s.selectWorkItem);
   const root = process.cwd();
 
   const queueStore = useMemo(() => {
@@ -76,7 +77,32 @@ export function Settings() {
     jira: 'available',
   });
 
-  const capabilities = backend.getCapabilities();
+  const capabilities = backend?.getCapabilities() ?? {
+    relationships: false,
+    customTypes: false,
+    customStatuses: false,
+    iterations: false,
+    comments: false,
+    templates: false,
+    fields: {
+      priority: false,
+      assignee: false,
+      labels: false,
+      parent: false,
+      dependsOn: false,
+    },
+    templateFields: {
+      type: false,
+      status: false,
+      priority: false,
+      assignee: false,
+      labels: false,
+      iteration: false,
+      parent: false,
+      dependsOn: false,
+      description: false,
+    },
+  };
 
   useEffect(() => {
     void checkAllBackendAvailability().then((results) => {
@@ -92,7 +118,7 @@ export function Settings() {
   }, []);
 
   useEffect(() => {
-    if (capabilities.templates) {
+    if (capabilities.templates && backend) {
       void backend.listTemplates().then(setTemplates);
     }
   }, [backend, capabilities.templates]);
@@ -188,6 +214,7 @@ export function Settings() {
       if (activeOverlay?.type !== 'delete-template-confirm') return;
       if (input === 'y' || input === 'Y') {
         const slug = activeOverlay.templateSlug;
+        if (!backend) return;
         void backend.deleteTemplate(slug).then(async () => {
           setTemplates((prev) => prev.filter((t) => t.slug !== slug));
           if (queueStore) {
