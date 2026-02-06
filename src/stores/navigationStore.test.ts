@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { navigationStore } from './navigationStore.js';
 import { uiStore } from './uiStore.js';
+import { formStackStore } from './formStackStore.js';
 
 beforeEach(() => {
   navigationStore.getState().reset();
   uiStore.getState().reset();
+  formStackStore.getState().clear();
 });
 
 describe('navigationStore', () => {
@@ -33,6 +35,79 @@ describe('navigationStore', () => {
       navigationStore.setState({ navigationStack: ['item-1'] });
       navigationStore.getState().navigate('form');
       expect(navigationStore.getState().navigationStack).toEqual(['item-1']);
+    });
+
+    it('clears form stack when navigating away from form', () => {
+      formStackStore.getState().push({
+        itemId: 'item-1',
+        itemTitle: 'Test',
+        fields: {
+          title: 'Test',
+          type: 'task',
+          status: 'open',
+          iteration: '',
+          priority: '',
+          assignee: '',
+          labels: '',
+          description: '',
+          parentId: '',
+          dependsOn: '',
+          newComment: '',
+        },
+        initialSnapshot: {
+          title: 'Test',
+          type: 'task',
+          status: 'open',
+          iteration: '',
+          priority: '',
+          assignee: '',
+          labels: '',
+          description: '',
+          parentId: '',
+          dependsOn: '',
+          newComment: '',
+        },
+        focusedField: 0,
+      });
+      navigationStore.setState({ screen: 'form' });
+      navigationStore.getState().navigate('list');
+      expect(formStackStore.getState().stack).toHaveLength(0);
+    });
+
+    it('preserves form stack when navigating to form', () => {
+      formStackStore.getState().push({
+        itemId: 'item-1',
+        itemTitle: 'Test',
+        fields: {
+          title: 'Test',
+          type: 'task',
+          status: 'open',
+          iteration: '',
+          priority: '',
+          assignee: '',
+          labels: '',
+          description: '',
+          parentId: '',
+          dependsOn: '',
+          newComment: '',
+        },
+        initialSnapshot: {
+          title: 'Test',
+          type: 'task',
+          status: 'open',
+          iteration: '',
+          priority: '',
+          assignee: '',
+          labels: '',
+          description: '',
+          parentId: '',
+          dependsOn: '',
+          newComment: '',
+        },
+        focusedField: 0,
+      });
+      navigationStore.getState().navigate('form');
+      expect(formStackStore.getState().stack).toHaveLength(1);
     });
   });
 

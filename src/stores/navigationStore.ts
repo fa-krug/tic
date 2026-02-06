@@ -3,6 +3,7 @@ import { useStore } from 'zustand';
 import type { Template } from '../types.js';
 import type { UpdateInfo } from '../update-checker.js';
 import { uiStore } from './uiStore.js';
+import { formStackStore } from './formStackStore.js';
 
 export type Screen =
   | 'list'
@@ -64,6 +65,9 @@ const createNavigationStore = () =>
     navigate: (newScreen: Screen) => {
       uiStore.getState().reset();
       const clearStack = newScreen !== 'form';
+      if (clearStack) {
+        formStackStore.getState().clear();
+      }
       set((state) => ({
         screen: newScreen,
         navigationStack: clearStack ? [] : state.navigationStack,
