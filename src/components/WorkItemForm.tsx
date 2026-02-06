@@ -18,7 +18,6 @@ import { useScrollViewport } from '../hooks/useScrollViewport.js';
 import { useBackendDataStore } from '../stores/backendDataStore.js';
 import { openInEditor } from '../editor.js';
 import { slugifyTemplateName } from '../backends/local/templates.js';
-import { createSnapshot, type FormSnapshot } from './formSnapshot.js';
 
 type FieldName =
   | 'title'
@@ -249,16 +248,6 @@ export function WorkItemForm() {
   };
   const setShowDirtyPrompt = setStoreShowDiscardPrompt;
 
-  // Stub for backward compatibility with existing lifecycle effects (Part 2 will remove)
-  const initialSnapshot: FormSnapshot | null = currentDraft?.initialSnapshot
-    ? createSnapshot(currentDraft.initialSnapshot)
-    : null;
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const setInitialSnapshot = (_s: FormSnapshot | null) => {
-    // No-op: dirty tracking now handled by formStackStore
-    // Part 2 will update lifecycle effects to use pushDraft/updateFields
-  };
-
   // Initialize form draft when entering form (only if stack is empty)
   useEffect(() => {
     if (formStackStore.getState().stack.length > 0) return; // Already has a draft
@@ -291,15 +280,10 @@ export function WorkItemForm() {
   // Sync form fields when the existing item finishes loading
   useEffect(() => {
     if (!existingItem) return;
-    setTitle(existingItem.title);
-    setType(existingItem.type);
-    setStatus(existingItem.status);
-    setIteration(existingItem.iteration);
-    setPriority(existingItem.priority ?? 'medium');
-    setAssignee(existingItem.assignee ?? '');
-    setLabels(existingItem.labels.join(', '));
-    setDescription(existingItem.description ?? '');
-    setParentId(
+    setComments(existingItem.comments ?? []);
+
+    // Build field values
+    const parentIdValue =
       existingItem.parent !== null && existingItem.parent !== undefined
         ? (() => {
             const pi = allItems.find((i) => i.id === existingItem.parent);
@@ -307,47 +291,43 @@ export function WorkItemForm() {
               ? `#${existingItem.parent} - ${pi.title}`
               : String(existingItem.parent);
           })()
-        : '',
-    );
-    setDependsOn(
+        : '';
+    const dependsOnValue =
       existingItem.dependsOn
         ?.map((depId) => {
           const depItem = allItems.find((i) => i.id === depId);
           return depItem ? `#${depId} - ${depItem.title}` : depId;
         })
-        .join(', ') ?? '',
-    );
-    setComments(existingItem.comments ?? []);
-    setInitialSnapshot(
-      createSnapshot({
-        title: existingItem.title,
-        type: existingItem.type,
-        status: existingItem.status,
-        iteration: existingItem.iteration,
-        priority: existingItem.priority ?? 'medium',
-        assignee: existingItem.assignee ?? '',
-        labels: existingItem.labels.join(', '),
-        description: existingItem.description ?? '',
-        parentId:
-          existingItem.parent !== null && existingItem.parent !== undefined
-            ? (() => {
-                const pi = allItems.find((i) => i.id === existingItem.parent);
-                return pi
-                  ? `#${existingItem.parent} - ${pi.title}`
-                  : String(existingItem.parent);
-              })()
-            : '',
-        dependsOn:
-          existingItem.dependsOn
-            ?.map((depId) => {
-              const depItem = allItems.find((i) => i.id === depId);
-              return depItem ? `#${depId} - ${depItem.title}` : depId;
-            })
-            .join(', ') ?? '',
-        newComment: '',
-      }),
-    );
-  }, [existingItem]);
+        .join(', ') ?? '';
+
+    const newFields: FormFields = {
+      title: existingItem.title,
+      type: existingItem.type,
+      status: existingItem.status,
+      iteration: existingItem.iteration,
+      priority: existingItem.priority ?? 'medium',
+      assignee: existingItem.assignee ?? '',
+      labels: existingItem.labels.join(', '),
+      description: existingItem.description ?? '',
+      parentId: parentIdValue,
+      dependsOn: dependsOnValue,
+      newComment: '',
+    };
+
+    // Update both fields and initialSnapshot in the store
+    formStackStore.setState((state) => {
+      if (state.stack.length === 0) return state;
+      const updated = [...state.stack];
+      const current = updated[updated.length - 1]!;
+      updated[updated.length - 1] = {
+        ...current,
+        itemTitle: existingItem.title,
+        fields: newFields,
+        initialSnapshot: { ...newFields },
+      };
+      return { stack: updated };
+    });
+  }, [existingItem, allItems]);
 
   // Prefill from template (create mode only)
   useEffect(() => {
@@ -368,62 +348,40 @@ export function WorkItemForm() {
       setDependsOn(activeTemplate.dependsOn.join(', '));
   }, [activeTemplate, selectedWorkItemId]);
 
-  // Capture initial snapshot for new items once config finishes loading
-  useEffect(() => {
-    if (
-      selectedWorkItemId !== null ||
-      configLoading ||
-      initialSnapshot !== null
-    )
-      return;
-    setInitialSnapshot(
-      createSnapshot({
-        title,
-        type,
-        status,
-        iteration,
-        priority,
-        assignee,
-        labels,
-        description,
-        parentId,
-        dependsOn,
-        newComment,
-      }),
-    );
-  }, [selectedWorkItemId, configLoading]);
-
   // Load existing template for editing
   useEffect(() => {
     if (formMode !== 'template' || !editingTemplateSlug || !backend) return;
     let cancelled = false;
     void backend.getTemplate(editingTemplateSlug).then((t) => {
       if (cancelled) return;
-      setTitle(t.name);
-      if (t.type != null) setType(t.type);
-      if (t.status != null) setStatus(t.status);
-      if (t.priority != null) setPriority(t.priority);
-      if (t.assignee != null) setAssignee(t.assignee);
-      if (t.labels != null) setLabels(t.labels.join(', '));
-      if (t.iteration != null) setIteration(t.iteration);
-      if (t.description != null) setDescription(t.description);
-      if (t.parent != null) setParentId(String(t.parent));
-      if (t.dependsOn != null) setDependsOn(t.dependsOn.join(', '));
-      setInitialSnapshot(
-        createSnapshot({
-          title: t.name,
-          type: t.type ?? type,
-          status: t.status ?? status,
-          iteration: t.iteration ?? iteration,
-          priority: t.priority ?? priority,
-          assignee: t.assignee ?? assignee,
-          labels: t.labels != null ? t.labels.join(', ') : labels,
-          description: t.description ?? description,
-          parentId: t.parent != null ? String(t.parent) : parentId,
-          dependsOn: t.dependsOn != null ? t.dependsOn.join(', ') : dependsOn,
-          newComment: '',
-        }),
-      );
+
+      const newFields: FormFields = {
+        title: t.name,
+        type: t.type ?? type,
+        status: t.status ?? status,
+        iteration: t.iteration ?? iteration,
+        priority: t.priority ?? priority,
+        assignee: t.assignee ?? assignee,
+        labels: t.labels != null ? t.labels.join(', ') : labels,
+        description: t.description ?? description,
+        parentId: t.parent != null ? String(t.parent) : parentId,
+        dependsOn: t.dependsOn != null ? t.dependsOn.join(', ') : dependsOn,
+        newComment: '',
+      };
+
+      // Update both fields and initialSnapshot in the store
+      formStackStore.setState((state) => {
+        if (state.stack.length === 0) return state;
+        const updated = [...state.stack];
+        const current = updated[updated.length - 1]!;
+        updated[updated.length - 1] = {
+          ...current,
+          itemTitle: t.name,
+          fields: newFields,
+          initialSnapshot: { ...newFields },
+        };
+        return { stack: updated };
+      });
     });
     return () => {
       cancelled = true;
@@ -561,21 +519,24 @@ export function WorkItemForm() {
       setActiveTemplate(null);
     }
 
-    setInitialSnapshot(
-      createSnapshot({
-        title,
-        type,
-        status,
-        iteration,
-        priority,
-        assignee,
-        labels,
-        description,
-        parentId,
-        dependsOn,
-        newComment: '',
-      }),
-    );
+    // Update the initialSnapshot after saving so isDirty becomes false
+    formStackStore.setState((state) => {
+      if (state.stack.length === 0) return state;
+      const updated = [...state.stack];
+      const current = updated[updated.length - 1]!;
+      updated[updated.length - 1] = {
+        ...current,
+        initialSnapshot: {
+          ...current.fields,
+          newComment: '', // Comment was saved, reset
+        },
+        fields: {
+          ...current.fields,
+          newComment: '', // Clear after save
+        },
+      };
+      return { stack: updated };
+    });
   }
 
   useInput(
@@ -586,13 +547,38 @@ export function WorkItemForm() {
           void (async () => {
             await save();
             if (pendingRelNav) {
+              // Push a new draft for the target item
+              const targetItem = allItems.find((i) => i.id === pendingRelNav);
+              const defaultFields: FormFields = {
+                title: '',
+                type: activeType ?? types[0] ?? '',
+                status: statuses[0] ?? '',
+                iteration: currentIteration,
+                priority: 'medium',
+                assignee: '',
+                labels: '',
+                description: '',
+                parentId: '',
+                dependsOn: '',
+                newComment: '',
+              };
+              const newDraft: FormDraft = {
+                itemId: pendingRelNav,
+                itemTitle: targetItem?.title ?? `#${pendingRelNav}`,
+                fields: defaultFields,
+                initialSnapshot: { ...defaultFields },
+                focusedField: 0,
+              };
+              pushDraft(newDraft);
               pushWorkItem(pendingRelNav);
               setPendingRelNav(null);
             } else if (formMode === 'template') {
+              formStackStore.getState().pop();
               setFormMode('item');
               setEditingTemplateSlug(null);
               navigate('settings');
             } else {
+              formStackStore.getState().pop();
               const prev = popWorkItem();
               if (prev === null) navigate('list');
             }
@@ -603,13 +589,39 @@ export function WorkItemForm() {
         if (_input === 'd') {
           // Discard: navigate back without saving
           if (pendingRelNav) {
+            // Push a new draft for the target item (discarding current)
+            formStackStore.getState().pop();
+            const targetItem = allItems.find((i) => i.id === pendingRelNav);
+            const defaultFields: FormFields = {
+              title: '',
+              type: activeType ?? types[0] ?? '',
+              status: statuses[0] ?? '',
+              iteration: currentIteration,
+              priority: 'medium',
+              assignee: '',
+              labels: '',
+              description: '',
+              parentId: '',
+              dependsOn: '',
+              newComment: '',
+            };
+            const newDraft: FormDraft = {
+              itemId: pendingRelNav,
+              itemTitle: targetItem?.title ?? `#${pendingRelNav}`,
+              fields: defaultFields,
+              initialSnapshot: { ...defaultFields },
+              focusedField: 0,
+            };
+            pushDraft(newDraft);
             pushWorkItem(pendingRelNav);
             setPendingRelNav(null);
           } else if (formMode === 'template') {
+            formStackStore.getState().pop();
             setFormMode('item');
             setEditingTemplateSlug(null);
             navigate('settings');
           } else {
+            formStackStore.getState().pop();
             const prev = popWorkItem();
             if (prev === null) navigate('list');
           }
@@ -629,6 +641,7 @@ export function WorkItemForm() {
       if (key.escape && !editing) {
         if (configLoading || itemLoading || saving) {
           // Allow escape even while loading (no save)
+          formStackStore.getState().pop();
           if (formMode === 'template') {
             setFormMode('item');
             setEditingTemplateSlug(null);
@@ -644,6 +657,7 @@ export function WorkItemForm() {
           return;
         }
         // Clean — just go back
+        formStackStore.getState().pop();
         if (formMode === 'template') {
           setFormMode('item');
           setEditingTemplateSlug(null);
@@ -667,6 +681,7 @@ export function WorkItemForm() {
           setSaving(true);
           void (async () => {
             await save();
+            formStackStore.getState().pop();
             if (formMode === 'template') {
               setFormMode('item');
               setEditingTemplateSlug(null);
@@ -702,6 +717,29 @@ export function WorkItemForm() {
                 setPendingRelNav(targetId);
                 setShowDirtyPrompt(true);
               } else {
+                // Create new draft for target item before navigating
+                const targetItem = allItems.find((i) => i.id === targetId);
+                const defaultFields: FormFields = {
+                  title: '',
+                  type: activeType ?? types[0] ?? '',
+                  status: statuses[0] ?? '',
+                  iteration: currentIteration,
+                  priority: 'medium',
+                  assignee: '',
+                  labels: '',
+                  description: '',
+                  parentId: '',
+                  dependsOn: '',
+                  newComment: '',
+                };
+                const newDraft: FormDraft = {
+                  itemId: targetId,
+                  itemTitle: targetItem?.title ?? `#${targetId}`,
+                  fields: defaultFields,
+                  initialSnapshot: { ...defaultFields },
+                  focusedField: 0,
+                };
+                pushDraft(newDraft);
                 pushWorkItem(targetId);
               }
             }
