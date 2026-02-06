@@ -33,14 +33,10 @@ export const configStore = createStore<ConfigStoreState>((set, get) => ({
   loaded: false,
 
   async init(root: string) {
-    // Clean up any existing watcher from a prior init
     get().destroy();
-
     currentRoot = root;
     const config = await readConfig(root);
     set({ config, loaded: true });
-
-    get().startWatching();
   },
 
   startWatching() {

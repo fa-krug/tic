@@ -157,6 +157,7 @@ export const backendDataStore = createStore<BackendDataStoreState>(
         })
         .then(() => {
           if (generation !== initGeneration) return;
+          configStore.getState().startWatching();
           set({ loaded: true, loading: false });
         })
         .catch((err: unknown) => {

@@ -60,6 +60,7 @@ describe('configStore', () => {
 
   it('picks up external file changes', async () => {
     await configStore.getState().init(tmpDir);
+    configStore.getState().startWatching();
     await writeConfig(tmpDir, {
       ...configStore.getState().config,
       next_id: 99,
@@ -70,6 +71,7 @@ describe('configStore', () => {
 
   it('does not double-trigger on self-writes', async () => {
     await configStore.getState().init(tmpDir);
+    configStore.getState().startWatching();
     let changeCount = 0;
     const unsub = configStore.subscribe(() => {
       changeCount++;
@@ -82,6 +84,7 @@ describe('configStore', () => {
 
   it('destroy stops the file watcher', async () => {
     await configStore.getState().init(tmpDir);
+    configStore.getState().startWatching();
     configStore.getState().destroy();
     await writeConfig(tmpDir, {
       ...configStore.getState().config,
