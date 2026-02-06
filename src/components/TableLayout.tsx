@@ -56,9 +56,10 @@ function computeColumnWidths(
   }, 6); // min 6 for "Status" header
   const status = maxStatusLen;
 
-  // Available space after marker, ID, status gap, and minimum title
+  // Available space after marker, ID, title margin, status, status margin,
+  // and minimum title width
   let available =
-    terminalWidth - MARKER_WIDTH - id - status - gap - TITLE_MIN_WIDTH;
+    terminalWidth - MARKER_WIDTH - id - gap - status - gap - TITLE_MIN_WIDTH;
 
   // Priority — try to fit
   let showPriority = false;
