@@ -704,7 +704,10 @@ export function WorkItemList() {
   const helpText =
     '↑↓ navigate  ←→ expand/collapse  enter edit  c create  , settings  ? help';
 
-  const visibleTreeItems = treeItems.slice(viewport.start, viewport.end);
+  const visibleTreeItems = useMemo(
+    () => treeItems.slice(viewport.start, viewport.end),
+    [treeItems, viewport.start, viewport.end],
+  );
 
   return (
     <Box flexDirection="column">
