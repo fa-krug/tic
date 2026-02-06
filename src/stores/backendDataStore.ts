@@ -4,6 +4,7 @@ import type { Backend, BackendCapabilities } from '../backends/types.js';
 import type { WorkItem } from '../types.js';
 import type { SyncStatus } from '../sync/types.js';
 import type { SyncManager } from '../sync/SyncManager.js';
+import { configStore } from './configStore.js';
 
 export const defaultCapabilities: BackendCapabilities = {
   relationships: false,
@@ -51,7 +52,7 @@ export interface BackendDataStoreState {
   backend: Backend | null;
   syncManager: SyncManager | null;
 
-  init(backend: Backend, syncManager?: SyncManager | null): void;
+  init(cwd: string): void;
   refresh(): Promise<void>;
   setSyncStatus(status: SyncStatus): void;
   destroy(): void;
@@ -59,7 +60,57 @@ export interface BackendDataStoreState {
 
 // Module-level references (not reactive state)
 let currentBackend: Backend | null = null;
-let currentSyncManager: SyncManager | null = null;
+let initGeneration = 0;
+
+async function createBackendAndSync(cwd: string): Promise<{
+  backend: Backend;
+  syncManager: SyncManager | null;
+}> {
+  const { LocalBackend } = await import('../backends/local/index.js');
+  const backendType = configStore.getState().config.backend ?? 'local';
+
+  const local = await LocalBackend.create(cwd, {
+    tempIds: backendType !== 'local',
+  });
+
+  if (backendType === 'local') {
+    return { backend: local, syncManager: null };
+  }
+
+  // Dynamic import of remote backend — this is the expensive part
+  let remote: Backend;
+  switch (backendType) {
+    case 'github': {
+      const { GitHubBackend } = await import('../backends/github/index.js');
+      remote = new GitHubBackend(cwd);
+      break;
+    }
+    case 'gitlab': {
+      const { GitLabBackend } = await import('../backends/gitlab/index.js');
+      remote = new GitLabBackend(cwd);
+      break;
+    }
+    case 'azure': {
+      const { AzureDevOpsBackend } = await import('../backends/ado/index.js');
+      remote = new AzureDevOpsBackend(cwd);
+      break;
+    }
+    case 'jira': {
+      const { JiraBackend } = await import('../backends/jira/index.js');
+      remote = await JiraBackend.create(cwd);
+      break;
+    }
+    default:
+      throw new Error(`Unknown backend "${backendType}"`);
+  }
+
+  const { SyncQueueStore } = await import('../sync/queue.js');
+  const { SyncManager } = await import('../sync/SyncManager.js');
+  const queueStore = new SyncQueueStore(cwd);
+  const syncManager = new SyncManager(local, remote, queueStore);
+
+  return { backend: local, syncManager };
+}
 
 export const backendDataStore = createStore<BackendDataStoreState>(
   (set, get) => ({
@@ -80,29 +131,42 @@ export const backendDataStore = createStore<BackendDataStoreState>(
     backend: null,
     syncManager: null,
 
-    init(backend: Backend, syncManager?: SyncManager | null) {
+    init(cwd: string) {
       get().destroy();
+      const generation = ++initGeneration;
+      set({ loading: true });
 
-      currentBackend = backend;
-      currentSyncManager = syncManager ?? null;
+      void createBackendAndSync(cwd)
+        .then(({ backend, syncManager }) => {
+          if (generation !== initGeneration) return;
+          currentBackend = backend;
+          set({ backend, syncManager });
 
-      // Set backend refs and loading state immediately - UI can render
-      set({ backend, syncManager: syncManager ?? null, loading: true });
-
-      if (currentSyncManager) {
-        currentSyncManager.onStatusChange((status: SyncStatus) => {
-          get().setSyncStatus(status);
-          if (status.state === 'idle') {
-            void get().refresh();
+          if (syncManager) {
+            syncManager.onStatusChange((status: SyncStatus) => {
+              if (generation !== initGeneration) return;
+              get().setSyncStatus(status);
+              if (status.state === 'idle') {
+                void get().refresh();
+              }
+            });
+            syncManager.sync().catch(() => {});
           }
-        });
-      }
 
-      // Start loading data in background - don't block UI render
-      void get()
-        .refresh()
-        .finally(() => {
+          return get().refresh();
+        })
+        .then(() => {
+          if (generation !== initGeneration) return;
+          configStore.getState().startWatching();
           set({ loaded: true, loading: false });
+        })
+        .catch((err: unknown) => {
+          if (generation !== initGeneration) return;
+          set({
+            error: err instanceof Error ? err.message : String(err),
+            loaded: true,
+            loading: false,
+          });
         });
     },
 
@@ -142,8 +206,8 @@ export const backendDataStore = createStore<BackendDataStoreState>(
     },
 
     destroy() {
+      ++initGeneration;
       currentBackend = null;
-      currentSyncManager = null;
       set({
         items: [],
         capabilities: { ...defaultCapabilities },

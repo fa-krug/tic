@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createStore } from 'zustand/vanilla';
 import { useStore } from 'zustand';
+import yaml from 'yaml';
 import {
   type Config,
   defaultConfig,
@@ -13,6 +14,7 @@ export interface ConfigStoreState {
   config: Config;
   loaded: boolean;
   init(root: string): Promise<void>;
+  startWatching(): void;
   update(partial: Partial<Config>): Promise<void>;
   destroy(): void;
 }
@@ -31,22 +33,25 @@ export const configStore = createStore<ConfigStoreState>((set, get) => ({
   loaded: false,
 
   async init(root: string) {
-    // Clean up any existing watcher from a prior init
     get().destroy();
-
     currentRoot = root;
     const config = await readConfig(root);
     set({ config, loaded: true });
+  },
+
+  startWatching() {
+    if (watcher) return; // Already watching
+    if (!currentRoot) return;
 
     // Ensure .tic dir exists before watching
-    const ticDir = path.join(root, '.tic');
+    const ticDir = path.join(currentRoot, '.tic');
     fs.mkdirSync(ticDir, { recursive: true });
 
     const configPath = path.join(ticDir, 'config.yml');
 
     // Ensure the config file exists so fs.watch doesn't error
     if (!fs.existsSync(configPath)) {
-      await writeConfig(root, config);
+      fs.writeFileSync(configPath, yaml.stringify(get().config));
     }
 
     watcher = fs.watch(configPath, () => {
