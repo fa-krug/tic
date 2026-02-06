@@ -11,7 +11,6 @@ import { beginImplementation } from '../implement.js';
 import { useConfigStore } from '../stores/configStore.js';
 import { uiStore, useUIStore, getOverlayTargetIds } from '../stores/uiStore.js';
 import { TableLayout } from './TableLayout.js';
-import { CardLayout } from './CardLayout.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { useScrollViewport } from '../hooks/useScrollViewport.js';
 import {
@@ -276,12 +275,11 @@ export function WorkItemList() {
     };
   }, [activeOverlay?.type, backend]);
 
-  const isCardMode = terminalWidth < 80;
   const viewport = useScrollViewport({
     totalItems: treeItems.length,
     cursor,
     chromeLines: 6, // title+margin (2) + table header (1) + help bar margin+text (2) + warning (1)
-    linesPerItem: isCardMode ? 3 : 1,
+    linesPerItem: 1,
   });
 
   // Block 1: Overlay escape handlers for inline inputs
@@ -880,24 +878,14 @@ export function WorkItemList() {
             </Text>
           </Box>
 
-          {terminalWidth >= 80 ? (
-            <TableLayout
-              treeItems={visibleTreeItems}
-              cursor={viewport.visibleCursor}
-              capabilities={capabilities}
-              collapsedIds={collapsedIds}
-              markedIds={markedIds}
-              terminalWidth={terminalWidth}
-            />
-          ) : (
-            <CardLayout
-              treeItems={visibleTreeItems}
-              cursor={viewport.visibleCursor}
-              capabilities={capabilities}
-              collapsedIds={collapsedIds}
-              markedIds={markedIds}
-            />
-          )}
+          <TableLayout
+            treeItems={visibleTreeItems}
+            cursor={viewport.visibleCursor}
+            capabilities={capabilities}
+            collapsedIds={collapsedIds}
+            markedIds={markedIds}
+            terminalWidth={terminalWidth}
+          />
 
           {treeItems.length === 0 && !loading && (
             <Box marginTop={1}>

@@ -5,6 +5,7 @@ import type { TreeItem } from './buildTree.js';
 
 interface ColumnWidths {
   id: number;
+  title: number;
   status: number;
   priority: number;
   assignee: number;
@@ -36,83 +37,88 @@ const gap = 2;
 const MARKER_WIDTH = 2;
 const TITLE_MIN_WIDTH = 20;
 
+const FIXED_STATUS = 10;
+const FIXED_PRIORITY = 10;
+const FIXED_ASSIGNEE = 20;
+const FIXED_LABELS = 20;
+
+function hasData(
+  treeItems: TreeItem[],
+  field: 'priority' | 'assignee' | 'labels',
+): boolean {
+  return treeItems.some(({ item }) => {
+    if (field === 'labels') return item.labels.length > 0;
+    return !!item[field];
+  });
+}
+
 function computeColumnWidths(
   treeItems: TreeItem[],
   capabilities: BackendCapabilities,
   terminalWidth: number,
 ): ColumnWidths {
-  // ID column — sized to longest visible ID
+  // ID column — sized to longest visible ID + gap
   const maxIdLen = treeItems.reduce(
     (max, { item }) => Math.max(max, item.id.length),
     2,
   );
   const id = maxIdLen + gap;
 
-  // Status column — always shown, sized to content
-  const maxStatusLen = treeItems.reduce((max, { item }) => {
-    const depPrefix =
-      capabilities.fields.dependsOn && item.dependsOn.length > 0 ? 2 : 0;
-    return Math.max(max, item.status.length + depPrefix);
-  }, 6); // min 6 for "Status" header
-  const status = maxStatusLen;
+  // Fixed-width columns, removed right-to-left if title would drop below min
+  const status = FIXED_STATUS;
 
-  // Available space after marker, ID, title margin, status, status margin,
-  // and minimum title width
-  let available =
-    terminalWidth - MARKER_WIDTH - id - gap - status - gap - TITLE_MIN_WIDTH;
+  // Budget = total - marker - id - title_min - status - gaps(title+status)
+  let budget =
+    terminalWidth - MARKER_WIDTH - id - TITLE_MIN_WIDTH - status - gap * 2;
 
-  // Priority — try to fit (only if any items have a value)
+  // Try adding optional columns (right-to-left removal order: labels, assignee, priority)
+  // We add them left-to-right and track what fits
   let showPriority = false;
   let priority = 0;
-  if (capabilities.fields.priority && available > 0) {
-    const maxContent = treeItems.reduce(
-      (max, { item }) => Math.max(max, (item.priority || '').length),
-      0,
-    );
-    if (maxContent > 0) {
-      priority = Math.max(maxContent, 8); // at least "Priority" header
-      if (available >= priority + gap) {
-        showPriority = true;
-        available -= priority + gap;
-      }
-    }
+  if (
+    capabilities.fields.priority &&
+    hasData(treeItems, 'priority') &&
+    budget >= FIXED_PRIORITY + gap
+  ) {
+    showPriority = true;
+    priority = FIXED_PRIORITY;
+    budget -= priority + gap;
   }
 
-  // Assignee — try to fit (only if any items have a value)
   let showAssignee = false;
   let assignee = 0;
-  if (capabilities.fields.assignee && available > 0) {
-    const maxContent = treeItems.reduce(
-      (max, { item }) => Math.max(max, (item.assignee || '').length),
-      0,
-    );
-    if (maxContent > 0) {
-      assignee = Math.min(Math.max(maxContent, 8), 20); // header min 8, cap 20
-      if (available >= assignee + gap) {
-        showAssignee = true;
-        available -= assignee + gap;
-      }
-    }
+  if (
+    capabilities.fields.assignee &&
+    hasData(treeItems, 'assignee') &&
+    budget >= FIXED_ASSIGNEE + gap
+  ) {
+    showAssignee = true;
+    assignee = FIXED_ASSIGNEE;
+    budget -= assignee + gap;
   }
 
-  // Labels — try to fit (only if any items have labels)
   let showLabels = false;
   let labels = 0;
-  if (capabilities.fields.labels && available > 0) {
-    const maxContent = treeItems.reduce(
-      (max, { item }) => Math.max(max, item.labels.join(', ').length),
-      0,
-    );
-    if (maxContent > 0) {
-      labels = Math.min(Math.max(maxContent, 6), 24); // header min 6, cap 24
-      if (available >= labels) {
-        showLabels = true;
-      }
-    }
+  if (
+    capabilities.fields.labels &&
+    hasData(treeItems, 'labels') &&
+    budget >= FIXED_LABELS
+  ) {
+    showLabels = true;
+    labels = FIXED_LABELS;
   }
 
   return {
     id,
+    title:
+      terminalWidth -
+      MARKER_WIDTH -
+      id -
+      status -
+      gap * 2 -
+      (showPriority ? priority + gap : 0) -
+      (showAssignee ? assignee + gap : 0) -
+      (showLabels ? labels : 0),
     status,
     priority,
     assignee,
@@ -150,7 +156,7 @@ const TableRow = memo(
             {item.id}
           </Text>
         </Box>
-        <Box flexGrow={1} marginRight={gap} overflowX="hidden">
+        <Box width={columns.title} marginRight={gap} overflowX="hidden">
           <Text
             color={selected ? 'cyan' : undefined}
             bold={selected}
@@ -168,6 +174,7 @@ const TableRow = memo(
             color={selected ? 'cyan' : undefined}
             bold={selected}
             dimColor={dimmed}
+            wrap="truncate"
           >
             {capabilities.fields.dependsOn && hasUnresolvedDeps ? '⧗ ' : ''}
             {item.status}
@@ -179,6 +186,7 @@ const TableRow = memo(
               color={selected ? 'cyan' : undefined}
               bold={selected}
               dimColor={dimmed}
+              wrap="truncate"
             >
               {item.priority}
             </Text>
@@ -266,7 +274,7 @@ function TableLayoutInner({
             ID
           </Text>
         </Box>
-        <Box flexGrow={1} marginRight={gap}>
+        <Box width={columns.title} marginRight={gap}>
           <Text bold underline>
             Title
           </Text>
