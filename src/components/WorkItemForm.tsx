@@ -1114,7 +1114,7 @@ export function WorkItemForm() {
             <Text bold={focused} color={focused ? 'cyan' : undefined}>
               {label}:{' '}
             </Text>
-            <Text>
+            <Text wrap="truncate">
               {preview || <Text dimColor>(empty)</Text>}
               {focused && <Text dimColor> [enter opens $EDITOR]</Text>}
             </Text>
