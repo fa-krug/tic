@@ -4,6 +4,8 @@ import { useNavigationStore } from '../stores/navigationStore.js';
 import type { BackendCapabilities } from '../backends/types.js';
 import { useScrollViewport } from '../hooks/useScrollViewport.js';
 import { useBackendDataStore } from '../stores/backendDataStore.js';
+import { useConfigStore } from '../stores/configStore.js';
+import { BACKEND_LABELS } from './Header.js';
 
 function CapabilityLine({
   label,
@@ -56,8 +58,8 @@ export function StatusScreen() {
     [backend],
   );
 
-  const backendName =
-    backend?.constructor.name.replace(/Backend$/, '') ?? 'Unknown';
+  const backendType = useConfigStore((s) => s.config.backend ?? 'local');
+  const backendName = BACKEND_LABELS[backendType] ?? backendType;
 
   const syncStatus = useBackendDataStore((s) => s.syncStatus);
 

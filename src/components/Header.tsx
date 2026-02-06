@@ -5,11 +5,12 @@ import { useBackendDataStore } from '../stores/backendDataStore.js';
 import os from 'node:os';
 import { VERSION } from '../version.js';
 
-const BACKEND_LABELS: Record<string, string> = {
+export const BACKEND_LABELS: Record<string, string> = {
   local: 'Local',
   github: 'GitHub',
   gitlab: 'GitLab',
   azure: 'Azure DevOps',
+  jira: 'Jira',
 };
 
 function shortenPath(fullPath: string): string {
