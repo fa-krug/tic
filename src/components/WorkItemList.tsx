@@ -861,7 +861,10 @@ export function WorkItemList() {
 
           {treeItems.length === 0 && !loading && (
             <Box marginTop={1}>
-              <Text dimColor>No {activeType}s in this iteration.</Text>
+              <Text dimColor>
+                No {activeType}s in this iteration. Press c to create, / to
+                search all.
+              </Text>
             </Box>
           )}
           {loading && treeItems.length === 0 && (
