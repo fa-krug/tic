@@ -35,7 +35,7 @@ function getExistingLabels(value: string): Set<string> {
 export function filterSuggestions(
   value: string,
   suggestions: string[],
-): string[] {
+): { visible: string[]; totalCount: number } {
   const { current } = parseSegments(value);
   const existing = getExistingLabels(value);
 
@@ -48,7 +48,10 @@ export function filterSuggestions(
     return !current || lower.includes(current.toLowerCase());
   });
 
-  return filtered.slice(0, MAX_VISIBLE);
+  return {
+    visible: filtered.slice(0, MAX_VISIBLE),
+    totalCount: filtered.length,
+  };
 }
 
 export function MultiAutocompleteInput({
@@ -60,7 +63,7 @@ export function MultiAutocompleteInput({
 }: MultiAutocompleteInputProps) {
   const [highlightIndex, setHighlightIndex] = useState(-1);
 
-  const visible = filterSuggestions(value, suggestions);
+  const { visible, totalCount } = filterSuggestions(value, suggestions);
   const { prefix } = parseSegments(value);
 
   useInput(
@@ -112,6 +115,11 @@ export function MultiAutocompleteInput({
               {suggestion}
             </Text>
           ))}
+        </Box>
+      )}
+      {totalCount > MAX_VISIBLE && (
+        <Box marginLeft={2}>
+          <Text dimColor>+{totalCount - MAX_VISIBLE} more</Text>
         </Box>
       )}
     </Box>

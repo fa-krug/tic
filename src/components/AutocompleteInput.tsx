@@ -15,11 +15,14 @@ interface AutocompleteInputProps {
 export function filterSuggestions(
   value: string,
   suggestions: string[],
-): string[] {
+): { visible: string[]; totalCount: number } {
   const filtered = value
     ? suggestions.filter((s) => s.toLowerCase().includes(value.toLowerCase()))
     : suggestions;
-  return filtered.slice(0, MAX_VISIBLE);
+  return {
+    visible: filtered.slice(0, MAX_VISIBLE),
+    totalCount: filtered.length,
+  };
 }
 
 export function AutocompleteInput({
@@ -31,7 +34,7 @@ export function AutocompleteInput({
 }: AutocompleteInputProps) {
   const [highlightIndex, setHighlightIndex] = useState(-1);
 
-  const visible = filterSuggestions(value, suggestions);
+  const { visible, totalCount } = filterSuggestions(value, suggestions);
 
   useInput(
     (_input, key) => {
@@ -81,6 +84,11 @@ export function AutocompleteInput({
               {suggestion}
             </Text>
           ))}
+        </Box>
+      )}
+      {totalCount > MAX_VISIBLE && (
+        <Box marginLeft={2}>
+          <Text dimColor>+{totalCount - MAX_VISIBLE} more</Text>
         </Box>
       )}
     </Box>

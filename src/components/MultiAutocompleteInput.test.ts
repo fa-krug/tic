@@ -6,19 +6,23 @@ describe('MultiAutocompleteInput', () => {
     const suggestions = ['bug', 'feature', 'enhancement', 'documentation'];
 
     it('filters suggestions based on current segment', () => {
-      expect(filterSuggestions('feat', suggestions)).toEqual(['feature']);
+      expect(filterSuggestions('feat', suggestions).visible).toEqual([
+        'feature',
+      ]);
     });
 
     it('returns all suggestions when current segment is empty', () => {
-      expect(filterSuggestions('', suggestions)).toEqual(suggestions);
+      expect(filterSuggestions('', suggestions).visible).toEqual(suggestions);
     });
 
     it('filters based on the segment after the last comma', () => {
-      expect(filterSuggestions('bug, feat', suggestions)).toEqual(['feature']);
+      expect(filterSuggestions('bug, feat', suggestions).visible).toEqual([
+        'feature',
+      ]);
     });
 
     it('excludes already-selected labels from suggestions', () => {
-      expect(filterSuggestions('bug, ', suggestions)).toEqual([
+      expect(filterSuggestions('bug, ', suggestions).visible).toEqual([
         'feature',
         'enhancement',
         'documentation',
@@ -26,18 +30,20 @@ describe('MultiAutocompleteInput', () => {
     });
 
     it('excludes multiple already-selected labels', () => {
-      expect(filterSuggestions('bug, feature, ', suggestions)).toEqual([
+      expect(filterSuggestions('bug, feature, ', suggestions).visible).toEqual([
         'enhancement',
         'documentation',
       ]);
     });
 
     it('is case-insensitive for filtering', () => {
-      expect(filterSuggestions('BUG, Feat', suggestions)).toEqual(['feature']);
+      expect(filterSuggestions('BUG, Feat', suggestions).visible).toEqual([
+        'feature',
+      ]);
     });
 
     it('is case-insensitive for excluding selected labels', () => {
-      expect(filterSuggestions('BUG, ', suggestions)).toEqual([
+      expect(filterSuggestions('BUG, ', suggestions).visible).toEqual([
         'feature',
         'enhancement',
         'documentation',
@@ -46,7 +52,9 @@ describe('MultiAutocompleteInput', () => {
 
     it('limits to MAX_VISIBLE suggestions', () => {
       const manySuggestions = Array.from({ length: 10 }, (_, i) => `label${i}`);
-      expect(filterSuggestions('', manySuggestions)).toHaveLength(5);
+      const result = filterSuggestions('', manySuggestions);
+      expect(result.visible).toHaveLength(5);
+      expect(result.totalCount).toBe(10);
     });
   });
 });
