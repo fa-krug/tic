@@ -887,6 +887,7 @@ export function WorkItemList() {
               capabilities={capabilities}
               collapsedIds={collapsedIds}
               markedIds={markedIds}
+              terminalWidth={terminalWidth}
             />
           ) : (
             <CardLayout

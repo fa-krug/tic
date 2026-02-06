@@ -3,12 +3,24 @@ import { Box, Text } from 'ink';
 import type { BackendCapabilities } from '../backends/types.js';
 import type { TreeItem } from './buildTree.js';
 
+interface ColumnWidths {
+  id: number;
+  status: number;
+  priority: number;
+  assignee: number;
+  labels: number;
+  showPriority: boolean;
+  showAssignee: boolean;
+  showLabels: boolean;
+}
+
 interface TableLayoutProps {
   treeItems: TreeItem[];
   cursor: number;
   capabilities: BackendCapabilities;
   collapsedIds: Set<string>;
   markedIds: Set<string>;
+  terminalWidth: number;
 }
 
 interface TableRowProps {
@@ -17,14 +29,92 @@ interface TableRowProps {
   marked: boolean;
   collapseIndicator: string;
   capabilities: BackendCapabilities;
-  colId: number;
+  columns: ColumnWidths;
 }
 
-const colStatus = 14;
-const colPriority = 10;
-const colAssignee = 12;
-const colLabels = 16;
 const gap = 2;
+const MARKER_WIDTH = 2;
+const TITLE_MIN_WIDTH = 20;
+
+function computeColumnWidths(
+  treeItems: TreeItem[],
+  capabilities: BackendCapabilities,
+  terminalWidth: number,
+): ColumnWidths {
+  // ID column — sized to longest visible ID
+  const maxIdLen = treeItems.reduce(
+    (max, { item }) => Math.max(max, item.id.length),
+    2,
+  );
+  const id = maxIdLen + gap;
+
+  // Status column — always shown, sized to content
+  const maxStatusLen = treeItems.reduce((max, { item }) => {
+    const depPrefix =
+      capabilities.fields.dependsOn && item.dependsOn.length > 0 ? 2 : 0;
+    return Math.max(max, item.status.length + depPrefix);
+  }, 6); // min 6 for "Status" header
+  const status = maxStatusLen;
+
+  // Available space after marker, ID, status gap, and minimum title
+  let available =
+    terminalWidth - MARKER_WIDTH - id - status - gap - TITLE_MIN_WIDTH;
+
+  // Priority — try to fit
+  let showPriority = false;
+  let priority = 0;
+  if (capabilities.fields.priority && available > 0) {
+    const maxContent = treeItems.reduce(
+      (max, { item }) => Math.max(max, (item.priority || '').length),
+      8, // min for "Priority" header
+    );
+    priority = maxContent;
+    if (available >= priority + gap) {
+      showPriority = true;
+      available -= priority + gap;
+    }
+  }
+
+  // Assignee — try to fit
+  let showAssignee = false;
+  let assignee = 0;
+  if (capabilities.fields.assignee && available > 0) {
+    const maxContent = treeItems.reduce(
+      (max, { item }) => Math.max(max, (item.assignee || '').length),
+      8, // min for "Assignee" header
+    );
+    assignee = Math.min(maxContent, 20); // cap at 20
+    if (available >= assignee + gap) {
+      showAssignee = true;
+      available -= assignee + gap;
+    }
+  }
+
+  // Labels — try to fit
+  let showLabels = false;
+  let labels = 0;
+  if (capabilities.fields.labels && available > 0) {
+    const maxContent = treeItems.reduce(
+      (max, { item }) => Math.max(max, item.labels.join(', ').length),
+      6, // min for "Labels" header
+    );
+    labels = Math.min(maxContent, 24); // cap at 24
+    if (available >= labels) {
+      showLabels = true;
+    }
+  }
+
+  return {
+    id,
+    status,
+    priority,
+    assignee,
+    labels,
+    showPriority,
+    showAssignee,
+    showLabels,
+  };
+}
 
 const TableRow = memo(
   function TableRow({
@@ -33,7 +123,7 @@ const TableRow = memo(
     marked,
     collapseIndicator,
     capabilities,
-    colId,
+    columns,
   }: TableRowProps) {
     const { item, prefix, isCrossType } = treeItem;
     const hasUnresolvedDeps = item.dependsOn.length > 0;
@@ -44,7 +134,7 @@ const TableRow = memo(
         <Box width={2}>
           <Text color="cyan">{selected ? '>' : ' '}</Text>
         </Box>
-        <Box width={colId} overflowX="hidden">
+        <Box width={columns.id} overflowX="hidden">
           <Text
             color={selected ? 'cyan' : undefined}
             bold={selected}
@@ -66,7 +156,7 @@ const TableRow = memo(
             {typeLabel}
           </Text>
         </Box>
-        <Box width={colStatus} marginRight={gap} overflowX="hidden">
+        <Box width={columns.status} marginRight={gap} overflowX="hidden">
           <Text
             color={selected ? 'cyan' : undefined}
             bold={selected}
@@ -76,8 +166,8 @@ const TableRow = memo(
             {item.status}
           </Text>
         </Box>
-        {capabilities.fields.priority && (
-          <Box width={colPriority} marginRight={gap} overflowX="hidden">
+        {columns.showPriority && (
+          <Box width={columns.priority} marginRight={gap} overflowX="hidden">
             <Text
               color={selected ? 'cyan' : undefined}
               bold={selected}
@@ -87,8 +177,8 @@ const TableRow = memo(
             </Text>
           </Box>
         )}
-        {capabilities.fields.assignee && (
-          <Box width={colAssignee} marginRight={gap} overflowX="hidden">
+        {columns.showAssignee && (
+          <Box width={columns.assignee} marginRight={gap} overflowX="hidden">
             <Text
               color={selected ? 'cyan' : undefined}
               bold={selected}
@@ -99,8 +189,8 @@ const TableRow = memo(
             </Text>
           </Box>
         )}
-        {capabilities.fields.labels && (
-          <Box width={colLabels} overflowX="hidden">
+        {columns.showLabels && (
+          <Box width={columns.labels} overflowX="hidden">
             <Text
               color={selected ? 'cyan' : undefined}
               bold={selected}
@@ -119,7 +209,7 @@ const TableRow = memo(
     if (prev.marked !== next.marked) return false;
     if (prev.collapseIndicator !== next.collapseIndicator) return false;
     if (prev.capabilities !== next.capabilities) return false;
-    if (prev.colId !== next.colId) return false;
+    if (prev.columns !== next.columns) return false;
 
     const prevItem = prev.treeItem.item;
     const nextItem = next.treeItem.item;
@@ -151,14 +241,12 @@ function TableLayoutInner({
   capabilities,
   collapsedIds,
   markedIds,
+  terminalWidth,
 }: TableLayoutProps) {
-  const colId = useMemo(() => {
-    const maxLen = treeItems.reduce(
-      (max, { item }) => Math.max(max, item.id.length),
-      2,
-    );
-    return maxLen + gap;
-  }, [treeItems]);
+  const columns = useMemo(
+    () => computeColumnWidths(treeItems, capabilities, terminalWidth),
+    [treeItems, capabilities, terminalWidth],
+  );
 
   return (
     <>
@@ -166,7 +254,7 @@ function TableLayoutInner({
         <Box width={2}>
           <Text> </Text>
         </Box>
-        <Box width={colId}>
+        <Box width={columns.id}>
           <Text bold underline>
             ID
           </Text>
@@ -176,27 +264,27 @@ function TableLayoutInner({
             Title
           </Text>
         </Box>
-        <Box width={colStatus} marginRight={gap}>
+        <Box width={columns.status} marginRight={gap}>
           <Text bold underline>
             Status
           </Text>
         </Box>
-        {capabilities.fields.priority && (
-          <Box width={colPriority} marginRight={gap}>
+        {columns.showPriority && (
+          <Box width={columns.priority} marginRight={gap}>
             <Text bold underline>
               Priority
             </Text>
           </Box>
         )}
-        {capabilities.fields.assignee && (
-          <Box width={colAssignee} marginRight={gap}>
+        {columns.showAssignee && (
+          <Box width={columns.assignee} marginRight={gap}>
             <Text bold underline>
               Assignee
             </Text>
           </Box>
         )}
-        {capabilities.fields.labels && (
-          <Box width={colLabels}>
+        {columns.showLabels && (
+          <Box width={columns.labels}>
             <Text bold underline>
               Labels
             </Text>
@@ -219,7 +307,7 @@ function TableLayoutInner({
             marked={markedIds.has(item.id)}
             collapseIndicator={collapseIndicator}
             capabilities={capabilities}
-            colId={colId}
+            columns={columns}
           />
         );
       })}
