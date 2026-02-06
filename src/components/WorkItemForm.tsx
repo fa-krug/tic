@@ -18,6 +18,7 @@ import { useScrollViewport } from '../hooks/useScrollViewport.js';
 import { useBackendDataStore } from '../stores/backendDataStore.js';
 import { openInEditor } from '../editor.js';
 import { slugifyTemplateName } from '../backends/local/templates.js';
+import { Breadcrumbs } from './Breadcrumbs.js';
 
 type FieldName =
   | 'title'
@@ -1265,6 +1266,8 @@ export function WorkItemForm() {
             : ''}
         </Text>
       </Box>
+
+      <Breadcrumbs />
 
       {fields.map((field, index) => {
         if (
