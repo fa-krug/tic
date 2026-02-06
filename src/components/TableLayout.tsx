@@ -61,47 +61,53 @@ function computeColumnWidths(
   let available =
     terminalWidth - MARKER_WIDTH - id - gap - status - gap - TITLE_MIN_WIDTH;
 
-  // Priority — try to fit
+  // Priority — try to fit (only if any items have a value)
   let showPriority = false;
   let priority = 0;
   if (capabilities.fields.priority && available > 0) {
     const maxContent = treeItems.reduce(
       (max, { item }) => Math.max(max, (item.priority || '').length),
-      8, // min for "Priority" header
+      0,
     );
-    priority = maxContent;
-    if (available >= priority + gap) {
-      showPriority = true;
-      available -= priority + gap;
+    if (maxContent > 0) {
+      priority = Math.max(maxContent, 8); // at least "Priority" header
+      if (available >= priority + gap) {
+        showPriority = true;
+        available -= priority + gap;
+      }
     }
   }
 
-  // Assignee — try to fit
+  // Assignee — try to fit (only if any items have a value)
   let showAssignee = false;
   let assignee = 0;
   if (capabilities.fields.assignee && available > 0) {
     const maxContent = treeItems.reduce(
       (max, { item }) => Math.max(max, (item.assignee || '').length),
-      8, // min for "Assignee" header
+      0,
     );
-    assignee = Math.min(maxContent, 20); // cap at 20
-    if (available >= assignee + gap) {
-      showAssignee = true;
-      available -= assignee + gap;
+    if (maxContent > 0) {
+      assignee = Math.min(Math.max(maxContent, 8), 20); // header min 8, cap 20
+      if (available >= assignee + gap) {
+        showAssignee = true;
+        available -= assignee + gap;
+      }
     }
   }
 
-  // Labels — try to fit
+  // Labels — try to fit (only if any items have labels)
   let showLabels = false;
   let labels = 0;
   if (capabilities.fields.labels && available > 0) {
     const maxContent = treeItems.reduce(
       (max, { item }) => Math.max(max, item.labels.join(', ').length),
-      6, // min for "Labels" header
+      0,
     );
-    labels = Math.min(maxContent, 24); // cap at 24
-    if (available >= labels) {
-      showLabels = true;
+    if (maxContent > 0) {
+      labels = Math.min(Math.max(maxContent, 6), 24); // header min 6, cap 24
+      if (available >= labels) {
+        showLabels = true;
+      }
     }
   }
 
