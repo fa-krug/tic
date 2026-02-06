@@ -17,6 +17,7 @@ if (process.argv.length > 2) {
   // Init is non-blocking - UI renders immediately with loading state
   backendDataStore.getState().init(cwd);
 
+  console.clear();
   const app = render(<App />);
   await app.waitUntilExit();
   backendDataStore.getState().destroy();
