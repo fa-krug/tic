@@ -1,7 +1,10 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
 
-import { useNavigationStore } from '../stores/navigationStore.js';
+import {
+  navigationStore,
+  useNavigationStore,
+} from '../stores/navigationStore.js';
 import { listViewStore, useListViewStore } from '../stores/listViewStore.js';
 import { isGitRepo } from '../git.js';
 import { beginImplementation } from '../implement.js';
@@ -47,55 +50,47 @@ export function getTargetIds(
 }
 
 export function WorkItemList() {
-  // Backend data store - grouped selector with shallow comparison
+  // Backend data store - split by change frequency for minimal re-renders
+
+  // Rarely changes (individual selectors)
+  const backend = useBackendDataStore((s) => s.backend);
+  const syncManager = useBackendDataStore((s) => s.syncManager);
+  const capabilities = useBackendDataStore((s) => s.capabilities);
+
+  // Changes on data refresh (grouped with useShallow)
   const {
-    backend,
-    syncManager,
-    capabilities,
+    items: allItems,
     types,
     statuses,
     assignees,
     labels: labelSuggestions,
-    currentIteration: iteration,
-    items: allItems,
-    loading,
   } = useBackendDataStore(
     useShallow((s) => ({
-      backend: s.backend,
-      syncManager: s.syncManager,
-      capabilities: s.capabilities,
+      items: s.items,
       types: s.types,
       statuses: s.statuses,
       assignees: s.assignees,
       labels: s.labels,
-      currentIteration: s.currentIteration,
-      items: s.items,
-      loading: s.loading,
     })),
   );
 
-  // Navigation store - grouped selector with shallow comparison
+  // Changes independently (individual selectors)
+  const iteration = useBackendDataStore((s) => s.currentIteration);
+  const loading = useBackendDataStore((s) => s.loading);
+
+  // Navigation store — actions via getState() (stable, never trigger re-renders)
   const {
     navigate,
     navigateToHelp,
     selectWorkItem,
-    activeType,
     setActiveType,
     setActiveTemplate,
     setFormMode,
-    updateInfo,
-  } = useNavigationStore(
-    useShallow((s) => ({
-      navigate: s.navigate,
-      navigateToHelp: s.navigateToHelp,
-      selectWorkItem: s.selectWorkItem,
-      activeType: s.activeType,
-      setActiveType: s.setActiveType,
-      setActiveTemplate: s.setActiveTemplate,
-      setFormMode: s.setFormMode,
-      updateInfo: s.updateInfo,
-    })),
-  );
+  } = navigationStore.getState();
+
+  // Only reactive data via hooks
+  const activeType = useNavigationStore((s) => s.activeType);
+  const updateInfo = useNavigationStore((s) => s.updateInfo);
 
   const defaultType = useConfigStore((s) => s.config.defaultType ?? null);
   const branchMode = useConfigStore((s) => s.config.branchMode ?? 'worktree');
@@ -709,7 +704,10 @@ export function WorkItemList() {
   const helpText =
     '↑↓ navigate  ←→ expand/collapse  enter edit  c create  , settings  ? help';
 
-  const visibleTreeItems = treeItems.slice(viewport.start, viewport.end);
+  const visibleTreeItems = useMemo(
+    () => treeItems.slice(viewport.start, viewport.end),
+    [treeItems, viewport.start, viewport.end],
+  );
 
   return (
     <Box flexDirection="column">

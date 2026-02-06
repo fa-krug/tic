@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, memo } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import { fuzzyMatch, type FuzzyResult } from './fuzzyMatch.js';
@@ -30,7 +30,7 @@ export function groupResults(
   return [...current, ...other].slice(0, maxResults);
 }
 
-export function SearchOverlay({
+function SearchOverlayInner({
   items,
   currentIteration,
   onSelect,
@@ -148,3 +148,5 @@ export function SearchOverlay({
     </Box>
   );
 }
+
+export const SearchOverlay = memo(SearchOverlayInner);
