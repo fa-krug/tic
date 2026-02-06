@@ -239,6 +239,15 @@ export function WorkItemForm() {
     dependents,
   ]);
 
+  const requiredFields = useMemo<Set<FieldName>>(() => {
+    const required = new Set<FieldName>(['title']);
+    if (selectedWorkItemId === null) {
+      required.add('status');
+      if (capabilities.customTypes) required.add('type');
+    }
+    return required;
+  }, [selectedWorkItemId, capabilities.customTypes]);
+
   const [comments, setComments] = useState<Comment[]>([]);
 
   // Derive field values from current draft
@@ -945,6 +954,7 @@ export function WorkItemForm() {
       formMode === 'template' && field === 'title'
         ? 'Name'
         : field.charAt(0).toUpperCase() + field.slice(1);
+    const isRequired = requiredFields.has(field);
     const cursor = focused ? '>' : ' ';
 
     if (field === 'comments') {
@@ -953,7 +963,7 @@ export function WorkItemForm() {
           <Box>
             <Text color={focused ? 'cyan' : undefined}>{cursor} </Text>
             <Text bold={focused} color={focused ? 'cyan' : undefined}>
-              {label}:
+              {label}:{isRequired && <Text dimColor> *</Text>}
             </Text>
           </Box>
           {comments.map((c, ci) => (
@@ -1004,7 +1014,7 @@ export function WorkItemForm() {
             <Box>
               <Text color="cyan">{cursor} </Text>
               <Text bold color="cyan">
-                {label}:{' '}
+                {label}:{isRequired && <Text dimColor> *</Text>}{' '}
               </Text>
             </Box>
             <Box marginLeft={4}>
@@ -1024,7 +1034,7 @@ export function WorkItemForm() {
         <Box key={field}>
           <Text color={focused ? 'cyan' : undefined}>{cursor} </Text>
           <Text bold={focused} color={focused ? 'cyan' : undefined}>
-            {label}:{' '}
+            {label}:{isRequired && <Text dimColor> *</Text>}{' '}
           </Text>
           <Text>{currentValue}</Text>
         </Box>
@@ -1038,7 +1048,7 @@ export function WorkItemForm() {
             <Box>
               <Text color="cyan">{cursor} </Text>
               <Text bold color="cyan">
-                {label}:{' '}
+                {label}:{isRequired && <Text dimColor> *</Text>}{' '}
               </Text>
             </Box>
             <Box marginLeft={4}>
@@ -1060,7 +1070,7 @@ export function WorkItemForm() {
         <Box key={field}>
           <Text color={focused ? 'cyan' : undefined}>{cursor} </Text>
           <Text bold={focused} color={focused ? 'cyan' : undefined}>
-            {label}:{' '}
+            {label}:{isRequired && <Text dimColor> *</Text>}{' '}
           </Text>
           <Text>{assignee || <Text dimColor>(empty)</Text>}</Text>
         </Box>
@@ -1074,7 +1084,7 @@ export function WorkItemForm() {
             <Box>
               <Text color="cyan">{cursor} </Text>
               <Text bold color="cyan">
-                {label}:{' '}
+                {label}:{isRequired && <Text dimColor> *</Text>}{' '}
               </Text>
             </Box>
             <Box marginLeft={4}>
@@ -1096,7 +1106,7 @@ export function WorkItemForm() {
         <Box key={field}>
           <Text color={focused ? 'cyan' : undefined}>{cursor} </Text>
           <Text bold={focused} color={focused ? 'cyan' : undefined}>
-            {label}:{' '}
+            {label}:{isRequired && <Text dimColor> *</Text>}{' '}
           </Text>
           <Text>{parentId || <Text dimColor>(empty)</Text>}</Text>
         </Box>
@@ -1116,7 +1126,7 @@ export function WorkItemForm() {
           <Box>
             <Text color={focused ? 'cyan' : undefined}>{cursor} </Text>
             <Text bold={focused} color={focused ? 'cyan' : undefined}>
-              {label}:{' '}
+              {label}:{isRequired && <Text dimColor> *</Text>}{' '}
             </Text>
             <Text wrap="truncate">
               {preview || <Text dimColor>(empty)</Text>}
@@ -1134,7 +1144,7 @@ export function WorkItemForm() {
             <Box>
               <Text color="cyan">{cursor} </Text>
               <Text bold color="cyan">
-                {label}:{' '}
+                {label}:{isRequired && <Text dimColor> *</Text>}{' '}
               </Text>
             </Box>
             <Box marginLeft={4}>
@@ -1156,7 +1166,7 @@ export function WorkItemForm() {
         <Box key={field}>
           <Text color={focused ? 'cyan' : undefined}>{cursor} </Text>
           <Text bold={focused} color={focused ? 'cyan' : undefined}>
-            {label}:{' '}
+            {label}:{isRequired && <Text dimColor> *</Text>}{' '}
           </Text>
           <Text>{dependsOn || <Text dimColor>(empty)</Text>}</Text>
         </Box>
@@ -1170,7 +1180,7 @@ export function WorkItemForm() {
             <Box>
               <Text color="cyan">{cursor} </Text>
               <Text bold color="cyan">
-                {label}:{' '}
+                {label}:{isRequired && <Text dimColor> *</Text>}{' '}
               </Text>
             </Box>
             <Box marginLeft={4}>
@@ -1192,7 +1202,7 @@ export function WorkItemForm() {
         <Box key={field}>
           <Text color={focused ? 'cyan' : undefined}>{cursor} </Text>
           <Text bold={focused} color={focused ? 'cyan' : undefined}>
-            {label}:{' '}
+            {label}:{isRequired && <Text dimColor> *</Text>}{' '}
           </Text>
           <Text>{labels || <Text dimColor>(empty)</Text>}</Text>
         </Box>
@@ -1209,7 +1219,7 @@ export function WorkItemForm() {
         <Box key={field}>
           <Text color="cyan">{cursor} </Text>
           <Text bold color="cyan">
-            {label}:{' '}
+            {label}:{isRequired && <Text dimColor> *</Text>}{' '}
           </Text>
           <TextInput
             value={textValue}
@@ -1227,7 +1237,7 @@ export function WorkItemForm() {
       <Box key={field}>
         <Text color={focused ? 'cyan' : undefined}>{cursor} </Text>
         <Text bold={focused} color={focused ? 'cyan' : undefined}>
-          {label}:{' '}
+          {label}:{isRequired && <Text dimColor> *</Text>}{' '}
         </Text>
         <Text>{textValue || <Text dimColor>(empty)</Text>}</Text>
       </Box>
