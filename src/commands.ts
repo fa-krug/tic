@@ -171,7 +171,7 @@ const commands: Command[] = [
     id: 'toggle-detail-panel',
     label: 'Toggle detail panel',
     category: 'Other',
-    shortcut: 'v',
+    shortcut: 'V',
     when: (ctx) => ctx.screen === 'list',
   },
   {
