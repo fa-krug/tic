@@ -28,8 +28,6 @@ import {
 } from '../commands.js';
 import { OverlayPanel, type OverlayItem } from './OverlayPanel.js';
 import { DetailPanel } from './DetailPanel.js';
-import { AutocompleteInput } from './AutocompleteInput.js';
-import { MultiAutocompleteInput } from './MultiAutocompleteInput.js';
 import type { WorkItem, Template } from '../types.js';
 export type { TreeItem } from './buildTree.js';
 
@@ -145,10 +143,7 @@ export function WorkItemList() {
   } = listViewStore.getState();
 
   // Local state for inputs and templates
-  const [parentInput, setParentInput] = useState('');
   const [allSearchItems, setAllSearchItems] = useState<WorkItem[]>([]);
-  const [assigneeInput, setAssigneeInput] = useState('');
-  const [labelsInput, setLabelsInput] = useState('');
   const [templates, setTemplates] = useState<Template[]>([]);
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [descriptionScrollOffset, setDescriptionScrollOffset] = useState(0);
@@ -332,21 +327,6 @@ export function WorkItemList() {
     linesPerItem: 1,
   });
 
-  // Block 1: Overlay escape handlers for inline inputs
-  useInput(
-    (_input, key) => {
-      if (key.escape) {
-        closeOverlay();
-      }
-    },
-    {
-      isActive:
-        activeOverlay?.type === 'parent-input' ||
-        activeOverlay?.type === 'assignee-input' ||
-        activeOverlay?.type === 'labels-input',
-    },
-  );
-
   // Block 1.5: Description scroll handler — active when full description is shown
   useInput(
     (_input, key) => {
@@ -527,13 +507,6 @@ export function WorkItemList() {
         const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
         if (targetIds.length > 0) {
           openOverlay({ type: 'parent-input', targetIds });
-          // For single item, prefill current parent
-          if (targetIds.length === 1) {
-            const item = treeItems.find((t) => t.item.id === targetIds[0]);
-            setParentInput(item?.item.parent ?? '');
-          } else {
-            setParentInput('');
-          }
         }
       }
 
@@ -583,7 +556,6 @@ export function WorkItemList() {
         const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
         if (targetIds.length > 0) {
           openOverlay({ type: 'assignee-input', targetIds });
-          setAssigneeInput('');
         }
       }
 
@@ -591,7 +563,6 @@ export function WorkItemList() {
         const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
         if (targetIds.length > 0) {
           openOverlay({ type: 'labels-input', targetIds });
-          setLabelsInput('');
         }
       }
 
@@ -731,7 +702,6 @@ export function WorkItemList() {
           const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
           if (targetIds.length > 0) {
             openOverlay({ type: 'assignee-input', targetIds });
-            setAssigneeInput('');
           }
         }
         break;
@@ -740,7 +710,6 @@ export function WorkItemList() {
           const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
           if (targetIds.length > 0) {
             openOverlay({ type: 'labels-input', targetIds });
-            setLabelsInput('');
           }
         }
         break;
@@ -783,7 +752,6 @@ export function WorkItemList() {
         break;
       case 'parent':
         openOverlay({ type: 'parent-input', targetIds });
-        setParentInput('');
         break;
       case 'type':
         openOverlay({ type: 'type-picker', targetIds });
@@ -793,11 +761,9 @@ export function WorkItemList() {
         break;
       case 'assignee':
         openOverlay({ type: 'assignee-input', targetIds });
-        setAssigneeInput('');
         break;
       case 'labels':
         openOverlay({ type: 'labels-input', targetIds });
-        setLabelsInput('');
         break;
       case 'delete':
         openOverlay({ type: 'delete-confirm', targetIds });
@@ -1114,119 +1080,176 @@ export function WorkItemList() {
             onCancel={() => closeOverlay()}
           />
         ) : activeOverlay?.type === 'parent-input' ? (
-          <Box flexDirection="column">
-            <Text color="cyan">
-              Set parent for {activeOverlay.targetIds.length} item
-              {activeOverlay.targetIds.length > 1 ? 's' : ''} (empty to clear):
-            </Text>
-            <AutocompleteInput
-              value={parentInput}
-              onChange={setParentInput}
-              focus={true}
-              suggestions={parentSuggestions}
-              onSubmit={() => {
-                const targetIds = getOverlayTargetIds();
-                if (!backend) return;
-                void (async () => {
-                  const raw = parentInput.trim();
-                  const newParent =
-                    raw === ''
-                      ? null
-                      : raw.includes(' - ')
-                        ? raw.split(' - ')[0]!.trim()
-                        : raw;
-                  try {
-                    for (const id of targetIds) {
-                      await backend.cachedUpdateWorkItem(id, {
-                        parent: newParent,
-                      });
-                      await queueWrite('update', id);
-                    }
-                    clearWarning();
-                  } catch (e) {
-                    setWarning(
-                      e instanceof Error ? e.message : 'Invalid parent',
-                    );
+          <OverlayPanel
+            title={`Set Parent (${activeOverlay.targetIds.length} item${activeOverlay.targetIds.length > 1 ? 's' : ''})`}
+            items={parentSuggestions.map((s) => ({
+              id: s,
+              label: s,
+              value: s,
+            }))}
+            allowFreeform
+            onSelect={(item) => {
+              const targetIds = getOverlayTargetIds();
+              if (!backend) return;
+              void (async () => {
+                const raw = item.value.trim();
+                const newParent = raw.includes(' - ')
+                  ? raw.split(' - ')[0]!.trim()
+                  : raw;
+                try {
+                  for (const id of targetIds) {
+                    await backend.cachedUpdateWorkItem(id, {
+                      parent: newParent,
+                    });
+                    await queueWrite('update', id);
                   }
-                  closeOverlay();
-                  setParentInput('');
-                  refreshData();
-                  setToast(
-                    targetIds.length === 1
-                      ? 'Parent updated'
-                      : `${targetIds.length} items updated`,
-                  );
-                })();
-              }}
-            />
-          </Box>
+                  clearWarning();
+                } catch (e) {
+                  setWarning(e instanceof Error ? e.message : 'Invalid parent');
+                }
+                closeOverlay();
+                refreshData();
+                setToast(
+                  targetIds.length === 1
+                    ? 'Parent updated'
+                    : `${targetIds.length} items updated`,
+                );
+              })();
+            }}
+            onSubmitFreeform={(text) => {
+              const targetIds = getOverlayTargetIds();
+              if (!backend) return;
+              void (async () => {
+                const raw = text.trim();
+                const newParent =
+                  raw === ''
+                    ? null
+                    : raw.includes(' - ')
+                      ? raw.split(' - ')[0]!.trim()
+                      : raw;
+                try {
+                  for (const id of targetIds) {
+                    await backend.cachedUpdateWorkItem(id, {
+                      parent: newParent,
+                    });
+                    await queueWrite('update', id);
+                  }
+                  clearWarning();
+                } catch (e) {
+                  setWarning(e instanceof Error ? e.message : 'Invalid parent');
+                }
+                closeOverlay();
+                refreshData();
+                setToast(
+                  targetIds.length === 1
+                    ? 'Parent updated'
+                    : `${targetIds.length} items updated`,
+                );
+              })();
+            }}
+            onCancel={() => closeOverlay()}
+            placeholder="Type parent ID or title..."
+            emptyMessage="Type a parent ID (empty to clear)"
+          />
         ) : activeOverlay?.type === 'assignee-input' ? (
-          <Box flexDirection="column">
-            <Text color="cyan">
-              Set assignee for {activeOverlay.targetIds.length} item
-              {activeOverlay.targetIds.length > 1 ? 's' : ''}:
-            </Text>
-            <AutocompleteInput
-              value={assigneeInput}
-              onChange={setAssigneeInput}
-              focus={true}
-              suggestions={assignees}
-              onSubmit={() => {
-                const targetIds = getOverlayTargetIds();
-                closeOverlay();
-                if (!backend) return;
-                void (async () => {
-                  const assignee = assigneeInput.trim();
-                  for (const id of targetIds) {
-                    await backend.cachedUpdateWorkItem(id, { assignee });
-                    await queueWrite('update', id);
-                  }
-                  setAssigneeInput('');
-                  refreshData();
-                  setToast(
-                    targetIds.length === 1
-                      ? 'Assignee updated'
-                      : `${targetIds.length} items updated`,
-                  );
-                })();
-              }}
-            />
-          </Box>
+          <OverlayPanel
+            title={`Set Assignee (${activeOverlay.targetIds.length} item${activeOverlay.targetIds.length > 1 ? 's' : ''})`}
+            items={assignees.map((a) => ({ id: a, label: a, value: a }))}
+            allowFreeform
+            onSelect={(item) => {
+              const targetIds = getOverlayTargetIds();
+              closeOverlay();
+              if (!backend) return;
+              void (async () => {
+                for (const id of targetIds) {
+                  await backend.cachedUpdateWorkItem(id, {
+                    assignee: item.value.trim(),
+                  });
+                  await queueWrite('update', id);
+                }
+                refreshData();
+                setToast(
+                  targetIds.length === 1
+                    ? 'Assignee updated'
+                    : `${targetIds.length} items updated`,
+                );
+              })();
+            }}
+            onSubmitFreeform={(text) => {
+              const targetIds = getOverlayTargetIds();
+              closeOverlay();
+              if (!backend) return;
+              void (async () => {
+                for (const id of targetIds) {
+                  await backend.cachedUpdateWorkItem(id, {
+                    assignee: text.trim(),
+                  });
+                  await queueWrite('update', id);
+                }
+                refreshData();
+                setToast(
+                  targetIds.length === 1
+                    ? 'Assignee updated'
+                    : `${targetIds.length} items updated`,
+                );
+              })();
+            }}
+            onCancel={() => closeOverlay()}
+            placeholder="Type assignee name..."
+          />
         ) : activeOverlay?.type === 'labels-input' ? (
-          <Box flexDirection="column">
-            <Text color="cyan">
-              Set labels for {activeOverlay.targetIds.length} item
-              {activeOverlay.targetIds.length > 1 ? 's' : ''} (comma-separated):
-            </Text>
-            <MultiAutocompleteInput
-              value={labelsInput}
-              onChange={setLabelsInput}
-              focus={true}
-              suggestions={labelSuggestions}
-              onSubmit={() => {
-                const targetIds = getOverlayTargetIds();
-                closeOverlay();
-                if (!backend) return;
-                void (async () => {
-                  const labels = labelsInput
-                    .split(',')
-                    .map((l) => l.trim())
-                    .filter(Boolean);
-                  for (const id of targetIds) {
-                    await backend.cachedUpdateWorkItem(id, { labels });
-                    await queueWrite('update', id);
-                  }
-                  setLabelsInput('');
-                  refreshData();
-                  setToast(
-                    targetIds.length === 1
-                      ? 'Labels updated'
-                      : `${targetIds.length} items updated`,
-                  );
-                })();
-              }}
-            />
-          </Box>
+          <OverlayPanel
+            title={`Set Labels (${activeOverlay.targetIds.length} item${activeOverlay.targetIds.length > 1 ? 's' : ''})`}
+            items={labelSuggestions.map((l) => ({
+              id: l,
+              label: l,
+              value: l,
+            }))}
+            multiSelect
+            allowFreeform
+            onSelect={() => {}}
+            onConfirm={(selected) => {
+              const targetIds = getOverlayTargetIds();
+              closeOverlay();
+              if (!backend) return;
+              void (async () => {
+                const labels = selected.map((i) => i.value);
+                for (const id of targetIds) {
+                  await backend.cachedUpdateWorkItem(id, { labels });
+                  await queueWrite('update', id);
+                }
+                refreshData();
+                setToast(
+                  targetIds.length === 1
+                    ? 'Labels updated'
+                    : `${targetIds.length} items updated`,
+                );
+              })();
+            }}
+            onSubmitFreeform={(text) => {
+              const targetIds = getOverlayTargetIds();
+              closeOverlay();
+              if (!backend) return;
+              void (async () => {
+                const labels = text
+                  .split(',')
+                  .map((l) => l.trim())
+                  .filter(Boolean);
+                for (const id of targetIds) {
+                  await backend.cachedUpdateWorkItem(id, { labels });
+                  await queueWrite('update', id);
+                }
+                refreshData();
+                setToast(
+                  targetIds.length === 1
+                    ? 'Labels updated'
+                    : `${targetIds.length} items updated`,
+                );
+              })();
+            }}
+            onCancel={() => closeOverlay()}
+            placeholder="Type to filter labels..."
+          />
         ) : activeOverlay?.type === 'delete-confirm' ? (
           <OverlayPanel
             title={`Delete ${activeOverlay.targetIds.length} item${activeOverlay.targetIds.length > 1 ? 's' : ''}?`}
