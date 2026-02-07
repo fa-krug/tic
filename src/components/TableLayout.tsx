@@ -13,6 +13,7 @@ interface ColumnWidths {
   showPriority: boolean;
   showAssignee: boolean;
   showLabels: boolean;
+  showStatus: boolean;
 }
 
 interface TableLayoutProps {
@@ -64,15 +65,12 @@ function computeColumnWidths(
   );
   const id = maxIdLen + gap;
 
-  // Fixed-width columns, removed right-to-left if title would drop below min
-  const status = FIXED_STATUS;
+  // Start with mandatory columns: marker + id + title_min + gap(title)
+  // Budget = remaining space for optional columns (status, assignee, labels, priority)
+  let budget = terminalWidth - MARKER_WIDTH - id - TITLE_MIN_WIDTH - gap;
 
-  // Budget = total - marker - id - title_min - status - gaps(title+status)
-  let budget =
-    terminalWidth - MARKER_WIDTH - id - TITLE_MIN_WIDTH - status - gap * 2;
-
-  // Try adding optional columns (right-to-left removal order: priority, labels, assignee)
-  // Priority is rightmost — its width is NOT subtracted from title, giving title more space
+  // Try adding optional columns; removal order when narrow: priority, labels, status
+  // Assignee is kept as long as status is shown (they share the same budget tier)
   let showAssignee = false;
   let assignee = 0;
   if (
@@ -83,6 +81,13 @@ function computeColumnWidths(
     showAssignee = true;
     assignee = FIXED_ASSIGNEE;
     budget -= assignee + gap;
+  }
+
+  let showStatus = false;
+  const status = FIXED_STATUS;
+  if (budget >= status + gap) {
+    showStatus = true;
+    budget -= status + gap;
   }
 
   let showLabels = false;
@@ -97,20 +102,31 @@ function computeColumnWidths(
     budget -= labels + gap;
   }
 
-  const showPriority =
-    capabilities.fields.priority && hasData(treeItems, 'priority');
-  const priority = showPriority ? FIXED_PRIORITY : 0;
+  let showPriority = false;
+  let priority = 0;
+  if (
+    capabilities.fields.priority &&
+    hasData(treeItems, 'priority') &&
+    budget >= FIXED_PRIORITY
+  ) {
+    showPriority = true;
+    priority = FIXED_PRIORITY;
+  }
+
+  // Title gets all remaining space after fixed columns
+  const titleWidth =
+    terminalWidth -
+    MARKER_WIDTH -
+    id -
+    gap -
+    (showStatus ? status + gap : 0) -
+    (showAssignee ? assignee + gap : 0) -
+    (showLabels ? labels + gap : 0) -
+    (showPriority ? priority : 0);
 
   return {
     id,
-    title:
-      terminalWidth -
-      MARKER_WIDTH -
-      id -
-      status -
-      gap * 2 -
-      (showAssignee ? assignee + gap : 0) -
-      (showLabels ? labels + gap : 0),
+    title: titleWidth,
     status,
     priority,
     assignee,
@@ -118,6 +134,7 @@ function computeColumnWidths(
     showPriority,
     showAssignee,
     showLabels,
+    showStatus,
   };
 }
 
@@ -161,17 +178,19 @@ const TableRow = memo(
             {typeLabel}
           </Text>
         </Box>
-        <Box width={columns.status} marginRight={gap} overflowX="hidden">
-          <Text
-            color={selected ? 'cyan' : undefined}
-            bold={selected}
-            dimColor={dimmed}
-            wrap="truncate"
-          >
-            {capabilities.fields.dependsOn && hasUnresolvedDeps ? '⧗ ' : ''}
-            {item.status}
-          </Text>
-        </Box>
+        {columns.showStatus && (
+          <Box width={columns.status} marginRight={gap} overflowX="hidden">
+            <Text
+              color={selected ? 'cyan' : undefined}
+              bold={selected}
+              dimColor={dimmed}
+              wrap="truncate"
+            >
+              {capabilities.fields.dependsOn && hasUnresolvedDeps ? '⧗ ' : ''}
+              {item.status}
+            </Text>
+          </Box>
+        )}
         {columns.showAssignee && (
           <Box width={columns.assignee} marginRight={gap} overflowX="hidden">
             <Text
@@ -275,11 +294,13 @@ function TableLayoutInner({
             Title
           </Text>
         </Box>
-        <Box width={columns.status} marginRight={gap}>
-          <Text bold underline>
-            Status
-          </Text>
-        </Box>
+        {columns.showStatus && (
+          <Box width={columns.status} marginRight={gap}>
+            <Text bold underline>
+              Status
+            </Text>
+          </Box>
+        )}
         {columns.showAssignee && (
           <Box width={columns.assignee} marginRight={gap}>
             <Text bold underline>
