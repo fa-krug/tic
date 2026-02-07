@@ -168,6 +168,13 @@ const commands: Command[] = [
   },
   // Other
   {
+    id: 'toggle-detail-panel',
+    label: 'Toggle detail panel',
+    category: 'Other',
+    shortcut: 'v',
+    when: (ctx) => ctx.screen === 'list',
+  },
+  {
     id: 'quit',
     label: 'Quit',
     category: 'Other',

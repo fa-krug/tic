@@ -8,7 +8,7 @@ import {
 import { listViewStore, useListViewStore } from '../stores/listViewStore.js';
 import { isGitRepo } from '../git.js';
 import { beginImplementation } from '../implement.js';
-import { useConfigStore } from '../stores/configStore.js';
+import { configStore, useConfigStore } from '../stores/configStore.js';
 import { uiStore, useUIStore, getOverlayTargetIds } from '../stores/uiStore.js';
 import { TableLayout } from './TableLayout.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
@@ -33,6 +33,7 @@ import { PriorityPicker } from './PriorityPicker.js';
 import { TemplatePicker } from './TemplatePicker.js';
 import { TypePicker } from './TypePicker.js';
 import { StatusPicker } from './StatusPicker.js';
+import { DetailPanel } from './DetailPanel.js';
 import { AutocompleteInput } from './AutocompleteInput.js';
 import { MultiAutocompleteInput } from './MultiAutocompleteInput.js';
 import type { WorkItem, Template } from '../types.js';
@@ -117,6 +118,9 @@ export function WorkItemList() {
 
   const defaultType = useConfigStore((s) => s.config.defaultType ?? null);
   const branchMode = useConfigStore((s) => s.config.branchMode ?? 'worktree');
+  const showDetailPanel = useConfigStore(
+    (s) => s.config.showDetailPanel ?? true,
+  );
   const { exit } = useApp();
 
   // Store selectors for persistent list view state
@@ -280,7 +284,7 @@ export function WorkItemList() {
   const viewport = useScrollViewport({
     totalItems: treeItems.length,
     cursor,
-    chromeLines: 7, // title+margin (2) + table header (1) + preview line (1) + help bar margin+text (2) + warning (1)
+    chromeLines: showDetailPanel ? 11 : 6, // title+margin (2) + table header (1) + detail panel (5) or nothing (0) + help bar margin+text (2) + warning (1)
     linesPerItem: 1,
   });
 
@@ -464,6 +468,12 @@ export function WorkItemList() {
 
       if (input === 's') {
         navigate('status');
+      }
+
+      if (input === 'v') {
+        void configStore
+          .getState()
+          .update({ showDetailPanel: !showDetailPanel });
       }
 
       if (input === 'p' && capabilities.fields.parent && treeItems.length > 0) {
@@ -917,12 +927,11 @@ export function WorkItemList() {
             </Box>
           )}
 
-          {treeItems.length > 0 && treeItems[cursor] && (
-            <Box>
-              <Text dimColor wrap="truncate">
-                {treeItems[cursor].item.title}
-              </Text>
-            </Box>
+          {showDetailPanel && treeItems.length > 0 && treeItems[cursor] && (
+            <DetailPanel
+              item={treeItems[cursor].item}
+              terminalWidth={terminalWidth}
+            />
           )}
 
           <Box marginTop={1}>

@@ -13,6 +13,7 @@ export interface Config {
   branchMode: 'worktree' | 'branch';
   autoUpdate: boolean;
   defaultType?: string;
+  showDetailPanel?: boolean;
   jira?: {
     site: string;
     project: string;
