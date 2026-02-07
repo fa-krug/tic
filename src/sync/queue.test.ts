@@ -104,6 +104,19 @@ describe('SyncQueueStore', () => {
     expect(queue.pending).toEqual([]);
   });
 
+  it('removeByIds removes entries matching item IDs and action', async () => {
+    await store.append({ action: 'update', itemId: 'a', timestamp: '1' });
+    await store.append({ action: 'update', itemId: 'b', timestamp: '2' });
+    await store.append({ action: 'delete', itemId: 'c', timestamp: '3' });
+    await store.append({ action: 'update', itemId: 'd', timestamp: '4' });
+
+    await store.removeByIds(['b', 'd'], 'update');
+
+    const queue = await store.read();
+    expect(queue.pending).toHaveLength(2);
+    expect(queue.pending.map((e) => e.itemId)).toEqual(['a', 'c']);
+  });
+
   it('renames an itemId across all pending entries', async () => {
     await store.append({
       action: 'create',

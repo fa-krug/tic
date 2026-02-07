@@ -44,6 +44,15 @@ export class SyncQueueStore {
     await this.write(queue);
   }
 
+  async removeByIds(itemIds: string[], action: QueueAction): Promise<void> {
+    const queue = await this.read();
+    const idSet = new Set(itemIds);
+    queue.pending = queue.pending.filter(
+      (e) => !(idSet.has(e.itemId) && e.action === action),
+    );
+    await this.write(queue);
+  }
+
   async clear(): Promise<void> {
     await this.write({ pending: [] });
   }
