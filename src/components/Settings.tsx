@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Box, Text, useInput } from 'ink';
+import { Box, Text, useInput, useApp } from 'ink';
 import TextInput from 'ink-text-input';
 import { useNavigationStore } from '../stores/navigationStore.js';
 import {
@@ -16,9 +16,7 @@ import type { Template } from '../types.js';
 import { checkForUpdate } from '../update-checker.js';
 import type { UpdateInfo } from '../update-checker.js';
 import { VERSION } from '../version.js';
-import { spawn } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
-import path from 'node:path';
+import { requestUpdate } from '../updater.js';
 import { DefaultPicker } from './DefaultPicker.js';
 
 type NavItem =
@@ -38,6 +36,7 @@ const JIRA_FIELDS = ['site', 'project', 'boardId'] as const;
 type AvailabilityStatus = 'checking' | 'available' | 'unavailable';
 
 export function Settings() {
+  const { exit } = useApp();
   const backend = useBackendDataStore((s) => s.backend);
   const syncManager = useBackendDataStore((s) => s.syncManager);
   const navigate = useNavigationStore((s) => s.navigate);
@@ -288,18 +287,8 @@ export function Settings() {
             setUpdateChecking(false);
           });
         } else if (item.kind === 'update-now') {
-          const __filename = fileURLToPath(import.meta.url);
-          const updaterPath = path.join(
-            path.dirname(__filename),
-            '..',
-            'updater.js',
-          );
-          const originalArgs = process.argv.slice(2);
-          spawn('node', [updaterPath, ...originalArgs], {
-            stdio: 'inherit',
-            detached: true,
-          });
-          process.exit(0);
+          requestUpdate();
+          exit();
         } else if (item.kind === 'update-toggle') {
           void configStore
             .getState()

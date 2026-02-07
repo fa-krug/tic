@@ -1,6 +1,16 @@
-import { execSync, spawn } from 'node:child_process';
+import { execSync, spawnSync } from 'node:child_process';
 
 const PACKAGE_NAME = '@sascha384/tic';
+
+let _updateRequested = false;
+
+export function requestUpdate(): void {
+  _updateRequested = true;
+}
+
+export function isUpdateRequested(): boolean {
+  return _updateRequested;
+}
 
 export function buildUpdateCommand(): string {
   return `npm install -g ${PACKAGE_NAME}@latest`;
@@ -28,23 +38,9 @@ export function runUpdate(originalArgs: string[]): void {
   console.log('\nUpdate complete! Restarting tic...\n');
 
   const { command, args } = buildRelaunchArgs(originalArgs);
-  const child = spawn(command, args, {
+  const result = spawnSync(command, args, {
     stdio: 'inherit',
-    detached: false,
   });
 
-  child.on('exit', (code) => {
-    process.exit(code ?? 0);
-  });
-}
-
-// When run directly as a script
-const isDirectRun =
-  process.argv[1] &&
-  (process.argv[1].endsWith('/updater.js') ||
-    process.argv[1].endsWith('\\updater.js'));
-
-if (isDirectRun) {
-  const originalArgs = process.argv.slice(2);
-  runUpdate(originalArgs);
+  process.exit(result.status ?? 0);
 }

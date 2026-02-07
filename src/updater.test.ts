@@ -1,7 +1,23 @@
 import { describe, it, expect } from 'vitest';
-import { buildUpdateCommand, buildRelaunchArgs } from './updater.js';
+import {
+  buildUpdateCommand,
+  buildRelaunchArgs,
+  isUpdateRequested,
+  requestUpdate,
+} from './updater.js';
 
 describe('updater', () => {
+  describe('update signal', () => {
+    it('isUpdateRequested returns false by default', () => {
+      expect(isUpdateRequested()).toBe(false);
+    });
+
+    it('returns true after requestUpdate', () => {
+      requestUpdate();
+      expect(isUpdateRequested()).toBe(true);
+    });
+  });
+
   describe('buildUpdateCommand', () => {
     it('returns npm install command for the package', () => {
       const cmd = buildUpdateCommand();

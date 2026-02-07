@@ -22,4 +22,11 @@ if (process.argv.length > 2) {
   await app.waitUntilExit();
   backendDataStore.getState().destroy();
   configStore.getState().destroy();
+
+  // If an update was requested from Settings, run it now while we still
+  // have foreground terminal control (Ink has already unmounted).
+  const { isUpdateRequested, runUpdate } = await import('./updater.js');
+  if (isUpdateRequested()) {
+    runUpdate([]);
+  }
 }
