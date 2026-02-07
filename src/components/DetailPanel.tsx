@@ -31,12 +31,28 @@ function priorityIcon(priority: string): string {
   }
 }
 
+export function truncateDescription(
+  description: string,
+  width: number,
+): string {
+  if (!description) return '';
+  const firstLine = description.split('\n')[0]!;
+  if (firstLine.length <= width) return firstLine;
+  return firstLine.slice(0, width - 1) + '\u2026';
+}
+
 export function DetailPanel({
   item,
   terminalWidth,
+  showFullDescription,
+  descriptionScrollOffset,
+  maxDescriptionHeight,
 }: {
   item: WorkItem;
   terminalWidth: number;
+  showFullDescription?: boolean;
+  descriptionScrollOffset?: number;
+  maxDescriptionHeight?: number;
 }) {
   const metaParts: string[] = [`#${item.id}`, item.status];
   if (item.assignee) {
@@ -45,6 +61,17 @@ export function DetailPanel({
   const metaLine = metaParts.join('  ·  ');
 
   const hasBottom = item.priority || item.labels.length > 0;
+  const hasDescription = item.description.trim().length > 0;
+  const contentWidth = terminalWidth - 1;
+
+  const descriptionLines =
+    hasDescription && showFullDescription ? item.description.split('\n') : [];
+  const scrollOffset = descriptionScrollOffset ?? 0;
+  const viewportHeight = maxDescriptionHeight ?? descriptionLines.length;
+  const visibleLines = descriptionLines.slice(
+    scrollOffset,
+    scrollOffset + viewportHeight,
+  );
 
   return (
     <Box
@@ -75,6 +102,28 @@ export function DetailPanel({
             <Text dimColor>{item.labels.join(', ')}</Text>
           )}
         </Box>
+      )}
+      {hasDescription && !showFullDescription && (
+        <Box>
+          <Text dimColor wrap="truncate">
+            {truncateDescription(item.description, contentWidth)}
+          </Text>
+        </Box>
+      )}
+      {showFullDescription && hasDescription && (
+        <>
+          <Box>
+            <Text dimColor>
+              {'─── description '}
+              {'─'.repeat(Math.max(0, contentWidth - 17))}
+            </Text>
+          </Box>
+          {visibleLines.map((line, idx) => (
+            <Box key={idx}>
+              <Text dimColor>{line || ' '}</Text>
+            </Box>
+          ))}
+        </>
       )}
     </Box>
   );
