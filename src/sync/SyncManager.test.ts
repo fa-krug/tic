@@ -292,6 +292,28 @@ describe('SyncManager push phase', () => {
     expect(deleteSpy).not.toHaveBeenCalled();
   });
 
+  it('treats not-found errors on delete as success (idempotent)', async () => {
+    const notFoundRemote = createMockRemote();
+    // eslint-disable-next-line @typescript-eslint/require-await
+    notFoundRemote.deleteWorkItem = async () => {
+      throw new Error(
+        'Could not resolve to an issue or pull request with the number of 1.',
+      );
+    };
+    const notFoundManager = new SyncManager(local, notFoundRemote, queueStore);
+
+    await queueStore.append({
+      action: 'delete',
+      itemId: '1',
+      timestamp: new Date().toISOString(),
+    });
+
+    const result = await notFoundManager.pushPending();
+    expect(result.pushed).toBe(1);
+    expect(result.failed).toBe(0);
+    expect((await queueStore.read()).pending).toHaveLength(0);
+  });
+
   it('keeps failed entries in queue', async () => {
     const failingRemote = createMockRemote();
     // eslint-disable-next-line @typescript-eslint/require-await

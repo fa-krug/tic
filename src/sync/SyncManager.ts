@@ -166,7 +166,14 @@ export class SyncManager {
         // Items with local- prefix were never synced to remote, nothing to delete.
         // Return successfully so the entry is removed from the queue.
         if (!entry.itemId.startsWith('local-')) {
-          await this.remote.deleteWorkItem(entry.itemId);
+          try {
+            await this.remote.deleteWorkItem(entry.itemId);
+          } catch (e) {
+            // If the item is already gone from remote, treat as success (idempotent delete).
+            if (!this.isNotFoundError(e)) {
+              throw e;
+            }
+          }
         }
         return entry.itemId;
       }
@@ -196,6 +203,18 @@ export class SyncManager {
       default:
         return entry.itemId;
     }
+  }
+
+  /** Check if an error indicates the remote item was not found (already deleted). */
+  private isNotFoundError(e: unknown): boolean {
+    if (!(e instanceof Error)) return false;
+    const msg = e.message.toLowerCase();
+    return (
+      msg.includes('could not resolve to') ||
+      msg.includes('not found') ||
+      msg.includes('does not exist') ||
+      msg.includes('404')
+    );
   }
 
   private async renameLocalItem(oldId: string, newId: string): Promise<void> {
