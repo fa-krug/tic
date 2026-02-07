@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { filterCommands, groupByCategory } from './CommandPalette.js';
-import type { Command } from '../commands.js';
+import {
+  filterCommands,
+  groupCommandsByCategory,
+  type Command,
+} from '../commands.js';
 
 function makeCmd(overrides: Partial<Command> & { id: string }): Command {
   return {
@@ -47,7 +50,7 @@ describe('filterCommands', () => {
   });
 });
 
-describe('groupByCategory', () => {
+describe('groupCommandsByCategory', () => {
   it('groups commands by category in order', () => {
     const cmds: Command[] = [
       makeCmd({ id: 'a', label: 'A', category: 'Other' }),
@@ -55,7 +58,7 @@ describe('groupByCategory', () => {
       makeCmd({ id: 'c', label: 'C', category: 'Actions' }),
       makeCmd({ id: 'd', label: 'D', category: 'Navigation' }),
     ];
-    const groups = groupByCategory(cmds);
+    const groups = groupCommandsByCategory(cmds);
     expect(groups[0]!.category).toBe('Actions');
     expect(groups[0]!.commands).toHaveLength(2);
     expect(groups[1]!.category).toBe('Navigation');
@@ -68,7 +71,7 @@ describe('groupByCategory', () => {
     const cmds: Command[] = [
       makeCmd({ id: 'a', label: 'A', category: 'Other' }),
     ];
-    const groups = groupByCategory(cmds);
+    const groups = groupCommandsByCategory(cmds);
     expect(groups).toHaveLength(1);
     expect(groups[0]!.category).toBe('Other');
   });

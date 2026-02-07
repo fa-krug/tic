@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { groupResults } from './SearchOverlay.js';
+import { groupResults } from './fuzzyMatch.js';
 import type { WorkItem } from '../types.js';
 import type { FuzzyResult } from './fuzzyMatch.js';
 

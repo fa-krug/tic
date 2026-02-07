@@ -21,8 +21,6 @@ import { useShallow } from 'zustand/shallow';
 import { SyncQueueStore } from '../sync/queue.js';
 import type { QueueAction } from '../sync/types.js';
 import { buildTree, type TreeItem } from './buildTree.js';
-import { SearchOverlay } from './SearchOverlay.js';
-import { CommandPalette } from './CommandPalette.js';
 import {
   getVisibleCommands,
   type Command,
@@ -823,456 +821,474 @@ export function WorkItemList() {
 
   return (
     <Box flexDirection="column">
-      {activeOverlay?.type === 'search' && (
-        <SearchOverlay
-          items={allSearchItems}
-          currentIteration={iteration}
-          onSelect={handleSearchSelect}
-          onCancel={handleSearchCancel}
+      <Box marginBottom={1}>
+        <Text wrap="truncate">
+          <Text bold color="cyan">
+            {typeLabel} — {iteration}
+          </Text>
+          <Text dimColor>{` (${items.length} items)`}</Text>
+          {markedCount > 0 && (
+            <Text color="magenta">{` ● ${markedCount} marked`}</Text>
+          )}
+        </Text>
+      </Box>
+
+      <TableLayout
+        treeItems={visibleTreeItems}
+        cursor={viewport.visibleCursor}
+        capabilities={capabilities}
+        collapsedIds={collapsedIds}
+        markedIds={markedIds}
+        terminalWidth={terminalWidth}
+      />
+
+      {treeItems.length === 0 && !loading && initError && (
+        <Box marginTop={1} flexDirection="column">
+          <Text color="red">Failed to connect to backend:</Text>
+          <Box marginLeft={2}>
+            <Text color="red">{initError}</Text>
+          </Box>
+          <Text dimColor>Press , for settings or q to quit.</Text>
+        </Box>
+      )}
+      {treeItems.length === 0 && !loading && !initError && (
+        <Box marginTop={1}>
+          <Text dimColor>
+            No {activeType ?? 'item'}s in this iteration. Press c to create, /
+            to search all.
+          </Text>
+        </Box>
+      )}
+      {loading && treeItems.length === 0 && (
+        <Box marginTop={1}>
+          <Text dimColor>Loading...</Text>
+        </Box>
+      )}
+
+      {showDetailPanel && treeItems.length > 0 && treeItems[cursor] && (
+        <DetailPanel
+          item={treeItems[cursor].item}
+          terminalWidth={terminalWidth}
+          showFullDescription={showFullDescription}
+          descriptionScrollOffset={descriptionScrollOffset}
+          maxDescriptionHeight={maxDescriptionHeight}
         />
       )}
-      {activeOverlay?.type !== 'search' && (
-        <>
-          {activeOverlay?.type === 'bulk-menu' &&
-            (() => {
-              const bulkItems: OverlayItem[] = [];
-              bulkItems.push({
-                id: 'status',
-                label: 'Set status...',
-                value: 'status',
-                hint: 's',
-              });
-              if (capabilities.iterations) {
-                bulkItems.push({
-                  id: 'iteration',
-                  label: 'Set iteration...',
-                  value: 'iteration',
-                  hint: 'i',
-                });
-              }
-              if (capabilities.fields.parent) {
-                bulkItems.push({
-                  id: 'parent',
-                  label: 'Set parent...',
-                  value: 'parent',
-                  hint: 'p',
-                });
-              }
-              if (capabilities.customTypes) {
-                bulkItems.push({
-                  id: 'type',
-                  label: 'Set type...',
-                  value: 'type',
-                  hint: 't',
-                });
-              }
-              if (capabilities.fields.priority) {
-                bulkItems.push({
-                  id: 'priority',
-                  label: 'Set priority...',
-                  value: 'priority',
-                  hint: 'P',
-                });
-              }
-              if (capabilities.fields.assignee) {
-                bulkItems.push({
-                  id: 'assignee',
-                  label: 'Set assignee...',
-                  value: 'assignee',
-                  hint: 'a',
-                });
-              }
-              if (capabilities.fields.labels) {
-                bulkItems.push({
-                  id: 'labels',
-                  label: 'Set labels...',
-                  value: 'labels',
-                  hint: 'l',
-                });
-              }
-              bulkItems.push({
-                id: 'delete',
-                label: 'Delete',
-                value: 'delete',
-                hint: 'd',
-              });
-              const count = markedIds.size > 0 ? markedIds.size : 1;
-              return (
-                <OverlayPanel
-                  title={`Bulk Actions (${count} ${count === 1 ? 'item' : 'items'})`}
-                  items={bulkItems}
-                  onSelect={(item) => {
-                    closeOverlay();
-                    handleBulkAction(item.value as BulkAction);
-                  }}
-                  onCancel={() => closeOverlay()}
-                />
-              );
-            })()}
-          {activeOverlay?.type === 'command-palette' && (
-            <CommandPalette
-              commands={paletteCommands}
-              onSelect={handleCommandSelect}
-              onCancel={() => closeOverlay()}
-            />
-          )}
-          {activeOverlay?.type === 'status-picker' && (
-            <OverlayPanel
-              title="Set Status"
-              items={statuses.map((s) => ({ id: s, label: s, value: s }))}
-              onSelect={(item) => {
-                const targetIds = getOverlayTargetIds();
-                closeOverlay();
-                if (!backend) return;
-                void (async () => {
-                  for (const id of targetIds) {
-                    await backend.cachedUpdateWorkItem(id, {
-                      status: item.value,
-                    });
-                    await queueWrite('update', id);
-                  }
-                  refreshData();
-                  setToast(
-                    targetIds.length === 1
-                      ? 'Status updated'
-                      : `${targetIds.length} items updated`,
-                  );
-                })();
-              }}
-              onCancel={() => closeOverlay()}
-            />
-          )}
-          {activeOverlay?.type === 'type-picker' && (
-            <OverlayPanel
-              title="Set Type"
-              items={types.map((t) => ({
-                id: t,
-                label: t.charAt(0).toUpperCase() + t.slice(1),
-                value: t,
-              }))}
-              onSelect={(item) => {
-                const targetIds = getOverlayTargetIds();
-                closeOverlay();
-                if (!backend) return;
-                void (async () => {
-                  for (const id of targetIds) {
-                    await backend.cachedUpdateWorkItem(id, {
-                      type: item.value,
-                    });
-                    await queueWrite('update', id);
-                  }
-                  refreshData();
-                  setToast(
-                    targetIds.length === 1
-                      ? 'Type updated'
-                      : `${targetIds.length} items updated`,
-                  );
-                })();
-              }}
-              onCancel={() => closeOverlay()}
-            />
-          )}
-          {activeOverlay?.type === 'priority-picker' && (
-            <OverlayPanel
-              title="Set Priority"
-              items={[
-                { id: 'critical', label: 'Critical', value: 'critical' },
-                { id: 'high', label: 'High', value: 'high' },
-                { id: 'medium', label: 'Medium', value: 'medium' },
-                { id: 'low', label: 'Low', value: 'low' },
-              ]}
-              onSelect={(item) => {
-                const targetIds = getOverlayTargetIds();
-                closeOverlay();
-                if (!backend) return;
-                const priority = item.value as
-                  | 'low'
-                  | 'medium'
-                  | 'high'
-                  | 'critical';
-                void (async () => {
-                  for (const id of targetIds) {
-                    await backend.cachedUpdateWorkItem(id, { priority });
-                    await queueWrite('update', id);
-                  }
-                  refreshData();
-                  setToast(
-                    targetIds.length === 1
-                      ? 'Priority updated'
-                      : `${targetIds.length} items updated`,
-                  );
-                })();
-              }}
-              onCancel={() => closeOverlay()}
-            />
-          )}
-          {activeOverlay?.type === 'template-picker' && (
-            <OverlayPanel
-              title="Select Template"
-              items={[
-                { id: '__none__', label: 'No template', value: '__none__' },
-                ...templates.map((t) => ({
-                  id: t.slug,
-                  label: t.name,
-                  value: t.slug,
-                })),
-              ]}
-              onSelect={(item) => {
-                closeOverlay();
-                setFormMode('item');
-                if (item.value === '__none__') {
-                  setActiveTemplate(null);
-                } else {
-                  const template = templates.find((t) => t.slug === item.value);
-                  setActiveTemplate(template ?? null);
-                }
-                selectWorkItem(null);
-                navigate('form');
-              }}
-              onCancel={() => closeOverlay()}
-            />
-          )}
-          <Box marginBottom={1}>
-            <Text wrap="truncate">
-              <Text bold color="cyan">
-                {typeLabel} — {iteration}
-              </Text>
-              <Text dimColor>{` (${items.length} items)`}</Text>
-              {markedCount > 0 && (
-                <Text color="magenta">{` ● ${markedCount} marked`}</Text>
-              )}
-            </Text>
+
+      <Box marginTop={1}>
+        {showFullDescription ? (
+          <Box>
+            <Text dimColor>↑↓ scroll space/esc close</Text>
+            {positionText && <Text dimColor> {positionText}</Text>}
           </Box>
-
-          <TableLayout
-            treeItems={visibleTreeItems}
-            cursor={viewport.visibleCursor}
-            capabilities={capabilities}
-            collapsedIds={collapsedIds}
-            markedIds={markedIds}
-            terminalWidth={terminalWidth}
-          />
-
-          {treeItems.length === 0 && !loading && initError && (
-            <Box marginTop={1} flexDirection="column">
-              <Text color="red">Failed to connect to backend:</Text>
-              <Box marginLeft={2}>
-                <Text color="red">{initError}</Text>
-              </Box>
-              <Text dimColor>Press , for settings or q to quit.</Text>
-            </Box>
-          )}
-          {treeItems.length === 0 && !loading && !initError && (
-            <Box marginTop={1}>
-              <Text dimColor>
-                No {activeType ?? 'item'}s in this iteration. Press c to create,
-                / to search all.
-              </Text>
-            </Box>
-          )}
-          {loading && treeItems.length === 0 && (
-            <Box marginTop={1}>
-              <Text dimColor>Loading...</Text>
-            </Box>
-          )}
-
-          {showDetailPanel && treeItems.length > 0 && treeItems[cursor] && (
-            <DetailPanel
-              item={treeItems[cursor].item}
-              terminalWidth={terminalWidth}
-              showFullDescription={showFullDescription}
-              descriptionScrollOffset={descriptionScrollOffset}
-              maxDescriptionHeight={maxDescriptionHeight}
-            />
-          )}
-
-          <Box marginTop={1}>
-            {showFullDescription ? (
-              <Box>
-                <Text dimColor>↑↓ scroll space/esc close</Text>
-                {positionText && <Text dimColor> {positionText}</Text>}
-              </Box>
-            ) : activeOverlay?.type === 'parent-input' ? (
-              <Box flexDirection="column">
-                <Text color="cyan">
-                  Set parent for {activeOverlay.targetIds.length} item
-                  {activeOverlay.targetIds.length > 1 ? 's' : ''} (empty to
-                  clear):
-                </Text>
-                <AutocompleteInput
-                  value={parentInput}
-                  onChange={setParentInput}
-                  focus={true}
-                  suggestions={parentSuggestions}
-                  onSubmit={() => {
-                    const targetIds = getOverlayTargetIds();
-                    if (!backend) return;
-                    void (async () => {
-                      const raw = parentInput.trim();
-                      const newParent =
-                        raw === ''
-                          ? null
-                          : raw.includes(' - ')
-                            ? raw.split(' - ')[0]!.trim()
-                            : raw;
-                      try {
-                        for (const id of targetIds) {
-                          await backend.cachedUpdateWorkItem(id, {
-                            parent: newParent,
-                          });
-                          await queueWrite('update', id);
-                        }
-                        clearWarning();
-                      } catch (e) {
-                        setWarning(
-                          e instanceof Error ? e.message : 'Invalid parent',
-                        );
-                      }
-                      closeOverlay();
-                      setParentInput('');
-                      refreshData();
-                      setToast(
-                        targetIds.length === 1
-                          ? 'Parent updated'
-                          : `${targetIds.length} items updated`,
-                      );
-                    })();
-                  }}
-                />
-              </Box>
-            ) : activeOverlay?.type === 'assignee-input' ? (
-              <Box flexDirection="column">
-                <Text color="cyan">
-                  Set assignee for {activeOverlay.targetIds.length} item
-                  {activeOverlay.targetIds.length > 1 ? 's' : ''}:
-                </Text>
-                <AutocompleteInput
-                  value={assigneeInput}
-                  onChange={setAssigneeInput}
-                  focus={true}
-                  suggestions={assignees}
-                  onSubmit={() => {
-                    const targetIds = getOverlayTargetIds();
-                    closeOverlay();
-                    if (!backend) return;
-                    void (async () => {
-                      const assignee = assigneeInput.trim();
-                      for (const id of targetIds) {
-                        await backend.cachedUpdateWorkItem(id, { assignee });
-                        await queueWrite('update', id);
-                      }
-                      setAssigneeInput('');
-                      refreshData();
-                      setToast(
-                        targetIds.length === 1
-                          ? 'Assignee updated'
-                          : `${targetIds.length} items updated`,
-                      );
-                    })();
-                  }}
-                />
-              </Box>
-            ) : activeOverlay?.type === 'labels-input' ? (
-              <Box flexDirection="column">
-                <Text color="cyan">
-                  Set labels for {activeOverlay.targetIds.length} item
-                  {activeOverlay.targetIds.length > 1 ? 's' : ''}{' '}
-                  (comma-separated):
-                </Text>
-                <MultiAutocompleteInput
-                  value={labelsInput}
-                  onChange={setLabelsInput}
-                  focus={true}
-                  suggestions={labelSuggestions}
-                  onSubmit={() => {
-                    const targetIds = getOverlayTargetIds();
-                    closeOverlay();
-                    if (!backend) return;
-                    void (async () => {
-                      const labels = labelsInput
-                        .split(',')
-                        .map((l) => l.trim())
-                        .filter(Boolean);
-                      for (const id of targetIds) {
-                        await backend.cachedUpdateWorkItem(id, { labels });
-                        await queueWrite('update', id);
-                      }
-                      setLabelsInput('');
-                      refreshData();
-                      setToast(
-                        targetIds.length === 1
-                          ? 'Labels updated'
-                          : `${targetIds.length} items updated`,
-                      );
-                    })();
-                  }}
-                />
-              </Box>
-            ) : activeOverlay?.type === 'delete-confirm' ? (
+        ) : activeOverlay?.type === 'search' ? (
+          (() => {
+            const searchItems: OverlayItem[] = allSearchItems.map((item) => ({
+              id: item.id,
+              label: `#${item.id} ${item.title}`,
+              value: item.id,
+              hint: item.type,
+              category:
+                item.iteration === iteration
+                  ? 'Current iteration'
+                  : (item.iteration ?? 'No iteration'),
+            }));
+            return (
               <OverlayPanel
-                title={`Delete ${activeOverlay.targetIds.length} item${activeOverlay.targetIds.length > 1 ? 's' : ''}?`}
-                items={[
-                  { id: 'yes', label: 'Yes, delete', value: 'yes' },
-                  { id: 'no', label: 'Cancel', value: 'no' },
-                ]}
+                title="Search"
+                items={searchItems}
+                placeholder="Type to search..."
+                onSelect={(selected) => {
+                  const item = allSearchItems.find(
+                    (i) => i.id === selected.value,
+                  );
+                  if (item) handleSearchSelect(item);
+                }}
+                onCancel={handleSearchCancel}
+              />
+            );
+          })()
+        ) : activeOverlay?.type === 'bulk-menu' ? (
+          (() => {
+            const bulkItems: OverlayItem[] = [];
+            bulkItems.push({
+              id: 'status',
+              label: 'Set status...',
+              value: 'status',
+              hint: 's',
+            });
+            if (capabilities.iterations) {
+              bulkItems.push({
+                id: 'iteration',
+                label: 'Set iteration...',
+                value: 'iteration',
+                hint: 'i',
+              });
+            }
+            if (capabilities.fields.parent) {
+              bulkItems.push({
+                id: 'parent',
+                label: 'Set parent...',
+                value: 'parent',
+                hint: 'p',
+              });
+            }
+            if (capabilities.customTypes) {
+              bulkItems.push({
+                id: 'type',
+                label: 'Set type...',
+                value: 'type',
+                hint: 't',
+              });
+            }
+            if (capabilities.fields.priority) {
+              bulkItems.push({
+                id: 'priority',
+                label: 'Set priority...',
+                value: 'priority',
+                hint: 'P',
+              });
+            }
+            if (capabilities.fields.assignee) {
+              bulkItems.push({
+                id: 'assignee',
+                label: 'Set assignee...',
+                value: 'assignee',
+                hint: 'a',
+              });
+            }
+            if (capabilities.fields.labels) {
+              bulkItems.push({
+                id: 'labels',
+                label: 'Set labels...',
+                value: 'labels',
+                hint: 'l',
+              });
+            }
+            bulkItems.push({
+              id: 'delete',
+              label: 'Delete',
+              value: 'delete',
+              hint: 'd',
+            });
+            const count = markedIds.size > 0 ? markedIds.size : 1;
+            return (
+              <OverlayPanel
+                title={`Bulk Actions (${count} ${count === 1 ? 'item' : 'items'})`}
+                items={bulkItems}
                 onSelect={(item) => {
-                  if (item.value === 'yes') {
-                    const targetIds = activeOverlay.targetIds;
-                    if (!backend) return;
-                    void (async () => {
-                      for (const id of targetIds) {
-                        await backend.cachedDeleteWorkItem(id);
-                        await queueWrite('delete', id);
-                      }
-                      closeOverlay();
-                      for (const id of targetIds) {
-                        removeDeletedItem(id);
-                      }
-                      setCursor(Math.max(0, cursor - 1));
-                      refreshData();
-                      setToast(
-                        targetIds.length === 1
-                          ? `Item #${targetIds[0]} deleted`
-                          : `${targetIds.length} items deleted`,
-                      );
-                    })();
-                  } else {
-                    closeOverlay();
-                  }
+                  closeOverlay();
+                  handleBulkAction(item.value as BulkAction);
                 }}
                 onCancel={() => closeOverlay()}
               />
-            ) : toast ? (
-              <Box>
-                <Text color="green">{toast.message}</Text>
-                {positionText && <Text dimColor> {positionText}</Text>}
-              </Box>
-            ) : (
-              <Box>
-                <Text dimColor>
-                  {buildHelpText(
-                    terminalWidth -
-                      (positionText ? positionText.length + 2 : 0),
-                  )}
-                </Text>
-                {positionText && <Text dimColor> {positionText}</Text>}
-              </Box>
-            )}
+            );
+          })()
+        ) : activeOverlay?.type === 'command-palette' ? (
+          <OverlayPanel
+            title="Commands"
+            items={paletteCommands.map((cmd) => ({
+              id: cmd.id,
+              label: cmd.label,
+              value: cmd.id,
+              hint: cmd.shortcut,
+              category: cmd.category,
+            }))}
+            placeholder="Type a command..."
+            onSelect={(item) => {
+              const cmd = paletteCommands.find((c) => c.id === item.value);
+              if (cmd) handleCommandSelect(cmd);
+            }}
+            onCancel={() => closeOverlay()}
+          />
+        ) : activeOverlay?.type === 'status-picker' ? (
+          <OverlayPanel
+            title="Set Status"
+            items={statuses.map((s) => ({ id: s, label: s, value: s }))}
+            onSelect={(item) => {
+              const targetIds = getOverlayTargetIds();
+              closeOverlay();
+              if (!backend) return;
+              void (async () => {
+                for (const id of targetIds) {
+                  await backend.cachedUpdateWorkItem(id, {
+                    status: item.value,
+                  });
+                  await queueWrite('update', id);
+                }
+                refreshData();
+                setToast(
+                  targetIds.length === 1
+                    ? 'Status updated'
+                    : `${targetIds.length} items updated`,
+                );
+              })();
+            }}
+            onCancel={() => closeOverlay()}
+          />
+        ) : activeOverlay?.type === 'type-picker' ? (
+          <OverlayPanel
+            title="Set Type"
+            items={types.map((t) => ({
+              id: t,
+              label: t.charAt(0).toUpperCase() + t.slice(1),
+              value: t,
+            }))}
+            onSelect={(item) => {
+              const targetIds = getOverlayTargetIds();
+              closeOverlay();
+              if (!backend) return;
+              void (async () => {
+                for (const id of targetIds) {
+                  await backend.cachedUpdateWorkItem(id, {
+                    type: item.value,
+                  });
+                  await queueWrite('update', id);
+                }
+                refreshData();
+                setToast(
+                  targetIds.length === 1
+                    ? 'Type updated'
+                    : `${targetIds.length} items updated`,
+                );
+              })();
+            }}
+            onCancel={() => closeOverlay()}
+          />
+        ) : activeOverlay?.type === 'priority-picker' ? (
+          <OverlayPanel
+            title="Set Priority"
+            items={[
+              { id: 'critical', label: 'Critical', value: 'critical' },
+              { id: 'high', label: 'High', value: 'high' },
+              { id: 'medium', label: 'Medium', value: 'medium' },
+              { id: 'low', label: 'Low', value: 'low' },
+            ]}
+            onSelect={(item) => {
+              const targetIds = getOverlayTargetIds();
+              closeOverlay();
+              if (!backend) return;
+              const priority = item.value as
+                | 'low'
+                | 'medium'
+                | 'high'
+                | 'critical';
+              void (async () => {
+                for (const id of targetIds) {
+                  await backend.cachedUpdateWorkItem(id, { priority });
+                  await queueWrite('update', id);
+                }
+                refreshData();
+                setToast(
+                  targetIds.length === 1
+                    ? 'Priority updated'
+                    : `${targetIds.length} items updated`,
+                );
+              })();
+            }}
+            onCancel={() => closeOverlay()}
+          />
+        ) : activeOverlay?.type === 'template-picker' ? (
+          <OverlayPanel
+            title="Select Template"
+            items={[
+              { id: '__none__', label: 'No template', value: '__none__' },
+              ...templates.map((t) => ({
+                id: t.slug,
+                label: t.name,
+                value: t.slug,
+              })),
+            ]}
+            onSelect={(item) => {
+              closeOverlay();
+              setFormMode('item');
+              if (item.value === '__none__') {
+                setActiveTemplate(null);
+              } else {
+                const template = templates.find((t) => t.slug === item.value);
+                setActiveTemplate(template ?? null);
+              }
+              selectWorkItem(null);
+              navigate('form');
+            }}
+            onCancel={() => closeOverlay()}
+          />
+        ) : activeOverlay?.type === 'parent-input' ? (
+          <Box flexDirection="column">
+            <Text color="cyan">
+              Set parent for {activeOverlay.targetIds.length} item
+              {activeOverlay.targetIds.length > 1 ? 's' : ''} (empty to clear):
+            </Text>
+            <AutocompleteInput
+              value={parentInput}
+              onChange={setParentInput}
+              focus={true}
+              suggestions={parentSuggestions}
+              onSubmit={() => {
+                const targetIds = getOverlayTargetIds();
+                if (!backend) return;
+                void (async () => {
+                  const raw = parentInput.trim();
+                  const newParent =
+                    raw === ''
+                      ? null
+                      : raw.includes(' - ')
+                        ? raw.split(' - ')[0]!.trim()
+                        : raw;
+                  try {
+                    for (const id of targetIds) {
+                      await backend.cachedUpdateWorkItem(id, {
+                        parent: newParent,
+                      });
+                      await queueWrite('update', id);
+                    }
+                    clearWarning();
+                  } catch (e) {
+                    setWarning(
+                      e instanceof Error ? e.message : 'Invalid parent',
+                    );
+                  }
+                  closeOverlay();
+                  setParentInput('');
+                  refreshData();
+                  setToast(
+                    targetIds.length === 1
+                      ? 'Parent updated'
+                      : `${targetIds.length} items updated`,
+                  );
+                })();
+              }}
+            />
           </Box>
-          {warning && (
-            <Box>
-              <Text color="yellow">⚠ {warning}</Text>
-            </Box>
-          )}
-          {updateInfo?.updateAvailable && activeOverlay === null && (
-            <Box>
-              <Text color="yellow">
-                Update available: {updateInfo.current} → {updateInfo.latest}{' '}
-                Press , to update in Settings
-              </Text>
-            </Box>
-          )}
-        </>
+        ) : activeOverlay?.type === 'assignee-input' ? (
+          <Box flexDirection="column">
+            <Text color="cyan">
+              Set assignee for {activeOverlay.targetIds.length} item
+              {activeOverlay.targetIds.length > 1 ? 's' : ''}:
+            </Text>
+            <AutocompleteInput
+              value={assigneeInput}
+              onChange={setAssigneeInput}
+              focus={true}
+              suggestions={assignees}
+              onSubmit={() => {
+                const targetIds = getOverlayTargetIds();
+                closeOverlay();
+                if (!backend) return;
+                void (async () => {
+                  const assignee = assigneeInput.trim();
+                  for (const id of targetIds) {
+                    await backend.cachedUpdateWorkItem(id, { assignee });
+                    await queueWrite('update', id);
+                  }
+                  setAssigneeInput('');
+                  refreshData();
+                  setToast(
+                    targetIds.length === 1
+                      ? 'Assignee updated'
+                      : `${targetIds.length} items updated`,
+                  );
+                })();
+              }}
+            />
+          </Box>
+        ) : activeOverlay?.type === 'labels-input' ? (
+          <Box flexDirection="column">
+            <Text color="cyan">
+              Set labels for {activeOverlay.targetIds.length} item
+              {activeOverlay.targetIds.length > 1 ? 's' : ''} (comma-separated):
+            </Text>
+            <MultiAutocompleteInput
+              value={labelsInput}
+              onChange={setLabelsInput}
+              focus={true}
+              suggestions={labelSuggestions}
+              onSubmit={() => {
+                const targetIds = getOverlayTargetIds();
+                closeOverlay();
+                if (!backend) return;
+                void (async () => {
+                  const labels = labelsInput
+                    .split(',')
+                    .map((l) => l.trim())
+                    .filter(Boolean);
+                  for (const id of targetIds) {
+                    await backend.cachedUpdateWorkItem(id, { labels });
+                    await queueWrite('update', id);
+                  }
+                  setLabelsInput('');
+                  refreshData();
+                  setToast(
+                    targetIds.length === 1
+                      ? 'Labels updated'
+                      : `${targetIds.length} items updated`,
+                  );
+                })();
+              }}
+            />
+          </Box>
+        ) : activeOverlay?.type === 'delete-confirm' ? (
+          <OverlayPanel
+            title={`Delete ${activeOverlay.targetIds.length} item${activeOverlay.targetIds.length > 1 ? 's' : ''}?`}
+            items={[
+              { id: 'yes', label: 'Yes, delete', value: 'yes' },
+              { id: 'no', label: 'Cancel', value: 'no' },
+            ]}
+            onSelect={(item) => {
+              if (item.value === 'yes') {
+                const targetIds = activeOverlay.targetIds;
+                if (!backend) return;
+                void (async () => {
+                  for (const id of targetIds) {
+                    await backend.cachedDeleteWorkItem(id);
+                    await queueWrite('delete', id);
+                  }
+                  closeOverlay();
+                  for (const id of targetIds) {
+                    removeDeletedItem(id);
+                  }
+                  setCursor(Math.max(0, cursor - 1));
+                  refreshData();
+                  setToast(
+                    targetIds.length === 1
+                      ? `Item #${targetIds[0]} deleted`
+                      : `${targetIds.length} items deleted`,
+                  );
+                })();
+              } else {
+                closeOverlay();
+              }
+            }}
+            onCancel={() => closeOverlay()}
+          />
+        ) : toast ? (
+          <Box>
+            <Text color="green">{toast.message}</Text>
+            {positionText && <Text dimColor> {positionText}</Text>}
+          </Box>
+        ) : (
+          <Box>
+            <Text dimColor>
+              {buildHelpText(
+                terminalWidth - (positionText ? positionText.length + 2 : 0),
+              )}
+            </Text>
+            {positionText && <Text dimColor> {positionText}</Text>}
+          </Box>
+        )}
+      </Box>
+      {warning && (
+        <Box>
+          <Text color="yellow">⚠ {warning}</Text>
+        </Box>
+      )}
+      {updateInfo?.updateAvailable && activeOverlay === null && (
+        <Box>
+          <Text color="yellow">
+            Update available: {updateInfo.current} → {updateInfo.latest} Press ,
+            to update in Settings
+          </Text>
+        </Box>
       )}
     </Box>
   );
