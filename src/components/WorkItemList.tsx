@@ -108,6 +108,7 @@ export function WorkItemList() {
     setActiveType,
     setActiveTemplate,
     setFormMode,
+    setSettingsInitialFocus,
   } = navigationStore.getState();
 
   // Only reactive data via hooks
@@ -406,7 +407,12 @@ export function WorkItemList() {
       if (input === 'q') exit();
       if (input === 'i' && capabilities.iterations)
         navigate('iteration-picker');
-      if (input === ',') navigate('settings');
+      if (input === ',') {
+        if (updateInfo?.updateAvailable) {
+          setSettingsInitialFocus('update-now');
+        }
+        navigate('settings');
+      }
 
       if (input === 'c') {
         if (capabilities.templates && templates.length > 0) {

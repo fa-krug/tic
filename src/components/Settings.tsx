@@ -40,6 +40,12 @@ export function Settings() {
   const backend = useBackendDataStore((s) => s.backend);
   const syncManager = useBackendDataStore((s) => s.syncManager);
   const navigate = useNavigationStore((s) => s.navigate);
+  const settingsInitialFocus = useNavigationStore(
+    (s) => s.settingsInitialFocus,
+  );
+  const setSettingsInitialFocus = useNavigationStore(
+    (s) => s.setSettingsInitialFocus,
+  );
   const navigateToHelp = useNavigationStore((s) => s.navigateToHelp);
   const setFormMode = useNavigationStore((s) => s.setFormMode);
   const setEditingTemplateSlug = useNavigationStore(
@@ -173,6 +179,19 @@ export function Settings() {
   useEffect(() => {
     setCursor((c) => Math.min(c, navItems.length - 1));
   }, [navItems.length]);
+
+  // Jump cursor to initial focus target (e.g. 'update-now' from update banner)
+  useEffect(() => {
+    if (settingsInitialFocus) {
+      const idx = navItems.findIndex(
+        (item) => item.kind === settingsInitialFocus,
+      );
+      if (idx >= 0) {
+        setCursor(idx);
+      }
+      setSettingsInitialFocus(null);
+    }
+  }, [settingsInitialFocus, navItems, setSettingsInitialFocus]);
 
   function saveJiraConfig() {
     if (!configLoaded) return;

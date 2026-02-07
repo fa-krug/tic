@@ -31,6 +31,9 @@ interface NavigationState {
   // Update info
   updateInfo: UpdateInfo | null;
 
+  // Settings initial focus (e.g. jump to 'update-now' from update banner)
+  settingsInitialFocus: string | null;
+
   // Actions
   navigate: (screen: Screen) => void;
   navigateToHelp: () => void;
@@ -43,6 +46,7 @@ interface NavigationState {
   setFormMode: (mode: 'item' | 'template') => void;
   setEditingTemplateSlug: (slug: string | null) => void;
   setUpdateInfo: (info: UpdateInfo | null) => void;
+  setSettingsInitialFocus: (focus: string | null) => void;
   reset: () => void;
 }
 
@@ -56,6 +60,7 @@ const initialState = {
   formMode: 'item' as const,
   editingTemplateSlug: null,
   updateInfo: null,
+  settingsInitialFocus: null,
 };
 
 const createNavigationStore = () =>
@@ -129,6 +134,10 @@ const createNavigationStore = () =>
 
     setUpdateInfo: (info: UpdateInfo | null) => {
       set({ updateInfo: info });
+    },
+
+    setSettingsInitialFocus: (focus: string | null) => {
+      set({ settingsInitialFocus: focus });
     },
 
     reset: () => {
