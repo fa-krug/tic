@@ -71,20 +71,8 @@ function computeColumnWidths(
   let budget =
     terminalWidth - MARKER_WIDTH - id - TITLE_MIN_WIDTH - status - gap * 2;
 
-  // Try adding optional columns (right-to-left removal order: labels, assignee, priority)
-  // We add them left-to-right and track what fits
-  let showPriority = false;
-  let priority = 0;
-  if (
-    capabilities.fields.priority &&
-    hasData(treeItems, 'priority') &&
-    budget >= FIXED_PRIORITY + gap
-  ) {
-    showPriority = true;
-    priority = FIXED_PRIORITY;
-    budget -= priority + gap;
-  }
-
+  // Try adding optional columns (right-to-left removal order: priority, labels, assignee)
+  // Priority is rightmost — its width is NOT subtracted from title, giving title more space
   let showAssignee = false;
   let assignee = 0;
   if (
@@ -102,11 +90,16 @@ function computeColumnWidths(
   if (
     capabilities.fields.labels &&
     hasData(treeItems, 'labels') &&
-    budget >= FIXED_LABELS
+    budget >= FIXED_LABELS + gap
   ) {
     showLabels = true;
     labels = FIXED_LABELS;
+    budget -= labels + gap;
   }
+
+  const showPriority =
+    capabilities.fields.priority && hasData(treeItems, 'priority');
+  const priority = showPriority ? FIXED_PRIORITY : 0;
 
   return {
     id,
@@ -116,9 +109,8 @@ function computeColumnWidths(
       id -
       status -
       gap * 2 -
-      (showPriority ? priority + gap : 0) -
       (showAssignee ? assignee + gap : 0) -
-      (showLabels ? labels : 0),
+      (showLabels ? labels + gap : 0),
     status,
     priority,
     assignee,
@@ -180,18 +172,6 @@ const TableRow = memo(
             {item.status}
           </Text>
         </Box>
-        {columns.showPriority && (
-          <Box width={columns.priority} marginRight={gap} overflowX="hidden">
-            <Text
-              color={selected ? 'cyan' : undefined}
-              bold={selected}
-              dimColor={dimmed}
-              wrap="truncate"
-            >
-              {item.priority}
-            </Text>
-          </Box>
-        )}
         {columns.showAssignee && (
           <Box width={columns.assignee} marginRight={gap} overflowX="hidden">
             <Text
@@ -205,7 +185,11 @@ const TableRow = memo(
           </Box>
         )}
         {columns.showLabels && (
-          <Box width={columns.labels} overflowX="hidden">
+          <Box
+            width={columns.labels}
+            marginRight={columns.showPriority ? gap : 0}
+            overflowX="hidden"
+          >
             <Text
               color={selected ? 'cyan' : undefined}
               bold={selected}
@@ -213,6 +197,18 @@ const TableRow = memo(
               wrap="truncate"
             >
               {item.labels.join(', ')}
+            </Text>
+          </Box>
+        )}
+        {columns.showPriority && (
+          <Box width={columns.priority} overflowX="hidden">
+            <Text
+              color={selected ? 'cyan' : undefined}
+              bold={selected}
+              dimColor={dimmed}
+              wrap="truncate"
+            >
+              {item.priority}
             </Text>
           </Box>
         )}
@@ -284,13 +280,6 @@ function TableLayoutInner({
             Status
           </Text>
         </Box>
-        {columns.showPriority && (
-          <Box width={columns.priority} marginRight={gap}>
-            <Text bold underline>
-              Priority
-            </Text>
-          </Box>
-        )}
         {columns.showAssignee && (
           <Box width={columns.assignee} marginRight={gap}>
             <Text bold underline>
@@ -299,9 +288,19 @@ function TableLayoutInner({
           </Box>
         )}
         {columns.showLabels && (
-          <Box width={columns.labels}>
+          <Box
+            width={columns.labels}
+            marginRight={columns.showPriority ? gap : 0}
+          >
             <Text bold underline>
               Labels
+            </Text>
+          </Box>
+        )}
+        {columns.showPriority && (
+          <Box width={columns.priority}>
+            <Text bold underline>
+              Priority
             </Text>
           </Box>
         )}
