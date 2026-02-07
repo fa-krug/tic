@@ -62,7 +62,8 @@ export function DetailPanel({
 
   const hasBottom = item.priority || item.labels.length > 0;
   const hasDescription = item.description.trim().length > 0;
-  const contentWidth = terminalWidth - 1;
+  // Border takes 2 chars (left+right), paddingLeft takes 1
+  const contentWidth = terminalWidth - 3;
 
   const descriptionLines =
     hasDescription && showFullDescription ? item.description.split('\n') : [];
@@ -76,15 +77,15 @@ export function DetailPanel({
   return (
     <Box
       flexDirection="column"
-      marginTop={1}
+      borderStyle="round"
+      borderColor="gray"
       paddingLeft={1}
+      paddingRight={1}
       width={terminalWidth}
     >
-      <Box height={2}>
-        <Text bold wrap="truncate">
-          {item.title}
-        </Text>
-      </Box>
+      <Text bold wrap="truncate">
+        {item.title}
+      </Text>
       <Box>
         <Text dimColor>{metaLine}</Text>
       </Box>

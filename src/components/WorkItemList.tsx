@@ -346,7 +346,7 @@ export function WorkItemList() {
   // Block 1.5: Description scroll handler — active when full description is shown
   useInput(
     (_input, key) => {
-      if (_input === 'v' || key.escape) {
+      if (_input === ' ' || key.escape) {
         setShowFullDescription(false);
         setDescriptionScrollOffset(0);
         return;
@@ -538,7 +538,7 @@ export function WorkItemList() {
           .update({ showDetailPanel: !showDetailPanel });
       }
 
-      if (input === 'v' && showDetailPanel && hasDescription) {
+      if (input === ' ' && showDetailPanel && hasDescription) {
         setShowFullDescription(true);
         setDescriptionScrollOffset(0);
       }
@@ -1007,7 +1007,7 @@ export function WorkItemList() {
           <Box marginTop={1}>
             {showFullDescription ? (
               <Box>
-                <Text dimColor>↑↓ scroll v/esc close</Text>
+                <Text dimColor>↑↓ scroll space/esc close</Text>
                 {positionText && <Text dimColor> {positionText}</Text>}
               </Box>
             ) : activeOverlay?.type === 'parent-input' ? (

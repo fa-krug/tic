@@ -81,7 +81,7 @@ export function getShortcuts(
 
       const other: ShortcutEntry[] = [];
       other.push({ key: 'V', description: 'Toggle detail panel' });
-      other.push({ key: 'v', description: 'Expand description' });
+      other.push({ key: 'space', description: 'Toggle full description' });
       if (hasSyncManager) {
         other.push({ key: 'r', description: 'Sync' });
       }
