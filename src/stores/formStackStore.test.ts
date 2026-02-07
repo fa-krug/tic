@@ -125,6 +125,36 @@ describe('formStackStore', () => {
     });
   });
 
+  describe('isFieldDirty', () => {
+    it('returns false when field matches snapshot', () => {
+      formStackStore.getState().push(createDraft());
+      expect(formStackStore.getState().isFieldDirty('title')).toBe(false);
+    });
+
+    it('returns true when field differs from snapshot', () => {
+      formStackStore.getState().push(createDraft());
+      formStackStore.getState().updateFields({ title: 'Changed' });
+      expect(formStackStore.getState().isFieldDirty('title')).toBe(true);
+    });
+
+    it('returns false for unchanged fields when others are dirty', () => {
+      formStackStore.getState().push(createDraft());
+      formStackStore.getState().updateFields({ title: 'Changed' });
+      expect(formStackStore.getState().isFieldDirty('status')).toBe(false);
+    });
+
+    it('returns false when field is reverted to original value', () => {
+      formStackStore.getState().push(createDraft());
+      formStackStore.getState().updateFields({ title: 'Changed' });
+      formStackStore.getState().updateFields({ title: '' });
+      expect(formStackStore.getState().isFieldDirty('title')).toBe(false);
+    });
+
+    it('returns false when stack is empty', () => {
+      expect(formStackStore.getState().isFieldDirty('title')).toBe(false);
+    });
+  });
+
   describe('showDiscardPrompt', () => {
     it('sets and clears discard prompt state', () => {
       formStackStore.getState().setShowDiscardPrompt(true);

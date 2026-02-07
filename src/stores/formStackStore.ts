@@ -32,6 +32,7 @@ interface FormStackState {
   updateFields: (fields: Partial<FormFields>) => void;
   setFocusedField: (index: number) => void;
   isDirty: () => boolean;
+  isFieldDirty: (key: keyof FormFields) => boolean;
   setShowDiscardPrompt: (show: boolean) => void;
   clear: () => void;
   currentDraft: () => FormDraft | undefined;
@@ -100,6 +101,12 @@ export const formStackStore = createStore<FormStackState>((set, get) => ({
     const current = get().currentDraft();
     if (!current) return false;
     return !fieldsEqual(current.fields, current.initialSnapshot);
+  },
+
+  isFieldDirty: (key: keyof FormFields) => {
+    const current = get().currentDraft();
+    if (!current) return false;
+    return current.fields[key] !== current.initialSnapshot[key];
   },
 
   setShowDiscardPrompt: (show) => set({ showDiscardPrompt: show }),
