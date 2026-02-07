@@ -61,6 +61,7 @@ export function StatusScreen() {
   const backendType = useConfigStore((s) => s.config.backend ?? 'local');
   const backendName = BACKEND_LABELS[backendType] ?? backendType;
 
+  const initError = useBackendDataStore((s) => s.error);
   const syncStatus = useBackendDataStore((s) => s.syncStatus);
 
   const errors = syncStatus?.errors ?? [];
@@ -112,6 +113,17 @@ export function StatusScreen() {
       <Box marginLeft={2} marginBottom={1}>
         <Text>{backendName}</Text>
       </Box>
+
+      {initError && (
+        <Box marginBottom={1} flexDirection="column">
+          <Text bold color="red">
+            Connection Error:
+          </Text>
+          <Box marginLeft={2}>
+            <Text color="red">{initError}</Text>
+          </Box>
+        </Box>
+      )}
 
       <Text bold>Capabilities:</Text>
       <Box marginLeft={2} flexDirection="column">

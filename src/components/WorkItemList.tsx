@@ -98,6 +98,7 @@ export function WorkItemList() {
   // Changes independently (individual selectors)
   const iteration = useBackendDataStore((s) => s.currentIteration);
   const loading = useBackendDataStore((s) => s.loading);
+  const initError = useBackendDataStore((s) => s.error);
 
   // Navigation store — actions via getState() (stable, never trigger re-renders)
   const {
@@ -887,7 +888,16 @@ export function WorkItemList() {
             terminalWidth={terminalWidth}
           />
 
-          {treeItems.length === 0 && !loading && (
+          {treeItems.length === 0 && !loading && initError && (
+            <Box marginTop={1} flexDirection="column">
+              <Text color="red">Failed to connect to backend:</Text>
+              <Box marginLeft={2}>
+                <Text color="red">{initError}</Text>
+              </Box>
+              <Text dimColor>Press , for settings or q to quit.</Text>
+            </Box>
+          )}
+          {treeItems.length === 0 && !loading && !initError && (
             <Box marginTop={1}>
               <Text dimColor>
                 No {activeType}s in this iteration. Press c to create, / to

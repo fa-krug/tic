@@ -26,14 +26,18 @@ const ART_LINES = ['        ██', '       ██ ', '  ██  ██  ', '  
 
 function getStatusDisplay(
   loading: boolean,
+  initError: string | null,
   syncStatus: {
     state: string;
     pendingCount: number;
     errors: { message: string }[];
   } | null,
-): { showSpinner: boolean; text: string | null } {
+): { showSpinner: boolean; text: string | null; isError?: boolean } {
   if (loading) {
     return { showSpinner: true, text: 'Loading...' };
+  }
+  if (initError) {
+    return { showSpinner: false, text: `⚠ Connection failed`, isError: true };
   }
   if (syncStatus?.state === 'syncing') {
     return { showSpinner: true, text: 'Syncing...' };
@@ -56,15 +60,17 @@ function getStatusDisplay(
 export function Header() {
   const backendType = useConfigStore((s) => s.config.backend ?? 'local');
   const loading = useBackendDataStore((s) => s.loading);
+  const initError = useBackendDataStore((s) => s.error);
   const syncStatus = useBackendDataStore((s) => s.syncStatus);
   const backendLabel = BACKEND_LABELS[backendType] ?? backendType;
   const root = process.cwd();
   const projectPath = shortenPath(root);
 
-  const { showSpinner, text: statusText } = getStatusDisplay(
-    loading,
-    syncStatus,
-  );
+  const {
+    showSpinner,
+    text: statusText,
+    isError,
+  } = getStatusDisplay(loading, initError, syncStatus);
 
   return (
     <Box marginTop={1} marginBottom={1}>
@@ -85,7 +91,12 @@ export function Header() {
               <Spinner type="dots" />
             </Text>
           )}
-          {statusText && <Text dimColor> {statusText}</Text>}
+          {statusText && (
+            <Text color={isError ? 'red' : undefined} dimColor={!isError}>
+              {' '}
+              {statusText}
+            </Text>
+          )}
         </Text>
         <Text dimColor>
           {backendLabel} · {projectPath}
