@@ -22,22 +22,28 @@ import { SyncQueueStore } from '../sync/queue.js';
 import type { QueueAction } from '../sync/types.js';
 import { buildTree, type TreeItem } from './buildTree.js';
 import { SearchOverlay } from './SearchOverlay.js';
-import { BulkMenu, type BulkAction } from './BulkMenu.js';
 import { CommandPalette } from './CommandPalette.js';
 import {
   getVisibleCommands,
   type Command,
   type CommandContext,
 } from '../commands.js';
-import { PriorityPicker } from './PriorityPicker.js';
-import { TemplatePicker } from './TemplatePicker.js';
-import { TypePicker } from './TypePicker.js';
-import { StatusPicker } from './StatusPicker.js';
+import { OverlayPanel, type OverlayItem } from './OverlayPanel.js';
 import { DetailPanel } from './DetailPanel.js';
 import { AutocompleteInput } from './AutocompleteInput.js';
 import { MultiAutocompleteInput } from './MultiAutocompleteInput.js';
 import type { WorkItem, Template } from '../types.js';
 export type { TreeItem } from './buildTree.js';
+
+type BulkAction =
+  | 'status'
+  | 'iteration'
+  | 'parent'
+  | 'type'
+  | 'priority'
+  | 'assignee'
+  | 'labels'
+  | 'delete';
 
 export function getTargetIds(
   markedIds: Set<string>,
@@ -363,37 +369,6 @@ export function WorkItemList() {
       }
     },
     { isActive: showFullDescription && activeOverlay === null },
-  );
-
-  // Block 2: Delete confirmation handler
-  useInput(
-    (input) => {
-      if (activeOverlay?.type !== 'delete-confirm') return;
-      if (input === 'y' || input === 'Y') {
-        const targetIds = activeOverlay.targetIds;
-        if (!backend) return;
-        void (async () => {
-          for (const id of targetIds) {
-            await backend.cachedDeleteWorkItem(id);
-            await queueWrite('delete', id);
-          }
-          closeOverlay();
-          for (const id of targetIds) {
-            removeDeletedItem(id);
-          }
-          setCursor(Math.max(0, cursor - 1));
-          refreshData();
-          setToast(
-            targetIds.length === 1
-              ? `Item #${targetIds[0]} deleted`
-              : `${targetIds.length} items deleted`,
-          );
-        })();
-      } else {
-        closeOverlay();
-      }
-    },
-    { isActive: activeOverlay?.type === 'delete-confirm' },
   );
 
   // Block 3: Main input handler — only active when no overlay is open
@@ -858,17 +833,82 @@ export function WorkItemList() {
       )}
       {activeOverlay?.type !== 'search' && (
         <>
-          {activeOverlay?.type === 'bulk-menu' && (
-            <BulkMenu
-              itemCount={markedIds.size > 0 ? markedIds.size : 1}
-              capabilities={capabilities}
-              onSelect={(action) => {
-                closeOverlay();
-                handleBulkAction(action);
-              }}
-              onCancel={() => closeOverlay()}
-            />
-          )}
+          {activeOverlay?.type === 'bulk-menu' &&
+            (() => {
+              const bulkItems: OverlayItem[] = [];
+              bulkItems.push({
+                id: 'status',
+                label: 'Set status...',
+                value: 'status',
+                hint: 's',
+              });
+              if (capabilities.iterations) {
+                bulkItems.push({
+                  id: 'iteration',
+                  label: 'Set iteration...',
+                  value: 'iteration',
+                  hint: 'i',
+                });
+              }
+              if (capabilities.fields.parent) {
+                bulkItems.push({
+                  id: 'parent',
+                  label: 'Set parent...',
+                  value: 'parent',
+                  hint: 'p',
+                });
+              }
+              if (capabilities.customTypes) {
+                bulkItems.push({
+                  id: 'type',
+                  label: 'Set type...',
+                  value: 'type',
+                  hint: 't',
+                });
+              }
+              if (capabilities.fields.priority) {
+                bulkItems.push({
+                  id: 'priority',
+                  label: 'Set priority...',
+                  value: 'priority',
+                  hint: 'P',
+                });
+              }
+              if (capabilities.fields.assignee) {
+                bulkItems.push({
+                  id: 'assignee',
+                  label: 'Set assignee...',
+                  value: 'assignee',
+                  hint: 'a',
+                });
+              }
+              if (capabilities.fields.labels) {
+                bulkItems.push({
+                  id: 'labels',
+                  label: 'Set labels...',
+                  value: 'labels',
+                  hint: 'l',
+                });
+              }
+              bulkItems.push({
+                id: 'delete',
+                label: 'Delete',
+                value: 'delete',
+                hint: 'd',
+              });
+              const count = markedIds.size > 0 ? markedIds.size : 1;
+              return (
+                <OverlayPanel
+                  title={`Bulk Actions (${count} ${count === 1 ? 'item' : 'items'})`}
+                  items={bulkItems}
+                  onSelect={(item) => {
+                    closeOverlay();
+                    handleBulkAction(item.value as BulkAction);
+                  }}
+                  onCancel={() => closeOverlay()}
+                />
+              );
+            })()}
           {activeOverlay?.type === 'command-palette' && (
             <CommandPalette
               commands={paletteCommands}
@@ -877,15 +917,18 @@ export function WorkItemList() {
             />
           )}
           {activeOverlay?.type === 'status-picker' && (
-            <StatusPicker
-              statuses={statuses}
-              onSelect={(status) => {
+            <OverlayPanel
+              title="Set Status"
+              items={statuses.map((s) => ({ id: s, label: s, value: s }))}
+              onSelect={(item) => {
                 const targetIds = getOverlayTargetIds();
                 closeOverlay();
                 if (!backend) return;
                 void (async () => {
                   for (const id of targetIds) {
-                    await backend.cachedUpdateWorkItem(id, { status });
+                    await backend.cachedUpdateWorkItem(id, {
+                      status: item.value,
+                    });
                     await queueWrite('update', id);
                   }
                   refreshData();
@@ -900,15 +943,22 @@ export function WorkItemList() {
             />
           )}
           {activeOverlay?.type === 'type-picker' && (
-            <TypePicker
-              types={types}
-              onSelect={(type) => {
+            <OverlayPanel
+              title="Set Type"
+              items={types.map((t) => ({
+                id: t,
+                label: t.charAt(0).toUpperCase() + t.slice(1),
+                value: t,
+              }))}
+              onSelect={(item) => {
                 const targetIds = getOverlayTargetIds();
                 closeOverlay();
                 if (!backend) return;
                 void (async () => {
                   for (const id of targetIds) {
-                    await backend.cachedUpdateWorkItem(id, { type });
+                    await backend.cachedUpdateWorkItem(id, {
+                      type: item.value,
+                    });
                     await queueWrite('update', id);
                   }
                   refreshData();
@@ -923,11 +973,23 @@ export function WorkItemList() {
             />
           )}
           {activeOverlay?.type === 'priority-picker' && (
-            <PriorityPicker
-              onSelect={(priority) => {
+            <OverlayPanel
+              title="Set Priority"
+              items={[
+                { id: 'critical', label: 'Critical', value: 'critical' },
+                { id: 'high', label: 'High', value: 'high' },
+                { id: 'medium', label: 'Medium', value: 'medium' },
+                { id: 'low', label: 'Low', value: 'low' },
+              ]}
+              onSelect={(item) => {
                 const targetIds = getOverlayTargetIds();
                 closeOverlay();
                 if (!backend) return;
+                const priority = item.value as
+                  | 'low'
+                  | 'medium'
+                  | 'high'
+                  | 'critical';
                 void (async () => {
                   for (const id of targetIds) {
                     await backend.cachedUpdateWorkItem(id, { priority });
@@ -945,12 +1007,25 @@ export function WorkItemList() {
             />
           )}
           {activeOverlay?.type === 'template-picker' && (
-            <TemplatePicker
-              templates={templates}
-              onSelect={(template) => {
+            <OverlayPanel
+              title="Select Template"
+              items={[
+                { id: '__none__', label: 'No template', value: '__none__' },
+                ...templates.map((t) => ({
+                  id: t.slug,
+                  label: t.name,
+                  value: t.slug,
+                })),
+              ]}
+              onSelect={(item) => {
                 closeOverlay();
                 setFormMode('item');
-                setActiveTemplate(template);
+                if (item.value === '__none__') {
+                  setActiveTemplate(null);
+                } else {
+                  const template = templates.find((t) => t.slug === item.value);
+                  setActiveTemplate(template ?? null);
+                }
                 selectWorkItem(null);
                 navigate('form');
               }}
@@ -1134,10 +1209,39 @@ export function WorkItemList() {
                 />
               </Box>
             ) : activeOverlay?.type === 'delete-confirm' ? (
-              <Text color="red">
-                Delete {activeOverlay.targetIds.length} item
-                {activeOverlay.targetIds.length > 1 ? 's' : ''}? (y/n)
-              </Text>
+              <OverlayPanel
+                title={`Delete ${activeOverlay.targetIds.length} item${activeOverlay.targetIds.length > 1 ? 's' : ''}?`}
+                items={[
+                  { id: 'yes', label: 'Yes, delete', value: 'yes' },
+                  { id: 'no', label: 'Cancel', value: 'no' },
+                ]}
+                onSelect={(item) => {
+                  if (item.value === 'yes') {
+                    const targetIds = activeOverlay.targetIds;
+                    if (!backend) return;
+                    void (async () => {
+                      for (const id of targetIds) {
+                        await backend.cachedDeleteWorkItem(id);
+                        await queueWrite('delete', id);
+                      }
+                      closeOverlay();
+                      for (const id of targetIds) {
+                        removeDeletedItem(id);
+                      }
+                      setCursor(Math.max(0, cursor - 1));
+                      refreshData();
+                      setToast(
+                        targetIds.length === 1
+                          ? `Item #${targetIds[0]} deleted`
+                          : `${targetIds.length} items deleted`,
+                      );
+                    })();
+                  } else {
+                    closeOverlay();
+                  }
+                }}
+                onCancel={() => closeOverlay()}
+              />
             ) : toast ? (
               <Box>
                 <Text color="green">{toast.message}</Text>
