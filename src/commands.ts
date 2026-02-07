@@ -183,6 +183,28 @@ const commands: Command[] = [
   },
 ];
 
+export interface CommandGroup {
+  category: string;
+  commands: Command[];
+}
+
+export function filterCommands(commands: Command[], query: string): Command[] {
+  if (query.trim() === '') return commands;
+  const q = query.toLowerCase();
+  return commands.filter((cmd) => cmd.label.toLowerCase().includes(q));
+}
+
+export function groupCommandsByCategory(commands: Command[]): CommandGroup[] {
+  const groups: CommandGroup[] = [];
+  for (const category of CATEGORIES) {
+    const cmds = commands.filter((c) => c.category === category);
+    if (cmds.length > 0) {
+      groups.push({ category, commands: cmds });
+    }
+  }
+  return groups;
+}
+
 export function getVisibleCommands(ctx: CommandContext): Command[] {
   const visible = commands.filter((cmd) => cmd.when(ctx));
 

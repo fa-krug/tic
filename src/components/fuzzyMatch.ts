@@ -44,3 +44,22 @@ export function fuzzyMatch(items: WorkItem[], query: string): FuzzyResult[] {
   results.sort((a, b) => b.score - a.score);
   return results;
 }
+
+export function groupResults(
+  results: FuzzyResult[],
+  currentIteration: string | null,
+  maxResults: number = 10,
+): FuzzyResult[] {
+  const sortByScore = (a: FuzzyResult, b: FuzzyResult) => b.score - a.score;
+
+  if (!currentIteration) {
+    return [...results].sort(sortByScore).slice(0, maxResults);
+  }
+  const current = results
+    .filter((r) => r.item.iteration === currentIteration)
+    .sort(sortByScore);
+  const other = results
+    .filter((r) => r.item.iteration !== currentIteration)
+    .sort(sortByScore);
+  return [...current, ...other].slice(0, maxResults);
+}

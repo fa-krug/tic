@@ -17,7 +17,7 @@ import { checkForUpdate } from '../update-checker.js';
 import type { UpdateInfo } from '../update-checker.js';
 import { VERSION } from '../version.js';
 import { requestUpdate } from '../updater.js';
-import { DefaultPicker } from './DefaultPicker.js';
+import { OverlayPanel } from './OverlayPanel.js';
 
 type NavItem =
   | { kind: 'backend'; backend: string }
@@ -206,31 +206,6 @@ export function Settings() {
       },
     });
   }
-
-  // Delete template confirmation handler
-  useInput(
-    (input) => {
-      if (activeOverlay?.type !== 'delete-template-confirm') return;
-      if (input === 'y' || input === 'Y') {
-        const slug = activeOverlay.templateSlug;
-        if (!backend) return;
-        void backend.deleteTemplate(slug).then(async () => {
-          setTemplates((prev) => prev.filter((t) => t.slug !== slug));
-          if (queueStore) {
-            await queueStore.append({
-              action: 'template-delete',
-              itemId: slug,
-              timestamp: new Date().toISOString(),
-              templateSlug: slug,
-            });
-            syncManager?.pushPending().catch(() => {});
-          }
-        });
-      }
-      closeOverlay();
-    },
-    { isActive: activeOverlay?.type === 'delete-template-confirm' },
-  );
 
   // Navigation mode input handler
   useInput(
@@ -569,40 +544,62 @@ export function Settings() {
       </Box>
 
       {activeOverlay?.type === 'default-type-picker' && (
-        <DefaultPicker
+        <OverlayPanel
           title="Default Type"
-          options={config.types}
-          onSelect={(type) => {
-            void configStore.getState().update({ defaultType: type });
+          items={config.types.map((t) => ({ id: t, label: t, value: t }))}
+          onSelect={(item) => {
+            void configStore.getState().update({ defaultType: item.value });
             closeOverlay();
           }}
           onCancel={() => closeOverlay()}
+          emptyMessage="(none configured)"
         />
       )}
 
       {activeOverlay?.type === 'default-iteration-picker' && (
-        <DefaultPicker
+        <OverlayPanel
           title="Default Iteration"
-          options={config.iterations}
-          onSelect={(iteration) => {
+          items={config.iterations.map((i) => ({ id: i, label: i, value: i }))}
+          onSelect={(item) => {
             void configStore
               .getState()
-              .update({ current_iteration: iteration });
+              .update({ current_iteration: item.value });
             closeOverlay();
           }}
           onCancel={() => closeOverlay()}
+          emptyMessage="(none configured)"
         />
       )}
 
       {activeOverlay?.type === 'delete-template-confirm' && (
-        <Box marginTop={1}>
-          <Text color="red">
-            Delete template &quot;
-            {templates.find((t) => t.slug === activeOverlay.templateSlug)
-              ?.name ?? activeOverlay.templateSlug}
-            &quot;? (y/n)
-          </Text>
-        </Box>
+        <OverlayPanel
+          title={`Delete template "${templates.find((t) => t.slug === activeOverlay.templateSlug)?.name ?? activeOverlay.templateSlug}"?`}
+          items={[
+            { id: 'yes', label: 'Yes, delete', value: 'yes' },
+            { id: 'no', label: 'Cancel', value: 'no' },
+          ]}
+          onSelect={(item) => {
+            if (item.value === 'yes') {
+              const slug = activeOverlay.templateSlug;
+              if (backend) {
+                void backend.deleteTemplate(slug).then(async () => {
+                  setTemplates((prev) => prev.filter((t) => t.slug !== slug));
+                  if (queueStore) {
+                    await queueStore.append({
+                      action: 'template-delete',
+                      itemId: slug,
+                      timestamp: new Date().toISOString(),
+                      templateSlug: slug,
+                    });
+                    syncManager?.pushPending().catch(() => {});
+                  }
+                });
+              }
+            }
+            closeOverlay();
+          }}
+          onCancel={() => closeOverlay()}
+        />
       )}
 
       <Box marginTop={1}>
