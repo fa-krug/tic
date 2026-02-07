@@ -219,8 +219,21 @@ export class GitHubBackend extends BaseBackend {
     return mapIssueToWorkItem(data.repository.issue);
   }
 
+  private ensureLabels(labels: string[]): void {
+    for (const label of labels) {
+      try {
+        ghExec(['label', 'create', label], this.cwd);
+      } catch {
+        // Label already exists — ignore
+      }
+    }
+  }
+
   async createWorkItem(data: NewWorkItem): Promise<WorkItem> {
     this.validateFields(data);
+    if (data.labels.length > 0) {
+      this.ensureLabels(data.labels);
+    }
     const args = [
       'issue',
       'create',
@@ -256,6 +269,9 @@ export class GitHubBackend extends BaseBackend {
 
   async updateWorkItem(id: string, data: Partial<WorkItem>): Promise<WorkItem> {
     this.validateFields(data);
+    if (data.labels !== undefined && data.labels.length > 0) {
+      this.ensureLabels(data.labels);
+    }
 
     // Handle parent changes via sub-issue mutations
     if (data.parent !== undefined) {

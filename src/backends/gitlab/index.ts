@@ -521,7 +521,20 @@ export class GitLabBackend extends BaseBackend {
     return this.cachedIterations;
   }
 
+  private ensureLabels(labels: string[]): void {
+    for (const label of labels) {
+      try {
+        glabExec(['label', 'create', label], this.cwd);
+      } catch {
+        // Label already exists — ignore
+      }
+    }
+  }
+
   private async createIssue(data: NewWorkItem): Promise<WorkItem> {
+    if (data.labels.length > 0) {
+      this.ensureLabels(data.labels);
+    }
     const args = ['issue', 'create', '--title', data.title, '--yes'];
 
     if (data.description) {
@@ -549,6 +562,9 @@ export class GitLabBackend extends BaseBackend {
 
   // eslint-disable-next-line @typescript-eslint/require-await
   private async createEpic(data: NewWorkItem): Promise<WorkItem> {
+    if (data.labels.length > 0) {
+      this.ensureLabels(data.labels);
+    }
     const encodedGroup = encodeURIComponent(this.group);
     const args = [
       'api',
@@ -574,6 +590,9 @@ export class GitLabBackend extends BaseBackend {
     iid: string,
     data: Partial<WorkItem>,
   ): Promise<WorkItem> {
+    if (data.labels !== undefined && data.labels.length > 0) {
+      this.ensureLabels(data.labels);
+    }
     // Handle status changes via close/reopen
     if (data.status === 'closed') {
       glabExec(['issue', 'close', iid], this.cwd);
@@ -625,6 +644,9 @@ export class GitLabBackend extends BaseBackend {
     iid: string,
     data: Partial<WorkItem>,
   ): Promise<WorkItem> {
+    if (data.labels !== undefined && data.labels.length > 0) {
+      this.ensureLabels(data.labels);
+    }
     const encodedGroup = encodeURIComponent(this.group);
     const args = ['api', `groups/${encodedGroup}/epics/${iid}`, '-X', 'PUT'];
     let hasEdits = false;

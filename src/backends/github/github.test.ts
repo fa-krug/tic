@@ -364,6 +364,93 @@ describe('GitHubBackend', () => {
       expect(item.parent).toBe('5');
       expect(mockGhGraphQL).toHaveBeenCalledTimes(4);
     });
+
+    it('ensures labels exist before creating an issue', async () => {
+      const backend = new GitHubBackend('/repo');
+
+      mockGhExec.mockReturnValue('https://github.com/owner/repo/issues/10\n');
+      mockGhGraphQL.mockReturnValue(
+        makeGetResponse(makeGhIssue({ number: 10, labels: ['bug', 'ux'] })),
+      );
+
+      await backend.createWorkItem({
+        title: 'New issue',
+        type: 'issue',
+        status: 'open',
+        iteration: '',
+        priority: 'medium',
+        assignee: '',
+        labels: ['bug', 'ux'],
+        description: '',
+        parent: null,
+        dependsOn: [],
+      });
+
+      expect(mockGhExec).toHaveBeenCalledWith(
+        ['label', 'create', 'bug'],
+        '/repo',
+      );
+      expect(mockGhExec).toHaveBeenCalledWith(
+        ['label', 'create', 'ux'],
+        '/repo',
+      );
+    });
+
+    it('ignores errors when ensuring labels that already exist', async () => {
+      const backend = new GitHubBackend('/repo');
+
+      mockGhExec
+        .mockImplementationOnce(() => {
+          throw new Error('label already exists');
+        })
+        .mockReturnValue('https://github.com/owner/repo/issues/10\n');
+      mockGhGraphQL.mockReturnValue(
+        makeGetResponse(makeGhIssue({ number: 10, labels: ['bug'] })),
+      );
+
+      const item = await backend.createWorkItem({
+        title: 'New issue',
+        type: 'issue',
+        status: 'open',
+        iteration: '',
+        priority: 'medium',
+        assignee: '',
+        labels: ['bug'],
+        description: '',
+        parent: null,
+        dependsOn: [],
+      });
+
+      expect(item.id).toBe('10');
+    });
+
+    it('skips ensureLabels when no labels provided', async () => {
+      const backend = new GitHubBackend('/repo');
+
+      mockGhExec.mockReturnValue('https://github.com/owner/repo/issues/10\n');
+      mockGhGraphQL.mockReturnValue(
+        makeGetResponse(makeGhIssue({ number: 10 })),
+      );
+
+      await backend.createWorkItem({
+        title: 'New issue',
+        type: 'issue',
+        status: 'open',
+        iteration: '',
+        priority: 'medium',
+        assignee: '',
+        labels: [],
+        description: '',
+        parent: null,
+        dependsOn: [],
+      });
+
+      // Only the issue create call, no label create calls
+      expect(mockGhExec).not.toHaveBeenCalledWith(
+        expect.arrayContaining(['label', 'create']),
+        expect.anything(),
+      );
+    });
   });
 
   describe('updateWorkItem', () => {
@@ -517,6 +604,21 @@ describe('GitHubBackend', () => {
 
       const item = await backend.updateWorkItem('5', { parent: '7' });
       expect(item.parent).toBe('7');
+    });
+
+    it('ensures labels exist before updating', async () => {
+      const backend = new GitHubBackend('/repo');
+      mockGhExec.mockReturnValue('');
+      mockGhGraphQL.mockReturnValue(
+        makeGetResponse(makeGhIssue({ number: 5, labels: ['new-label'] })),
+      );
+
+      await backend.updateWorkItem('5', { labels: ['new-label'] });
+
+      expect(mockGhExec).toHaveBeenCalledWith(
+        ['label', 'create', 'new-label'],
+        '/repo',
+      );
     });
   });
 

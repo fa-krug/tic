@@ -331,6 +331,92 @@ describe('GitLabBackend', () => {
       expect(item.id).toBe('epic-8');
       expect(item.type).toBe('epic');
     });
+
+    it('ensures labels exist before creating an issue', async () => {
+      const backend = makeBackend();
+
+      mockGlabExec.mockReturnValue(
+        'https://gitlab.com/mygroup/project/-/issues/10\n',
+      );
+      mockGlab
+        .mockReturnValueOnce({ ...sampleIssue, iid: 10 })
+        .mockReturnValueOnce([]); // notes
+
+      await backend.createWorkItem({
+        title: 'New issue',
+        type: 'issue',
+        status: 'open',
+        iteration: '',
+        priority: 'medium',
+        assignee: '',
+        labels: ['bug', 'ux'],
+        description: '',
+        parent: null,
+        dependsOn: [],
+      });
+
+      expect(mockGlabExec).toHaveBeenCalledWith(
+        ['label', 'create', 'bug'],
+        '/repo',
+      );
+      expect(mockGlabExec).toHaveBeenCalledWith(
+        ['label', 'create', 'ux'],
+        '/repo',
+      );
+    });
+
+    it('ensures labels exist before creating an epic', async () => {
+      const backend = makeBackend();
+
+      mockGlabExec.mockReturnValue('');
+      mockGlab.mockReturnValueOnce({ ...sampleEpic, iid: 8 });
+
+      await backend.createWorkItem({
+        title: 'New epic',
+        type: 'epic',
+        status: 'open',
+        iteration: '',
+        priority: 'medium',
+        assignee: '',
+        labels: ['feature'],
+        description: '',
+        parent: null,
+        dependsOn: [],
+      });
+
+      expect(mockGlabExec).toHaveBeenCalledWith(
+        ['label', 'create', 'feature'],
+        '/repo',
+      );
+    });
+
+    it('ignores errors when ensuring labels that already exist', async () => {
+      const backend = makeBackend();
+
+      mockGlabExec
+        .mockImplementationOnce(() => {
+          throw new Error('label already exists');
+        })
+        .mockReturnValue('https://gitlab.com/mygroup/project/-/issues/10\n');
+      mockGlab
+        .mockReturnValueOnce({ ...sampleIssue, iid: 10 })
+        .mockReturnValueOnce([]); // notes
+
+      const item = await backend.createWorkItem({
+        title: 'New issue',
+        type: 'issue',
+        status: 'open',
+        iteration: '',
+        priority: 'medium',
+        assignee: '',
+        labels: ['bug'],
+        description: '',
+        parent: null,
+        dependsOn: [],
+      });
+
+      expect(item.id).toBe('issue-10');
+    });
   });
 
   describe('updateWorkItem', () => {
@@ -412,6 +498,21 @@ describe('GitLabBackend', () => {
           '-f',
           'state_event=close',
         ]),
+        '/repo',
+      );
+    });
+
+    it('ensures labels exist before updating an issue', async () => {
+      const backend = makeBackend();
+      mockGlabExec.mockReturnValue('');
+      mockGlab
+        .mockReturnValueOnce({ ...sampleIssue, iid: 5, labels: ['new-label'] })
+        .mockReturnValueOnce([]); // notes
+
+      await backend.updateWorkItem('issue-5', { labels: ['new-label'] });
+
+      expect(mockGlabExec).toHaveBeenCalledWith(
+        ['label', 'create', 'new-label'],
         '/repo',
       );
     });
