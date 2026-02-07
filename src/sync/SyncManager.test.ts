@@ -370,6 +370,112 @@ describe('SyncManager push phase', () => {
   });
 });
 
+describe('SyncManager strips unsupported fields', () => {
+  let tmpDir: string;
+  let local: LocalBackend;
+  let queueStore: SyncQueueStore;
+
+  beforeEach(async () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-sync-test-'));
+    fs.mkdirSync(path.join(tmpDir, '.tic'), { recursive: true });
+    local = await LocalBackend.create(tmpDir);
+    queueStore = new SyncQueueStore(tmpDir);
+  });
+
+  afterEach(() => {
+    configStore.getState().destroy();
+    fs.rmSync(tmpDir, { recursive: true });
+  });
+
+  function createLimitedRemote(): Backend {
+    const base = createMockRemote();
+    const originalCaps = base.getCapabilities();
+    base.getCapabilities = () => ({
+      ...originalCaps,
+      fields: {
+        ...originalCaps.fields,
+        priority: false,
+        dependsOn: false,
+      },
+    });
+    return base;
+  }
+
+  it('strips priority on create when remote does not support it', async () => {
+    const remote = createLimitedRemote();
+    const createSpy = vi.spyOn(remote, 'createWorkItem');
+    const manager = new SyncManager(local, remote, queueStore);
+
+    const item = await local.createWorkItem({
+      title: 'High Priority',
+      type: 'task',
+      status: 'backlog',
+      priority: 'high',
+      assignee: '',
+      labels: [],
+      iteration: 'default',
+      description: '',
+      parent: null,
+      dependsOn: [],
+    });
+
+    await queueStore.append({
+      action: 'create',
+      itemId: item.id,
+      timestamp: new Date().toISOString(),
+    });
+
+    const result = await manager.pushPending();
+    expect(result.pushed).toBe(1);
+    expect(result.failed).toBe(0);
+    expect(createSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        priority: 'medium',
+        dependsOn: [],
+      }),
+    );
+  });
+
+  it('strips priority on update when remote does not support it', async () => {
+    const remote = createLimitedRemote();
+    const item = await local.createWorkItem({
+      title: 'Will Update',
+      type: 'task',
+      status: 'backlog',
+      priority: 'critical',
+      assignee: '',
+      labels: [],
+      iteration: 'default',
+      description: '',
+      parent: null,
+      dependsOn: [],
+    });
+
+    // Simulate item existing on remote
+    await remote.createWorkItem({ ...item, priority: 'medium', dependsOn: [] });
+
+    const updateSpy = vi.spyOn(remote, 'updateWorkItem');
+    const manager = new SyncManager(local, remote, queueStore);
+
+    await queueStore.append({
+      action: 'update',
+      itemId: item.id,
+      timestamp: new Date().toISOString(),
+    });
+
+    const result = await manager.pushPending();
+    expect(result.pushed).toBe(1);
+    expect(result.failed).toBe(0);
+    expect(updateSpy).toHaveBeenCalledWith(
+      item.id,
+      expect.objectContaining({
+        priority: 'medium',
+        dependsOn: [],
+      }),
+    );
+  });
+});
+
 describe('SyncManager pull phase (via sync)', () => {
   let tmpDir: string;
   let local: LocalBackend;

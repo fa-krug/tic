@@ -8,6 +8,7 @@ import type {
   PushResult,
   SyncError,
 } from './types.js';
+import type { NewWorkItem } from '../types.js';
 import {
   writeWorkItem,
   deleteWorkItem as removeWorkItemFile,
@@ -95,22 +96,46 @@ export class SyncManager {
     return { pushed, failed: errors.length, errors, idMappings };
   }
 
+  /** Strip fields the remote backend doesn't support to avoid UnsupportedOperationError. */
+  private stripUnsupportedFields(data: NewWorkItem): NewWorkItem {
+    const caps = this.remote.getCapabilities();
+    const result = { ...data };
+    if (!caps.fields.priority) {
+      result.priority = 'medium';
+    }
+    if (!caps.fields.assignee) {
+      result.assignee = '';
+    }
+    if (!caps.fields.labels) {
+      result.labels = [];
+    }
+    if (!caps.fields.parent) {
+      result.parent = null;
+    }
+    if (!caps.fields.dependsOn) {
+      result.dependsOn = [];
+    }
+    return result;
+  }
+
   private async pushEntry(entry: QueueEntry): Promise<string> {
     switch (entry.action) {
       case 'create': {
         const localItem = await this.local.getWorkItem(entry.itemId);
-        const remoteItem = await this.remote.createWorkItem({
-          title: localItem.title,
-          type: localItem.type,
-          status: localItem.status,
-          priority: localItem.priority,
-          assignee: localItem.assignee,
-          labels: localItem.labels,
-          iteration: localItem.iteration,
-          description: localItem.description,
-          parent: localItem.parent,
-          dependsOn: localItem.dependsOn,
-        });
+        const remoteItem = await this.remote.createWorkItem(
+          this.stripUnsupportedFields({
+            title: localItem.title,
+            type: localItem.type,
+            status: localItem.status,
+            priority: localItem.priority,
+            assignee: localItem.assignee,
+            labels: localItem.labels,
+            iteration: localItem.iteration,
+            description: localItem.description,
+            parent: localItem.parent,
+            dependsOn: localItem.dependsOn,
+          }),
+        );
         if (remoteItem.id !== entry.itemId) {
           await this.renameLocalItem(entry.itemId, remoteItem.id);
           await this.queue.renameItem(entry.itemId, remoteItem.id);
@@ -120,18 +145,21 @@ export class SyncManager {
       }
       case 'update': {
         const localItem = await this.local.getWorkItem(entry.itemId);
-        await this.remote.updateWorkItem(entry.itemId, {
-          title: localItem.title,
-          type: localItem.type,
-          status: localItem.status,
-          priority: localItem.priority,
-          assignee: localItem.assignee,
-          labels: localItem.labels,
-          iteration: localItem.iteration,
-          description: localItem.description,
-          parent: localItem.parent,
-          dependsOn: localItem.dependsOn,
-        });
+        await this.remote.updateWorkItem(
+          entry.itemId,
+          this.stripUnsupportedFields({
+            title: localItem.title,
+            type: localItem.type,
+            status: localItem.status,
+            priority: localItem.priority,
+            assignee: localItem.assignee,
+            labels: localItem.labels,
+            iteration: localItem.iteration,
+            description: localItem.description,
+            parent: localItem.parent,
+            dependsOn: localItem.dependsOn,
+          }),
+        );
         return entry.itemId;
       }
       case 'delete': {
