@@ -47,7 +47,7 @@ export function getShortcuts(
         { key: 'c', description: 'Create item (template picker if available)' },
         { key: 'd', description: 'Delete item' },
         { key: 'o', description: 'Open in browser' },
-        { key: 's', description: 'Status screen' },
+        { key: 'S', description: 'Status screen' },
       ];
       actions.push({ key: '/', description: 'Quick search' });
       actions.push({ key: ':', description: 'Command palette' });
@@ -57,6 +57,7 @@ export function getShortcuts(
       actions.push({ key: 'm', description: 'Toggle mark' });
       actions.push({ key: 'M', description: 'Clear all marks' });
       actions.push({ key: 'B', description: 'Bulk actions menu' });
+      actions.push({ key: 's', description: 'Set status' });
       if (capabilities.customTypes) {
         actions.push({ key: 't', description: 'Set type' });
       }

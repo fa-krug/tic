@@ -528,8 +528,15 @@ export function WorkItemList() {
         refreshData();
       }
 
-      if (input === 's') {
+      if (input === 'S') {
         navigate('status');
+      }
+
+      if (input === 's' && treeItems.length > 0) {
+        const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+        if (targetIds.length > 0) {
+          openOverlay({ type: 'status-picker', targetIds });
+        }
       }
 
       if (input === 'v') {
