@@ -144,3 +144,43 @@ export async function deleteWorkItem(root: string, id: string): Promise<void> {
     // File doesn't exist — nothing to delete
   }
 }
+
+function trashDir(root: string): string {
+  return path.join(root, '.tic', 'trash');
+}
+
+function trashPath(root: string, id: string): string {
+  return path.join(trashDir(root), `${id}.md`);
+}
+
+export async function softDeleteWorkItem(
+  root: string,
+  id: string,
+): Promise<void> {
+  await fs.mkdir(trashDir(root), { recursive: true });
+  await fs.rename(itemPath(root, id), trashPath(root, id));
+}
+
+export async function restoreWorkItem(root: string, id: string): Promise<void> {
+  await fs.mkdir(itemsDir(root), { recursive: true });
+  await fs.rename(trashPath(root, id), itemPath(root, id));
+}
+
+export async function permanentlyDeleteWorkItem(
+  root: string,
+  id: string,
+): Promise<void> {
+  try {
+    await fs.unlink(trashPath(root, id));
+  } catch {
+    // File doesn't exist — nothing to delete
+  }
+}
+
+export async function cleanupTrash(root: string): Promise<void> {
+  try {
+    await fs.rm(trashDir(root), { recursive: true });
+  } catch {
+    // Trash directory doesn't exist — nothing to clean
+  }
+}

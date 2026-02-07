@@ -7,6 +7,10 @@ import {
   writeWorkItem,
   deleteWorkItem,
   listItemFiles,
+  softDeleteWorkItem,
+  restoreWorkItem,
+  permanentlyDeleteWorkItem,
+  cleanupTrash,
 } from './items.js';
 import type { WorkItem } from '../../types.js';
 
@@ -183,5 +187,89 @@ describe('items', () => {
     const read = await readWorkItem(tmpDir, '2');
     expect(read.parent).toBeNull();
     expect(read.dependsOn).toEqual([]);
+  });
+
+  describe('soft-delete and restore', () => {
+    const makeItem = (id: string): WorkItem => ({
+      id,
+      title: `Item ${id}`,
+      type: 'task',
+      status: 'todo',
+      iteration: 'v1',
+      priority: 'medium',
+      assignee: '',
+      labels: [],
+      created: '2026-01-31T00:00:00Z',
+      updated: '2026-01-31T00:00:00Z',
+      description: 'Test item.',
+      comments: [],
+      parent: null,
+      dependsOn: [],
+    });
+
+    it('softDeleteWorkItem moves item to trash so readWorkItem fails', async () => {
+      await writeWorkItem(tmpDir, makeItem('10'));
+      await softDeleteWorkItem(tmpDir, '10');
+
+      // readWorkItem should fail because file is gone from items/
+      await expect(readWorkItem(tmpDir, '10')).rejects.toThrow();
+
+      // but the file should exist in trash/
+      const trashFile = path.join(tmpDir, '.tic', 'trash', '10.md');
+      expect(fs.existsSync(trashFile)).toBe(true);
+    });
+
+    it('restoreWorkItem moves item back so readWorkItem works', async () => {
+      await writeWorkItem(tmpDir, makeItem('11'));
+      await softDeleteWorkItem(tmpDir, '11');
+      await restoreWorkItem(tmpDir, '11');
+
+      const read = await readWorkItem(tmpDir, '11');
+      expect(read.id).toBe('11');
+      expect(read.title).toBe('Item 11');
+
+      // trash file should be gone
+      const trashFile = path.join(tmpDir, '.tic', 'trash', '11.md');
+      expect(fs.existsSync(trashFile)).toBe(false);
+    });
+
+    it('permanentlyDeleteWorkItem removes from trash', async () => {
+      await writeWorkItem(tmpDir, makeItem('12'));
+      await softDeleteWorkItem(tmpDir, '12');
+
+      const trashFile = path.join(tmpDir, '.tic', 'trash', '12.md');
+      expect(fs.existsSync(trashFile)).toBe(true);
+
+      await permanentlyDeleteWorkItem(tmpDir, '12');
+      expect(fs.existsSync(trashFile)).toBe(false);
+
+      // restore should fail because file is gone from trash
+      await expect(restoreWorkItem(tmpDir, '12')).rejects.toThrow();
+    });
+
+    it('permanentlyDeleteWorkItem ignores missing files', async () => {
+      // Should not throw when trash file does not exist
+      await expect(
+        permanentlyDeleteWorkItem(tmpDir, 'nonexistent'),
+      ).resolves.toBeUndefined();
+    });
+
+    it('cleanupTrash removes all trashed items', async () => {
+      await writeWorkItem(tmpDir, makeItem('20'));
+      await writeWorkItem(tmpDir, makeItem('21'));
+      await softDeleteWorkItem(tmpDir, '20');
+      await softDeleteWorkItem(tmpDir, '21');
+
+      const trashDir = path.join(tmpDir, '.tic', 'trash');
+      expect(fs.existsSync(path.join(trashDir, '20.md'))).toBe(true);
+      expect(fs.existsSync(path.join(trashDir, '21.md'))).toBe(true);
+
+      await cleanupTrash(tmpDir);
+      expect(fs.existsSync(trashDir)).toBe(false);
+    });
+
+    it('cleanupTrash is safe when trash dir does not exist', async () => {
+      await expect(cleanupTrash(tmpDir)).resolves.toBeUndefined();
+    });
   });
 });

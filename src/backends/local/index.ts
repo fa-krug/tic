@@ -14,6 +14,10 @@ import {
   deleteWorkItem as removeWorkItemFile,
   listItemFiles,
   parseWorkItemFile,
+  softDeleteWorkItem as softDeleteItem,
+  restoreWorkItem as restoreItem,
+  permanentlyDeleteWorkItem as permanentlyDeleteItem,
+  cleanupTrash as cleanupTrashDir,
 } from './items.js';
 import {
   listTemplates as listTemplateFiles,
@@ -274,6 +278,24 @@ export class LocalBackend extends BaseBackend {
     }
     await Promise.all(toWrite.map((item) => writeWorkItem(this.root, item)));
     this.invalidateCache();
+  }
+
+  async softDeleteWorkItem(id: string): Promise<void> {
+    await softDeleteItem(this.root, id);
+    this.invalidateCache();
+  }
+
+  async restoreWorkItem(id: string): Promise<void> {
+    await restoreItem(this.root, id);
+    this.invalidateCache();
+  }
+
+  async permanentlyDeleteWorkItem(id: string): Promise<void> {
+    await permanentlyDeleteItem(this.root, id);
+  }
+
+  async cleanupTrash(): Promise<void> {
+    await cleanupTrashDir(this.root);
   }
 
   async addComment(workItemId: string, comment: NewComment): Promise<Comment> {

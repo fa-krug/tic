@@ -578,4 +578,93 @@ describe('LocalBackend', () => {
   it('returns empty array when no items have assignees', async () => {
     expect(await backend.getAssignees()).toEqual([]);
   });
+
+  describe('soft-delete and restore', () => {
+    it('soft-deletes and restores a work item', async () => {
+      const item = await backend.createWorkItem({
+        title: 'Soft delete me',
+        type: 'task',
+        status: 'todo',
+        iteration: 'default',
+        priority: 'medium',
+        assignee: '',
+        labels: [],
+        description: 'Will be soft-deleted.',
+        parent: null,
+        dependsOn: [],
+      });
+
+      await backend.softDeleteWorkItem(item.id);
+      // Item should no longer appear in list
+      expect(await backend.listWorkItems()).toHaveLength(0);
+      // getWorkItem should fail
+      await expect(backend.getWorkItem(item.id)).rejects.toThrow();
+
+      await backend.restoreWorkItem(item.id);
+      // Item should be back
+      const restored = await backend.getWorkItem(item.id);
+      expect(restored.title).toBe('Soft delete me');
+      expect(await backend.listWorkItems()).toHaveLength(1);
+    });
+
+    it('permanently deletes a work item from trash', async () => {
+      const item = await backend.createWorkItem({
+        title: 'Permanently delete me',
+        type: 'task',
+        status: 'todo',
+        iteration: 'default',
+        priority: 'low',
+        assignee: '',
+        labels: [],
+        description: '',
+        parent: null,
+        dependsOn: [],
+      });
+
+      await backend.softDeleteWorkItem(item.id);
+      await backend.permanentlyDeleteWorkItem(item.id);
+
+      // Restore should fail because file is gone from trash
+      await expect(backend.restoreWorkItem(item.id)).rejects.toThrow();
+    });
+
+    it('cleans up all trashed items', async () => {
+      const item1 = await backend.createWorkItem({
+        title: 'Trash 1',
+        type: 'task',
+        status: 'todo',
+        iteration: 'default',
+        priority: 'low',
+        assignee: '',
+        labels: [],
+        description: '',
+        parent: null,
+        dependsOn: [],
+      });
+      const item2 = await backend.createWorkItem({
+        title: 'Trash 2',
+        type: 'task',
+        status: 'todo',
+        iteration: 'default',
+        priority: 'low',
+        assignee: '',
+        labels: [],
+        description: '',
+        parent: null,
+        dependsOn: [],
+      });
+
+      await backend.softDeleteWorkItem(item1.id);
+      await backend.softDeleteWorkItem(item2.id);
+      await backend.cleanupTrash();
+
+      // Both restores should fail
+      await expect(backend.restoreWorkItem(item1.id)).rejects.toThrow();
+      await expect(backend.restoreWorkItem(item2.id)).rejects.toThrow();
+
+      // Trash directory should be gone
+      const trashDir = path.join(tmpDir, '.tic', 'trash');
+      expect(fs.existsSync(trashDir)).toBe(false);
+    });
+  });
 });
