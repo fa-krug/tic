@@ -280,7 +280,7 @@ export function WorkItemList() {
   const viewport = useScrollViewport({
     totalItems: treeItems.length,
     cursor,
-    chromeLines: 6, // title+margin (2) + table header (1) + help bar margin+text (2) + warning (1)
+    chromeLines: 7, // title+margin (2) + table header (1) + preview line (1) + help bar margin+text (2) + warning (1)
     linesPerItem: 1,
   });
 
@@ -914,6 +914,14 @@ export function WorkItemList() {
           {loading && treeItems.length === 0 && (
             <Box marginTop={1}>
               <Text dimColor>Loading...</Text>
+            </Box>
+          )}
+
+          {treeItems.length > 0 && treeItems[cursor] && (
+            <Box>
+              <Text dimColor wrap="truncate">
+                {treeItems[cursor].item.title}
+              </Text>
             </Box>
           )}
 
