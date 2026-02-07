@@ -131,6 +131,7 @@ export function WorkItemForm() {
   const currentDraft = useFormStackStore((s) => s.currentDraft());
   const showDirtyPrompt = useFormStackStore((s) => s.showDiscardPrompt);
   const storeIsDirty = useFormStackStore((s) => s.isDirty());
+  const storeIsFieldDirty = useFormStackStore((s) => s.isFieldDirty);
   const {
     push: pushDraft,
     updateFields,
@@ -956,6 +957,13 @@ export function WorkItemForm() {
         : field.charAt(0).toUpperCase() + field.slice(1);
     const isRequired = requiredFields.has(field);
     const cursor = focused ? '>' : ' ';
+    const fieldKeyMap: Partial<Record<FieldName, keyof FormFields>> = {
+      parent: 'parentId',
+      comments: 'newComment',
+    };
+    const formKey = (fieldKeyMap[field] ?? field) as keyof FormFields;
+    const dirty = storeIsFieldDirty(formKey);
+    const dirtyIndicator = dirty ? <Text color="yellow"> ●</Text> : null;
 
     if (field === 'comments') {
       return (
@@ -963,7 +971,8 @@ export function WorkItemForm() {
           <Box>
             <Text color={focused ? 'cyan' : undefined}>{cursor} </Text>
             <Text bold={focused} color={focused ? 'cyan' : undefined}>
-              {label}:{isRequired && <Text dimColor> *</Text>}
+              {label}:{dirtyIndicator}
+              {isRequired && <Text dimColor> *</Text>}
             </Text>
           </Box>
           {comments.map((c, ci) => (
@@ -1014,7 +1023,8 @@ export function WorkItemForm() {
             <Box>
               <Text color="cyan">{cursor} </Text>
               <Text bold color="cyan">
-                {label}:{isRequired && <Text dimColor> *</Text>}{' '}
+                {label}:{dirtyIndicator}
+                {isRequired && <Text dimColor> *</Text>}{' '}
               </Text>
             </Box>
             <Box marginLeft={4}>
@@ -1034,7 +1044,8 @@ export function WorkItemForm() {
         <Box key={field}>
           <Text color={focused ? 'cyan' : undefined}>{cursor} </Text>
           <Text bold={focused} color={focused ? 'cyan' : undefined}>
-            {label}:{isRequired && <Text dimColor> *</Text>}{' '}
+            {label}:{dirtyIndicator}
+            {isRequired && <Text dimColor> *</Text>}{' '}
           </Text>
           <Text>{currentValue}</Text>
         </Box>
@@ -1048,7 +1059,8 @@ export function WorkItemForm() {
             <Box>
               <Text color="cyan">{cursor} </Text>
               <Text bold color="cyan">
-                {label}:{isRequired && <Text dimColor> *</Text>}{' '}
+                {label}:{dirtyIndicator}
+                {isRequired && <Text dimColor> *</Text>}{' '}
               </Text>
             </Box>
             <Box marginLeft={4}>
@@ -1070,7 +1082,8 @@ export function WorkItemForm() {
         <Box key={field}>
           <Text color={focused ? 'cyan' : undefined}>{cursor} </Text>
           <Text bold={focused} color={focused ? 'cyan' : undefined}>
-            {label}:{isRequired && <Text dimColor> *</Text>}{' '}
+            {label}:{dirtyIndicator}
+            {isRequired && <Text dimColor> *</Text>}{' '}
           </Text>
           <Text>{assignee || <Text dimColor>(empty)</Text>}</Text>
         </Box>
@@ -1084,7 +1097,8 @@ export function WorkItemForm() {
             <Box>
               <Text color="cyan">{cursor} </Text>
               <Text bold color="cyan">
-                {label}:{isRequired && <Text dimColor> *</Text>}{' '}
+                {label}:{dirtyIndicator}
+                {isRequired && <Text dimColor> *</Text>}{' '}
               </Text>
             </Box>
             <Box marginLeft={4}>
@@ -1106,7 +1120,8 @@ export function WorkItemForm() {
         <Box key={field}>
           <Text color={focused ? 'cyan' : undefined}>{cursor} </Text>
           <Text bold={focused} color={focused ? 'cyan' : undefined}>
-            {label}:{isRequired && <Text dimColor> *</Text>}{' '}
+            {label}:{dirtyIndicator}
+            {isRequired && <Text dimColor> *</Text>}{' '}
           </Text>
           <Text>{parentId || <Text dimColor>(empty)</Text>}</Text>
         </Box>
@@ -1126,7 +1141,8 @@ export function WorkItemForm() {
           <Box>
             <Text color={focused ? 'cyan' : undefined}>{cursor} </Text>
             <Text bold={focused} color={focused ? 'cyan' : undefined}>
-              {label}:{isRequired && <Text dimColor> *</Text>}{' '}
+              {label}:{dirtyIndicator}
+              {isRequired && <Text dimColor> *</Text>}{' '}
             </Text>
             <Text wrap="truncate">
               {preview || <Text dimColor>(empty)</Text>}
@@ -1144,7 +1160,8 @@ export function WorkItemForm() {
             <Box>
               <Text color="cyan">{cursor} </Text>
               <Text bold color="cyan">
-                {label}:{isRequired && <Text dimColor> *</Text>}{' '}
+                {label}:{dirtyIndicator}
+                {isRequired && <Text dimColor> *</Text>}{' '}
               </Text>
             </Box>
             <Box marginLeft={4}>
@@ -1166,7 +1183,8 @@ export function WorkItemForm() {
         <Box key={field}>
           <Text color={focused ? 'cyan' : undefined}>{cursor} </Text>
           <Text bold={focused} color={focused ? 'cyan' : undefined}>
-            {label}:{isRequired && <Text dimColor> *</Text>}{' '}
+            {label}:{dirtyIndicator}
+            {isRequired && <Text dimColor> *</Text>}{' '}
           </Text>
           <Text>{dependsOn || <Text dimColor>(empty)</Text>}</Text>
         </Box>
@@ -1180,7 +1198,8 @@ export function WorkItemForm() {
             <Box>
               <Text color="cyan">{cursor} </Text>
               <Text bold color="cyan">
-                {label}:{isRequired && <Text dimColor> *</Text>}{' '}
+                {label}:{dirtyIndicator}
+                {isRequired && <Text dimColor> *</Text>}{' '}
               </Text>
             </Box>
             <Box marginLeft={4}>
@@ -1202,7 +1221,8 @@ export function WorkItemForm() {
         <Box key={field}>
           <Text color={focused ? 'cyan' : undefined}>{cursor} </Text>
           <Text bold={focused} color={focused ? 'cyan' : undefined}>
-            {label}:{isRequired && <Text dimColor> *</Text>}{' '}
+            {label}:{dirtyIndicator}
+            {isRequired && <Text dimColor> *</Text>}{' '}
           </Text>
           <Text>{labels || <Text dimColor>(empty)</Text>}</Text>
         </Box>
@@ -1219,7 +1239,8 @@ export function WorkItemForm() {
         <Box key={field}>
           <Text color="cyan">{cursor} </Text>
           <Text bold color="cyan">
-            {label}:{isRequired && <Text dimColor> *</Text>}{' '}
+            {label}:{dirtyIndicator}
+            {isRequired && <Text dimColor> *</Text>}{' '}
           </Text>
           <TextInput
             value={textValue}
@@ -1237,7 +1258,8 @@ export function WorkItemForm() {
       <Box key={field}>
         <Text color={focused ? 'cyan' : undefined}>{cursor} </Text>
         <Text bold={focused} color={focused ? 'cyan' : undefined}>
-          {label}:{isRequired && <Text dimColor> *</Text>}{' '}
+          {label}:{dirtyIndicator}
+          {isRequired && <Text dimColor> *</Text>}{' '}
         </Text>
         <Text>{textValue || <Text dimColor>(empty)</Text>}</Text>
       </Box>
