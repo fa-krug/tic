@@ -145,6 +145,61 @@ describe('item commands', () => {
     });
   });
 
+  describe('runItemCreate validation', () => {
+    it('rejects invalid type', async () => {
+      await expect(
+        runItemCreate(backend, 'Bad type', { type: 'nonexistent' }),
+      ).rejects.toThrow('Invalid type "nonexistent"');
+    });
+
+    it('rejects invalid status', async () => {
+      await expect(
+        runItemCreate(backend, 'Bad status', { status: 'nonexistent' }),
+      ).rejects.toThrow('Invalid status "nonexistent"');
+    });
+
+    it('rejects invalid priority', async () => {
+      await expect(
+        runItemCreate(backend, 'Bad priority', { priority: 'urgent' }),
+      ).rejects.toThrow('Invalid priority "urgent"');
+    });
+
+    it('accepts valid type, status, and priority', async () => {
+      const item = await runItemCreate(backend, 'Good values', {
+        type: 'epic',
+        status: 'todo',
+        priority: 'high',
+      });
+      expect(item.type).toBe('epic');
+      expect(item.status).toBe('todo');
+      expect(item.priority).toBe('high');
+    });
+  });
+
+  describe('runItemUpdate validation', () => {
+    beforeEach(async () => {
+      await runItemCreate(backend, 'Item', {});
+    });
+
+    it('rejects invalid type on update', async () => {
+      await expect(
+        runItemUpdate(backend, '1', { type: 'nonexistent' }),
+      ).rejects.toThrow('Invalid type');
+    });
+
+    it('rejects invalid status on update', async () => {
+      await expect(
+        runItemUpdate(backend, '1', { status: 'nonexistent' }),
+      ).rejects.toThrow('Invalid status');
+    });
+
+    it('rejects invalid priority on update', async () => {
+      await expect(
+        runItemUpdate(backend, '1', { priority: 'urgent' }),
+      ).rejects.toThrow('Invalid priority');
+    });
+  });
+
   describe('item workflow integration', () => {
     it('create → list → show → update → comment → delete', async () => {
       const created = await runItemCreate(backend, 'Workflow test', {

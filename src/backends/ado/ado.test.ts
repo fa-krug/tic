@@ -328,6 +328,47 @@ describe('AzureDevOpsBackend', () => {
         '/repo',
       );
     });
+
+    it('rolls back created item when parent relation fails', async () => {
+      const backend = makeBackend();
+
+      // az: create succeeds, returning item with id 99
+      mockAz.mockResolvedValueOnce({ ...sampleWorkItem, id: 99 } as never);
+
+      // azExec: parent relation add fails
+      mockAzExec.mockRejectedValueOnce(new Error('Invalid parent reference'));
+
+      // azExec: delete (rollback) succeeds
+      mockAzExec.mockResolvedValueOnce('' as never);
+
+      await expect(
+        backend.createWorkItem({
+          title: 'New item',
+          type: 'User Story',
+          status: 'New',
+          iteration: '',
+          priority: 'medium',
+          assignee: '',
+          labels: [],
+          description: '',
+          parent: '10',
+          dependsOn: [],
+        }),
+      ).rejects.toThrow('Failed to link relationships');
+
+      // Verify rollback delete was called with the created item's ID
+      expect(mockAzExec).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          'boards',
+          'work-item',
+          'delete',
+          '--id',
+          '99',
+          '--yes',
+        ]),
+        '/repo',
+      );
+    });
   });
 
   describe('updateWorkItem', () => {

@@ -261,7 +261,18 @@ export class GitHubBackend extends BaseBackend {
     const id = match[1]!;
 
     if (data.parent) {
-      this.addSubIssue(data.parent, id);
+      try {
+        this.addSubIssue(data.parent, id);
+      } catch (err) {
+        try {
+          ghExec(['issue', 'delete', id, '--yes'], this.cwd);
+        } catch {
+          // Best-effort cleanup
+        }
+        throw new Error(
+          `Failed to link parent #${data.parent} to issue #${id}; issue was rolled back: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
     }
 
     return this.getWorkItem(id);
@@ -276,11 +287,17 @@ export class GitHubBackend extends BaseBackend {
     // Handle parent changes via sub-issue mutations
     if (data.parent !== undefined) {
       const current = await this.getWorkItem(id);
-      if (current.parent && current.parent !== data.parent) {
-        this.removeSubIssue(current.parent, id);
-      }
-      if (data.parent && data.parent !== current.parent) {
-        this.addSubIssue(data.parent, id);
+      try {
+        if (current.parent && current.parent !== data.parent) {
+          this.removeSubIssue(current.parent, id);
+        }
+        if (data.parent && data.parent !== current.parent) {
+          this.addSubIssue(data.parent, id);
+        }
+      } catch (err) {
+        throw new Error(
+          `Failed to update parent relationship for issue #${id}: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
     }
 

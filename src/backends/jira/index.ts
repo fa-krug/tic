@@ -252,22 +252,39 @@ export class JiraBackend extends BaseBackend {
     const key = result.key;
 
     // Create dependency links
-    for (const dep of data.dependsOn) {
-      acliExec(
-        [
-          'jira',
-          'workitem',
-          'link',
-          'create',
-          '--out',
-          dep,
-          '--in',
-          key,
-          '--type',
-          'Blocks',
-        ],
-        this.cwd,
-      );
+    if (data.dependsOn.length > 0) {
+      try {
+        for (const dep of data.dependsOn) {
+          acliExec(
+            [
+              'jira',
+              'workitem',
+              'link',
+              'create',
+              '--out',
+              dep,
+              '--in',
+              key,
+              '--type',
+              'Blocks',
+            ],
+            this.cwd,
+          );
+        }
+      } catch (err) {
+        try {
+          acliExec(
+            ['jira', 'workitem', 'delete', '--key', key, '--yes'],
+            this.cwd,
+          );
+        } catch {
+          // Best-effort cleanup
+        }
+        this.invalidateCache();
+        throw new Error(
+          `Failed to create dependency links for ${key}; issue was rolled back: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
     }
 
     this.invalidateCache();

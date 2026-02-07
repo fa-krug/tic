@@ -424,6 +424,41 @@ describe('GitHubBackend', () => {
       expect(item.id).toBe('10');
     });
 
+    it('rolls back created issue when parent linking fails', async () => {
+      const backend = new GitHubBackend('/repo');
+
+      mockGhExec.mockReturnValue('https://github.com/owner/repo/issues/10\n');
+      // addSubIssue calls: getIssueNodeId(parent), getIssueNodeId(child), then mutation
+      mockGhGraphQL
+        .mockReturnValueOnce({
+          repository: { issue: { id: 'NODE_5' } },
+        })
+        .mockImplementationOnce(() => {
+          throw new Error('GraphQL error: parent not found');
+        });
+
+      await expect(
+        backend.createWorkItem({
+          title: 'New issue',
+          type: 'issue',
+          status: 'open',
+          iteration: '',
+          priority: 'medium',
+          assignee: '',
+          labels: [],
+          description: '',
+          parent: '5',
+          dependsOn: [],
+        }),
+      ).rejects.toThrow('issue was rolled back');
+
+      // Verify delete was called to rollback
+      expect(mockGhExec).toHaveBeenCalledWith(
+        ['issue', 'delete', '10', '--yes'],
+        '/repo',
+      );
+    });
+
     it('skips ensureLabels when no labels provided', async () => {
       const backend = new GitHubBackend('/repo');
 

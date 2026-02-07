@@ -257,6 +257,33 @@ describe('MCP handlers', () => {
       expect(data.iteration).toBe('sprint-1');
       expect(data.description).toBe('A full item');
     });
+
+    it('returns error for invalid type', async () => {
+      const result = await handleCreateItem(backend, {
+        title: 'Bad type',
+        type: 'nonexistent',
+      });
+      expect(result.isError).toBe(true);
+      expect(result.content[0]!.text).toContain('Invalid type');
+    });
+
+    it('returns error for invalid status', async () => {
+      const result = await handleCreateItem(backend, {
+        title: 'Bad status',
+        status: 'nonexistent',
+      });
+      expect(result.isError).toBe(true);
+      expect(result.content[0]!.text).toContain('Invalid status');
+    });
+
+    it('returns error for invalid priority', async () => {
+      const result = await handleCreateItem(backend, {
+        title: 'Bad priority',
+        priority: 'urgent',
+      });
+      expect(result.isError).toBe(true);
+      expect(result.content[0]!.text).toContain('Invalid priority');
+    });
   });
 
   describe('handleUpdateItem', () => {
@@ -296,6 +323,69 @@ describe('MCP handlers', () => {
         title: 'Nope',
       });
       expect(result.isError).toBe(true);
+    });
+
+    it('returns error for invalid type', async () => {
+      await backend.createWorkItem({
+        title: 'Item',
+        type: 'task',
+        status: 'backlog',
+        priority: 'medium',
+        assignee: '',
+        labels: [],
+        iteration: 'default',
+        parent: null,
+        dependsOn: [],
+        description: '',
+      });
+      const result = await handleUpdateItem(backend, {
+        id: '1',
+        type: 'nonexistent',
+      });
+      expect(result.isError).toBe(true);
+      expect(result.content[0]!.text).toContain('Invalid type');
+    });
+
+    it('returns error for invalid status', async () => {
+      await backend.createWorkItem({
+        title: 'Item',
+        type: 'task',
+        status: 'backlog',
+        priority: 'medium',
+        assignee: '',
+        labels: [],
+        iteration: 'default',
+        parent: null,
+        dependsOn: [],
+        description: '',
+      });
+      const result = await handleUpdateItem(backend, {
+        id: '1',
+        status: 'nonexistent',
+      });
+      expect(result.isError).toBe(true);
+      expect(result.content[0]!.text).toContain('Invalid status');
+    });
+
+    it('returns error for invalid priority', async () => {
+      await backend.createWorkItem({
+        title: 'Item',
+        type: 'task',
+        status: 'backlog',
+        priority: 'medium',
+        assignee: '',
+        labels: [],
+        iteration: 'default',
+        parent: null,
+        dependsOn: [],
+        description: '',
+      });
+      const result = await handleUpdateItem(backend, {
+        id: '1',
+        priority: 'urgent',
+      });
+      expect(result.isError).toBe(true);
+      expect(result.content[0]!.text).toContain('Invalid priority');
     });
   });
 

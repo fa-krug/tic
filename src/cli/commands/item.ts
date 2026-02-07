@@ -37,6 +37,8 @@ export interface ItemCommentOptions {
   author?: string;
 }
 
+const VALID_PRIORITIES = ['low', 'medium', 'high', 'critical'];
+
 export async function runItemCreate(
   backend: Backend,
   title: string,
@@ -44,6 +46,26 @@ export async function runItemCreate(
 ): Promise<WorkItem> {
   const statuses = await backend.getStatuses();
   const types = await backend.getWorkItemTypes();
+
+  if (opts.type !== undefined && !types.includes(opts.type)) {
+    throw new Error(
+      `Invalid type "${opts.type}". Valid types: ${types.join(', ')}`,
+    );
+  }
+  if (opts.status !== undefined && !statuses.includes(opts.status)) {
+    throw new Error(
+      `Invalid status "${opts.status}". Valid statuses: ${statuses.join(', ')}`,
+    );
+  }
+  if (
+    opts.priority !== undefined &&
+    !VALID_PRIORITIES.includes(opts.priority)
+  ) {
+    throw new Error(
+      `Invalid priority "${opts.priority}". Valid priorities: ${VALID_PRIORITIES.join(', ')}`,
+    );
+  }
+
   return backend.cachedCreateWorkItem({
     title,
     type: opts.type ?? (types.includes('task') ? 'task' : types[0]!),
@@ -92,6 +114,31 @@ export async function runItemUpdate(
   id: string,
   opts: ItemUpdateOptions,
 ): Promise<WorkItem> {
+  if (opts.type !== undefined) {
+    const types = await backend.getWorkItemTypes();
+    if (!types.includes(opts.type)) {
+      throw new Error(
+        `Invalid type "${opts.type}". Valid types: ${types.join(', ')}`,
+      );
+    }
+  }
+  if (opts.status !== undefined) {
+    const statuses = await backend.getStatuses();
+    if (!statuses.includes(opts.status)) {
+      throw new Error(
+        `Invalid status "${opts.status}". Valid statuses: ${statuses.join(', ')}`,
+      );
+    }
+  }
+  if (
+    opts.priority !== undefined &&
+    !VALID_PRIORITIES.includes(opts.priority)
+  ) {
+    throw new Error(
+      `Invalid priority "${opts.priority}". Valid priorities: ${VALID_PRIORITIES.join(', ')}`,
+    );
+  }
+
   const data: Partial<WorkItem> = {};
   if (opts.title !== undefined) data.title = opts.title;
   if (opts.type !== undefined) data.type = opts.type;

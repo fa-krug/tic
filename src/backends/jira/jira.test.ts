@@ -306,6 +306,36 @@ describe('JiraBackend', () => {
         '/repo',
       );
     });
+
+    it('rolls back created issue when dependency link creation fails', async () => {
+      const backend = await JiraBackend.create('/repo');
+      mockAcli.mockReturnValueOnce({ key: 'TEAM-42' });
+      mockAcliExec
+        .mockImplementationOnce(() => {
+          throw new Error('link creation failed');
+        })
+        .mockReturnValueOnce('');
+
+      await expect(
+        backend.createWorkItem({
+          title: 'Issue with deps',
+          type: 'task',
+          status: 'to do',
+          iteration: '',
+          priority: 'medium',
+          assignee: '',
+          labels: [],
+          description: '',
+          parent: null,
+          dependsOn: ['TEAM-1'],
+        }),
+      ).rejects.toThrow('Failed to create dependency links');
+
+      expect(mockAcliExec).toHaveBeenCalledWith(
+        ['jira', 'workitem', 'delete', '--key', 'TEAM-42', '--yes'],
+        '/repo',
+      );
+    });
   });
 
   describe('updateWorkItem', () => {
