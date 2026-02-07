@@ -1275,10 +1275,36 @@ export function WorkItemForm() {
     );
   }
 
+  const formStackLength = useFormStackStore((s) => s.stack.length);
+
+  const chromeLines = useMemo(() => {
+    let lines = 4; // title+margin (2) + help bar margin+text (2)
+    if (formStackLength > 1) lines += 2; // breadcrumbs + marginBottom
+    if (selectedWorkItemId !== null && capabilities.relationships) {
+      const hasRelParent = existingItem?.parent != null;
+      const hasChildren = children.length > 0;
+      const hasDependents = dependents.length > 0;
+      if (hasRelParent || hasChildren || hasDependents) {
+        lines += 2; // marginTop + "Relationships:" header
+        if (hasRelParent) lines += 1; // "Parent:" label
+        if (hasChildren) lines += 1; // "Children:" label
+        if (hasDependents) lines += 1; // "Depended on by:" label
+      }
+    }
+    return lines;
+  }, [
+    formStackLength,
+    selectedWorkItemId,
+    capabilities.relationships,
+    existingItem?.parent,
+    children.length,
+    dependents.length,
+  ]);
+
   const viewport = useScrollViewport({
     totalItems: fields.length,
     cursor: focusedField,
-    chromeLines: 4, // title+margin (2) + help bar margin+text (2)
+    chromeLines,
   });
 
   // Show placeholder when item is still loading
