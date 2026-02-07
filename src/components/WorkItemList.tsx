@@ -195,7 +195,7 @@ export function WorkItemList() {
         itemId,
         timestamp: new Date().toISOString(),
       });
-      await syncManager?.pushPending();
+      syncManager?.pushPending().catch(() => {});
     }
   };
 

@@ -7,7 +7,7 @@ import type {
   Comment,
   Template,
 } from '../../types.js';
-import { acli, acliExec } from './acli.js';
+import { acli, acliExec, acliExecSync } from './acli.js';
 import { readJiraConfig } from './config.js';
 import type { JiraConfig } from './config.js';
 import {
@@ -41,7 +41,7 @@ export class JiraBackend extends BaseBackend {
   }
 
   static async create(cwd: string): Promise<JiraBackend> {
-    acliExec(['jira', 'auth', 'status'], cwd);
+    acliExecSync(['jira', 'auth', 'status'], cwd);
     const config = await readJiraConfig(cwd);
     return new JiraBackend(cwd, config);
   }
@@ -75,9 +75,8 @@ export class JiraBackend extends BaseBackend {
     };
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async getStatuses(): Promise<string[]> {
-    const statuses = acli<{ name: string }[]>(
+    const statuses = await acli<{ name: string }[]>(
       [
         'jira',
         'project',
@@ -91,19 +90,17 @@ export class JiraBackend extends BaseBackend {
     return statuses.map((s) => s.name.toLowerCase());
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async getWorkItemTypes(): Promise<string[]> {
-    const project = acli<{ issueTypes: { name: string }[] }>(
+    const project = await acli<{ issueTypes: { name: string }[] }>(
       ['jira', 'project', 'view', '--project', this.config.project, '--json'],
       this.cwd,
     );
     return project.issueTypes.map((t) => t.name.toLowerCase());
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async getAssignees(): Promise<string[]> {
     try {
-      const users = acli<{ emailAddress: string }[]>(
+      const users = await acli<{ emailAddress: string }[]>(
         ['jira', 'user', 'search', '--project', this.config.project, '--json'],
         this.cwd,
       );
@@ -117,17 +114,15 @@ export class JiraBackend extends BaseBackend {
     return this.getLabelsFromCache();
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async getIterations(): Promise<string[]> {
     if (!this.config.boardId) return [];
-    const sprints = this.fetchSprints();
+    const sprints = await this.fetchSprints();
     return sprints.map((s) => s.name);
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async getCurrentIteration(): Promise<string> {
     if (!this.config.boardId) return '';
-    const sprints = acli<JiraSprint[]>(
+    const sprints = await acli<JiraSprint[]>(
       [
         'jira',
         'board',
@@ -148,15 +143,14 @@ export class JiraBackend extends BaseBackend {
     // No-op — current iteration is the active sprint
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async listWorkItems(iteration?: string): Promise<WorkItem[]> {
     if (iteration && this.config.boardId) {
       // Find the sprint ID for the given iteration name
-      const sprints = this.fetchSprints();
+      const sprints = await this.fetchSprints();
       const sprint = sprints.find((s) => s.name === iteration);
       if (!sprint) return [];
 
-      const issues = acli<JiraIssue[]>(
+      const issues = await acli<JiraIssue[]>(
         [
           'jira',
           'workitem',
@@ -173,7 +167,7 @@ export class JiraBackend extends BaseBackend {
       return issues.map(mapIssueToWorkItem);
     }
 
-    const issues = acli<JiraIssue[]>(
+    const issues = await acli<JiraIssue[]>(
       [
         'jira',
         'workitem',
@@ -194,9 +188,8 @@ export class JiraBackend extends BaseBackend {
     return items;
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async getWorkItem(id: string): Promise<WorkItem> {
-    const issue = acli<JiraIssue>(
+    const issue = await acli<JiraIssue>(
       ['jira', 'workitem', 'view', '--key', id, '--fields', '*all', '--json'],
       this.cwd,
     );
@@ -204,7 +197,7 @@ export class JiraBackend extends BaseBackend {
 
     // Fetch comments separately
     try {
-      const comments = acli<JiraComment[]>(
+      const comments = await acli<JiraComment[]>(
         ['jira', 'workitem', 'comment', 'list', '--key', id, '--json'],
         this.cwd,
       );
@@ -248,14 +241,14 @@ export class JiraBackend extends BaseBackend {
     }
 
     args.push('--json');
-    const result = acli<{ key: string }>(args, this.cwd);
+    const result = await acli<{ key: string }>(args, this.cwd);
     const key = result.key;
 
     // Create dependency links
     if (data.dependsOn.length > 0) {
       try {
         for (const dep of data.dependsOn) {
-          acliExec(
+          await acliExec(
             [
               'jira',
               'workitem',
@@ -273,7 +266,7 @@ export class JiraBackend extends BaseBackend {
         }
       } catch (err) {
         try {
-          acliExec(
+          await acliExec(
             ['jira', 'workitem', 'delete', '--key', key, '--yes'],
             this.cwd,
           );
@@ -296,7 +289,7 @@ export class JiraBackend extends BaseBackend {
 
     // Handle status transition separately
     if (data.status !== undefined) {
-      acliExec(
+      await acliExec(
         [
           'jira',
           'workitem',
@@ -314,7 +307,7 @@ export class JiraBackend extends BaseBackend {
     // Handle assignee separately
     if (data.assignee !== undefined) {
       if (data.assignee) {
-        acliExec(
+        await acliExec(
           [
             'jira',
             'workitem',
@@ -327,7 +320,7 @@ export class JiraBackend extends BaseBackend {
           this.cwd,
         );
       } else {
-        acliExec(
+        await acliExec(
           ['jira', 'workitem', 'assign', '--key', id, '--remove-assignee'],
           this.cwd,
         );
@@ -356,22 +349,23 @@ export class JiraBackend extends BaseBackend {
     }
 
     if (hasEdits) {
-      acliExec(editArgs, this.cwd);
+      await acliExec(editArgs, this.cwd);
     }
 
     this.invalidateCache();
     return this.getWorkItem(id);
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async deleteWorkItem(id: string): Promise<void> {
-    acliExec(['jira', 'workitem', 'delete', '--key', id, '--yes'], this.cwd);
+    await acliExec(
+      ['jira', 'workitem', 'delete', '--key', id, '--yes'],
+      this.cwd,
+    );
     this.invalidateCache();
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async addComment(workItemId: string, comment: NewComment): Promise<Comment> {
-    acliExec(
+    await acliExec(
       [
         'jira',
         'workitem',
@@ -391,9 +385,8 @@ export class JiraBackend extends BaseBackend {
     };
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   override async getChildren(id: string): Promise<WorkItem[]> {
-    const issues = acli<JiraIssue[]>(
+    const issues = await acli<JiraIssue[]>(
       [
         'jira',
         'workitem',
@@ -410,9 +403,8 @@ export class JiraBackend extends BaseBackend {
     return issues.map(mapIssueToWorkItem);
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   override async getDependents(id: string): Promise<WorkItem[]> {
-    const issues = acli<JiraIssue[]>(
+    const issues = await acli<JiraIssue[]>(
       [
         'jira',
         'workitem',
@@ -433,9 +425,8 @@ export class JiraBackend extends BaseBackend {
     return `${this.config.site}/browse/${id}`;
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async openItem(id: string): Promise<void> {
-    acliExec(['jira', 'workitem', 'view', id, '--web'], this.cwd);
+    await acliExec(['jira', 'workitem', 'view', id, '--web'], this.cwd);
   }
 
   /* eslint-disable @typescript-eslint/require-await, @typescript-eslint/no-unused-vars */
@@ -459,9 +450,9 @@ export class JiraBackend extends BaseBackend {
   }
   /* eslint-enable @typescript-eslint/require-await, @typescript-eslint/no-unused-vars */
 
-  private fetchSprints(): JiraSprint[] {
+  private async fetchSprints(): Promise<JiraSprint[]> {
     if (this.cachedSprints) return this.cachedSprints;
-    this.cachedSprints = acli<JiraSprint[]>(
+    this.cachedSprints = await acli<JiraSprint[]>(
       [
         'jira',
         'board',

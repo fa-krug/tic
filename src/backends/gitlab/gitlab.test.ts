@@ -5,6 +5,8 @@ import { GitLabBackend } from './index.js';
 vi.mock('./glab.js', () => ({
   glab: vi.fn(),
   glabExec: vi.fn(),
+  glabExecSync: vi.fn(),
+  glabSync: vi.fn(),
 }));
 
 // Mock the group detection
@@ -12,18 +14,31 @@ vi.mock('./group.js', () => ({
   detectGroup: vi.fn().mockReturnValue('mygroup'),
 }));
 
-// Mock node:child_process for the direct execFileSync import in index.ts (used by openItem for epics)
-vi.mock('node:child_process', () => ({
-  execFileSync: vi.fn(),
-  execSync: vi.fn(),
-}));
+// Mock node:child_process for the direct execFile import in index.ts (used by openItem for epics)
+const { mockExecFilePromisified } = vi.hoisted(() => {
+  const mockExecFilePromisified = vi
+    .fn()
+    .mockResolvedValue({ stdout: '', stderr: '' });
+  return { mockExecFilePromisified };
+});
+vi.mock('node:child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:child_process')>();
+  const mockExecFile = Object.assign(vi.fn(), {
+    [Symbol.for('nodejs.util.promisify.custom')]: mockExecFilePromisified,
+  });
+  return {
+    ...actual,
+    execFileSync: vi.fn(),
+    execFile: mockExecFile,
+  };
+});
 
-import { glab, glabExec } from './glab.js';
-import { execFileSync } from 'node:child_process';
+import { glab, glabExec, glabExecSync, glabSync } from './glab.js';
 
 const mockGlab = vi.mocked(glab);
 const mockGlabExec = vi.mocked(glabExec);
-const mockExecFileSync = vi.mocked(execFileSync);
+const mockGlabExecSync = vi.mocked(glabExecSync);
+const mockGlabSync = vi.mocked(glabSync);
 
 function makeBackend(): GitLabBackend {
   return new GitLabBackend('/repo');
@@ -61,18 +76,21 @@ const sampleNote = {
 describe('GitLabBackend', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Constructor calls glabExec for auth check
-    mockGlabExec.mockReturnValue('');
+    // Constructor calls glabExecSync for auth check
+    mockGlabExecSync.mockReturnValue('');
   });
 
   describe('constructor', () => {
     it('verifies glab auth on construction', () => {
       makeBackend();
-      expect(mockGlabExec).toHaveBeenCalledWith(['auth', 'status'], '/repo');
+      expect(mockGlabExecSync).toHaveBeenCalledWith(
+        ['auth', 'status'],
+        '/repo',
+      );
     });
 
     it('throws when glab auth fails', () => {
-      mockGlabExec.mockImplementation(() => {
+      mockGlabExecSync.mockImplementation(() => {
         throw new Error('not logged in');
       });
       expect(() => new GitLabBackend('/repo')).toThrow();
@@ -113,7 +131,7 @@ describe('GitLabBackend', () => {
   describe('getIterations', () => {
     it('returns iteration titles', async () => {
       const backend = makeBackend();
-      mockGlab.mockReturnValueOnce([
+      mockGlab.mockResolvedValueOnce([
         {
           title: 'Sprint 1',
           start_date: '2026-01-01',
@@ -130,7 +148,7 @@ describe('GitLabBackend', () => {
 
     it('returns empty array when no iterations', async () => {
       const backend = makeBackend();
-      mockGlab.mockReturnValueOnce([]);
+      mockGlab.mockResolvedValueOnce([]);
       expect(await backend.getIterations()).toEqual([]);
     });
   });
@@ -138,7 +156,7 @@ describe('GitLabBackend', () => {
   describe('getCurrentIteration', () => {
     it('returns iteration that spans today', async () => {
       const backend = makeBackend();
-      mockGlab.mockReturnValueOnce([
+      mockGlab.mockResolvedValueOnce([
         {
           title: 'Past Sprint',
           start_date: '2020-01-01',
@@ -155,7 +173,7 @@ describe('GitLabBackend', () => {
 
     it('returns empty string when no current iteration', async () => {
       const backend = makeBackend();
-      mockGlab.mockReturnValueOnce([
+      mockGlab.mockResolvedValueOnce([
         {
           title: 'Past Sprint',
           start_date: '2020-01-01',
@@ -181,12 +199,12 @@ describe('GitLabBackend', () => {
 
       // First call: issues
       mockGlab
-        .mockReturnValueOnce([
+        .mockResolvedValueOnce([
           { ...sampleIssue, iid: 1, updated_at: '2026-01-20T00:00:00Z' },
           { ...sampleIssue, iid: 2, updated_at: '2026-01-18T00:00:00Z' },
         ])
         // Second call: epics
-        .mockReturnValueOnce([
+        .mockResolvedValueOnce([
           { ...sampleEpic, iid: 1, updated_at: '2026-01-19T00:00:00Z' },
         ]);
 
@@ -202,7 +220,7 @@ describe('GitLabBackend', () => {
       const backend = makeBackend();
 
       mockGlab
-        .mockReturnValueOnce([
+        .mockResolvedValueOnce([
           {
             ...sampleIssue,
             iid: 1,
@@ -216,7 +234,7 @@ describe('GitLabBackend', () => {
             updated_at: '2026-01-18T00:00:00Z',
           },
         ])
-        .mockReturnValueOnce([]);
+        .mockResolvedValueOnce([]);
 
       const items = await backend.listWorkItems('v1.0');
       const issueItems = items.filter((i) => i.type === 'issue');
@@ -230,8 +248,8 @@ describe('GitLabBackend', () => {
       const backend = makeBackend();
 
       mockGlab
-        .mockReturnValueOnce(sampleIssue) // issue view
-        .mockReturnValueOnce([sampleNote]); // notes
+        .mockResolvedValueOnce(sampleIssue) // issue view
+        .mockResolvedValueOnce([sampleNote]); // notes
 
       const item = await backend.getWorkItem('issue-42');
       expect(item.id).toBe('issue-42');
@@ -244,8 +262,8 @@ describe('GitLabBackend', () => {
       const backend = makeBackend();
 
       mockGlab
-        .mockReturnValueOnce(sampleEpic) // epic view
-        .mockReturnValueOnce([sampleNote]); // notes
+        .mockResolvedValueOnce(sampleEpic) // epic view
+        .mockResolvedValueOnce([sampleNote]); // notes
 
       const item = await backend.getWorkItem('epic-5');
       expect(item.id).toBe('epic-5');
@@ -269,16 +287,16 @@ describe('GitLabBackend', () => {
     it('creates an issue and returns the WorkItem', async () => {
       const backend = makeBackend();
 
-      mockGlabExec.mockReturnValue(
+      mockGlabExec.mockResolvedValue(
         'https://gitlab.com/mygroup/project/-/issues/10\n',
       );
       mockGlab
-        .mockReturnValueOnce({
+        .mockResolvedValueOnce({
           ...sampleIssue,
           iid: 10,
           title: 'New issue',
         })
-        .mockReturnValueOnce([]); // notes
+        .mockResolvedValueOnce([]); // notes
 
       const item = await backend.createWorkItem({
         title: 'New issue',
@@ -309,7 +327,7 @@ describe('GitLabBackend', () => {
     it('creates an epic via API', async () => {
       const backend = makeBackend();
 
-      mockGlab.mockReturnValueOnce({
+      mockGlab.mockResolvedValueOnce({
         ...sampleEpic,
         iid: 8,
         title: 'New epic',
@@ -335,12 +353,12 @@ describe('GitLabBackend', () => {
     it('ensures labels exist before creating an issue', async () => {
       const backend = makeBackend();
 
-      mockGlabExec.mockReturnValue(
+      mockGlabExec.mockResolvedValue(
         'https://gitlab.com/mygroup/project/-/issues/10\n',
       );
       mockGlab
-        .mockReturnValueOnce({ ...sampleIssue, iid: 10 })
-        .mockReturnValueOnce([]); // notes
+        .mockResolvedValueOnce({ ...sampleIssue, iid: 10 })
+        .mockResolvedValueOnce([]); // notes
 
       await backend.createWorkItem({
         title: 'New issue',
@@ -368,8 +386,8 @@ describe('GitLabBackend', () => {
     it('ensures labels exist before creating an epic', async () => {
       const backend = makeBackend();
 
-      mockGlabExec.mockReturnValue('');
-      mockGlab.mockReturnValueOnce({ ...sampleEpic, iid: 8 });
+      mockGlabExec.mockResolvedValue('');
+      mockGlab.mockResolvedValueOnce({ ...sampleEpic, iid: 8 });
 
       await backend.createWorkItem({
         title: 'New epic',
@@ -394,13 +412,11 @@ describe('GitLabBackend', () => {
       const backend = makeBackend();
 
       mockGlabExec
-        .mockImplementationOnce(() => {
-          throw new Error('label already exists');
-        })
-        .mockReturnValue('https://gitlab.com/mygroup/project/-/issues/10\n');
+        .mockRejectedValueOnce(new Error('label already exists'))
+        .mockResolvedValue('https://gitlab.com/mygroup/project/-/issues/10\n');
       mockGlab
-        .mockReturnValueOnce({ ...sampleIssue, iid: 10 })
-        .mockReturnValueOnce([]); // notes
+        .mockResolvedValueOnce({ ...sampleIssue, iid: 10 })
+        .mockResolvedValueOnce([]); // notes
 
       const item = await backend.createWorkItem({
         title: 'New issue',
@@ -423,15 +439,15 @@ describe('GitLabBackend', () => {
     it('updates issue title and description', async () => {
       const backend = makeBackend();
 
-      mockGlabExec.mockReturnValue('');
+      mockGlabExec.mockResolvedValue('');
       mockGlab
-        .mockReturnValueOnce({
+        .mockResolvedValueOnce({
           ...sampleIssue,
           iid: 5,
           title: 'Updated title',
           description: 'Updated body',
         })
-        .mockReturnValueOnce([]); // notes
+        .mockResolvedValueOnce([]); // notes
 
       const item = await backend.updateWorkItem('issue-5', {
         title: 'Updated title',
@@ -443,14 +459,14 @@ describe('GitLabBackend', () => {
 
     it('closes an issue when status changes to closed', async () => {
       const backend = makeBackend();
-      mockGlabExec.mockReturnValue('');
+      mockGlabExec.mockResolvedValue('');
       mockGlab
-        .mockReturnValueOnce({
+        .mockResolvedValueOnce({
           ...sampleIssue,
           iid: 5,
           state: 'closed',
         })
-        .mockReturnValueOnce([]);
+        .mockResolvedValueOnce([]);
 
       await backend.updateWorkItem('issue-5', { status: 'closed' });
       expect(mockGlabExec).toHaveBeenCalledWith(
@@ -461,14 +477,14 @@ describe('GitLabBackend', () => {
 
     it('reopens an issue when status changes to open', async () => {
       const backend = makeBackend();
-      mockGlabExec.mockReturnValue('');
+      mockGlabExec.mockResolvedValue('');
       mockGlab
-        .mockReturnValueOnce({
+        .mockResolvedValueOnce({
           ...sampleIssue,
           iid: 5,
           state: 'opened',
         })
-        .mockReturnValueOnce([]);
+        .mockResolvedValueOnce([]);
 
       await backend.updateWorkItem('issue-5', { status: 'open' });
       expect(mockGlabExec).toHaveBeenCalledWith(
@@ -481,11 +497,11 @@ describe('GitLabBackend', () => {
       const backend = makeBackend();
 
       // First glab call: PUT to update epic
-      mockGlab.mockReturnValueOnce({ ...sampleEpic, state: 'closed' });
+      mockGlab.mockResolvedValueOnce({ ...sampleEpic, state: 'closed' });
       // Second glab call: GET to fetch updated epic
-      mockGlab.mockReturnValueOnce({ ...sampleEpic, state: 'closed' });
+      mockGlab.mockResolvedValueOnce({ ...sampleEpic, state: 'closed' });
       // Third glab call: GET notes
-      mockGlab.mockReturnValueOnce([]);
+      mockGlab.mockResolvedValueOnce([]);
 
       await backend.updateWorkItem('epic-5', { status: 'closed' });
 
@@ -504,10 +520,14 @@ describe('GitLabBackend', () => {
 
     it('ensures labels exist before updating an issue', async () => {
       const backend = makeBackend();
-      mockGlabExec.mockReturnValue('');
+      mockGlabExec.mockResolvedValue('');
       mockGlab
-        .mockReturnValueOnce({ ...sampleIssue, iid: 5, labels: ['new-label'] })
-        .mockReturnValueOnce([]); // notes
+        .mockResolvedValueOnce({
+          ...sampleIssue,
+          iid: 5,
+          labels: ['new-label'],
+        })
+        .mockResolvedValueOnce([]); // notes
 
       await backend.updateWorkItem('issue-5', { labels: ['new-label'] });
 
@@ -521,7 +541,7 @@ describe('GitLabBackend', () => {
   describe('deleteWorkItem', () => {
     it('deletes an issue', async () => {
       const backend = makeBackend();
-      mockGlabExec.mockReturnValue('');
+      mockGlabExec.mockResolvedValue('');
       await backend.deleteWorkItem('issue-7');
       expect(mockGlabExec).toHaveBeenCalledWith(
         ['issue', 'delete', '7', '--yes'],
@@ -531,7 +551,7 @@ describe('GitLabBackend', () => {
 
     it('deletes an epic via API', async () => {
       const backend = makeBackend();
-      mockGlab.mockReturnValueOnce({});
+      mockGlab.mockResolvedValueOnce({});
       await backend.deleteWorkItem('epic-3');
       expect(mockGlab).toHaveBeenCalledWith(
         ['api', 'groups/mygroup/epics/3', '-X', 'DELETE'],
@@ -543,7 +563,7 @@ describe('GitLabBackend', () => {
   describe('addComment', () => {
     it('adds a comment to an issue', async () => {
       const backend = makeBackend();
-      mockGlabExec.mockReturnValue('');
+      mockGlabExec.mockResolvedValue('');
 
       const comment = await backend.addComment('issue-3', {
         author: 'alice',
@@ -561,7 +581,7 @@ describe('GitLabBackend', () => {
 
     it('adds a comment to an epic via API', async () => {
       const backend = makeBackend();
-      mockGlab.mockReturnValueOnce({});
+      mockGlab.mockResolvedValueOnce({});
 
       const comment = await backend.addComment('epic-5', {
         author: 'bob',
@@ -592,7 +612,7 @@ describe('GitLabBackend', () => {
 
     it('returns epic children as WorkItems', async () => {
       const backend = makeBackend();
-      mockGlab.mockReturnValueOnce([
+      mockGlab.mockResolvedValueOnce([
         { ...sampleIssue, iid: 10 },
         { ...sampleIssue, iid: 11 },
       ]);
@@ -615,7 +635,7 @@ describe('GitLabBackend', () => {
   describe('getItemUrl', () => {
     it('returns the issue web_url from API', () => {
       const backend = makeBackend();
-      mockGlab.mockReturnValueOnce({
+      mockGlabSync.mockReturnValueOnce({
         web_url: 'https://gitlab.com/mygroup/project/-/issues/5',
       });
 
@@ -633,7 +653,7 @@ describe('GitLabBackend', () => {
   describe('openItem', () => {
     it('opens an issue in the browser via glab', async () => {
       const backend = makeBackend();
-      mockGlabExec.mockReturnValue('');
+      mockGlabExec.mockResolvedValue('');
 
       await backend.openItem('issue-5');
       expect(mockGlabExec).toHaveBeenCalledWith(
@@ -644,10 +664,9 @@ describe('GitLabBackend', () => {
 
     it('opens an epic URL via open command', async () => {
       const backend = makeBackend();
-      mockExecFileSync.mockReturnValue('');
 
       await backend.openItem('epic-5');
-      expect(mockExecFileSync).toHaveBeenCalledWith('open', [
+      expect(mockExecFilePromisified).toHaveBeenCalledWith('open', [
         'https://gitlab.com/groups/mygroup/-/epics/5',
       ]);
     });
@@ -656,7 +675,7 @@ describe('GitLabBackend', () => {
   describe('getAssignees', () => {
     it('returns project member usernames', async () => {
       const backend = makeBackend();
-      mockGlab.mockReturnValueOnce([
+      mockGlab.mockResolvedValueOnce([
         { username: 'alice' },
         { username: 'bob' },
       ]);
@@ -665,9 +684,7 @@ describe('GitLabBackend', () => {
 
     it('returns empty array on error', async () => {
       const backend = makeBackend();
-      mockGlab.mockImplementationOnce(() => {
-        throw new Error('API error');
-      });
+      mockGlab.mockRejectedValueOnce(new Error('API error'));
       expect(await backend.getAssignees()).toEqual([]);
     });
   });

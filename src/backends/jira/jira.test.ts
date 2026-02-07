@@ -4,17 +4,19 @@ import { JiraBackend } from './index.js';
 vi.mock('./acli.js', () => ({
   acli: vi.fn(),
   acliExec: vi.fn(),
+  acliExecSync: vi.fn(),
 }));
 
 vi.mock('./config.js', () => ({
   readJiraConfig: vi.fn(),
 }));
 
-import { acli, acliExec } from './acli.js';
+import { acli, acliExec, acliExecSync } from './acli.js';
 import { readJiraConfig } from './config.js';
 
 const mockAcli = vi.mocked(acli);
 const mockAcliExec = vi.mocked(acliExec);
+const mockAcliExecSync = vi.mocked(acliExecSync);
 const mockReadJiraConfig = vi.mocked(readJiraConfig);
 
 function makeJiraIssue(overrides: {
@@ -63,7 +65,8 @@ function makeJiraIssue(overrides: {
 describe('JiraBackend', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockAcliExec.mockReturnValue('');
+    mockAcliExecSync.mockReturnValue('');
+    mockAcliExec.mockResolvedValue('');
     mockReadJiraConfig.mockResolvedValue({
       site: 'https://mycompany.atlassian.net',
       project: 'TEAM',
@@ -74,14 +77,14 @@ describe('JiraBackend', () => {
   describe('create', () => {
     it('verifies acli auth on construction', async () => {
       await JiraBackend.create('/repo');
-      expect(mockAcliExec).toHaveBeenCalledWith(
+      expect(mockAcliExecSync).toHaveBeenCalledWith(
         ['jira', 'auth', 'status'],
         '/repo',
       );
     });
 
     it('throws when acli auth fails', async () => {
-      mockAcliExec.mockImplementation(() => {
+      mockAcliExecSync.mockImplementation(() => {
         throw new Error('not logged in');
       });
       await expect(JiraBackend.create('/repo')).rejects.toThrow();
@@ -117,7 +120,7 @@ describe('JiraBackend', () => {
   describe('getStatuses', () => {
     it('returns statuses from project workflow', async () => {
       const backend = await JiraBackend.create('/repo');
-      mockAcli.mockReturnValue([
+      mockAcli.mockResolvedValue([
         { name: 'To Do' },
         { name: 'In Progress' },
         { name: 'Done' },
@@ -130,7 +133,7 @@ describe('JiraBackend', () => {
   describe('getWorkItemTypes', () => {
     it('returns issue types from project config', async () => {
       const backend = await JiraBackend.create('/repo');
-      mockAcli.mockReturnValue({
+      mockAcli.mockResolvedValue({
         issueTypes: [
           { name: 'Epic' },
           { name: 'Story' },
@@ -146,7 +149,7 @@ describe('JiraBackend', () => {
   describe('listWorkItems', () => {
     it('returns all issues mapped to WorkItems', async () => {
       const backend = await JiraBackend.create('/repo');
-      mockAcli.mockReturnValue([
+      mockAcli.mockResolvedValue([
         makeJiraIssue({
           key: 'TEAM-1',
           summary: 'First',
@@ -173,8 +176,8 @@ describe('JiraBackend', () => {
     it('filters by sprint when iteration provided', async () => {
       const backend = await JiraBackend.create('/repo');
       mockAcli
-        .mockReturnValueOnce([{ id: 42, name: 'Sprint 5', state: 'active' }])
-        .mockReturnValueOnce([
+        .mockResolvedValueOnce([{ id: 42, name: 'Sprint 5', state: 'active' }])
+        .mockResolvedValueOnce([
           makeJiraIssue({ key: 'TEAM-1', sprint: { name: 'Sprint 5' } }),
         ]);
 
@@ -187,7 +190,7 @@ describe('JiraBackend', () => {
   describe('getWorkItem', () => {
     it('returns a single issue as WorkItem', async () => {
       const backend = await JiraBackend.create('/repo');
-      mockAcli.mockReturnValue(
+      mockAcli.mockResolvedValue(
         makeJiraIssue({
           key: 'TEAM-42',
           summary: 'The issue',
@@ -206,7 +209,7 @@ describe('JiraBackend', () => {
   describe('createWorkItem', () => {
     it('creates an issue and returns the WorkItem', async () => {
       const backend = await JiraBackend.create('/repo');
-      mockAcli.mockReturnValueOnce({ key: 'TEAM-10' }).mockReturnValueOnce(
+      mockAcli.mockResolvedValueOnce({ key: 'TEAM-10' }).mockResolvedValueOnce(
         makeJiraIssue({
           key: 'TEAM-10',
           summary: 'New issue',
@@ -233,8 +236,8 @@ describe('JiraBackend', () => {
     it('sets parent when specified', async () => {
       const backend = await JiraBackend.create('/repo');
       mockAcli
-        .mockReturnValueOnce({ key: 'TEAM-11' })
-        .mockReturnValueOnce(
+        .mockResolvedValueOnce({ key: 'TEAM-11' })
+        .mockResolvedValueOnce(
           makeJiraIssue({ key: 'TEAM-11', parent: { key: 'TEAM-5' } }),
         );
 
@@ -259,9 +262,9 @@ describe('JiraBackend', () => {
 
     it('creates dependency links when dependsOn specified', async () => {
       const backend = await JiraBackend.create('/repo');
-      mockAcli.mockReturnValueOnce({ key: 'TEAM-12' });
-      mockAcliExec.mockReturnValue('');
-      mockAcli.mockReturnValueOnce(
+      mockAcli.mockResolvedValueOnce({ key: 'TEAM-12' });
+      mockAcliExec.mockResolvedValue('');
+      mockAcli.mockResolvedValueOnce(
         makeJiraIssue({
           key: 'TEAM-12',
           issuelinks: [
@@ -309,12 +312,10 @@ describe('JiraBackend', () => {
 
     it('rolls back created issue when dependency link creation fails', async () => {
       const backend = await JiraBackend.create('/repo');
-      mockAcli.mockReturnValueOnce({ key: 'TEAM-42' });
+      mockAcli.mockResolvedValueOnce({ key: 'TEAM-42' });
       mockAcliExec
-        .mockImplementationOnce(() => {
-          throw new Error('link creation failed');
-        })
-        .mockReturnValueOnce('');
+        .mockRejectedValueOnce(new Error('link creation failed'))
+        .mockResolvedValueOnce('');
 
       await expect(
         backend.createWorkItem({
@@ -341,8 +342,8 @@ describe('JiraBackend', () => {
   describe('updateWorkItem', () => {
     it('updates title via edit command', async () => {
       const backend = await JiraBackend.create('/repo');
-      mockAcliExec.mockReturnValue('');
-      mockAcli.mockReturnValue(
+      mockAcliExec.mockResolvedValue('');
+      mockAcli.mockResolvedValue(
         makeJiraIssue({ key: 'TEAM-5', summary: 'Updated title' }),
       );
 
@@ -367,8 +368,8 @@ describe('JiraBackend', () => {
 
     it('transitions status via separate command', async () => {
       const backend = await JiraBackend.create('/repo');
-      mockAcliExec.mockReturnValue('');
-      mockAcli.mockReturnValue(
+      mockAcliExec.mockResolvedValue('');
+      mockAcli.mockResolvedValue(
         makeJiraIssue({ key: 'TEAM-5', status: 'Done' }),
       );
 
@@ -390,8 +391,8 @@ describe('JiraBackend', () => {
 
     it('assigns via separate command', async () => {
       const backend = await JiraBackend.create('/repo');
-      mockAcliExec.mockReturnValue('');
-      mockAcli.mockReturnValue(
+      mockAcliExec.mockResolvedValue('');
+      mockAcli.mockResolvedValue(
         makeJiraIssue({
           key: 'TEAM-5',
           assignee: { displayName: 'Alice', emailAddress: 'alice@example.com' },
@@ -418,7 +419,7 @@ describe('JiraBackend', () => {
   describe('deleteWorkItem', () => {
     it('deletes a work item', async () => {
       const backend = await JiraBackend.create('/repo');
-      mockAcliExec.mockReturnValue('');
+      mockAcliExec.mockResolvedValue('');
       await backend.deleteWorkItem('TEAM-7');
       expect(mockAcliExec).toHaveBeenCalledWith(
         ['jira', 'workitem', 'delete', '--key', 'TEAM-7', '--yes'],
@@ -430,7 +431,7 @@ describe('JiraBackend', () => {
   describe('addComment', () => {
     it('adds a comment and returns it', async () => {
       const backend = await JiraBackend.create('/repo');
-      mockAcliExec.mockReturnValue('');
+      mockAcliExec.mockResolvedValue('');
 
       const comment = await backend.addComment('TEAM-3', {
         author: 'alice@example.com',
@@ -458,7 +459,7 @@ describe('JiraBackend', () => {
   describe('getChildren', () => {
     it('returns items whose parent matches the given id', async () => {
       const backend = await JiraBackend.create('/repo');
-      mockAcli.mockReturnValue([
+      mockAcli.mockResolvedValue([
         makeJiraIssue({ key: 'TEAM-2', parent: { key: 'TEAM-1' } }),
         makeJiraIssue({ key: 'TEAM-3', parent: { key: 'TEAM-1' } }),
       ]);
@@ -471,7 +472,7 @@ describe('JiraBackend', () => {
   describe('getDependents', () => {
     it('returns items that depend on the given id', async () => {
       const backend = await JiraBackend.create('/repo');
-      mockAcli.mockReturnValue([
+      mockAcli.mockResolvedValue([
         makeJiraIssue({
           key: 'TEAM-5',
           issuelinks: [
@@ -505,7 +506,7 @@ describe('JiraBackend', () => {
   describe('openItem', () => {
     it('opens the issue in the browser', async () => {
       const backend = await JiraBackend.create('/repo');
-      mockAcliExec.mockReturnValue('');
+      mockAcliExec.mockResolvedValue('');
       await backend.openItem('TEAM-5');
       expect(mockAcliExec).toHaveBeenCalledWith(
         ['jira', 'workitem', 'view', 'TEAM-5', '--web'],
@@ -517,7 +518,7 @@ describe('JiraBackend', () => {
   describe('getIterations', () => {
     it('returns sprint names from board', async () => {
       const backend = await JiraBackend.create('/repo');
-      mockAcli.mockReturnValue([
+      mockAcli.mockResolvedValue([
         { id: 1, name: 'Sprint 1', state: 'closed' },
         { id: 2, name: 'Sprint 2', state: 'active' },
         { id: 3, name: 'Sprint 3', state: 'future' },
@@ -539,7 +540,7 @@ describe('JiraBackend', () => {
   describe('getAssignees', () => {
     it('returns unique assignee emails', async () => {
       const backend = await JiraBackend.create('/repo');
-      mockAcli.mockReturnValue([
+      mockAcli.mockResolvedValue([
         { displayName: 'Alice', emailAddress: 'alice@example.com' },
         { displayName: 'Bob', emailAddress: 'bob@example.com' },
       ]);
@@ -550,9 +551,7 @@ describe('JiraBackend', () => {
 
     it('returns empty array on error', async () => {
       const backend = await JiraBackend.create('/repo');
-      mockAcli.mockImplementation(() => {
-        throw new Error('API error');
-      });
+      mockAcli.mockRejectedValue(new Error('API error'));
       expect(await backend.getAssignees()).toEqual([]);
     });
   });
@@ -569,13 +568,15 @@ describe('JiraBackend', () => {
   describe('getCurrentIteration', () => {
     it('returns active sprint name', async () => {
       const backend = await JiraBackend.create('/repo');
-      mockAcli.mockReturnValue([{ id: 2, name: 'Sprint 2', state: 'active' }]);
+      mockAcli.mockResolvedValue([
+        { id: 2, name: 'Sprint 2', state: 'active' },
+      ]);
       expect(await backend.getCurrentIteration()).toBe('Sprint 2');
     });
 
     it('returns empty string when no active sprint', async () => {
       const backend = await JiraBackend.create('/repo');
-      mockAcli.mockReturnValue([]);
+      mockAcli.mockResolvedValue([]);
       expect(await backend.getCurrentIteration()).toBe('');
     });
   });

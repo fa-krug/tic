@@ -1,4 +1,7 @@
-import { execFileSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+
+const execFileAsync = promisify(execFile);
 import { BaseBackend } from '../types.js';
 import type { BackendCapabilities } from '../types.js';
 import type {
@@ -8,7 +11,7 @@ import type {
   Comment,
   Template,
 } from '../../types.js';
-import { glab, glabExec } from './glab.js';
+import { glab, glabExec, glabExecSync, glabSync } from './glab.js';
 import { detectGroup } from './group.js';
 import { slugifyTemplateName } from '../local/templates.js';
 import {
@@ -51,7 +54,7 @@ export class GitLabBackend extends BaseBackend {
   constructor(cwd: string) {
     super(60_000);
     this.cwd = cwd;
-    glabExec(['auth', 'status'], cwd);
+    glabExecSync(['auth', 'status'], cwd);
     this.group = detectGroup(cwd);
   }
 
@@ -98,10 +101,9 @@ export class GitLabBackend extends BaseBackend {
     return ['epic', 'issue'];
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async getAssignees(): Promise<string[]> {
     try {
-      const members = glab<{ username: string }[]>(
+      const members = await glab<{ username: string }[]>(
         ['api', 'projects/:fullpath/members/all', '--paginate'],
         this.cwd,
       );
@@ -115,15 +117,13 @@ export class GitLabBackend extends BaseBackend {
     return this.getLabelsFromCache();
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async getIterations(): Promise<string[]> {
-    const iterations = this.fetchIterations();
+    const iterations = await this.fetchIterations();
     return iterations.map((i) => i.title);
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async getCurrentIteration(): Promise<string> {
-    const iterations = this.fetchIterations();
+    const iterations = await this.fetchIterations();
     const today = new Date().toISOString().split('T')[0]!;
     const current = iterations.find(
       (i) => i.start_date <= today && today <= i.due_date,
@@ -136,7 +136,6 @@ export class GitLabBackend extends BaseBackend {
     // No-op — current iteration is determined by date range
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async listWorkItems(iteration?: string): Promise<WorkItem[]> {
     // Fetch issues
     const issueArgs = [
@@ -148,7 +147,7 @@ export class GitLabBackend extends BaseBackend {
       '100',
       '--all',
     ];
-    const issues = glab<GlIssue[]>(issueArgs, this.cwd);
+    const issues = await glab<GlIssue[]>(issueArgs, this.cwd);
     let issueItems = issues.map(mapIssueToWorkItem);
 
     if (iteration) {
@@ -157,7 +156,7 @@ export class GitLabBackend extends BaseBackend {
 
     // Fetch epics
     const encodedGroup = encodeURIComponent(this.group);
-    const epics = glab<GlEpic[]>(
+    const epics = await glab<GlEpic[]>(
       ['api', `groups/${encodedGroup}/epics`, '--paginate'],
       this.cwd,
     );
@@ -169,19 +168,18 @@ export class GitLabBackend extends BaseBackend {
     return allItems;
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async getWorkItem(id: string): Promise<WorkItem> {
     const { type, iid } = parseId(id);
 
     if (type === 'issue') {
-      const issue = glab<GlIssue>(
+      const issue = await glab<GlIssue>(
         ['issue', 'view', iid, '-F', 'json'],
         this.cwd,
       );
       const item = mapIssueToWorkItem(issue);
 
       // Fetch notes via API
-      const notes = glab<GlNote[]>(
+      const notes = await glab<GlNote[]>(
         ['api', `projects/:fullpath/issues/${iid}/notes`, '--paginate'],
         this.cwd,
       );
@@ -191,14 +189,14 @@ export class GitLabBackend extends BaseBackend {
 
     // Epic
     const encodedGroup = encodeURIComponent(this.group);
-    const epic = glab<GlEpic>(
+    const epic = await glab<GlEpic>(
       ['api', `groups/${encodedGroup}/epics/${iid}`],
       this.cwd,
     );
     const item = mapEpicToWorkItem(epic);
 
     // Fetch epic notes
-    const notes = glab<GlNote[]>(
+    const notes = await glab<GlNote[]>(
       ['api', `groups/${encodedGroup}/epics/${iid}/notes`, '--paginate'],
       this.cwd,
     );
@@ -225,31 +223,29 @@ export class GitLabBackend extends BaseBackend {
     return this.updateEpic(iid, data);
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async deleteWorkItem(id: string): Promise<void> {
     const { type, iid } = parseId(id);
 
     if (type === 'issue') {
-      glabExec(['issue', 'delete', iid, '--yes'], this.cwd);
+      await glabExec(['issue', 'delete', iid, '--yes'], this.cwd);
       return;
     }
 
     const encodedGroup = encodeURIComponent(this.group);
-    glab(
+    await glab(
       ['api', `groups/${encodedGroup}/epics/${iid}`, '-X', 'DELETE'],
       this.cwd,
     );
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async addComment(workItemId: string, comment: NewComment): Promise<Comment> {
     const { type, iid } = parseId(workItemId);
 
     if (type === 'issue') {
-      glabExec(['issue', 'note', iid, '-m', comment.body], this.cwd);
+      await glabExec(['issue', 'note', iid, '-m', comment.body], this.cwd);
     } else {
       const encodedGroup = encodeURIComponent(this.group);
-      glab(
+      await glab(
         [
           'api',
           `groups/${encodedGroup}/epics/${iid}/notes`,
@@ -269,7 +265,6 @@ export class GitLabBackend extends BaseBackend {
     };
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   override async getChildren(id: string): Promise<WorkItem[]> {
     const { type, iid } = parseId(id);
 
@@ -278,7 +273,7 @@ export class GitLabBackend extends BaseBackend {
     }
 
     const encodedGroup = encodeURIComponent(this.group);
-    const issues = glab<GlIssue[]>(
+    const issues = await glab<GlIssue[]>(
       ['api', `groups/${encodedGroup}/epics/${iid}/issues`, '--paginate'],
       this.cwd,
     );
@@ -294,7 +289,7 @@ export class GitLabBackend extends BaseBackend {
     const { type, iid } = parseId(id);
 
     if (type === 'issue') {
-      const result = glab<{ web_url: string }>(
+      const result = glabSync<{ web_url: string }>(
         ['issue', 'view', iid, '-F', 'json'],
         this.cwd,
       );
@@ -304,24 +299,22 @@ export class GitLabBackend extends BaseBackend {
     return `https://gitlab.com/groups/${this.group}/-/epics/${iid}`;
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async openItem(id: string): Promise<void> {
     const { type, iid } = parseId(id);
 
     if (type === 'issue') {
-      glabExec(['issue', 'view', iid, '--web'], this.cwd);
+      await glabExec(['issue', 'view', iid, '--web'], this.cwd);
       return;
     }
 
     const url = `https://gitlab.com/groups/${this.group}/-/epics/${iid}`;
-    execFileSync('open', [url]);
+    await execFileAsync('open', [url]);
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async listTemplates(): Promise<Template[]> {
     let items: GlTreeItem[];
     try {
-      items = glab<GlTreeItem[]>(
+      items = await glab<GlTreeItem[]>(
         [
           'api',
           'projects/:fullpath/repository/tree',
@@ -348,7 +341,7 @@ export class GitLabBackend extends BaseBackend {
       let description = '';
       try {
         const encodedPath = encodeURIComponent(item.path);
-        const file = glab<GlFileResponse>(
+        const file = await glab<GlFileResponse>(
           [
             'api',
             `projects/:fullpath/repository/files/${encodedPath}`,
@@ -373,12 +366,11 @@ export class GitLabBackend extends BaseBackend {
     return this.templateNameCache.get(slug) ?? slug;
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async getTemplate(slug: string): Promise<Template> {
     const name = this.resolveTemplateName(slug);
     const filePath = `${TEMPLATES_DIR}/${name}.md`;
     const encodedPath = encodeURIComponent(filePath);
-    const file = glab<GlFileResponse>(
+    const file = await glab<GlFileResponse>(
       [
         'api',
         `projects/:fullpath/repository/files/${encodedPath}`,
@@ -391,14 +383,13 @@ export class GitLabBackend extends BaseBackend {
     return { slug, name, description: content };
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async createTemplate(template: Template): Promise<Template> {
     const slug = slugifyTemplateName(template.name);
     const filePath = `${TEMPLATES_DIR}/${template.name}.md`;
     const encodedPath = encodeURIComponent(filePath);
     const content = template.description ?? '';
 
-    glabExec(
+    await glabExec(
       [
         'api',
         `projects/:fullpath/repository/files/${encodedPath}`,
@@ -418,7 +409,6 @@ export class GitLabBackend extends BaseBackend {
     return { slug, name: template.name, description: content };
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async updateTemplate(oldSlug: string, template: Template): Promise<Template> {
     const newSlug = slugifyTemplateName(template.name);
     const oldName = this.resolveTemplateName(oldSlug);
@@ -429,7 +419,7 @@ export class GitLabBackend extends BaseBackend {
       const oldPath = `${TEMPLATES_DIR}/${oldName}.md`;
       const encodedOldPath = encodeURIComponent(oldPath);
       try {
-        glabExec(
+        await glabExec(
           [
             'api',
             `projects/:fullpath/repository/files/${encodedOldPath}`,
@@ -448,7 +438,7 @@ export class GitLabBackend extends BaseBackend {
 
       const newPath = `${TEMPLATES_DIR}/${template.name}.md`;
       const encodedNewPath = encodeURIComponent(newPath);
-      glabExec(
+      await glabExec(
         [
           'api',
           `projects/:fullpath/repository/files/${encodedNewPath}`,
@@ -470,7 +460,7 @@ export class GitLabBackend extends BaseBackend {
       // Same slug — update in place
       const filePath = `${TEMPLATES_DIR}/${oldName}.md`;
       const encodedPath = encodeURIComponent(filePath);
-      glabExec(
+      await glabExec(
         [
           'api',
           `projects/:fullpath/repository/files/${encodedPath}`,
@@ -490,12 +480,11 @@ export class GitLabBackend extends BaseBackend {
     return { slug: newSlug, name: template.name, description: content };
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async deleteTemplate(slug: string): Promise<void> {
     const name = this.resolveTemplateName(slug);
     const filePath = `${TEMPLATES_DIR}/${name}.md`;
     const encodedPath = encodeURIComponent(filePath);
-    glabExec(
+    await glabExec(
       [
         'api',
         `projects/:fullpath/repository/files/${encodedPath}`,
@@ -511,20 +500,20 @@ export class GitLabBackend extends BaseBackend {
     this.templateNameCache.delete(slug);
   }
 
-  private fetchIterations(): GlIteration[] {
+  private async fetchIterations(): Promise<GlIteration[]> {
     if (this.cachedIterations) return this.cachedIterations;
     const encodedGroup = encodeURIComponent(this.group);
-    this.cachedIterations = glab<GlIteration[]>(
+    this.cachedIterations = await glab<GlIteration[]>(
       ['api', `groups/${encodedGroup}/iterations`, '--paginate'],
       this.cwd,
     );
     return this.cachedIterations;
   }
 
-  private ensureLabels(labels: string[]): void {
+  private async ensureLabels(labels: string[]): Promise<void> {
     for (const label of labels) {
       try {
-        glabExec(['label', 'create', label], this.cwd);
+        await glabExec(['label', 'create', label], this.cwd);
       } catch {
         // Label already exists — ignore
       }
@@ -533,7 +522,7 @@ export class GitLabBackend extends BaseBackend {
 
   private async createIssue(data: NewWorkItem): Promise<WorkItem> {
     if (data.labels.length > 0) {
-      this.ensureLabels(data.labels);
+      await this.ensureLabels(data.labels);
     }
     const args = ['issue', 'create', '--title', data.title, '--yes'];
 
@@ -550,7 +539,7 @@ export class GitLabBackend extends BaseBackend {
       args.push('--label', label);
     }
 
-    const output = glabExec(args, this.cwd);
+    const output = await glabExec(args, this.cwd);
     // glab issue create prints a URL like: https://gitlab.com/group/project/-/issues/42
     const match = output.match(/\/issues\/(\d+)/);
     if (!match) {
@@ -560,10 +549,9 @@ export class GitLabBackend extends BaseBackend {
     return this.getWorkItem(`issue-${iid}`);
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   private async createEpic(data: NewWorkItem): Promise<WorkItem> {
     if (data.labels.length > 0) {
-      this.ensureLabels(data.labels);
+      await this.ensureLabels(data.labels);
     }
     const encodedGroup = encodeURIComponent(this.group);
     const args = [
@@ -582,7 +570,7 @@ export class GitLabBackend extends BaseBackend {
       args.push('-f', `labels[]=${label}`);
     }
 
-    const epic = glab<GlEpic>(args, this.cwd);
+    const epic = await glab<GlEpic>(args, this.cwd);
     return mapEpicToWorkItem(epic);
   }
 
@@ -591,13 +579,13 @@ export class GitLabBackend extends BaseBackend {
     data: Partial<WorkItem>,
   ): Promise<WorkItem> {
     if (data.labels !== undefined && data.labels.length > 0) {
-      this.ensureLabels(data.labels);
+      await this.ensureLabels(data.labels);
     }
     // Handle status changes via close/reopen
     if (data.status === 'closed') {
-      glabExec(['issue', 'close', iid], this.cwd);
+      await glabExec(['issue', 'close', iid], this.cwd);
     } else if (data.status === 'open') {
-      glabExec(['issue', 'reopen', iid], this.cwd);
+      await glabExec(['issue', 'reopen', iid], this.cwd);
     }
 
     // Handle field edits
@@ -634,7 +622,7 @@ export class GitLabBackend extends BaseBackend {
     }
 
     if (hasEdits) {
-      glabExec(editArgs, this.cwd);
+      await glabExec(editArgs, this.cwd);
     }
 
     return this.getWorkItem(`issue-${iid}`);
@@ -645,7 +633,7 @@ export class GitLabBackend extends BaseBackend {
     data: Partial<WorkItem>,
   ): Promise<WorkItem> {
     if (data.labels !== undefined && data.labels.length > 0) {
-      this.ensureLabels(data.labels);
+      await this.ensureLabels(data.labels);
     }
     const encodedGroup = encodeURIComponent(this.group);
     const args = ['api', `groups/${encodedGroup}/epics/${iid}`, '-X', 'PUT'];
@@ -670,7 +658,7 @@ export class GitLabBackend extends BaseBackend {
     }
 
     if (hasEdits) {
-      glab(args, this.cwd);
+      await glab(args, this.cwd);
     }
 
     return this.getWorkItem(`epic-${iid}`);

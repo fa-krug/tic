@@ -5,14 +5,18 @@ import { GitHubBackend } from './index.js';
 vi.mock('./gh.js', () => ({
   gh: vi.fn(),
   ghExec: vi.fn(),
+  ghExecSync: vi.fn(),
   ghGraphQL: vi.fn(),
+  ghSync: vi.fn(),
 }));
 
-import { gh, ghExec, ghGraphQL } from './gh.js';
+import { gh, ghExec, ghExecSync, ghGraphQL, ghSync } from './gh.js';
 
 const mockGh = vi.mocked(gh);
 const mockGhExec = vi.mocked(ghExec);
+const mockGhExecSync = vi.mocked(ghExecSync);
 const mockGhGraphQL = vi.mocked(ghGraphQL);
+const mockGhSync = vi.mocked(ghSync);
 
 /** Helper to build a GhIssue in the GraphQL response shape */
 function makeGhIssue(overrides: {
@@ -75,20 +79,20 @@ function makeGetResponse(issue: ReturnType<typeof makeGhIssue>) {
 describe('GitHubBackend', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Constructor calls ghExec for auth check
-    mockGhExec.mockReturnValue('');
+    // Constructor calls ghExecSync for auth check
+    mockGhExecSync.mockReturnValue('');
     // Most methods call getOwnerRepo -> getRepoNwo, so set a default
-    mockGh.mockReturnValue({ nameWithOwner: 'owner/repo' });
+    mockGh.mockResolvedValue({ nameWithOwner: 'owner/repo' });
   });
 
   describe('constructor', () => {
     it('verifies gh auth on construction', () => {
       new GitHubBackend('/repo');
-      expect(mockGhExec).toHaveBeenCalledWith(['auth', 'status'], '/repo');
+      expect(mockGhExecSync).toHaveBeenCalledWith(['auth', 'status'], '/repo');
     });
 
     it('throws when gh auth fails', () => {
-      mockGhExec.mockImplementation(() => {
+      mockGhExecSync.mockImplementation(() => {
         throw new Error('not logged in');
       });
       expect(() => new GitHubBackend('/repo')).toThrow();
@@ -130,8 +134,8 @@ describe('GitHubBackend', () => {
     it('returns milestone titles', async () => {
       const backend = new GitHubBackend('/repo');
       mockGh
-        .mockReturnValueOnce({ nameWithOwner: 'owner/repo' })
-        .mockReturnValueOnce([
+        .mockResolvedValueOnce({ nameWithOwner: 'owner/repo' })
+        .mockResolvedValueOnce([
           { title: 'v1.0', state: 'open', due_on: null },
           { title: 'v2.0', state: 'open', due_on: null },
         ]);
@@ -141,8 +145,8 @@ describe('GitHubBackend', () => {
     it('returns empty array when no milestones', async () => {
       const backend = new GitHubBackend('/repo');
       mockGh
-        .mockReturnValueOnce({ nameWithOwner: 'owner/repo' })
-        .mockReturnValueOnce([]);
+        .mockResolvedValueOnce({ nameWithOwner: 'owner/repo' })
+        .mockResolvedValueOnce([]);
       expect(await backend.getIterations()).toEqual([]);
     });
   });
@@ -151,8 +155,8 @@ describe('GitHubBackend', () => {
     it('returns first open milestone sorted by due date', async () => {
       const backend = new GitHubBackend('/repo');
       mockGh
-        .mockReturnValueOnce({ nameWithOwner: 'owner/repo' })
-        .mockReturnValueOnce([
+        .mockResolvedValueOnce({ nameWithOwner: 'owner/repo' })
+        .mockResolvedValueOnce([
           { title: 'v1.0', state: 'open', due_on: '2026-03-01T00:00:00Z' },
           { title: 'v2.0', state: 'open', due_on: '2026-06-01T00:00:00Z' },
         ]);
@@ -162,8 +166,8 @@ describe('GitHubBackend', () => {
     it('returns empty string when no open milestones', async () => {
       const backend = new GitHubBackend('/repo');
       mockGh
-        .mockReturnValueOnce({ nameWithOwner: 'owner/repo' })
-        .mockReturnValueOnce([]);
+        .mockResolvedValueOnce({ nameWithOwner: 'owner/repo' })
+        .mockResolvedValueOnce([]);
       expect(await backend.getCurrentIteration()).toBe('');
     });
   });
@@ -178,7 +182,7 @@ describe('GitHubBackend', () => {
   describe('listWorkItems', () => {
     it('returns all issues mapped to WorkItems', async () => {
       const backend = new GitHubBackend('/repo');
-      mockGhGraphQL.mockReturnValue(
+      mockGhGraphQL.mockResolvedValue(
         makeListResponse([
           makeGhIssue({
             number: 1,
@@ -210,7 +214,7 @@ describe('GitHubBackend', () => {
 
     it('filters by iteration client-side', async () => {
       const backend = new GitHubBackend('/repo');
-      mockGhGraphQL.mockReturnValue(
+      mockGhGraphQL.mockResolvedValue(
         makeListResponse([
           makeGhIssue({ number: 1, milestone: 'v1.0' }),
           makeGhIssue({ number: 2, milestone: 'v2.0' }),
@@ -225,10 +229,10 @@ describe('GitHubBackend', () => {
     it('paginates through multiple pages', async () => {
       const backend = new GitHubBackend('/repo');
       mockGhGraphQL
-        .mockReturnValueOnce(
+        .mockResolvedValueOnce(
           makeListResponse([makeGhIssue({ number: 1 })], true, 'cursor1'),
         )
-        .mockReturnValueOnce(makeListResponse([makeGhIssue({ number: 2 })]));
+        .mockResolvedValueOnce(makeListResponse([makeGhIssue({ number: 2 })]));
 
       const items = await backend.listWorkItems();
       expect(items).toHaveLength(2);
@@ -237,7 +241,7 @@ describe('GitHubBackend', () => {
 
     it('includes parent info from GraphQL response', async () => {
       const backend = new GitHubBackend('/repo');
-      mockGhGraphQL.mockReturnValue(
+      mockGhGraphQL.mockResolvedValue(
         makeListResponse([
           makeGhIssue({ number: 2, parent: { number: 1 } }),
           makeGhIssue({ number: 1, parent: null }),
@@ -253,7 +257,7 @@ describe('GitHubBackend', () => {
   describe('getWorkItem', () => {
     it('returns a single issue as WorkItem', async () => {
       const backend = new GitHubBackend('/repo');
-      mockGhGraphQL.mockReturnValue(
+      mockGhGraphQL.mockResolvedValue(
         makeGetResponse(
           makeGhIssue({
             number: 42,
@@ -283,7 +287,7 @@ describe('GitHubBackend', () => {
 
     it('returns parent info', async () => {
       const backend = new GitHubBackend('/repo');
-      mockGhGraphQL.mockReturnValue(
+      mockGhGraphQL.mockResolvedValue(
         makeGetResponse(makeGhIssue({ number: 5, parent: { number: 3 } })),
       );
 
@@ -296,8 +300,8 @@ describe('GitHubBackend', () => {
     it('creates an issue and returns the WorkItem', async () => {
       const backend = new GitHubBackend('/repo');
 
-      mockGhExec.mockReturnValue('https://github.com/owner/repo/issues/10\n');
-      mockGhGraphQL.mockReturnValue(
+      mockGhExec.mockResolvedValue('https://github.com/owner/repo/issues/10\n');
+      mockGhGraphQL.mockResolvedValue(
         makeGetResponse(
           makeGhIssue({
             number: 10,
@@ -329,22 +333,22 @@ describe('GitHubBackend', () => {
     it('adds sub-issue relationship when parent is specified', async () => {
       const backend = new GitHubBackend('/repo');
 
-      mockGhExec.mockReturnValue('https://github.com/owner/repo/issues/10\n');
+      mockGhExec.mockResolvedValue('https://github.com/owner/repo/issues/10\n');
       // getIssueNodeId for parent #5, then for child #10, then addSubIssue, then getWorkItem
       mockGhGraphQL
-        .mockReturnValueOnce({
+        .mockResolvedValueOnce({
           repository: { issue: { id: 'NODE_5' } },
         })
-        .mockReturnValueOnce({
+        .mockResolvedValueOnce({
           repository: { issue: { id: 'NODE_10' } },
         })
-        .mockReturnValueOnce({
+        .mockResolvedValueOnce({
           addSubIssue: {
             issue: { title: 'Parent' },
             subIssue: { title: 'New issue' },
           },
         })
-        .mockReturnValueOnce(
+        .mockResolvedValueOnce(
           makeGetResponse(makeGhIssue({ number: 10, parent: { number: 5 } })),
         );
 
@@ -368,8 +372,8 @@ describe('GitHubBackend', () => {
     it('ensures labels exist before creating an issue', async () => {
       const backend = new GitHubBackend('/repo');
 
-      mockGhExec.mockReturnValue('https://github.com/owner/repo/issues/10\n');
-      mockGhGraphQL.mockReturnValue(
+      mockGhExec.mockResolvedValue('https://github.com/owner/repo/issues/10\n');
+      mockGhGraphQL.mockResolvedValue(
         makeGetResponse(makeGhIssue({ number: 10, labels: ['bug', 'ux'] })),
       );
 
@@ -400,11 +404,9 @@ describe('GitHubBackend', () => {
       const backend = new GitHubBackend('/repo');
 
       mockGhExec
-        .mockImplementationOnce(() => {
-          throw new Error('label already exists');
-        })
-        .mockReturnValue('https://github.com/owner/repo/issues/10\n');
-      mockGhGraphQL.mockReturnValue(
+        .mockRejectedValueOnce(new Error('label already exists'))
+        .mockResolvedValue('https://github.com/owner/repo/issues/10\n');
+      mockGhGraphQL.mockResolvedValue(
         makeGetResponse(makeGhIssue({ number: 10, labels: ['bug'] })),
       );
 
@@ -427,15 +429,13 @@ describe('GitHubBackend', () => {
     it('rolls back created issue when parent linking fails', async () => {
       const backend = new GitHubBackend('/repo');
 
-      mockGhExec.mockReturnValue('https://github.com/owner/repo/issues/10\n');
+      mockGhExec.mockResolvedValue('https://github.com/owner/repo/issues/10\n');
       // addSubIssue calls: getIssueNodeId(parent), getIssueNodeId(child), then mutation
       mockGhGraphQL
-        .mockReturnValueOnce({
+        .mockResolvedValueOnce({
           repository: { issue: { id: 'NODE_5' } },
         })
-        .mockImplementationOnce(() => {
-          throw new Error('GraphQL error: parent not found');
-        });
+        .mockRejectedValueOnce(new Error('GraphQL error: parent not found'));
 
       await expect(
         backend.createWorkItem({
@@ -462,8 +462,8 @@ describe('GitHubBackend', () => {
     it('skips ensureLabels when no labels provided', async () => {
       const backend = new GitHubBackend('/repo');
 
-      mockGhExec.mockReturnValue('https://github.com/owner/repo/issues/10\n');
-      mockGhGraphQL.mockReturnValue(
+      mockGhExec.mockResolvedValue('https://github.com/owner/repo/issues/10\n');
+      mockGhGraphQL.mockResolvedValue(
         makeGetResponse(makeGhIssue({ number: 10 })),
       );
 
@@ -492,8 +492,8 @@ describe('GitHubBackend', () => {
     it('updates title and body', async () => {
       const backend = new GitHubBackend('/repo');
 
-      mockGhExec.mockReturnValue('');
-      mockGhGraphQL.mockReturnValue(
+      mockGhExec.mockResolvedValue('');
+      mockGhGraphQL.mockResolvedValue(
         makeGetResponse(
           makeGhIssue({
             number: 5,
@@ -514,8 +514,8 @@ describe('GitHubBackend', () => {
 
     it('closes an issue when status changes to closed', async () => {
       const backend = new GitHubBackend('/repo');
-      mockGhExec.mockReturnValue('');
-      mockGhGraphQL.mockReturnValue(
+      mockGhExec.mockResolvedValue('');
+      mockGhGraphQL.mockResolvedValue(
         makeGetResponse(makeGhIssue({ number: 5, state: 'CLOSED' })),
       );
 
@@ -526,8 +526,8 @@ describe('GitHubBackend', () => {
 
     it('reopens an issue when status changes to open', async () => {
       const backend = new GitHubBackend('/repo');
-      mockGhExec.mockReturnValue('');
-      mockGhGraphQL.mockReturnValue(
+      mockGhExec.mockResolvedValue('');
+      mockGhGraphQL.mockResolvedValue(
         makeGetResponse(makeGhIssue({ number: 5 })),
       );
 
@@ -541,26 +541,26 @@ describe('GitHubBackend', () => {
 
     it('sets parent via addSubIssue when parent is added', async () => {
       const backend = new GitHubBackend('/repo');
-      mockGhExec.mockReturnValue('');
+      mockGhExec.mockResolvedValue('');
 
       // getWorkItem (current, no parent), getIssueNodeId x2, addSubIssue, getWorkItem (final)
       mockGhGraphQL
-        .mockReturnValueOnce(
+        .mockResolvedValueOnce(
           makeGetResponse(makeGhIssue({ number: 5, parent: null })),
         )
-        .mockReturnValueOnce({
+        .mockResolvedValueOnce({
           repository: { issue: { id: 'NODE_3' } },
         })
-        .mockReturnValueOnce({
+        .mockResolvedValueOnce({
           repository: { issue: { id: 'NODE_5' } },
         })
-        .mockReturnValueOnce({
+        .mockResolvedValueOnce({
           addSubIssue: {
             issue: { title: 'Parent' },
             subIssue: { title: 'Child' },
           },
         })
-        .mockReturnValueOnce(
+        .mockResolvedValueOnce(
           makeGetResponse(makeGhIssue({ number: 5, parent: { number: 3 } })),
         );
 
@@ -570,26 +570,26 @@ describe('GitHubBackend', () => {
 
     it('removes parent via removeSubIssue when parent is cleared', async () => {
       const backend = new GitHubBackend('/repo');
-      mockGhExec.mockReturnValue('');
+      mockGhExec.mockResolvedValue('');
 
       // getWorkItem (current, has parent #3), getIssueNodeId x2, removeSubIssue, getWorkItem (final)
       mockGhGraphQL
-        .mockReturnValueOnce(
+        .mockResolvedValueOnce(
           makeGetResponse(makeGhIssue({ number: 5, parent: { number: 3 } })),
         )
-        .mockReturnValueOnce({
+        .mockResolvedValueOnce({
           repository: { issue: { id: 'NODE_3' } },
         })
-        .mockReturnValueOnce({
+        .mockResolvedValueOnce({
           repository: { issue: { id: 'NODE_5' } },
         })
-        .mockReturnValueOnce({
+        .mockResolvedValueOnce({
           removeSubIssue: {
             issue: { title: 'Parent' },
             subIssue: { title: 'Child' },
           },
         })
-        .mockReturnValueOnce(
+        .mockResolvedValueOnce(
           makeGetResponse(makeGhIssue({ number: 5, parent: null })),
         );
 
@@ -599,41 +599,41 @@ describe('GitHubBackend', () => {
 
     it('changes parent by removing old and adding new', async () => {
       const backend = new GitHubBackend('/repo');
-      mockGhExec.mockReturnValue('');
+      mockGhExec.mockResolvedValue('');
 
       // getWorkItem (current, parent #3), remove(#3,#5), add(#7,#5), getWorkItem (final)
       mockGhGraphQL
-        .mockReturnValueOnce(
+        .mockResolvedValueOnce(
           makeGetResponse(makeGhIssue({ number: 5, parent: { number: 3 } })),
         )
         // removeSubIssue: getIssueNodeId(3), getIssueNodeId(5), mutation
-        .mockReturnValueOnce({
+        .mockResolvedValueOnce({
           repository: { issue: { id: 'NODE_3' } },
         })
-        .mockReturnValueOnce({
+        .mockResolvedValueOnce({
           repository: { issue: { id: 'NODE_5' } },
         })
-        .mockReturnValueOnce({
+        .mockResolvedValueOnce({
           removeSubIssue: {
             issue: { title: 'Old' },
             subIssue: { title: 'Child' },
           },
         })
         // addSubIssue: getIssueNodeId(7), getIssueNodeId(5), mutation
-        .mockReturnValueOnce({
+        .mockResolvedValueOnce({
           repository: { issue: { id: 'NODE_7' } },
         })
-        .mockReturnValueOnce({
+        .mockResolvedValueOnce({
           repository: { issue: { id: 'NODE_5' } },
         })
-        .mockReturnValueOnce({
+        .mockResolvedValueOnce({
           addSubIssue: {
             issue: { title: 'New' },
             subIssue: { title: 'Child' },
           },
         })
         // final getWorkItem
-        .mockReturnValueOnce(
+        .mockResolvedValueOnce(
           makeGetResponse(makeGhIssue({ number: 5, parent: { number: 7 } })),
         );
 
@@ -643,8 +643,8 @@ describe('GitHubBackend', () => {
 
     it('ensures labels exist before updating', async () => {
       const backend = new GitHubBackend('/repo');
-      mockGhExec.mockReturnValue('');
-      mockGhGraphQL.mockReturnValue(
+      mockGhExec.mockResolvedValue('');
+      mockGhGraphQL.mockResolvedValue(
         makeGetResponse(makeGhIssue({ number: 5, labels: ['new-label'] })),
       );
 
@@ -660,7 +660,7 @@ describe('GitHubBackend', () => {
   describe('deleteWorkItem', () => {
     it('deletes an issue', async () => {
       const backend = new GitHubBackend('/repo');
-      mockGhExec.mockReturnValue('');
+      mockGhExec.mockResolvedValue('');
       await backend.deleteWorkItem('7');
       expect(mockGhExec).toHaveBeenCalledWith(
         ['issue', 'delete', '7', '--yes'],
@@ -672,7 +672,7 @@ describe('GitHubBackend', () => {
   describe('addComment', () => {
     it('adds a comment and returns it', async () => {
       const backend = new GitHubBackend('/repo');
-      mockGhExec.mockReturnValue('');
+      mockGhExec.mockResolvedValue('');
 
       const comment = await backend.addComment('3', {
         author: 'alice',
@@ -692,7 +692,7 @@ describe('GitHubBackend', () => {
   describe('getItemUrl', () => {
     it('returns the GitHub issue URL', () => {
       const backend = new GitHubBackend('/repo');
-      mockGh.mockReturnValue({
+      mockGhSync.mockReturnValue({
         url: 'https://github.com/owner/repo/issues/5',
       });
 
@@ -704,7 +704,7 @@ describe('GitHubBackend', () => {
   describe('openItem', () => {
     it('opens the issue in the browser', async () => {
       const backend = new GitHubBackend('/repo');
-      mockGhExec.mockReturnValue('');
+      mockGhExec.mockResolvedValue('');
 
       await backend.openItem('5');
       expect(mockGhExec).toHaveBeenCalledWith(
@@ -717,7 +717,7 @@ describe('GitHubBackend', () => {
   describe('getChildren', () => {
     it('returns items whose parent matches the given id', async () => {
       const backend = new GitHubBackend('/repo');
-      mockGhGraphQL.mockReturnValue(
+      mockGhGraphQL.mockResolvedValue(
         makeListResponse([
           makeGhIssue({ number: 1, parent: null }),
           makeGhIssue({ number: 2, parent: { number: 1 } }),
@@ -735,7 +735,7 @@ describe('GitHubBackend', () => {
   describe('getDependents', () => {
     it('returns empty array (dependsOn not supported)', async () => {
       const backend = new GitHubBackend('/repo');
-      mockGhGraphQL.mockReturnValue(
+      mockGhGraphQL.mockResolvedValue(
         makeListResponse([
           makeGhIssue({ number: 1 }),
           makeGhIssue({ number: 2 }),
@@ -751,8 +751,8 @@ describe('GitHubBackend', () => {
     it('returns collaborator logins', async () => {
       const backend = new GitHubBackend('/repo');
       mockGh
-        .mockReturnValueOnce({ nameWithOwner: 'owner/repo' })
-        .mockReturnValueOnce([
+        .mockResolvedValueOnce({ nameWithOwner: 'owner/repo' })
+        .mockResolvedValueOnce([
           { login: 'alice' },
           { login: 'bob' },
           { login: 'charlie' },
@@ -762,10 +762,8 @@ describe('GitHubBackend', () => {
 
     it('returns empty array on error', async () => {
       const backend = new GitHubBackend('/repo');
-      mockGh.mockReturnValueOnce({ nameWithOwner: 'owner/repo' });
-      mockGh.mockImplementationOnce(() => {
-        throw new Error('API error');
-      });
+      mockGh.mockResolvedValueOnce({ nameWithOwner: 'owner/repo' });
+      mockGh.mockRejectedValueOnce(new Error('API error'));
       expect(await backend.getAssignees()).toEqual([]);
     });
   });

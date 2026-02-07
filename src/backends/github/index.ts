@@ -7,7 +7,7 @@ import type {
   Comment,
   Template,
 } from '../../types.js';
-import { gh, ghExec, ghGraphQL } from './gh.js';
+import { gh, ghExec, ghGraphQL, ghExecSync, ghSync } from './gh.js';
 import { mapIssueToWorkItem } from './mappers.js';
 import type { GhIssue, GhMilestone } from './mappers.js';
 
@@ -101,7 +101,7 @@ export class GitHubBackend extends BaseBackend {
   constructor(cwd: string) {
     super(60_000);
     this.cwd = cwd;
-    ghExec(['auth', 'status'], cwd);
+    ghExecSync(['auth', 'status'], cwd);
   }
 
   protected override onCacheInvalidate(): void {
@@ -147,11 +147,10 @@ export class GitHubBackend extends BaseBackend {
     return ['issue'];
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async getAssignees(): Promise<string[]> {
     try {
-      const { owner, repo } = this.getOwnerRepo();
-      const collaborators = gh<{ login: string }[]>(
+      const { owner, repo } = await this.getOwnerRepo();
+      const collaborators = await gh<{ login: string }[]>(
         ['api', `repos/${owner}/${repo}/collaborators`, '--jq', '.'],
         this.cwd,
       );
@@ -165,15 +164,13 @@ export class GitHubBackend extends BaseBackend {
     return this.getLabelsFromCache();
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async getIterations(): Promise<string[]> {
-    const milestones = this.fetchMilestones();
+    const milestones = await this.fetchMilestones();
     return milestones.map((m) => m.title);
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async getCurrentIteration(): Promise<string> {
-    const milestones = this.fetchOpenMilestones();
+    const milestones = await this.fetchOpenMilestones();
     if (milestones.length === 0) return '';
     return milestones[0]!.title;
   }
@@ -183,14 +180,13 @@ export class GitHubBackend extends BaseBackend {
     // No-op — current iteration is always first open milestone
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async listWorkItems(iteration?: string): Promise<WorkItem[]> {
-    const { owner, repo } = this.getOwnerRepo();
+    const { owner, repo } = await this.getOwnerRepo();
     const allIssues: GhIssue[] = [];
     let cursor: string | null = null;
 
     do {
-      const data: ListIssuesResponse = ghGraphQL<ListIssuesResponse>(
+      const data: ListIssuesResponse = await ghGraphQL<ListIssuesResponse>(
         LIST_ISSUES_QUERY,
         { owner, repo, cursor },
         this.cwd,
@@ -208,10 +204,9 @@ export class GitHubBackend extends BaseBackend {
     return items;
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async getWorkItem(id: string): Promise<WorkItem> {
-    const { owner, repo } = this.getOwnerRepo();
-    const data = ghGraphQL<GetIssueResponse>(
+    const { owner, repo } = await this.getOwnerRepo();
+    const data = await ghGraphQL<GetIssueResponse>(
       GET_ISSUE_QUERY,
       { owner, repo, number: Number(id) },
       this.cwd,
@@ -219,10 +214,10 @@ export class GitHubBackend extends BaseBackend {
     return mapIssueToWorkItem(data.repository.issue);
   }
 
-  private ensureLabels(labels: string[]): void {
+  private async ensureLabels(labels: string[]): Promise<void> {
     for (const label of labels) {
       try {
-        ghExec(['label', 'create', label], this.cwd);
+        await ghExec(['label', 'create', label], this.cwd);
       } catch {
         // Label already exists — ignore
       }
@@ -232,7 +227,7 @@ export class GitHubBackend extends BaseBackend {
   async createWorkItem(data: NewWorkItem): Promise<WorkItem> {
     this.validateFields(data);
     if (data.labels.length > 0) {
-      this.ensureLabels(data.labels);
+      await this.ensureLabels(data.labels);
     }
     const args = [
       'issue',
@@ -252,7 +247,7 @@ export class GitHubBackend extends BaseBackend {
       args.push('--label', label);
     }
 
-    const output = ghExec(args, this.cwd);
+    const output = await ghExec(args, this.cwd);
     // gh issue create prints the URL: https://github.com/owner/repo/issues/123
     const match = output.match(/\/issues\/(\d+)/);
     if (!match) {
@@ -262,10 +257,10 @@ export class GitHubBackend extends BaseBackend {
 
     if (data.parent) {
       try {
-        this.addSubIssue(data.parent, id);
+        await this.addSubIssue(data.parent, id);
       } catch (err) {
         try {
-          ghExec(['issue', 'delete', id, '--yes'], this.cwd);
+          await ghExec(['issue', 'delete', id, '--yes'], this.cwd);
         } catch {
           // Best-effort cleanup
         }
@@ -281,7 +276,7 @@ export class GitHubBackend extends BaseBackend {
   async updateWorkItem(id: string, data: Partial<WorkItem>): Promise<WorkItem> {
     this.validateFields(data);
     if (data.labels !== undefined && data.labels.length > 0) {
-      this.ensureLabels(data.labels);
+      await this.ensureLabels(data.labels);
     }
 
     // Handle parent changes via sub-issue mutations
@@ -289,10 +284,10 @@ export class GitHubBackend extends BaseBackend {
       const current = await this.getWorkItem(id);
       try {
         if (current.parent && current.parent !== data.parent) {
-          this.removeSubIssue(current.parent, id);
+          await this.removeSubIssue(current.parent, id);
         }
         if (data.parent && data.parent !== current.parent) {
-          this.addSubIssue(data.parent, id);
+          await this.addSubIssue(data.parent, id);
         }
       } catch (err) {
         throw new Error(
@@ -303,9 +298,9 @@ export class GitHubBackend extends BaseBackend {
 
     // Handle status changes via close/reopen
     if (data.status === 'closed') {
-      ghExec(['issue', 'close', id], this.cwd);
+      await ghExec(['issue', 'close', id], this.cwd);
     } else if (data.status === 'open') {
-      ghExec(['issue', 'reopen', id], this.cwd);
+      await ghExec(['issue', 'reopen', id], this.cwd);
     }
 
     // Handle field edits
@@ -342,20 +337,21 @@ export class GitHubBackend extends BaseBackend {
     }
 
     if (hasEdits) {
-      ghExec(editArgs, this.cwd);
+      await ghExec(editArgs, this.cwd);
     }
 
     return this.getWorkItem(id);
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async deleteWorkItem(id: string): Promise<void> {
-    ghExec(['issue', 'delete', id, '--yes'], this.cwd);
+    await ghExec(['issue', 'delete', id, '--yes'], this.cwd);
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async addComment(workItemId: string, comment: NewComment): Promise<Comment> {
-    ghExec(['issue', 'comment', workItemId, '--body', comment.body], this.cwd);
+    await ghExec(
+      ['issue', 'comment', workItemId, '--body', comment.body],
+      this.cwd,
+    );
     return {
       author: comment.author,
       date: new Date().toISOString(),
@@ -364,16 +360,15 @@ export class GitHubBackend extends BaseBackend {
   }
 
   getItemUrl(id: string): string {
-    const result = gh<{ url: string }>(
+    const result = ghSync<{ url: string }>(
       ['issue', 'view', id, '--json', 'url'],
       this.cwd,
     );
     return result.url;
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async openItem(id: string): Promise<void> {
-    ghExec(['issue', 'view', id, '--web'], this.cwd);
+    await ghExec(['issue', 'view', id, '--web'], this.cwd);
   }
 
   /* eslint-disable @typescript-eslint/require-await, @typescript-eslint/no-unused-vars */
@@ -397,9 +392,9 @@ export class GitHubBackend extends BaseBackend {
   }
   /* eslint-enable @typescript-eslint/require-await, @typescript-eslint/no-unused-vars */
 
-  private getIssueNodeId(issueNumber: number): string {
-    const { owner, repo } = this.getOwnerRepo();
-    const data = ghGraphQL<GetIssueNodeIdResponse>(
+  private async getIssueNodeId(issueNumber: number): Promise<string> {
+    const { owner, repo } = await this.getOwnerRepo();
+    const data = await ghGraphQL<GetIssueNodeIdResponse>(
       GET_ISSUE_NODE_ID_QUERY,
       { owner, repo, number: issueNumber },
       this.cwd,
@@ -407,39 +402,45 @@ export class GitHubBackend extends BaseBackend {
     return data.repository.issue.id;
   }
 
-  private addSubIssue(parentNumber: string, childNumber: string): void {
-    const parentId = this.getIssueNodeId(Number(parentNumber));
-    const childId = this.getIssueNodeId(Number(childNumber));
-    ghGraphQL(ADD_SUB_ISSUE_MUTATION, { parentId, childId }, this.cwd);
+  private async addSubIssue(
+    parentNumber: string,
+    childNumber: string,
+  ): Promise<void> {
+    const parentId = await this.getIssueNodeId(Number(parentNumber));
+    const childId = await this.getIssueNodeId(Number(childNumber));
+    await ghGraphQL(ADD_SUB_ISSUE_MUTATION, { parentId, childId }, this.cwd);
   }
 
-  private removeSubIssue(parentNumber: string, childNumber: string): void {
-    const parentId = this.getIssueNodeId(Number(parentNumber));
-    const childId = this.getIssueNodeId(Number(childNumber));
-    ghGraphQL(REMOVE_SUB_ISSUE_MUTATION, { parentId, childId }, this.cwd);
+  private async removeSubIssue(
+    parentNumber: string,
+    childNumber: string,
+  ): Promise<void> {
+    const parentId = await this.getIssueNodeId(Number(parentNumber));
+    const childId = await this.getIssueNodeId(Number(childNumber));
+    await ghGraphQL(REMOVE_SUB_ISSUE_MUTATION, { parentId, childId }, this.cwd);
   }
 
-  private getOwnerRepo(): { owner: string; repo: string } {
+  private async getOwnerRepo(): Promise<{ owner: string; repo: string }> {
     if (!this.ownerRepo) {
-      const nwo = this.getRepoNwo();
+      const nwo = await this.getRepoNwo();
       const [owner, repo] = nwo.split('/');
       this.ownerRepo = { owner: owner!, repo: repo! };
     }
     return this.ownerRepo;
   }
 
-  private fetchMilestones(): GhMilestone[] {
+  private async fetchMilestones(): Promise<GhMilestone[]> {
     if (this.cachedMilestones) return this.cachedMilestones;
-    const { owner, repo } = this.getOwnerRepo();
-    this.cachedMilestones = gh<GhMilestone[]>(
+    const { owner, repo } = await this.getOwnerRepo();
+    this.cachedMilestones = await gh<GhMilestone[]>(
       ['api', `repos/${owner}/${repo}/milestones`, '--jq', '.'],
       this.cwd,
     );
     return this.cachedMilestones;
   }
 
-  private fetchOpenMilestones(): GhMilestone[] {
-    const milestones = this.fetchMilestones();
+  private async fetchOpenMilestones(): Promise<GhMilestone[]> {
+    const milestones = await this.fetchMilestones();
     return milestones
       .filter((m) => m.state === 'open')
       .sort((a, b) => {
@@ -450,8 +451,8 @@ export class GitHubBackend extends BaseBackend {
       });
   }
 
-  private getRepoNwo(): string {
-    const result = gh<{ nameWithOwner: string }>(
+  private async getRepoNwo(): Promise<string> {
+    const result = await gh<{ nameWithOwner: string }>(
       ['repo', 'view', '--json', 'nameWithOwner'],
       this.cwd,
     );
