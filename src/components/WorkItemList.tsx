@@ -146,6 +146,8 @@ export function WorkItemList() {
   const [assigneeInput, setAssigneeInput] = useState('');
   const [labelsInput, setLabelsInput] = useState('');
   const [templates, setTemplates] = useState<Template[]>([]);
+  const [showFullDescription, setShowFullDescription] = useState(false);
+  const [descriptionScrollOffset, setDescriptionScrollOffset] = useState(0);
 
   // UI overlay state from store
   const { activeOverlay, warning, toast } = useUIStore(
@@ -204,7 +206,7 @@ export function WorkItemList() {
     }
   };
 
-  const { width: terminalWidth } = useTerminalSize();
+  const { width: terminalWidth, height: terminalHeight } = useTerminalSize();
   const gitAvailable = useMemo(() => isGitRepo(process.cwd()), []);
 
   useEffect(() => {
@@ -271,6 +273,11 @@ export function WorkItemList() {
   }, [treeItems.length, clampCursor]);
 
   useEffect(() => {
+    setShowFullDescription(false);
+    setDescriptionScrollOffset(0);
+  }, [cursor]);
+
+  useEffect(() => {
     if (activeOverlay?.type !== 'search' || !backend) return;
     let cancelled = false;
     void backend.listWorkItems().then((items) => {
@@ -281,10 +288,43 @@ export function WorkItemList() {
     };
   }, [activeOverlay?.type, backend]);
 
+  // Description viewport calculation
+  const currentItem = treeItems[cursor]?.item;
+  const descriptionLines = currentItem?.description?.split('\n') ?? [];
+  const descriptionTotalLines = descriptionLines.length;
+  const hasDescription = (currentItem?.description?.trim().length ?? 0) > 0;
+
+  const minListRows = 2;
+  const baseChromeLines = 6; // title+margin(2) + table header(1) + help bar margin+text(2) + warning(1)
+  const panelBaseLines = 5; // marginTop(1) + title height(2) + meta(1) + priority/labels(1)
+  const separatorLine = 1;
+
+  const maxDescriptionHeight = showFullDescription
+    ? Math.max(
+        1,
+        terminalHeight -
+          baseChromeLines -
+          panelBaseLines -
+          separatorLine -
+          minListRows,
+      )
+    : 0;
+
+  const actualDescriptionViewHeight = showFullDescription
+    ? Math.min(descriptionTotalLines, maxDescriptionHeight) + separatorLine
+    : 0;
+
+  const previewLine =
+    showDetailPanel && hasDescription && !showFullDescription ? 1 : 0;
+
+  const chromeLines = showDetailPanel
+    ? 11 + previewLine + actualDescriptionViewHeight
+    : 6;
+
   const viewport = useScrollViewport({
     totalItems: treeItems.length,
     cursor,
-    chromeLines: showDetailPanel ? 11 : 6, // title+margin (2) + table header (1) + detail panel (5) or nothing (0) + help bar margin+text (2) + warning (1)
+    chromeLines,
     linesPerItem: 1,
   });
 
@@ -301,6 +341,28 @@ export function WorkItemList() {
         activeOverlay?.type === 'assignee-input' ||
         activeOverlay?.type === 'labels-input',
     },
+  );
+
+  // Block 1.5: Description scroll handler — active when full description is shown
+  useInput(
+    (_input, key) => {
+      if (_input === 'v' || key.escape) {
+        setShowFullDescription(false);
+        setDescriptionScrollOffset(0);
+        return;
+      }
+      if (key.upArrow) {
+        setDescriptionScrollOffset((o) => Math.max(0, o - 1));
+      }
+      if (key.downArrow) {
+        const maxScroll = Math.max(
+          0,
+          descriptionTotalLines - maxDescriptionHeight,
+        );
+        setDescriptionScrollOffset((o) => Math.min(maxScroll, o + 1));
+      }
+    },
+    { isActive: showFullDescription && activeOverlay === null },
   );
 
   // Block 2: Delete confirmation handler
@@ -476,6 +538,11 @@ export function WorkItemList() {
           .update({ showDetailPanel: !showDetailPanel });
       }
 
+      if (input === 'v' && showDetailPanel && hasDescription) {
+        setShowFullDescription(true);
+        setDescriptionScrollOffset(0);
+      }
+
       if (input === 'p' && capabilities.fields.parent && treeItems.length > 0) {
         const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
         if (targetIds.length > 0) {
@@ -555,7 +622,7 @@ export function WorkItemList() {
         }
       }
     },
-    { isActive: activeOverlay === null },
+    { isActive: activeOverlay === null && !showFullDescription },
   );
 
   const handleSearchSelect = (item: WorkItem) => {
@@ -931,11 +998,19 @@ export function WorkItemList() {
             <DetailPanel
               item={treeItems[cursor].item}
               terminalWidth={terminalWidth}
+              showFullDescription={showFullDescription}
+              descriptionScrollOffset={descriptionScrollOffset}
+              maxDescriptionHeight={maxDescriptionHeight}
             />
           )}
 
           <Box marginTop={1}>
-            {activeOverlay?.type === 'parent-input' ? (
+            {showFullDescription ? (
+              <Box>
+                <Text dimColor>↑↓ scroll v/esc close</Text>
+                {positionText && <Text dimColor> {positionText}</Text>}
+              </Box>
+            ) : activeOverlay?.type === 'parent-input' ? (
               <Box flexDirection="column">
                 <Text color="cyan">
                   Set parent for {activeOverlay.targetIds.length} item
