@@ -532,7 +532,7 @@ export function WorkItemList() {
         navigate('status');
       }
 
-      if (input === 'V') {
+      if (input === 'v') {
         void configStore
           .getState()
           .update({ showDetailPanel: !showDetailPanel });

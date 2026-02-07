@@ -80,7 +80,7 @@ export function getShortcuts(
       switching.push({ key: ',', description: 'Settings' });
 
       const other: ShortcutEntry[] = [];
-      other.push({ key: 'V', description: 'Toggle detail panel' });
+      other.push({ key: 'v', description: 'Toggle detail panel' });
       other.push({ key: 'space', description: 'Toggle full description' });
       if (hasSyncManager) {
         other.push({ key: 'r', description: 'Sync' });
