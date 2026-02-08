@@ -115,6 +115,14 @@ describe('getShortcuts', () => {
     expect(groups.length).toBeGreaterThan(0);
     const allKeys = groups.flatMap((g) => g.shortcuts.map((s) => s.key));
     expect(allKeys).toContain('esc/q');
+    expect(allKeys).not.toContain('r');
+  });
+
+  it('returns status shortcuts with retry when syncManager available', () => {
+    const groups = getShortcuts('status', fullCapabilities, false, true);
+    const allKeys = groups.flatMap((g) => g.shortcuts.map((s) => s.key));
+    expect(allKeys).toContain('r');
+    expect(allKeys).toContain('esc/q');
   });
 
   it('returns empty for help screen itself', () => {

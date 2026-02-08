@@ -88,6 +88,11 @@ export function StatusScreen() {
       return;
     }
 
+    if (input === 'r' && syncManager && syncStatus?.state !== 'syncing') {
+      void syncManager.sync();
+      return;
+    }
+
     if (key.upArrow) {
       setScrollOffset((o) => Math.max(0, o - 1));
     }
@@ -220,7 +225,12 @@ export function StatusScreen() {
       )}
 
       <Box marginTop={1}>
-        <Text dimColor>{'↑↓ scroll  esc back  ? help'}</Text>
+        <Text dimColor>
+          {syncManager &&
+          (errors.length > 0 || (syncStatus?.pendingCount ?? 0) > 0)
+            ? '↑↓ scroll  r retry  esc back  ? help'
+            : '↑↓ scroll  esc back  ? help'}
+        </Text>
       </Box>
     </Box>
   );

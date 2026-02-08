@@ -194,7 +194,7 @@ export function getShortcuts(
     }
 
     case 'status': {
-      return [
+      const groups: ShortcutGroup[] = [
         {
           label: 'Navigation',
           shortcuts: [
@@ -203,6 +203,15 @@ export function getShortcuts(
           ],
         },
       ];
+      if (hasSyncManager) {
+        groups.push({
+          label: 'Actions',
+          shortcuts: [
+            { key: 'r', description: 'Retry failed sync operations' },
+          ],
+        });
+      }
+      return groups;
     }
 
     default:
