@@ -147,6 +147,8 @@ export function WorkItemList() {
     toggleExpanded,
     toggleMarked,
     clearMarked,
+    setMarkedIds,
+    setRangeAnchor,
     clampCursor,
     removeDeletedItem,
   } = listViewStore.getState();
@@ -603,8 +605,15 @@ export function WorkItemList() {
         toggleMarked(itemId);
       }
 
-      if (input === 'M') {
-        clearMarked();
+      if (input === 'M' && treeItems.length > 0) {
+        setRangeAnchor(null);
+        const visibleIds = treeItems.map((t) => t.item.id);
+        const allMarked = visibleIds.every((id) => markedIds.has(id));
+        if (allMarked) {
+          clearMarked();
+        } else {
+          setMarkedIds(new Set(visibleIds));
+        }
       }
 
       if (input === 'B' && treeItems.length > 0) {
