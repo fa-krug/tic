@@ -60,6 +60,7 @@ export function buildHelpText(availableWidth: number): string {
     { key: 'enter', label: 'edit' },
     { key: 'c', label: 'create' },
     { key: 'd', label: 'delete' },
+    { key: 'u', label: 'undo' },
     { key: '/', label: 'search' },
     { key: ',', label: 'settings' },
     { key: '?', label: 'help' },

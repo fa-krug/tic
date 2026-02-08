@@ -6,6 +6,11 @@ import { render } from 'ink';
 import { App } from './app.js';
 import { configStore } from './stores/configStore.js';
 import { backendDataStore } from './stores/backendDataStore.js';
+import { undoStore } from './stores/undoStore.js';
+import {
+  cleanupTrash,
+  permanentlyDeleteWorkItem,
+} from './backends/local/items.js';
 
 if (process.argv.length > 2) {
   const { runCli } = await import('./cli/index.js');
@@ -17,9 +22,22 @@ if (process.argv.length > 2) {
   // Init is non-blocking - UI renders immediately with loading state
   backendDataStore.getState().init(cwd);
 
+  await cleanupTrash(cwd);
+
   console.clear();
   const app = render(<App />);
   await app.waitUntilExit();
+
+  // Clean up undo stack — permanently delete any remaining trashed files
+  const remaining = undoStore.getState().clear();
+  for (const entry of remaining) {
+    if (entry.type === 'delete') {
+      for (const snap of entry.itemSnapshots) {
+        await permanentlyDeleteWorkItem(cwd, snap.id);
+      }
+    }
+  }
+
   backendDataStore.getState().destroy();
   configStore.getState().destroy();
 

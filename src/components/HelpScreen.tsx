@@ -46,6 +46,7 @@ export function getShortcuts(
         { key: 'enter', description: 'Edit item' },
         { key: 'c', description: 'Create item (template picker if available)' },
         { key: 'd', description: 'Delete item' },
+        { key: 'u', description: 'Undo last action' },
         { key: 'o', description: 'Open in browser' },
         { key: 'S', description: 'Status screen' },
       ];
