@@ -135,11 +135,12 @@ export function WorkItemList() {
   const { exit } = useApp();
 
   // Store selectors for persistent list view state
-  const { cursor, markedIds, expandedIds } = useListViewStore(
+  const { cursor, markedIds, expandedIds, rangeAnchor } = useListViewStore(
     useShallow((s) => ({
       cursor: s.cursor,
       markedIds: s.markedIds,
       expandedIds: s.expandedIds,
+      rangeAnchor: s.rangeAnchor,
     })),
   );
   const {
@@ -293,7 +294,8 @@ export function WorkItemList() {
 
   useEffect(() => {
     clampCursor(treeItems.length - 1);
-  }, [treeItems.length, clampCursor]);
+    setRangeAnchor(null);
+  }, [treeItems.length, clampCursor, setRangeAnchor]);
 
   useEffect(() => {
     setShowFullDescription(false);
@@ -392,11 +394,37 @@ export function WorkItemList() {
       }
 
       if (key.upArrow) {
-        setCursor(Math.max(0, cursor - 1));
+        if (key.shift) {
+          const anchor = rangeAnchor ?? cursor;
+          if (rangeAnchor === null) setRangeAnchor(cursor);
+          const newCursor = Math.max(0, cursor - 1);
+          setCursor(newCursor);
+          const start = Math.min(anchor, newCursor);
+          const end = Math.max(anchor, newCursor);
+          setMarkedIds(
+            new Set(treeItems.slice(start, end + 1).map((t) => t.item.id)),
+          );
+        } else {
+          if (rangeAnchor !== null) setRangeAnchor(null);
+          setCursor(Math.max(0, cursor - 1));
+        }
         clearWarning();
       }
       if (key.downArrow) {
-        setCursor(Math.min(treeItems.length - 1, cursor + 1));
+        if (key.shift) {
+          const anchor = rangeAnchor ?? cursor;
+          if (rangeAnchor === null) setRangeAnchor(cursor);
+          const newCursor = Math.min(treeItems.length - 1, cursor + 1);
+          setCursor(newCursor);
+          const start = Math.min(anchor, newCursor);
+          const end = Math.max(anchor, newCursor);
+          setMarkedIds(
+            new Set(treeItems.slice(start, end + 1).map((t) => t.item.id)),
+          );
+        } else {
+          if (rangeAnchor !== null) setRangeAnchor(null);
+          setCursor(Math.min(treeItems.length - 1, cursor + 1));
+        }
         clearWarning();
       }
       if (key.pageUp) {
@@ -601,6 +629,7 @@ export function WorkItemList() {
       }
 
       if (input === 'm' && treeItems.length > 0) {
+        setRangeAnchor(null);
         const itemId = treeItems[cursor]!.item.id;
         toggleMarked(itemId);
       }
