@@ -68,6 +68,25 @@ describe('listViewStore', () => {
     });
   });
 
+  describe('rangeAnchor', () => {
+    it('sets range anchor', () => {
+      listViewStore.getState().setRangeAnchor(3);
+      expect(listViewStore.getState().rangeAnchor).toBe(3);
+    });
+
+    it('clears range anchor', () => {
+      listViewStore.getState().setRangeAnchor(3);
+      listViewStore.getState().setRangeAnchor(null);
+      expect(listViewStore.getState().rangeAnchor).toBeNull();
+    });
+
+    it('resets range anchor on reset', () => {
+      listViewStore.getState().setRangeAnchor(5);
+      listViewStore.getState().reset();
+      expect(listViewStore.getState().rangeAnchor).toBeNull();
+    });
+  });
+
   describe('removeDeletedItem', () => {
     it('removes item from expandedIds and markedIds', () => {
       listViewStore.getState().toggleExpanded('item-1');

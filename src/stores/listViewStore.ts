@@ -6,6 +6,7 @@ interface ListViewState {
   expandedIds: Set<string>;
   markedIds: Set<string>;
   scrollOffset: number;
+  rangeAnchor: number | null;
 
   setCursor: (index: number) => void;
   clampCursor: (maxIndex: number) => void;
@@ -14,6 +15,7 @@ interface ListViewState {
   clearMarked: () => void;
   setMarkedIds: (ids: Set<string>) => void;
   setScrollOffset: (offset: number) => void;
+  setRangeAnchor: (index: number | null) => void;
   removeDeletedItem: (id: string) => void;
   reset: () => void;
 }
@@ -23,6 +25,7 @@ const initialState = {
   expandedIds: new Set<string>(),
   markedIds: new Set<string>(),
   scrollOffset: 0,
+  rangeAnchor: null as number | null,
 };
 
 export const listViewStore = createStore<ListViewState>((set) => ({
@@ -63,6 +66,8 @@ export const listViewStore = createStore<ListViewState>((set) => ({
 
   setScrollOffset: (offset) => set({ scrollOffset: offset }),
 
+  setRangeAnchor: (index) => set({ rangeAnchor: index }),
+
   removeDeletedItem: (id) =>
     set((state) => {
       const nextExpanded = new Set(state.expandedIds);
@@ -78,6 +83,7 @@ export const listViewStore = createStore<ListViewState>((set) => ({
       expandedIds: new Set(),
       markedIds: new Set(),
       scrollOffset: 0,
+      rangeAnchor: null,
     }),
 }));
 
