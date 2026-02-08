@@ -1,6 +1,6 @@
 ---
 name: tic-items
-description: Use when creating, updating, listing, searching, or deleting work items
+description: Use when creating, updating, listing, searching, or deleting epics, tasks, issues, bugs, stories, features, tickets, items, cards, defects, improvements, subtasks, or any work item
 ---
 
 # tic Work Items
@@ -14,6 +14,17 @@ Call `get_config` first to understand:
 - Available `statuses` (e.g., backlog, todo, in-progress, done)
 - Available `iterations`
 - Backend `capabilities` (which fields are supported)
+
+## Creating Items — Brainstorm First
+
+When the user asks to create a work item, **brainstorm before calling `create_item`**:
+
+1. **Clarify intent** — Ask what the item is about if the request is vague. Use `AskUserQuestion` with concrete options when possible.
+2. **Suggest structure** — Propose a title, type, priority, and brief description. For larger items (epics, features), suggest breaking them into child tasks.
+3. **Check for duplicates** — Use `search_items` to see if a similar item already exists. If matches are found, ask whether to update an existing item or create a new one.
+4. **Present the plan** — Show the user exactly what you'll create before calling `create_item`. Use options to let them approve or adjust.
+
+**Skip brainstorming** when the user provides all details explicitly (e.g., "create a bug titled 'Login fails on Safari' with priority high").
 
 ## Tools
 
