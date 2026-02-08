@@ -1,7 +1,7 @@
 {
   "name": "tic",
   "description": "Issue tracking skills for Claude Code",
-  "version": "1.31.0",
+  "version": "1.32.0",
   "author": {
     "name": "Sascha Krug"
   },
