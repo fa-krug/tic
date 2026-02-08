@@ -1,5 +1,5 @@
 ---
-name: tic-items
+name: items
 description: Use when creating, updating, listing, searching, or deleting epics, tasks, issues, bugs, stories, features, tickets, items, cards, defects, improvements, subtasks, or any work item
 ---
 

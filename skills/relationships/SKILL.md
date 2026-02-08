@@ -1,5 +1,5 @@
 ---
-name: tic-relationships
+name: relationships
 description: Use when working with parent-child hierarchies or dependencies between epics, tasks, issues, bugs, stories, features, tickets, or any work items
 ---
 

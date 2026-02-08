@@ -1,5 +1,5 @@
 ---
-name: tic-config
+name: config
 description: Use when initializing projects, checking configuration, or changing backends/iterations for epics, tasks, issues, bugs, stories, features, tickets, or any work items
 ---
 
