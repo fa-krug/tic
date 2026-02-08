@@ -308,4 +308,111 @@ describe('beginImplementation', () => {
 
     expect(result.clipboardOk).toBe(false);
   });
+
+  it('accepts branchCommand and copyToClipboard in config', () => {
+    const item = makeItem();
+    const result = beginImplementation(
+      item,
+      [],
+      {
+        branchMode: 'worktree',
+        branchCommand: 'echo hello',
+        copyToClipboard: false,
+      },
+      tmpDir,
+      { skipShell: true, skipClipboard: true },
+    );
+    expect(result.resumed).toBe(false);
+  });
+
+  it('returns commandFailed when branchCommand fails', () => {
+    const item = makeItem();
+    // Set SHELL to /usr/bin/true so the fallback shell exits immediately
+    const origShell = process.env['SHELL'];
+    process.env['SHELL'] = '/usr/bin/true';
+    try {
+      const result = beginImplementation(
+        item,
+        [],
+        {
+          branchMode: 'worktree',
+          branchCommand: 'exit 1',
+          copyToClipboard: true,
+        },
+        tmpDir,
+        { skipClipboard: true },
+      );
+      expect(result.commandFailed).toBe(true);
+    } finally {
+      if (origShell !== undefined) {
+        process.env['SHELL'] = origShell;
+      } else {
+        delete process.env['SHELL'];
+      }
+    }
+  });
+
+  it('respects copyToClipboard false', () => {
+    const item = makeItem();
+    const result = beginImplementation(
+      item,
+      [],
+      { branchMode: 'worktree', copyToClipboard: false },
+      tmpDir,
+      { skipShell: true },
+    );
+    expect(result.clipboardOk).toBe(false);
+  });
+
+  it('runs branchCommand when not skipping shell', () => {
+    const item = makeItem();
+    const marker = path.join(
+      tmpDir,
+      '.worktrees',
+      '42-add-user-authentication',
+      'branch-cmd-ran',
+    );
+    const result = beginImplementation(
+      item,
+      [],
+      { branchMode: 'worktree', branchCommand: `touch "${marker}"` },
+      tmpDir,
+      { skipClipboard: true },
+    );
+    expect(fs.existsSync(marker)).toBe(true);
+    expect(result.commandFailed).toBe(false);
+  });
+
+  it('sets TIC env vars when running branchCommand', () => {
+    const item = makeItem({
+      description: 'Test desc',
+      priority: 'high',
+      labels: ['a', 'b'],
+    });
+    const envFile = path.join(
+      tmpDir,
+      '.worktrees',
+      '42-add-user-authentication',
+      'env-dump',
+    );
+    beginImplementation(
+      item,
+      [],
+      {
+        branchMode: 'worktree',
+        branchCommand: `env | grep ^TIC_ > "${envFile}"`,
+      },
+      tmpDir,
+      { skipClipboard: true },
+    );
+    const envContent = fs.readFileSync(envFile, 'utf-8');
+    expect(envContent).toContain('TIC_ITEM_ID=42');
+    expect(envContent).toContain('TIC_ITEM_TITLE=Add user authentication');
+    expect(envContent).toContain('TIC_ITEM_DESCRIPTION=Test desc');
+    expect(envContent).toContain('TIC_ITEM_STATUS=in-progress');
+    expect(envContent).toContain('TIC_ITEM_PRIORITY=high');
+    expect(envContent).toContain('TIC_ITEM_LABELS=a,b');
+    expect(envContent).toContain('TIC_BRANCH=tic/42-add-user-authentication');
+    expect(envContent).toContain('TIC_TARGET_DIR=');
+  });
 });

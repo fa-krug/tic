@@ -109,6 +109,7 @@ export function copyToClipboard(text: string): boolean {
 export interface ImplementOptions {
   skipShell?: boolean;
   skipClipboard?: boolean;
+  itemUrl?: string;
 }
 
 /**
@@ -118,10 +119,19 @@ export interface ImplementOptions {
 export function beginImplementation(
   item: WorkItem,
   comments: Comment[],
-  config: { branchMode: 'worktree' | 'branch' },
+  config: {
+    branchMode: 'worktree' | 'branch';
+    branchCommand?: string;
+    copyToClipboard?: boolean;
+  },
   repoRoot: string,
   options?: ImplementOptions,
-): { resumed: boolean; targetDir: string; clipboardOk: boolean } {
+): {
+  resumed: boolean;
+  targetDir: string;
+  clipboardOk: boolean;
+  commandFailed: boolean;
+} {
   const slug = slugify(item.id, item.title);
   const branch = `tic/${slug}`;
   const resumed = branchExists(branch, repoRoot);
@@ -153,24 +163,47 @@ export function beginImplementation(
 
   // Copy to clipboard
   let clipboardOk = false;
-  if (!options?.skipClipboard) {
+  if (!options?.skipClipboard && config.copyToClipboard !== false) {
     const text = formatItemForClipboard(item, comments);
     clipboardOk = copyToClipboard(text);
   }
 
-  // Spawn shell
+  // Spawn shell / run branch command
+  let commandFailed = false;
   if (!options?.skipShell) {
-    const shell = process.env['SHELL'] || '/bin/sh';
-    spawnSync(shell, [], {
-      cwd: targetDir,
-      stdio: 'inherit',
-      env: {
-        ...process.env,
-        TIC_ITEM_ID: item.id,
-        TIC_ITEM_TITLE: item.title,
-      },
-    });
+    const env = {
+      ...process.env,
+      TIC_ITEM_ID: item.id,
+      TIC_ITEM_TITLE: item.title,
+      TIC_ITEM_DESCRIPTION: item.description,
+      TIC_ITEM_STATUS: item.status,
+      TIC_ITEM_PRIORITY: item.priority || '',
+      TIC_ITEM_LABELS: item.labels.join(','),
+      TIC_ITEM_URL: options?.itemUrl || '',
+      TIC_BRANCH: branch,
+      TIC_TARGET_DIR: targetDir,
+    };
+
+    const command = config.branchCommand;
+    if (command) {
+      const result = spawnSync(command, [], {
+        cwd: targetDir,
+        stdio: 'inherit',
+        env,
+        shell: true,
+      });
+      if (result.status !== 0 && result.status !== null) {
+        commandFailed = true;
+        // Fall back to plain shell
+        const shell = process.env['SHELL'] || '/bin/sh';
+        spawnSync(shell, [], { cwd: targetDir, stdio: 'inherit', env });
+      }
+    } else {
+      // Empty/unset branchCommand: plain shell
+      const shell = process.env['SHELL'] || '/bin/sh';
+      spawnSync(shell, [], { cwd: targetDir, stdio: 'inherit', env });
+    }
   }
 
-  return { resumed, targetDir, clipboardOk };
+  return { resumed, targetDir, clipboardOk, commandFailed };
 }
