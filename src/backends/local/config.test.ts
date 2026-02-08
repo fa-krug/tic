@@ -136,6 +136,14 @@ describe('config', () => {
     expect(config.defaultType).toBe('task');
   });
 
+  it('has branchCommand in defaultConfig', () => {
+    expect(defaultConfig.branchCommand).toContain('claude');
+  });
+
+  it('has copyToClipboard true in defaultConfig', () => {
+    expect(defaultConfig.copyToClipboard).toBe(true);
+  });
+
   describe('readConfigSync', () => {
     it('returns default config when no config file exists', () => {
       const config = readConfigSync(tmpDir);

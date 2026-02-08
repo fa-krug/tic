@@ -14,6 +14,8 @@ export interface Config {
   autoUpdate: boolean;
   defaultType?: string;
   showDetailPanel?: boolean;
+  branchCommand?: string;
+  copyToClipboard?: boolean;
   jira?: {
     site: string;
     project: string;
@@ -30,6 +32,8 @@ export const defaultConfig: Config = {
   next_id: 1,
   branchMode: 'worktree',
   autoUpdate: true,
+  branchCommand: `bash --init-file <(echo "source ~/.bashrc; claude 'Brainstorm the implementation of issue #$TIC_ITEM_ID: $TIC_ITEM_TITLE. $TIC_ITEM_DESCRIPTION'")`,
+  copyToClipboard: true,
 };
 
 function configPath(root: string): string {
