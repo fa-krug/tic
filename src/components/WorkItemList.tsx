@@ -127,6 +127,8 @@ export function WorkItemList() {
 
   const defaultType = useConfigStore((s) => s.config.defaultType ?? null);
   const branchMode = useConfigStore((s) => s.config.branchMode ?? 'worktree');
+  const branchCommand = useConfigStore((s) => s.config.branchCommand);
+  const copyToClipboard = useConfigStore((s) => s.config.copyToClipboard);
   const showDetailPanel = useConfigStore(
     (s) => s.config.showDetailPanel ?? true,
   );
@@ -530,17 +532,21 @@ export function WorkItemList() {
         const item = treeItems[cursor]!.item;
         const comments = item.comments;
         try {
+          const itemUrl = backend?.getItemUrl(item.id) || '';
           const result = beginImplementation(
             item,
             comments,
-            { branchMode },
+            { branchMode, branchCommand, copyToClipboard },
             process.cwd(),
+            { itemUrl },
           );
-          setWarning(
-            result.resumed
-              ? `Resumed work on #${item.id}`
-              : `Started work on #${item.id}`,
-          );
+          let msg = result.resumed
+            ? `Resumed work on #${item.id}`
+            : `Started work on #${item.id}`;
+          if (result.commandFailed) {
+            msg += ' (branch command failed, fell back to shell)';
+          }
+          setWarning(msg);
         } catch (e) {
           setWarning(
             e instanceof Error ? e.message : 'Failed to start implementation',
@@ -743,17 +749,21 @@ export function WorkItemList() {
           const item = treeItems[cursor].item;
           const comments = item.comments;
           try {
+            const itemUrl = backend?.getItemUrl(item.id) || '';
             const result = beginImplementation(
               item,
               comments,
-              { branchMode },
+              { branchMode, branchCommand, copyToClipboard },
               process.cwd(),
+              { itemUrl },
             );
-            setWarning(
-              result.resumed
-                ? `Resumed work on #${item.id}`
-                : `Started work on #${item.id}`,
-            );
+            let msg = result.resumed
+              ? `Resumed work on #${item.id}`
+              : `Started work on #${item.id}`;
+            if (result.commandFailed) {
+              msg += ' (branch command failed, fell back to shell)';
+            }
+            setWarning(msg);
           } catch (e) {
             setWarning(
               e instanceof Error ? e.message : 'Failed to start implementation',
