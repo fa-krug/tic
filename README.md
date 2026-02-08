@@ -19,6 +19,8 @@ Built with TypeScript and [Ink](https://github.com/vadimdemedes/ink).
 - **Comments** — add timestamped comments to any work item
 - **Bulk operations** — mark multiple items and change status, type, priority, assignee, labels, or parent in batch
 - **Quick search** — fuzzy search across all work items regardless of type or iteration
+- **Detail panel** — inline preview of selected item with metadata, description, and scroll support
+- **Undo** — undo delete, create, and property changes with `u` (up to 5 actions deep)
 - **External editor** — edit descriptions in your `$EDITOR` (falls back to vi)
 - **Settings screen** — switch backends and configure Jira connection from within the TUI
 - **MCP server** — expose work items to AI assistants via the Model Context Protocol
@@ -58,16 +60,23 @@ The main screen shows work items filtered by type and iteration, displayed as a 
 | `↑` `↓` | Navigate between items |
 | `←` | Collapse children or jump to parent |
 | `→` | Expand children |
+| `PageUp` `PageDown` | Jump by viewport height |
+| `Home` `End` | Jump to first/last item |
 | `Enter` | Edit selected item |
 | `c` | Create new work item |
 | `d` | Delete item(s) (with confirmation) |
+| `u` | Undo last action (delete, create, or property change) |
 | `o` | Open item in browser/editor |
-| `s` | Status screen |
+| `v` | Toggle detail panel |
+| `Space` | Expand full description in detail panel |
 | `/` | Quick search across all items |
+| `:` | Command palette |
+| `s` | Set status (single or marked items) |
+| `S` | Sync status screen |
 | `p` | Set parent for selected item |
 | `m` | Toggle mark on current item |
 | `M` | Clear all marks |
-| `b` | Bulk actions menu |
+| `B` | Bulk actions menu |
 | `P` | Set priority (single or marked items) |
 | `a` | Set assignee (single or marked items) |
 | `l` | Set labels (single or marked items) |
@@ -75,7 +84,7 @@ The main screen shows work items filtered by type and iteration, displayed as a 
 | `Tab` | Cycle work item type filter (epic / issue / task) |
 | `i` | Iteration picker |
 | `,` | Settings |
-| `B` | Create branch / worktree for item (requires git) |
+| `b` | Create branch / worktree for item (requires git) |
 | `r` | Sync with remote backend |
 | `?` | Show keyboard shortcuts |
 | `q` | Quit |
@@ -119,10 +128,13 @@ Work items live in `.tic/` at the root of your project:
 ```
 .tic/
 ├── config.yml          # Types, statuses, iterations, settings
-└── items/
-    ├── 1.md            # Work item #1
-    ├── 2.md            # Work item #2
-    └── ...
+├── items/
+│   ├── 1.md            # Work item #1
+│   ├── 2.md            # Work item #2
+│   └── ...
+├── templates/          # Work item templates
+│   └── bug-report.md   # Template with YAML frontmatter
+└── trash/              # Soft-deleted items (for undo)
 ```
 
 Each item is a markdown file with YAML frontmatter:

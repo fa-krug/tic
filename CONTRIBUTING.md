@@ -75,19 +75,31 @@ The app uses screen-based routing via React Context (`AppContext` in `src/app.ts
 
 ### Components
 
-- **WorkItemList** (`src/components/WorkItemList.tsx`) — collapsible tree-indented table with keyboard navigation. Supports bulk operations (mark/unmark items), inline property pickers, search overlay, and both table and card layouts (auto-selects based on terminal width).
-- **WorkItemForm** (`src/components/WorkItemForm.tsx`) — multi-field form for create/edit. Supports text fields, dropdowns, autocomplete inputs (assignee, parent, depends-on), multi-autocomplete (labels), external editor for descriptions, and navigable relationship links.
+- **WorkItemList** (`src/components/WorkItemList.tsx`) — collapsible tree-indented table with keyboard navigation. Supports bulk operations (mark/unmark items), inline property pickers via OverlayPanel, detail panel toggle, undo, and responsive column hiding based on terminal width.
+- **WorkItemForm** (`src/components/WorkItemForm.tsx`) — multi-field form for create/edit. Supports text fields, dropdowns, autocomplete inputs (assignee, parent, depends-on), multi-autocomplete (labels), external editor for descriptions, and navigable relationship links. Also serves as the template editor via `formMode`.
+- **OverlayPanel** (`src/components/OverlayPanel.tsx`) — unified overlay for search, bulk actions, and property pickers (status, priority, type, assignee, labels). Supports single-select, multi-select, and freeform input modes with fuzzy filtering and category grouping.
+- **DetailPanel** (`src/components/DetailPanel.tsx`) — inline preview panel showing selected item metadata (status, priority, assignee, labels) and description with scroll support.
 - **IterationPicker** (`src/components/IterationPicker.tsx`) — select from configured iterations.
 - **Settings** (`src/components/Settings.tsx`) — backend selector with Jira configuration fields.
 - **StatusScreen** (`src/components/StatusScreen.tsx`) — sync status display with error details.
 - **HelpScreen** (`src/components/HelpScreen.tsx`) — context-sensitive keyboard shortcut reference.
-- **SearchOverlay** (`src/components/SearchOverlay.tsx`) — fuzzy search across all work items.
-- **BulkMenu** (`src/components/BulkMenu.tsx`) — action picker for bulk operations on marked items.
+- **Breadcrumbs** (`src/components/Breadcrumbs.tsx`) — breadcrumb navigation for form drill-down stack.
 - **AutocompleteInput** (`src/components/AutocompleteInput.tsx`) — single-value fuzzy autocomplete input.
 - **MultiAutocompleteInput** (`src/components/MultiAutocompleteInput.tsx`) — comma-separated multi-value autocomplete (used for labels).
-- **TableLayout** / **CardLayout** (`src/components/TableLayout.tsx`, `src/components/CardLayout.tsx`) — list rendering strategies for wide and narrow terminals.
+- **TableLayout** (`src/components/TableLayout.tsx`) — list rendering with responsive column visibility based on terminal width.
 - **Header** (`src/components/Header.tsx`) — top-level header bar.
-- **PriorityPicker** / **StatusPicker** / **TypePicker** — inline overlay pickers for bulk property changes.
+
+### State Management
+
+State is managed via Zustand vanilla stores in `src/stores/`:
+
+- **backendDataStore** — single source of truth for backend data (items, statuses, types, assignees, labels, capabilities, sync status). Initialized with `init(cwd)` which creates backends asynchronously. Components subscribe via `useBackendDataStore(selector)`.
+- **configStore** — single source of truth for `.tic/config.yml`. Reads config on `init(root)` and watches for external file changes via `startWatching()`.
+- **undoStore** — undo action stack (max depth 5). Supports delete (soft-delete to `.tic/trash/`), create, and update operations via whole-item snapshots.
+- **formStackStore** — form navigation stack and field state for drill-down into related items.
+- **listViewStore** — list view state (cursor position, expanded/collapsed items, marked items, scroll offset).
+- **navigationStore** — screen routing and work item selection.
+- **uiStore** — UI state (active overlay, warnings, toasts).
 
 ### CLI
 

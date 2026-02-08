@@ -66,17 +66,29 @@ Or add `.mcp.json` to the project root:
 
 ### Components
 
-- `WorkItemList` — collapsible tree-indented table view (or card layout in narrow terminals) with keyboard navigation. Supports bulk operations via mark/unmark (`m`/`M`), inline property pickers (`P` priority, `a` assignee, `l` labels, `t` type), search overlay (`/`), branch/worktree creation (`B`), and a bulk actions menu (`b`). Shows `⧗` indicator for items with dependencies.
-- `WorkItemForm` — multi-field form for create/edit with dropdowns (type, status, iteration, priority), autocomplete inputs (assignee, parent, depends-on), multi-autocomplete (labels), and external `$EDITOR` for descriptions. Navigable relationship links allow drilling into related items with a back-stack.
+- `WorkItemList` — collapsible tree-indented table with keyboard navigation. Supports bulk operations via mark/unmark (`m`/`M`), inline property pickers via OverlayPanel (`s` status, `P` priority, `a` assignee, `l` labels, `t` type), search (`/`), command palette (`:`), branch/worktree creation (`b`), bulk actions menu (`B`), detail panel toggle (`v`), and undo (`u`). Shows `⧗` indicator for items with dependencies. Responsive column hiding based on terminal width.
+- `WorkItemForm` — multi-field form for create/edit with dropdowns, autocomplete inputs, multi-autocomplete (labels), and external `$EDITOR` for descriptions. Navigable relationship links allow drilling into related items with a back-stack. Also serves as the template editor via `formMode`.
+- `OverlayPanel` — unified overlay component for search, bulk actions, and all property pickers. Supports single-select, multi-select, and freeform input modes with fuzzy filtering and category grouping.
+- `DetailPanel` — inline preview panel showing selected item metadata and description with scroll support.
+- `Breadcrumbs` — breadcrumb navigation for form drill-down stack.
 - `IterationPicker` — select from configured iterations
 - `Settings` — backend selector and Jira configuration
 - `StatusScreen` — sync status and error details
 - `HelpScreen` — context-sensitive keyboard shortcut reference (press `?` from any screen)
-- `SearchOverlay` — fuzzy search across all work items
-- `BulkMenu` — action picker for bulk operations on marked items
 - `AutocompleteInput` / `MultiAutocompleteInput` — fuzzy autocomplete inputs for single and comma-separated multi-value fields
-- `TableLayout` / `CardLayout` — list rendering for wide (≥80 cols) and narrow terminals
-- `PriorityPicker` / `StatusPicker` / `TypePicker` — inline overlay pickers for bulk property changes
+- `TableLayout` — list rendering with responsive column visibility based on terminal width
+
+### State Management
+
+Zustand vanilla stores in `src/stores/`:
+
+- `backendDataStore` — single source of truth for backend data (items, statuses, types, assignees, labels, capabilities, sync status). Initialized with `init(cwd)` which creates backends asynchronously (LocalBackend + optional remote + SyncManager). Components subscribe via `useBackendDataStore(selector)`. Has `initGeneration` counter to prevent stale async init from overwriting store after destroy.
+- `configStore` — single source of truth for `.tic/config.yml`. `init(root)` reads config, `startWatching()` watches for external changes. In TUI, watching is deferred to after first render. Store must be `destroy()`'d on exit.
+- `undoStore` — undo action stack (max depth 5). Delete uses soft-delete (`.tic/trash/`), create/update use whole-item snapshots. `u` keybinding in WorkItemList pops and reverses.
+- `formStackStore` — form navigation stack and field state for drill-down into related items.
+- `listViewStore` — list view state (cursor position, expanded/collapsed items, marked items, scroll offset).
+- `navigationStore` — screen routing and work item selection.
+- `uiStore` — UI state (active overlay, warnings, toasts).
 
 ### CLI
 
