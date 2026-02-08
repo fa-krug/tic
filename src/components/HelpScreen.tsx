@@ -56,7 +56,8 @@ export function getShortcuts(
         actions.push({ key: 'p', description: 'Set parent' });
       }
       actions.push({ key: 'm', description: 'Toggle mark' });
-      actions.push({ key: 'M', description: 'Clear all marks' });
+      actions.push({ key: 'M', description: 'Toggle mark all' });
+      actions.push({ key: 'shift+↑↓', description: 'Range select' });
       actions.push({ key: 'B', description: 'Bulk actions menu' });
       actions.push({ key: 's', description: 'Set status' });
       if (capabilities.customTypes) {
