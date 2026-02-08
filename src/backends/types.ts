@@ -70,6 +70,22 @@ export interface Backend {
   deleteTemplate(slug: string): Promise<void>;
 }
 
+export interface SoftDeleteBackend extends Backend {
+  softDeleteWorkItem(id: string): Promise<void>;
+  restoreWorkItem(id: string): Promise<void>;
+  permanentlyDeleteWorkItem(id: string): Promise<void>;
+}
+
+export function isSoftDeleteBackend(
+  backend: Backend,
+): backend is SoftDeleteBackend {
+  return (
+    'softDeleteWorkItem' in backend &&
+    'restoreWorkItem' in backend &&
+    'permanentlyDeleteWorkItem' in backend
+  );
+}
+
 export abstract class BaseBackend implements Backend {
   protected cache: BackendCache;
 

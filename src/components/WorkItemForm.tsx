@@ -21,6 +21,7 @@ import { openInEditor } from '../editor.js';
 import { slugifyTemplateName } from '../backends/local/templates.js';
 import { Breadcrumbs } from './Breadcrumbs.js';
 import { uiStore } from '../stores/uiStore.js';
+import { undoStore } from '../stores/undoStore.js';
 
 type FieldName =
   | 'title'
@@ -514,6 +515,7 @@ export function WorkItemForm() {
     }
 
     if (selectedWorkItemId !== null) {
+      const snapshot = await backend.getWorkItem(selectedWorkItemId);
       await backend.cachedUpdateWorkItem(selectedWorkItemId, {
         title,
         type,
@@ -527,6 +529,13 @@ export function WorkItemForm() {
         dependsOn: parsedDependsOn,
       });
       await queueWrite('update', selectedWorkItemId);
+      undoStore.getState().pushUndo({
+        type: 'update',
+        label: `edited #${selectedWorkItemId}`,
+        itemSnapshots: [snapshot],
+        syncItemIds: [selectedWorkItemId],
+        syncAction: 'update',
+      });
 
       if (capabilities.comments && newComment.trim().length > 0) {
         const added = await backend.addComment(selectedWorkItemId, {
@@ -539,7 +548,9 @@ export function WorkItemForm() {
         setComments((prev) => [...prev, added]);
         setNewComment('');
       }
-      uiStore.getState().setToast(`Item #${selectedWorkItemId} updated`);
+      uiStore
+        .getState()
+        .setToast(`Item #${selectedWorkItemId} updated — press u to undo`);
     } else {
       const created = await backend.cachedCreateWorkItem({
         title: title || 'Untitled',
@@ -554,6 +565,14 @@ export function WorkItemForm() {
         dependsOn: parsedDependsOn,
       });
       await queueWrite('create', created.id);
+      undoStore.getState().pushUndo({
+        type: 'create',
+        label: `created #${created.id}`,
+        itemSnapshots: [],
+        syncItemIds: [created.id],
+        syncAction: 'create',
+        createdIds: [created.id],
+      });
 
       if (capabilities.comments && newComment.trim().length > 0) {
         await backend.addComment(created.id, {
@@ -564,7 +583,9 @@ export function WorkItemForm() {
           commentData: { author: 'me', body: newComment.trim() },
         });
       }
-      uiStore.getState().setToast(`Item #${created.id} created`);
+      uiStore
+        .getState()
+        .setToast(`Item #${created.id} created — press u to undo`);
       setActiveTemplate(null);
     }
 

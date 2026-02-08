@@ -29,6 +29,8 @@ import {
 import { OverlayPanel, type OverlayItem } from './OverlayPanel.js';
 import { DetailPanel } from './DetailPanel.js';
 import type { WorkItem, Template } from '../types.js';
+import { undoStore } from '../stores/undoStore.js';
+import { isSoftDeleteBackend } from '../backends/types.js';
 export type { TreeItem } from './buildTree.js';
 
 type BulkAction =
@@ -203,6 +205,19 @@ export function WorkItemList() {
       });
       syncManager?.pushPending().catch(() => {});
     }
+  };
+
+  const pushUpdateUndo = (targetIds: string[], label: string) => {
+    const snapshots = targetIds
+      .map((id) => allItems.find((i) => i.id === id))
+      .filter((i): i is WorkItem => i !== undefined);
+    undoStore.getState().pushUndo({
+      type: 'update',
+      label,
+      itemSnapshots: snapshots,
+      syncItemIds: [...targetIds],
+      syncAction: 'update',
+    });
   };
 
   const { width: terminalWidth, height: terminalHeight } = useTerminalSize();
@@ -449,6 +464,54 @@ export function WorkItemList() {
         if (targetIds.length > 0) {
           openOverlay({ type: 'delete-confirm', targetIds });
         }
+      }
+
+      if (input === 'u') {
+        const entry = undoStore.getState().popUndo();
+        if (!entry || !backend) return;
+        void (async () => {
+          if (entry.type === 'delete') {
+            if (isSoftDeleteBackend(backend)) {
+              for (const snap of entry.itemSnapshots) {
+                await backend.restoreWorkItem(snap.id);
+              }
+            }
+            if (queueStore) {
+              await queueStore.removeByIds(entry.syncItemIds, 'delete');
+            }
+            refreshData();
+            setToast(
+              entry.itemSnapshots.length === 1
+                ? `Restored #${entry.itemSnapshots[0]!.id}`
+                : `Restored ${entry.itemSnapshots.length} items`,
+            );
+          } else if (entry.type === 'create') {
+            for (const id of entry.createdIds ?? []) {
+              await backend.cachedDeleteWorkItem(id);
+            }
+            if (queueStore) {
+              await queueStore.removeByIds(entry.syncItemIds, 'create');
+            }
+            refreshData();
+            setToast(
+              (entry.createdIds?.length ?? 0) === 1
+                ? `Undid create #${entry.createdIds?.[0]}`
+                : `Undid create of ${entry.createdIds?.length} items`,
+            );
+          } else if (entry.type === 'update') {
+            for (const snap of entry.itemSnapshots) {
+              await backend.cachedUpdateWorkItem(snap.id, snap);
+            }
+            if (queueStore) {
+              await queueStore.removeByIds(entry.syncItemIds, 'update');
+            }
+            for (const snap of entry.itemSnapshots) {
+              await queueWrite('update', snap.id);
+            }
+            refreshData();
+            setToast(`Undid ${entry.label}`);
+          }
+        })();
       }
 
       if (input === 'o' && treeItems.length > 0 && backend) {
@@ -976,6 +1039,7 @@ export function WorkItemList() {
               closeOverlay();
               if (!backend) return;
               void (async () => {
+                pushUpdateUndo(targetIds, 'status change');
                 for (const id of targetIds) {
                   await backend.cachedUpdateWorkItem(id, {
                     status: item.value,
@@ -985,8 +1049,8 @@ export function WorkItemList() {
                 refreshData();
                 setToast(
                   targetIds.length === 1
-                    ? 'Status updated'
-                    : `${targetIds.length} items updated`,
+                    ? 'Status updated — press u to undo'
+                    : `${targetIds.length} items updated — press u to undo`,
                 );
               })();
             }}
@@ -1005,6 +1069,7 @@ export function WorkItemList() {
               closeOverlay();
               if (!backend) return;
               void (async () => {
+                pushUpdateUndo(targetIds, 'type change');
                 for (const id of targetIds) {
                   await backend.cachedUpdateWorkItem(id, {
                     type: item.value,
@@ -1014,8 +1079,8 @@ export function WorkItemList() {
                 refreshData();
                 setToast(
                   targetIds.length === 1
-                    ? 'Type updated'
-                    : `${targetIds.length} items updated`,
+                    ? 'Type updated — press u to undo'
+                    : `${targetIds.length} items updated — press u to undo`,
                 );
               })();
             }}
@@ -1040,6 +1105,7 @@ export function WorkItemList() {
                 | 'high'
                 | 'critical';
               void (async () => {
+                pushUpdateUndo(targetIds, 'priority change');
                 for (const id of targetIds) {
                   await backend.cachedUpdateWorkItem(id, { priority });
                   await queueWrite('update', id);
@@ -1047,8 +1113,8 @@ export function WorkItemList() {
                 refreshData();
                 setToast(
                   targetIds.length === 1
-                    ? 'Priority updated'
-                    : `${targetIds.length} items updated`,
+                    ? 'Priority updated — press u to undo'
+                    : `${targetIds.length} items updated — press u to undo`,
                 );
               })();
             }}
@@ -1097,6 +1163,7 @@ export function WorkItemList() {
                   ? raw.split(' - ')[0]!.trim()
                   : raw;
                 try {
+                  pushUpdateUndo(targetIds, 'parent change');
                   for (const id of targetIds) {
                     await backend.cachedUpdateWorkItem(id, {
                       parent: newParent,
@@ -1111,8 +1178,8 @@ export function WorkItemList() {
                 refreshData();
                 setToast(
                   targetIds.length === 1
-                    ? 'Parent updated'
-                    : `${targetIds.length} items updated`,
+                    ? 'Parent updated — press u to undo'
+                    : `${targetIds.length} items updated — press u to undo`,
                 );
               })();
             }}
@@ -1128,6 +1195,7 @@ export function WorkItemList() {
                       ? raw.split(' - ')[0]!.trim()
                       : raw;
                 try {
+                  pushUpdateUndo(targetIds, 'parent change');
                   for (const id of targetIds) {
                     await backend.cachedUpdateWorkItem(id, {
                       parent: newParent,
@@ -1142,8 +1210,8 @@ export function WorkItemList() {
                 refreshData();
                 setToast(
                   targetIds.length === 1
-                    ? 'Parent updated'
-                    : `${targetIds.length} items updated`,
+                    ? 'Parent updated — press u to undo'
+                    : `${targetIds.length} items updated — press u to undo`,
                 );
               })();
             }}
@@ -1161,6 +1229,7 @@ export function WorkItemList() {
               closeOverlay();
               if (!backend) return;
               void (async () => {
+                pushUpdateUndo(targetIds, 'assignee change');
                 for (const id of targetIds) {
                   await backend.cachedUpdateWorkItem(id, {
                     assignee: item.value.trim(),
@@ -1170,8 +1239,8 @@ export function WorkItemList() {
                 refreshData();
                 setToast(
                   targetIds.length === 1
-                    ? 'Assignee updated'
-                    : `${targetIds.length} items updated`,
+                    ? 'Assignee updated — press u to undo'
+                    : `${targetIds.length} items updated — press u to undo`,
                 );
               })();
             }}
@@ -1180,6 +1249,7 @@ export function WorkItemList() {
               closeOverlay();
               if (!backend) return;
               void (async () => {
+                pushUpdateUndo(targetIds, 'assignee change');
                 for (const id of targetIds) {
                   await backend.cachedUpdateWorkItem(id, {
                     assignee: text.trim(),
@@ -1189,8 +1259,8 @@ export function WorkItemList() {
                 refreshData();
                 setToast(
                   targetIds.length === 1
-                    ? 'Assignee updated'
-                    : `${targetIds.length} items updated`,
+                    ? 'Assignee updated — press u to undo'
+                    : `${targetIds.length} items updated — press u to undo`,
                 );
               })();
             }}
@@ -1213,6 +1283,7 @@ export function WorkItemList() {
               closeOverlay();
               if (!backend) return;
               void (async () => {
+                pushUpdateUndo(targetIds, 'labels change');
                 const labels = selected.map((i) => i.value);
                 for (const id of targetIds) {
                   await backend.cachedUpdateWorkItem(id, { labels });
@@ -1221,8 +1292,8 @@ export function WorkItemList() {
                 refreshData();
                 setToast(
                   targetIds.length === 1
-                    ? 'Labels updated'
-                    : `${targetIds.length} items updated`,
+                    ? 'Labels updated — press u to undo'
+                    : `${targetIds.length} items updated — press u to undo`,
                 );
               })();
             }}
@@ -1231,6 +1302,7 @@ export function WorkItemList() {
               closeOverlay();
               if (!backend) return;
               void (async () => {
+                pushUpdateUndo(targetIds, 'labels change');
                 const labels = text
                   .split(',')
                   .map((l) => l.trim())
@@ -1242,8 +1314,8 @@ export function WorkItemList() {
                 refreshData();
                 setToast(
                   targetIds.length === 1
-                    ? 'Labels updated'
-                    : `${targetIds.length} items updated`,
+                    ? 'Labels updated — press u to undo'
+                    : `${targetIds.length} items updated — press u to undo`,
                 );
               })();
             }}
@@ -1262,9 +1334,32 @@ export function WorkItemList() {
                 const targetIds = activeOverlay.targetIds;
                 if (!backend) return;
                 void (async () => {
+                  const snapshots = targetIds
+                    .map((id) => allItems.find((i) => i.id === id))
+                    .filter((i): i is WorkItem => i !== undefined);
+                  const softDelete = isSoftDeleteBackend(backend);
                   for (const id of targetIds) {
-                    await backend.cachedDeleteWorkItem(id);
+                    if (softDelete) {
+                      await backend.softDeleteWorkItem(id);
+                    } else {
+                      await backend.cachedDeleteWorkItem(id);
+                    }
                     await queueWrite('delete', id);
+                  }
+                  const evicted = undoStore.getState().pushUndo({
+                    type: 'delete',
+                    label:
+                      targetIds.length === 1
+                        ? `deleted #${targetIds[0]}`
+                        : `deleted ${targetIds.length} items`,
+                    itemSnapshots: snapshots,
+                    syncItemIds: [...targetIds],
+                    syncAction: 'delete',
+                  });
+                  if (evicted?.type === 'delete' && softDelete) {
+                    for (const snap of evicted.itemSnapshots) {
+                      await backend.permanentlyDeleteWorkItem(snap.id);
+                    }
                   }
                   closeOverlay();
                   for (const id of targetIds) {
@@ -1274,8 +1369,8 @@ export function WorkItemList() {
                   refreshData();
                   setToast(
                     targetIds.length === 1
-                      ? `Item #${targetIds[0]} deleted`
-                      : `${targetIds.length} items deleted`,
+                      ? `Item #${targetIds[0]} deleted — press u to undo`
+                      : `${targetIds.length} items deleted — press u to undo`,
                   );
                 })();
               } else {
