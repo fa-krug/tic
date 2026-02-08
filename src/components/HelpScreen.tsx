@@ -88,7 +88,10 @@ export function getShortcuts(
         other.push({ key: 'r', description: 'Sync' });
       }
       if (gitAvailable) {
-        other.push({ key: 'b', description: 'Branch / worktree' });
+        other.push({
+          key: 'b',
+          description: 'Branch / worktree (runs branchCommand from settings)',
+        });
       }
       other.push({ key: 'q', description: 'Quit' });
 
