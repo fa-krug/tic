@@ -7,6 +7,7 @@ import { App } from './app.js';
 import { configStore } from './stores/configStore.js';
 import { backendDataStore } from './stores/backendDataStore.js';
 import { undoStore } from './stores/undoStore.js';
+import { recentCommandsStore } from './stores/recentCommandsStore.js';
 import {
   cleanupTrash,
   permanentlyDeleteWorkItem,
@@ -21,6 +22,8 @@ if (process.argv.length > 2) {
 
   // Init is non-blocking - UI renders immediately with loading state
   backendDataStore.getState().init(cwd);
+
+  await recentCommandsStore.getState().init(cwd);
 
   await cleanupTrash(cwd);
 
@@ -38,6 +41,7 @@ if (process.argv.length > 2) {
     }
   }
 
+  recentCommandsStore.getState().destroy();
   backendDataStore.getState().destroy();
   configStore.getState().destroy();
 

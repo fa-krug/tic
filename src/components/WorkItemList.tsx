@@ -30,6 +30,10 @@ import { OverlayPanel, type OverlayItem } from './OverlayPanel.js';
 import { DetailPanel } from './DetailPanel.js';
 import type { WorkItem, Template } from '../types.js';
 import { undoStore } from '../stores/undoStore.js';
+import {
+  recentCommandsStore,
+  useRecentCommandsStore,
+} from '../stores/recentCommandsStore.js';
 import { isSoftDeleteBackend } from '../backends/types.js';
 export type { TreeItem } from './buildTree.js';
 
@@ -674,8 +678,39 @@ export function WorkItemList() {
     ],
   );
 
+  const recentIds = useRecentCommandsStore((s) => s.recentIds);
+
+  const paletteItems: OverlayItem[] = useMemo(() => {
+    const commandItems = paletteCommands.map((cmd) => ({
+      id: cmd.id,
+      label: cmd.label,
+      value: cmd.id,
+      hint: cmd.shortcut,
+      category: cmd.category,
+    }));
+
+    // Build "Recent" items from IDs that exist in current visible commands
+    const commandMap = new Map(paletteCommands.map((c) => [c.id, c]));
+    const recentItems: OverlayItem[] = [];
+    for (const id of recentIds) {
+      const cmd = commandMap.get(id);
+      if (cmd) {
+        recentItems.push({
+          id: `recent-${cmd.id}`,
+          label: cmd.label,
+          value: cmd.id,
+          hint: cmd.shortcut,
+          category: 'Recent',
+        });
+      }
+    }
+
+    return [...recentItems, ...commandItems];
+  }, [paletteCommands, recentIds]);
+
   const handleCommandSelect = (command: Command) => {
     closeOverlay();
+    recentCommandsStore.getState().addRecent(command.id);
     switch (command.id) {
       case 'create':
         selectWorkItem(null);
@@ -1017,13 +1052,7 @@ export function WorkItemList() {
         ) : activeOverlay?.type === 'command-palette' ? (
           <OverlayPanel
             title="Commands"
-            items={paletteCommands.map((cmd) => ({
-              id: cmd.id,
-              label: cmd.label,
-              value: cmd.id,
-              hint: cmd.shortcut,
-              category: cmd.category,
-            }))}
+            items={paletteItems}
             placeholder="Type a command..."
             onSelect={(item) => {
               const cmd = paletteCommands.find((c) => c.id === item.value);
