@@ -12,6 +12,7 @@ interface ListViewState {
   toggleExpanded: (id: string) => void;
   toggleMarked: (id: string) => void;
   clearMarked: () => void;
+  setMarkedIds: (ids: Set<string>) => void;
   setScrollOffset: (offset: number) => void;
   removeDeletedItem: (id: string) => void;
   reset: () => void;
@@ -57,6 +58,8 @@ export const listViewStore = createStore<ListViewState>((set) => ({
     }),
 
   clearMarked: () => set({ markedIds: new Set() }),
+
+  setMarkedIds: (ids) => set({ markedIds: ids }),
 
   setScrollOffset: (offset) => set({ scrollOffset: offset }),
 

@@ -52,6 +52,20 @@ describe('listViewStore', () => {
       listViewStore.getState().clearMarked();
       expect(listViewStore.getState().markedIds.size).toBe(0);
     });
+
+    it('sets marked ids to exact set', () => {
+      listViewStore.getState().toggleMarked('item-1');
+      listViewStore.getState().setMarkedIds(new Set(['item-2', 'item-3']));
+      expect(listViewStore.getState().markedIds).toEqual(
+        new Set(['item-2', 'item-3']),
+      );
+    });
+
+    it('sets marked ids to empty set', () => {
+      listViewStore.getState().toggleMarked('item-1');
+      listViewStore.getState().setMarkedIds(new Set());
+      expect(listViewStore.getState().markedIds.size).toBe(0);
+    });
   });
 
   describe('removeDeletedItem', () => {
