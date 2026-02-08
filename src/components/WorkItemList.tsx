@@ -1347,19 +1347,21 @@ export function WorkItemList() {
                     }
                     await queueWrite('delete', id);
                   }
-                  const evicted = undoStore.getState().pushUndo({
-                    type: 'delete',
-                    label:
-                      targetIds.length === 1
-                        ? `deleted #${targetIds[0]}`
-                        : `deleted ${targetIds.length} items`,
-                    itemSnapshots: snapshots,
-                    syncItemIds: [...targetIds],
-                    syncAction: 'delete',
-                  });
-                  if (evicted?.type === 'delete' && softDelete) {
-                    for (const snap of evicted.itemSnapshots) {
-                      await backend.permanentlyDeleteWorkItem(snap.id);
+                  if (softDelete) {
+                    const evicted = undoStore.getState().pushUndo({
+                      type: 'delete',
+                      label:
+                        targetIds.length === 1
+                          ? `deleted #${targetIds[0]}`
+                          : `deleted ${targetIds.length} items`,
+                      itemSnapshots: snapshots,
+                      syncItemIds: [...targetIds],
+                      syncAction: 'delete',
+                    });
+                    if (evicted?.type === 'delete') {
+                      for (const snap of evicted.itemSnapshots) {
+                        await backend.permanentlyDeleteWorkItem(snap.id);
+                      }
                     }
                   }
                   closeOverlay();
@@ -1370,8 +1372,8 @@ export function WorkItemList() {
                   refreshData();
                   setToast(
                     targetIds.length === 1
-                      ? `Item #${targetIds[0]} deleted — press u to undo`
-                      : `${targetIds.length} items deleted — press u to undo`,
+                      ? `Item #${targetIds[0]} deleted${softDelete ? ' — press u to undo' : ''}`
+                      : `${targetIds.length} items deleted${softDelete ? ' — press u to undo' : ''}`,
                   );
                 })();
               } else {
