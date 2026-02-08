@@ -18,6 +18,9 @@ import type { UpdateInfo } from '../update-checker.js';
 import { VERSION } from '../version.js';
 import { requestUpdate } from '../updater.js';
 import { OverlayPanel } from './OverlayPanel.js';
+import { openInEditor } from '../editor.js';
+import { defaultConfig } from '../backends/local/config.js';
+import { useTerminalWidth } from '../hooks/useTerminalWidth.js';
 
 type NavItem =
   | { kind: 'backend'; backend: string }
@@ -29,7 +32,9 @@ type NavItem =
   | { kind: 'updates-header' }
   | { kind: 'update-now' }
   | { kind: 'update-check' }
-  | { kind: 'update-toggle' };
+  | { kind: 'update-toggle' }
+  | { kind: 'branch-command' }
+  | { kind: 'branch-clipboard-toggle' };
 
 const JIRA_FIELDS = ['site', 'project', 'boardId'] as const;
 
@@ -52,6 +57,7 @@ export function Settings() {
     (s) => s.setEditingTemplateSlug,
   );
   const selectWorkItem = useNavigationStore((s) => s.selectWorkItem);
+  const terminalWidth = useTerminalWidth();
   const root = process.cwd();
 
   const queueStore = useMemo(() => {
@@ -160,6 +166,8 @@ export function Settings() {
     }
     items.push({ kind: 'default-type' });
     items.push({ kind: 'default-iteration' });
+    items.push({ kind: 'branch-command' });
+    items.push({ kind: 'branch-clipboard-toggle' });
     if (capabilities.templates) {
       items.push({ kind: 'template-header' });
       for (const t of templates) {
@@ -287,6 +295,21 @@ export function Settings() {
           void configStore
             .getState()
             .update({ autoUpdate: !(config.autoUpdate !== false) });
+        } else if (item.kind === 'branch-command') {
+          try {
+            const current =
+              config?.branchCommand ?? defaultConfig.branchCommand ?? '';
+            const edited = openInEditor(current);
+            void configStore
+              .getState()
+              .update({ branchCommand: edited.trim() });
+          } catch {
+            // Editor failed, ignore
+          }
+        } else if (item.kind === 'branch-clipboard-toggle') {
+          void configStore
+            .getState()
+            .update({ copyToClipboard: !(config?.copyToClipboard !== false) });
         }
       }
 
@@ -366,6 +389,8 @@ export function Settings() {
           item.kind === 'template' ||
           item.kind === 'default-type' ||
           item.kind === 'default-iteration' ||
+          item.kind === 'branch-command' ||
+          item.kind === 'branch-clipboard-toggle' ||
           item.kind === 'updates-header' ||
           item.kind === 'update-now' ||
           item.kind === 'update-check' ||
@@ -451,6 +476,56 @@ export function Settings() {
               </Text>
             </Box>
           );
+        })}
+      </Box>
+
+      <Box marginTop={1} flexDirection="column">
+        <Text bold>Branch:</Text>
+        {navItems.map((item, idx) => {
+          if (
+            item.kind !== 'branch-command' &&
+            item.kind !== 'branch-clipboard-toggle'
+          )
+            return null;
+          const focused = idx === cursor;
+
+          if (item.kind === 'branch-command') {
+            const rawCmd =
+              config?.branchCommand ?? defaultConfig.branchCommand ?? '';
+            // "  Branch command: " prefix is ~20 chars + indicator
+            const maxLen = Math.max(10, terminalWidth - 24);
+            const truncCmd =
+              rawCmd.length > maxLen
+                ? rawCmd.slice(0, maxLen - 1) + '\u2026'
+                : rawCmd;
+            return (
+              <Box key="branch-command" marginLeft={2}>
+                <Text color={focused ? 'cyan' : undefined}>
+                  {focused ? '>' : ' '}{' '}
+                </Text>
+                <Text bold={focused} color={focused ? 'cyan' : undefined}>
+                  Branch command: {truncCmd || '(none)'}
+                </Text>
+                {focused && <Text dimColor> [enter opens $EDITOR]</Text>}
+              </Box>
+            );
+          }
+
+          if (item.kind === 'branch-clipboard-toggle') {
+            return (
+              <Box key="branch-clipboard-toggle" marginLeft={2}>
+                <Text color={focused ? 'cyan' : undefined}>
+                  {focused ? '>' : ' '}{' '}
+                </Text>
+                <Text bold={focused} color={focused ? 'cyan' : undefined}>
+                  Copy to clipboard:{' '}
+                  {config?.copyToClipboard !== false ? 'on' : 'off'}
+                </Text>
+              </Box>
+            );
+          }
+
+          return null;
         })}
       </Box>
 
