@@ -14,6 +14,7 @@ export type ActiveOverlay =
   | { type: 'parent-input'; targetIds: string[] }
   | { type: 'assignee-input'; targetIds: string[] }
   | { type: 'labels-input'; targetIds: string[] }
+  | { type: 'sort-picker' }
   // Settings overlays
   | { type: 'default-type-picker' }
   | { type: 'default-iteration-picker' }
