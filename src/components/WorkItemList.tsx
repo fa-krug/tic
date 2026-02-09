@@ -20,7 +20,8 @@ import {
 import { useShallow } from 'zustand/shallow';
 import { SyncQueueStore } from '../sync/queue.js';
 import type { QueueAction } from '../sync/types.js';
-import { buildTree, type TreeItem } from './buildTree.js';
+import { buildTree, sortTree, type TreeItem } from './buildTree.js';
+import type { SortColumn } from '../stores/listViewStore.js';
 import {
   getVisibleCommands,
   type Command,
@@ -135,14 +136,16 @@ export function WorkItemList() {
   const { exit } = useApp();
 
   // Store selectors for persistent list view state
-  const { cursor, markedIds, expandedIds, rangeAnchor } = useListViewStore(
-    useShallow((s) => ({
-      cursor: s.cursor,
-      markedIds: s.markedIds,
-      expandedIds: s.expandedIds,
-      rangeAnchor: s.rangeAnchor,
-    })),
-  );
+  const { cursor, markedIds, expandedIds, rangeAnchor, sortStack } =
+    useListViewStore(
+      useShallow((s) => ({
+        cursor: s.cursor,
+        markedIds: s.markedIds,
+        expandedIds: s.expandedIds,
+        rangeAnchor: s.rangeAnchor,
+        sortStack: s.sortStack,
+      })),
+    );
   const {
     setCursor,
     toggleExpanded,
@@ -152,6 +155,8 @@ export function WorkItemList() {
     setRangeAnchor,
     clampCursor,
     removeDeletedItem,
+    toggleSortColumn,
+    clearSort,
   } = listViewStore.getState();
 
   // Local state for inputs and templates
@@ -245,13 +250,12 @@ export function WorkItemList() {
     () => allItems.filter((item) => item.type === activeType),
     [allItems, activeType],
   );
-  const fullTree = useMemo(
-    () =>
-      capabilities.relationships
-        ? buildTree(items, allItems, activeType ?? '')
-        : buildTree(items, items, activeType ?? ''),
-    [items, allItems, activeType, capabilities.relationships],
-  );
+  const fullTree = useMemo(() => {
+    const tree = capabilities.relationships
+      ? buildTree(items, allItems, activeType ?? '')
+      : buildTree(items, items, activeType ?? '');
+    return sortTree(tree, sortStack);
+  }, [items, allItems, activeType, capabilities.relationships, sortStack]);
 
   const parentSuggestions = useMemo(
     () => allItems.map((item) => `${item.id} - ${item.title}`),
@@ -589,6 +593,10 @@ export function WorkItemList() {
         navigate('status');
       }
 
+      if (input === 'O') {
+        openOverlay({ type: 'sort-picker' });
+      }
+
       if (input === 's' && treeItems.length > 0) {
         const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
         if (targetIds.length > 0) {
@@ -752,6 +760,42 @@ export function WorkItemList() {
     return [...recentItems, ...commandItems];
   }, [paletteCommands, recentIds]);
 
+  const sortPickerItems: OverlayItem[] = useMemo(() => {
+    const columns: { column: SortColumn; label: string }[] = [
+      { column: 'id', label: 'ID' },
+      { column: 'title', label: 'Title' },
+      { column: 'status', label: 'Status' },
+      { column: 'priority', label: 'Priority' },
+      { column: 'assignee', label: 'Assignee' },
+      { column: 'created', label: 'Created' },
+      { column: 'updated', label: 'Updated' },
+    ];
+
+    const items: OverlayItem[] = [];
+
+    if (sortStack.length > 0) {
+      items.push({ id: '__clear__', label: 'Clear sort', value: '__clear__' });
+    }
+
+    for (const col of columns) {
+      if (col.column === 'priority' && !capabilities.fields.priority) continue;
+      if (col.column === 'assignee' && !capabilities.fields.assignee) continue;
+
+      const idx = sortStack.findIndex((e) => e.column === col.column);
+      let label = col.label;
+      if (idx !== -1) {
+        const entry = sortStack[idx]!;
+        const arrow = entry.direction === 'asc' ? '\u25B2' : '\u25BC';
+        const pos = sortStack.length > 1 ? `${idx + 1} ` : '';
+        label = `${pos}${col.label} ${arrow}`;
+      }
+
+      items.push({ id: col.column, label, value: col.column });
+    }
+
+    return items;
+  }, [sortStack, capabilities.fields.priority, capabilities.fields.assignee]);
+
   const handleCommandSelect = (command: Command) => {
     closeOverlay();
     recentCommandsStore.getState().addRecent(command.id);
@@ -870,6 +914,9 @@ export function WorkItemList() {
         break;
       case 'bulk-menu':
         openOverlay({ type: 'bulk-menu' });
+        break;
+      case 'sort':
+        openOverlay({ type: 'sort-picker' });
         break;
       case 'quit':
         exit();
@@ -1399,6 +1446,20 @@ export function WorkItemList() {
             }}
             onCancel={() => closeOverlay()}
             placeholder="Type to filter labels..."
+          />
+        ) : activeOverlay?.type === 'sort-picker' ? (
+          <OverlayPanel
+            title="Order by"
+            items={sortPickerItems}
+            onSelect={(item) => {
+              closeOverlay();
+              if (item.value === '__clear__') {
+                clearSort();
+              } else {
+                toggleSortColumn(item.value as SortColumn);
+              }
+            }}
+            onCancel={() => closeOverlay()}
           />
         ) : activeOverlay?.type === 'delete-confirm' ? (
           <OverlayPanel
