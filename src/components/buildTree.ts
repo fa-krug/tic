@@ -1,3 +1,4 @@
+import type { SortEntry } from '../stores/listViewStore.js';
 import type { WorkItem } from '../types.js';
 
 export interface TreeItem {
@@ -70,5 +71,108 @@ export function buildTree(
   }
 
   walk(null, 0, '');
+  return result;
+}
+
+const PRIORITY_RANK: Record<string, number> = {
+  critical: 0,
+  high: 1,
+  medium: 2,
+  low: 3,
+};
+
+function compareValues(a: WorkItem, b: WorkItem, entry: SortEntry): number {
+  const { column, direction } = entry;
+  let result = 0;
+
+  switch (column) {
+    case 'id': {
+      const aNum = Number(a.id);
+      const bNum = Number(b.id);
+      if (!isNaN(aNum) && !isNaN(bNum)) {
+        result = aNum - bNum;
+      } else {
+        result = a.id.localeCompare(b.id);
+      }
+      break;
+    }
+    case 'title':
+      result = a.title.localeCompare(b.title, undefined, {
+        sensitivity: 'base',
+      });
+      break;
+    case 'status':
+      result = a.status.localeCompare(b.status, undefined, {
+        sensitivity: 'base',
+      });
+      break;
+    case 'assignee':
+      result = a.assignee.localeCompare(b.assignee, undefined, {
+        sensitivity: 'base',
+      });
+      break;
+    case 'priority': {
+      const aRank = PRIORITY_RANK[a.priority] ?? 999;
+      const bRank = PRIORITY_RANK[b.priority] ?? 999;
+      result = aRank - bRank;
+      break;
+    }
+    case 'created':
+      result = a.created.localeCompare(b.created);
+      break;
+    case 'updated':
+      result = a.updated.localeCompare(b.updated);
+      break;
+  }
+
+  return direction === 'desc' ? -result : result;
+}
+
+export function sortTree(
+  treeItems: TreeItem[],
+  sortStack: SortEntry[],
+): TreeItem[] {
+  if (sortStack.length === 0) return treeItems;
+
+  // Group items by parent (depth 0 items have parent null)
+  const groups = new Map<string | null, { index: number; item: TreeItem }[]>();
+  for (let i = 0; i < treeItems.length; i++) {
+    const t = treeItems[i]!;
+    const key = t.depth === 0 ? null : t.item.parent;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push({ index: i, item: t });
+  }
+
+  // Sort each sibling group
+  for (const siblings of groups.values()) {
+    siblings.sort((a, b) => {
+      for (const entry of sortStack) {
+        const cmp = compareValues(a.item.item, b.item.item, entry);
+        if (cmp !== 0) return cmp;
+      }
+      return 0;
+    });
+  }
+
+  // Reconstruct the flat list in tree order (DFS)
+  const result: TreeItem[] = [];
+  const childMap = new Map<string | null, TreeItem[]>();
+  for (const [key, siblings] of groups) {
+    childMap.set(
+      key,
+      siblings.map((s) => s.item),
+    );
+  }
+
+  function walk(parentId: string | null) {
+    const children = childMap.get(parentId);
+    if (!children) return;
+    for (const child of children) {
+      result.push(child);
+      walk(child.item.id);
+    }
+  }
+
+  walk(null);
   return result;
 }
