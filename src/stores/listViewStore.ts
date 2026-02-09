@@ -1,12 +1,28 @@
 import { createStore } from 'zustand/vanilla';
 import { useStore } from 'zustand';
 
+export type SortDirection = 'asc' | 'desc';
+export type SortColumn =
+  | 'id'
+  | 'title'
+  | 'status'
+  | 'priority'
+  | 'assignee'
+  | 'created'
+  | 'updated';
+
+export interface SortEntry {
+  column: SortColumn;
+  direction: SortDirection;
+}
+
 interface ListViewState {
   cursor: number;
   expandedIds: Set<string>;
   markedIds: Set<string>;
   scrollOffset: number;
   rangeAnchor: number | null;
+  sortStack: SortEntry[];
 
   setCursor: (index: number) => void;
   clampCursor: (maxIndex: number) => void;
@@ -17,6 +33,8 @@ interface ListViewState {
   setScrollOffset: (offset: number) => void;
   setRangeAnchor: (index: number | null) => void;
   removeDeletedItem: (id: string) => void;
+  toggleSortColumn: (column: SortColumn) => void;
+  clearSort: () => void;
   reset: () => void;
 }
 
@@ -26,6 +44,7 @@ const initialState = {
   markedIds: new Set<string>(),
   scrollOffset: 0,
   rangeAnchor: null as number | null,
+  sortStack: [] as SortEntry[],
 };
 
 export const listViewStore = createStore<ListViewState>((set) => ({
@@ -77,6 +96,25 @@ export const listViewStore = createStore<ListViewState>((set) => ({
       return { expandedIds: nextExpanded, markedIds: nextMarked };
     }),
 
+  toggleSortColumn: (column) =>
+    set((state) => {
+      const idx = state.sortStack.findIndex((e) => e.column === column);
+      if (idx === -1) {
+        return {
+          sortStack: [...state.sortStack, { column, direction: 'asc' }],
+        };
+      }
+      const entry = state.sortStack[idx]!;
+      if (entry.direction === 'asc') {
+        const next = [...state.sortStack];
+        next[idx] = { column, direction: 'desc' };
+        return { sortStack: next };
+      }
+      return { sortStack: state.sortStack.filter((_, i) => i !== idx) };
+    }),
+
+  clearSort: () => set({ sortStack: [] }),
+
   reset: () =>
     set({
       cursor: 0,
@@ -84,6 +122,7 @@ export const listViewStore = createStore<ListViewState>((set) => ({
       markedIds: new Set(),
       scrollOffset: 0,
       rangeAnchor: null,
+      sortStack: [],
     }),
 }));
 
