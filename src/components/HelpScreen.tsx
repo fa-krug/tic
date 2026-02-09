@@ -137,7 +137,7 @@ export function getShortcuts(
           label: 'Save & Exit',
           shortcuts: [
             {
-              key: 'ctrl+s',
+              key: 's',
               description: 'Save and go back',
             },
             {

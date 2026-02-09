@@ -746,8 +746,8 @@ export function WorkItemForm() {
           return;
         }
 
-        // Ctrl+S: save and go back
-        if (key.ctrl && _input === 's') {
+        // S: save and go back
+        if (_input === 's') {
           setSaving(true);
           void (async () => {
             await save();
@@ -1503,8 +1503,8 @@ export function WorkItemForm() {
             {editing
               ? 'enter confirm  esc revert  ? help'
               : isDirty
-                ? '↑↓ navigate  enter edit  ctrl+s save & back  esc back (unsaved changes)  ? help'
-                : '↑↓ navigate  enter edit  ctrl+s save & back  esc back  ? help'}
+                ? '↑↓ navigate  enter edit  s save & back  esc back (unsaved changes)  ? help'
+                : '↑↓ navigate  enter edit  s save & back  esc back  ? help'}
           </Text>
         )}
       </Box>

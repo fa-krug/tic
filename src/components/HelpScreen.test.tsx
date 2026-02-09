@@ -130,11 +130,11 @@ describe('getShortcuts', () => {
     expect(groups).toEqual([]);
   });
 
-  it('includes ctrl+s and revert info in form shortcuts', () => {
+  it('includes s (save) and revert info in form shortcuts', () => {
     const groups = getShortcuts('form', fullCapabilities, true, true);
     const allShortcuts = groups.flatMap((g) => g.shortcuts);
     const keys = allShortcuts.map((s) => s.key);
-    expect(keys).toContain('ctrl+s');
+    expect(keys).toContain('s');
     expect(keys).toContain('esc');
     const escShortcuts = allShortcuts.filter((s) => s.key === 'esc');
     expect(escShortcuts.some((s) => s.description.includes('revert'))).toBe(
