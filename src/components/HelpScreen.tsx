@@ -50,6 +50,7 @@ export function getShortcuts(
         { key: 'o', description: 'Open in browser' },
         { key: 'S', description: 'Status screen' },
       ];
+      actions.push({ key: 'O', description: 'Order by column' });
       actions.push({ key: '/', description: 'Quick search' });
       actions.push({ key: ':', description: 'Command palette' });
       if (capabilities.fields.parent) {
