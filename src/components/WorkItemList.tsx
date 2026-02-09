@@ -1000,6 +1000,7 @@ export function WorkItemList() {
         collapsedIds={collapsedIds}
         markedIds={markedIds}
         terminalWidth={terminalWidth}
+        sortStack={sortStack}
       />
 
       {treeItems.length === 0 && !loading && initError && (

@@ -2,6 +2,7 @@ import { memo, useMemo } from 'react';
 import { Box, Text } from 'ink';
 import type { BackendCapabilities } from '../backends/types.js';
 import type { TreeItem } from './buildTree.js';
+import type { SortEntry } from '../stores/listViewStore.js';
 
 interface ColumnWidths {
   id: number;
@@ -23,6 +24,7 @@ interface TableLayoutProps {
   collapsedIds: Set<string>;
   markedIds: Set<string>;
   terminalWidth: number;
+  sortStack?: SortEntry[];
 }
 
 interface TableRowProps {
@@ -36,7 +38,7 @@ interface TableRowProps {
 
 const gap = 2;
 const MARKER_WIDTH = 2;
-const TITLE_MIN_WIDTH = 20;
+const TITLE_MIN_WIDTH = 30;
 
 const FIXED_STATUS = 10;
 const FIXED_PRIORITY = 10;
@@ -265,6 +267,19 @@ const TableRow = memo(
   },
 );
 
+function sortedHeaderLabel(
+  baseLabel: string,
+  column: string,
+  sortStack: SortEntry[],
+): string {
+  const idx = sortStack.findIndex((e) => e.column === column);
+  if (idx === -1) return baseLabel;
+  const entry = sortStack[idx]!;
+  const arrow = entry.direction === 'asc' ? '\u25B2' : '\u25BC';
+  const pos = sortStack.length > 1 ? `${idx + 1}` : '';
+  return `${baseLabel} ${pos}${arrow}`;
+}
+
 function TableLayoutInner({
   treeItems,
   cursor,
@@ -272,7 +287,9 @@ function TableLayoutInner({
   collapsedIds,
   markedIds,
   terminalWidth,
+  sortStack,
 }: TableLayoutProps) {
+  const ss = sortStack ?? [];
   const columns = useMemo(
     () => computeColumnWidths(treeItems, capabilities, terminalWidth),
     [treeItems, capabilities, terminalWidth],
@@ -286,25 +303,25 @@ function TableLayoutInner({
         </Box>
         <Box width={columns.id}>
           <Text bold underline>
-            ID
+            {sortedHeaderLabel('ID', 'id', ss)}
           </Text>
         </Box>
         <Box width={columns.title} marginRight={gap}>
           <Text bold underline>
-            Title
+            {sortedHeaderLabel('Title', 'title', ss)}
           </Text>
         </Box>
         {columns.showStatus && (
           <Box width={columns.status} marginRight={gap}>
             <Text bold underline>
-              Status
+              {sortedHeaderLabel('Status', 'status', ss)}
             </Text>
           </Box>
         )}
         {columns.showAssignee && (
           <Box width={columns.assignee} marginRight={gap}>
             <Text bold underline>
-              Assignee
+              {sortedHeaderLabel('Assignee', 'assignee', ss)}
             </Text>
           </Box>
         )}
@@ -321,11 +338,30 @@ function TableLayoutInner({
         {columns.showPriority && (
           <Box width={columns.priority}>
             <Text bold underline>
-              Priority
+              {sortedHeaderLabel('Priority', 'priority', ss)}
             </Text>
           </Box>
         )}
       </Box>
+
+      {(() => {
+        const nonVisibleSorts = ss.filter(
+          (e) => e.column === 'created' || e.column === 'updated',
+        );
+        if (nonVisibleSorts.length === 0) return null;
+        const parts = nonVisibleSorts.map((e) => {
+          const idx = ss.indexOf(e);
+          const arrow = e.direction === 'asc' ? '\u25B2' : '\u25BC';
+          const pos = ss.length > 1 ? `${idx + 1}` : '';
+          const label = e.column.charAt(0).toUpperCase() + e.column.slice(1);
+          return `${label} ${pos}${arrow}`;
+        });
+        return (
+          <Box>
+            <Text dimColor>Sorted by: {parts.join(', ')}</Text>
+          </Box>
+        );
+      })()}
 
       {treeItems.map((treeItem, idx) => {
         const { item, hasChildren } = treeItem;
