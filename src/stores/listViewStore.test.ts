@@ -104,6 +104,56 @@ describe('listViewStore', () => {
     });
   });
 
+  describe('sortStack', () => {
+    it('starts with empty sort stack', () => {
+      expect(listViewStore.getState().sortStack).toEqual([]);
+    });
+
+    it('toggleSortColumn adds column as ascending', () => {
+      listViewStore.getState().toggleSortColumn('priority');
+      expect(listViewStore.getState().sortStack).toEqual([
+        { column: 'priority', direction: 'asc' },
+      ]);
+    });
+
+    it('toggleSortColumn flips ascending to descending', () => {
+      listViewStore.getState().toggleSortColumn('priority');
+      listViewStore.getState().toggleSortColumn('priority');
+      expect(listViewStore.getState().sortStack).toEqual([
+        { column: 'priority', direction: 'desc' },
+      ]);
+    });
+
+    it('toggleSortColumn removes descending column', () => {
+      listViewStore.getState().toggleSortColumn('priority');
+      listViewStore.getState().toggleSortColumn('priority');
+      listViewStore.getState().toggleSortColumn('priority');
+      expect(listViewStore.getState().sortStack).toEqual([]);
+    });
+
+    it('stacks multiple sort columns', () => {
+      listViewStore.getState().toggleSortColumn('priority');
+      listViewStore.getState().toggleSortColumn('status');
+      expect(listViewStore.getState().sortStack).toEqual([
+        { column: 'priority', direction: 'asc' },
+        { column: 'status', direction: 'asc' },
+      ]);
+    });
+
+    it('clearSort empties the stack', () => {
+      listViewStore.getState().toggleSortColumn('priority');
+      listViewStore.getState().toggleSortColumn('status');
+      listViewStore.getState().clearSort();
+      expect(listViewStore.getState().sortStack).toEqual([]);
+    });
+
+    it('reset clears sort stack', () => {
+      listViewStore.getState().toggleSortColumn('priority');
+      listViewStore.getState().reset();
+      expect(listViewStore.getState().sortStack).toEqual([]);
+    });
+  });
+
   describe('reset', () => {
     it('resets all state', () => {
       listViewStore.getState().setCursor(5);
