@@ -75,6 +75,13 @@ const commands: Command[] = [
     shortcut: 'r',
     when: (ctx) => ctx.screen === 'list' && ctx.hasSyncManager,
   },
+  {
+    id: 'sort',
+    label: 'Order by...',
+    category: 'Actions',
+    shortcut: 'O',
+    when: (ctx) => ctx.screen === 'list',
+  },
   // Navigation
   {
     id: 'iterations',

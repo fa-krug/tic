@@ -159,6 +159,13 @@ describe('getVisibleCommands', () => {
     expect(switchCmds).toHaveLength(0);
   });
 
+  it('shows sort command on list screen', () => {
+    const ctx = makeContext();
+    const commands = getVisibleCommands(ctx);
+    const labels = commands.map((c) => c.label);
+    expect(labels).toContain('Order by...');
+  });
+
   it('shows only quit on non-list screens', () => {
     const ctx = makeContext({ screen: 'form' });
     const commands = getVisibleCommands(ctx);
