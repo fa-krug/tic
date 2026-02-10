@@ -32,6 +32,8 @@ describe('sync types', () => {
       pendingCount: 0,
       lastSyncTime: null,
       errors: [],
+      progress: null,
+      syncLog: [],
     };
     expect(status.state).toBe('idle');
   });

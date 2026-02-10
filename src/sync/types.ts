@@ -27,11 +27,28 @@ export interface SyncError {
   timestamp: string;
 }
 
+export interface SyncProgress {
+  phase: 'push' | 'pull';
+  current: number;
+  total: number;
+}
+
+export interface SyncLogEntry {
+  phase: 'push' | 'pull';
+  action: QueueAction;
+  itemId: string;
+  result: 'success' | 'error';
+  message?: string;
+  timestamp: string;
+}
+
 export interface SyncStatus {
   state: 'idle' | 'syncing' | 'error';
   pendingCount: number;
   lastSyncTime: Date | null;
   errors: SyncError[];
+  progress: SyncProgress | null;
+  syncLog: SyncLogEntry[];
 }
 
 export interface PushResult {
