@@ -46,6 +46,8 @@ import {
 } from '../filters.js';
 export type { TreeItem } from './buildTree.js';
 
+const EMPTY_VIEWS: SavedView[] = [];
+
 type BulkAction =
   | 'status'
   | 'iteration'
@@ -141,7 +143,7 @@ export function WorkItemList() {
   const showDetailPanel = useConfigStore(
     (s) => s.config.showDetailPanel ?? true,
   );
-  const savedViews = useConfigStore((s) => s.config.views ?? []);
+  const savedViews = useConfigStore((s) => s.config.views ?? EMPTY_VIEWS);
   const { exit } = useApp();
 
   // Store selectors for persistent list view state
@@ -266,6 +268,15 @@ export function WorkItemList() {
     }
   }, [activeType, types, setActiveType, defaultType]);
 
+  // Apply view filters to all items (used for children in tree view)
+  const viewFilteredItems = useMemo(
+    () => applyFilters(allItems, activeFilters),
+    [allItems, activeFilters],
+  );
+  const unfilteredCount = useMemo(
+    () => allItems.filter((item) => item.type === activeType).length,
+    [allItems, activeType],
+  );
   const items = useMemo(() => {
     const hasTypeFilter = (activeFilters.types?.length ?? 0) > 0;
     let filtered = hasTypeFilter
@@ -276,10 +287,16 @@ export function WorkItemList() {
   }, [allItems, activeType, activeFilters]);
   const fullTree = useMemo(() => {
     const tree = capabilities.relationships
-      ? buildTree(items, allItems, activeType ?? '')
+      ? buildTree(items, viewFilteredItems, activeType ?? '')
       : buildTree(items, items, activeType ?? '');
     return sortTree(tree, sortStack);
-  }, [items, allItems, activeType, capabilities.relationships, sortStack]);
+  }, [
+    items,
+    viewFilteredItems,
+    activeType,
+    capabilities.relationships,
+    sortStack,
+  ]);
 
   const parentSuggestions = useMemo(
     () => allItems.map((item) => `${item.id} - ${item.title}`),
@@ -1130,7 +1147,9 @@ export function WorkItemList() {
           <Text bold color="cyan">
             {typeLabel} — {iteration}
           </Text>
-          <Text dimColor>{` (${items.length} items)`}</Text>
+          <Text
+            dimColor
+          >{` (${filterCount > 0 ? `${items.length}/${unfilteredCount}` : items.length} item${unfilteredCount === 1 ? '' : 's'})`}</Text>
           {markedCount > 0 && (
             <Text color="magenta">{` ● ${markedCount} marked`}</Text>
           )}
@@ -1176,13 +1195,15 @@ export function WorkItemList() {
       )}
 
       {showDetailPanel && treeItems.length > 0 && treeItems[cursor] && (
-        <DetailPanel
-          item={treeItems[cursor].item}
-          terminalWidth={terminalWidth}
-          showFullDescription={showFullDescription}
-          descriptionScrollOffset={descriptionScrollOffset}
-          maxDescriptionHeight={maxDescriptionHeight}
-        />
+        <Box marginTop={1}>
+          <DetailPanel
+            item={treeItems[cursor].item}
+            terminalWidth={terminalWidth}
+            showFullDescription={showFullDescription}
+            descriptionScrollOffset={descriptionScrollOffset}
+            maxDescriptionHeight={maxDescriptionHeight}
+          />
+        </Box>
       )}
 
       <Box marginTop={1}>
