@@ -21,6 +21,17 @@ export interface Config {
     project: string;
     boardId?: number;
   };
+  views?: Array<{
+    name: string;
+    filters: {
+      statuses?: string[];
+      types?: string[];
+      priorities?: string[];
+      assignees?: string[];
+      labels?: string[];
+    };
+    sort?: Array<{ column: string; direction: string }>;
+  }>;
 }
 
 export const defaultConfig: Config = {
