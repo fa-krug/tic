@@ -51,6 +51,8 @@ export function getShortcuts(
         { key: 'S', description: 'Status screen' },
       ];
       actions.push({ key: 'O', description: 'Order by column' });
+      actions.push({ key: 'F', description: 'Filter items' });
+      actions.push({ key: 'X', description: 'Clear all filters' });
       actions.push({ key: '/', description: 'Quick search' });
       actions.push({ key: ':', description: 'Command palette' });
       if (capabilities.fields.parent) {
@@ -81,6 +83,7 @@ export function getShortcuts(
       if (capabilities.iterations) {
         switching.push({ key: 'i', description: 'Iteration picker' });
       }
+      switching.push({ key: 'V', description: 'Load saved view' });
       switching.push({ key: ',', description: 'Settings' });
 
       const other: ShortcutEntry[] = [];
