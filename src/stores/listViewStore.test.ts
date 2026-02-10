@@ -152,6 +152,24 @@ describe('listViewStore', () => {
       listViewStore.getState().reset();
       expect(listViewStore.getState().sortStack).toEqual([]);
     });
+
+    it('setSortStack replaces the entire stack', () => {
+      listViewStore.getState().toggleSortColumn('priority');
+      listViewStore.getState().setSortStack([
+        { column: 'status', direction: 'desc' },
+        { column: 'title', direction: 'asc' },
+      ]);
+      expect(listViewStore.getState().sortStack).toEqual([
+        { column: 'status', direction: 'desc' },
+        { column: 'title', direction: 'asc' },
+      ]);
+    });
+
+    it('setSortStack with empty array clears sort', () => {
+      listViewStore.getState().toggleSortColumn('priority');
+      listViewStore.getState().setSortStack([]);
+      expect(listViewStore.getState().sortStack).toEqual([]);
+    });
   });
 
   describe('reset', () => {

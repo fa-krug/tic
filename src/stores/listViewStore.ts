@@ -35,6 +35,7 @@ interface ListViewState {
   removeDeletedItem: (id: string) => void;
   toggleSortColumn: (column: SortColumn) => void;
   clearSort: () => void;
+  setSortStack: (stack: SortEntry[]) => void;
   reset: () => void;
 }
 
@@ -114,6 +115,8 @@ export const listViewStore = createStore<ListViewState>((set) => ({
     }),
 
   clearSort: () => set({ sortStack: [] }),
+
+  setSortStack: (stack) => set({ sortStack: stack }),
 
   reset: () =>
     set({

@@ -21,7 +21,7 @@ import { useShallow } from 'zustand/shallow';
 import { SyncQueueStore } from '../sync/queue.js';
 import type { QueueAction } from '../sync/types.js';
 import { buildTree, sortTree, type TreeItem } from './buildTree.js';
-import type { SortColumn } from '../stores/listViewStore.js';
+import type { SortColumn, SortEntry } from '../stores/listViewStore.js';
 import {
   getVisibleCommands,
   type Command,
@@ -36,6 +36,14 @@ import {
   useRecentCommandsStore,
 } from '../stores/recentCommandsStore.js';
 import { isSoftDeleteBackend } from '../backends/types.js';
+import { filterStore, useFilterStore } from '../stores/filterStore.js';
+import {
+  applyFilters,
+  countActiveFilters,
+  summarizeFilters,
+  type ViewFilters,
+  type SavedView,
+} from '../filters.js';
 export type { TreeItem } from './buildTree.js';
 
 type BulkAction =
@@ -133,6 +141,7 @@ export function WorkItemList() {
   const showDetailPanel = useConfigStore(
     (s) => s.config.showDetailPanel ?? true,
   );
+  const savedViews = useConfigStore((s) => s.config.views ?? []);
   const { exit } = useApp();
 
   // Store selectors for persistent list view state
@@ -146,6 +155,17 @@ export function WorkItemList() {
         sortStack: s.sortStack,
       })),
     );
+  const { activeFilters, activeViewName } = useFilterStore(
+    useShallow((s) => ({
+      activeFilters: s.activeFilters,
+      activeViewName: s.activeViewName,
+    })),
+  );
+  const filterCount = useMemo(
+    () => countActiveFilters(activeFilters),
+    [activeFilters],
+  );
+
   const {
     setCursor,
     toggleExpanded,
@@ -246,10 +266,14 @@ export function WorkItemList() {
     }
   }, [activeType, types, setActiveType, defaultType]);
 
-  const items = useMemo(
-    () => allItems.filter((item) => item.type === activeType),
-    [allItems, activeType],
-  );
+  const items = useMemo(() => {
+    const hasTypeFilter = (activeFilters.types?.length ?? 0) > 0;
+    let filtered = hasTypeFilter
+      ? allItems
+      : allItems.filter((item) => item.type === activeType);
+    filtered = applyFilters(filtered, activeFilters);
+    return filtered;
+  }, [allItems, activeType, activeFilters]);
   const fullTree = useMemo(() => {
     const tree = capabilities.relationships
       ? buildTree(items, allItems, activeType ?? '')
@@ -600,6 +624,19 @@ export function WorkItemList() {
         openOverlay({ type: 'sort-picker' });
       }
 
+      if (input === 'F') {
+        openOverlay({ type: 'filter-picker' });
+      }
+
+      if (input === 'V' && savedViews.length > 0) {
+        openOverlay({ type: 'view-picker' });
+      }
+
+      if (input === 'X' && filterCount > 0) {
+        filterStore.getState().clearFilters();
+        setToast('Filters cleared');
+      }
+
       if (input === 's' && treeItems.length > 0) {
         const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
         if (targetIds.length > 0) {
@@ -718,6 +755,8 @@ export function WorkItemList() {
     activeType,
     hasSyncManager: syncManager !== null,
     gitAvailable,
+    hasActiveFilters: filterCount > 0,
+    hasSavedViews: savedViews.length > 0,
   };
 
   const paletteCommands = useMemo(
@@ -798,6 +837,90 @@ export function WorkItemList() {
 
     return items;
   }, [sortStack, capabilities.fields.priority, capabilities.fields.assignee]);
+
+  const filterPickerItems: OverlayItem[] = useMemo(() => {
+    const items: OverlayItem[] = [];
+
+    if (filterCount > 0) {
+      items.push({
+        id: '__clear__',
+        label: 'Clear all filters',
+        value: '__clear__',
+      });
+    }
+
+    for (const s of statuses) {
+      items.push({
+        id: `status-${s}`,
+        label: s,
+        value: s,
+        category: 'Status',
+        selected: activeFilters.statuses?.includes(s),
+      });
+    }
+
+    for (const p of ['critical', 'high', 'medium', 'low']) {
+      if (!capabilities.fields.priority) continue;
+      items.push({
+        id: `priority-${p}`,
+        label: p.charAt(0).toUpperCase() + p.slice(1),
+        value: p,
+        category: 'Priority',
+        selected: activeFilters.priorities?.includes(p),
+      });
+    }
+
+    for (const t of types) {
+      items.push({
+        id: `type-${t}`,
+        label: t.charAt(0).toUpperCase() + t.slice(1),
+        value: t,
+        category: 'Type',
+        selected: activeFilters.types?.includes(t),
+      });
+    }
+
+    for (const a of assignees) {
+      if (!capabilities.fields.assignee) continue;
+      items.push({
+        id: `assignee-${a}`,
+        label: a,
+        value: a,
+        category: 'Assignee',
+        selected: activeFilters.assignees?.includes(a),
+      });
+    }
+
+    for (const l of labelSuggestions) {
+      if (!capabilities.fields.labels) continue;
+      items.push({
+        id: `label-${l}`,
+        label: l,
+        value: l,
+        category: 'Labels',
+        selected: activeFilters.labels?.includes(l),
+      });
+    }
+
+    return items;
+  }, [
+    statuses,
+    types,
+    assignees,
+    labelSuggestions,
+    capabilities,
+    activeFilters,
+    filterCount,
+  ]);
+
+  const viewPickerItems: OverlayItem[] = useMemo(() => {
+    return savedViews.map((v) => ({
+      id: v.name,
+      label: v.name,
+      value: v.name,
+      hint: summarizeFilters(v.filters),
+    }));
+  }, [savedViews]);
 
   const handleCommandSelect = (command: Command) => {
     closeOverlay();
@@ -923,6 +1046,22 @@ export function WorkItemList() {
       case 'sort':
         openOverlay({ type: 'sort-picker' });
         break;
+      case 'filter':
+        openOverlay({ type: 'filter-picker' });
+        break;
+      case 'clear-filters':
+        filterStore.getState().clearFilters();
+        setToast('Filters cleared');
+        break;
+      case 'load-view':
+        openOverlay({ type: 'view-picker' });
+        break;
+      case 'save-view':
+        openOverlay({ type: 'save-view-input' });
+        break;
+      case 'delete-view':
+        openOverlay({ type: 'delete-view-picker' });
+        break;
       case 'quit':
         exit();
         break;
@@ -994,6 +1133,11 @@ export function WorkItemList() {
           <Text dimColor>{` (${items.length} items)`}</Text>
           {markedCount > 0 && (
             <Text color="magenta">{` ● ${markedCount} marked`}</Text>
+          )}
+          {filterCount > 0 && (
+            <Text color="yellow">
+              {` [${filterCount} filter${filterCount === 1 ? '' : 's'}${activeViewName ? `: ${activeViewName}` : ''}]`}
+            </Text>
           )}
         </Text>
       </Box>
@@ -1464,6 +1608,119 @@ export function WorkItemList() {
               } else {
                 toggleSortColumn(item.value as SortColumn);
               }
+            }}
+            onCancel={() => closeOverlay()}
+          />
+        ) : activeOverlay?.type === 'filter-picker' ? (
+          (() => {
+            const handleFilterConfirm = (selected: OverlayItem[]) => {
+              const newFilters: ViewFilters = {};
+              for (const item of selected) {
+                const cat = item.category;
+                if (cat === 'Status') {
+                  (newFilters.statuses ??= []).push(item.value);
+                } else if (cat === 'Priority') {
+                  (newFilters.priorities ??= []).push(item.value);
+                } else if (cat === 'Type') {
+                  (newFilters.types ??= []).push(item.value);
+                } else if (cat === 'Assignee') {
+                  (newFilters.assignees ??= []).push(item.value);
+                } else if (cat === 'Labels') {
+                  (newFilters.labels ??= []).push(item.value);
+                }
+              }
+              filterStore.getState().setFilters(newFilters);
+              closeOverlay();
+              const count = countActiveFilters(newFilters);
+              if (count > 0) {
+                setToast(`${count} filter${count === 1 ? '' : 's'} applied`);
+              } else {
+                setToast('Filters cleared');
+              }
+            };
+
+            const handleFilterSelect = (item: OverlayItem) => {
+              if (item.value === '__clear__') {
+                filterStore.getState().clearFilters();
+                closeOverlay();
+                setToast('Filters cleared');
+              }
+            };
+
+            return (
+              <OverlayPanel
+                title={
+                  filterCount > 0 ? `Filter [${filterCount} active]` : 'Filter'
+                }
+                items={filterPickerItems}
+                multiSelect
+                onSelect={handleFilterSelect}
+                onConfirm={handleFilterConfirm}
+                onCancel={() => closeOverlay()}
+                placeholder="Type to filter..."
+                footer="space toggle  enter confirm  esc cancel"
+              />
+            );
+          })()
+        ) : activeOverlay?.type === 'view-picker' ? (
+          <OverlayPanel
+            title="Load View"
+            items={viewPickerItems}
+            onSelect={(item) => {
+              const view = savedViews.find((v) => v.name === item.value);
+              if (view) {
+                filterStore.getState().loadView(view as SavedView);
+                if (view.sort) {
+                  listViewStore
+                    .getState()
+                    .setSortStack(view.sort as SortEntry[]);
+                }
+                closeOverlay();
+                setToast(`View "${view.name}" loaded`);
+              }
+            }}
+            onCancel={() => closeOverlay()}
+          />
+        ) : activeOverlay?.type === 'save-view-input' ? (
+          <OverlayPanel
+            title="Save View"
+            items={[]}
+            allowFreeform
+            onSelect={() => {}}
+            onSubmitFreeform={(name) => {
+              if (!name.trim()) {
+                closeOverlay();
+                return;
+              }
+              const newView = {
+                name: name.trim(),
+                filters: { ...activeFilters },
+                ...(sortStack.length > 0 ? { sort: [...sortStack] } : {}),
+              };
+              const existing = savedViews.filter((v) => v.name !== name.trim());
+              void configStore.getState().update({
+                views: [...existing, newView],
+              });
+              filterStore.setState({ activeViewName: name.trim() });
+              closeOverlay();
+              setToast(`View "${name.trim()}" saved`);
+            }}
+            onCancel={() => closeOverlay()}
+            placeholder="Enter view name..."
+            emptyMessage="Type a name and press enter"
+          />
+        ) : activeOverlay?.type === 'delete-view-picker' ? (
+          <OverlayPanel
+            title="Delete View"
+            items={viewPickerItems}
+            onSelect={(item) => {
+              const remaining = savedViews.filter((v) => v.name !== item.value);
+              void configStore.getState().update({ views: remaining });
+              if (activeViewName === item.value) {
+                filterStore.setState({ activeViewName: null });
+              }
+              closeOverlay();
+              setToast(`View "${item.value}" deleted`);
             }}
             onCancel={() => closeOverlay()}
           />

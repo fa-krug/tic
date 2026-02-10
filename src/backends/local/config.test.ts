@@ -144,6 +144,55 @@ describe('config', () => {
     expect(defaultConfig.copyToClipboard).toBe(true);
   });
 
+  it('reads config with saved views', async () => {
+    const ticDir = path.join(tmpDir, '.tic');
+    fs.mkdirSync(ticDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(ticDir, 'config.yml'),
+      `statuses:
+  - open
+current_iteration: v1
+iterations:
+  - v1
+next_id: 1
+views:
+  - name: My bugs
+    filters:
+      statuses:
+        - open
+      types:
+        - bug
+    sort:
+      - column: priority
+        direction: asc
+`,
+    );
+    const config = await readConfig(tmpDir);
+    expect(config.views).toEqual([
+      {
+        name: 'My bugs',
+        filters: { statuses: ['open'], types: ['bug'] },
+        sort: [{ column: 'priority', direction: 'asc' }],
+      },
+    ]);
+  });
+
+  it('writes config with views and reads them back', async () => {
+    await writeConfig(tmpDir, {
+      ...defaultConfig,
+      views: [
+        {
+          name: 'Test view',
+          filters: { priorities: ['high'] },
+        },
+      ],
+    });
+    const config = await readConfig(tmpDir);
+    expect(config.views).toEqual([
+      { name: 'Test view', filters: { priorities: ['high'] } },
+    ]);
+  });
+
   describe('readConfigSync', () => {
     it('returns default config when no config file exists', () => {
       const config = readConfigSync(tmpDir);

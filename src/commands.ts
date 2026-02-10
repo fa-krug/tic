@@ -20,6 +20,8 @@ export interface CommandContext {
   activeType: string | null;
   hasSyncManager: boolean;
   gitAvailable: boolean;
+  hasActiveFilters: boolean;
+  hasSavedViews: boolean;
 }
 
 export interface Command {
@@ -172,6 +174,39 @@ const commands: Command[] = [
     category: 'Bulk',
     shortcut: 'B',
     when: (ctx) => ctx.screen === 'list' && ctx.markedCount > 0,
+  },
+  {
+    id: 'filter',
+    label: 'Filter...',
+    category: 'Actions',
+    shortcut: 'F',
+    when: (ctx) => ctx.screen === 'list',
+  },
+  {
+    id: 'clear-filters',
+    label: 'Clear filters',
+    category: 'Actions',
+    shortcut: 'X',
+    when: (ctx) => ctx.screen === 'list' && ctx.hasActiveFilters,
+  },
+  {
+    id: 'load-view',
+    label: 'Load view...',
+    category: 'Actions',
+    shortcut: 'V',
+    when: (ctx) => ctx.screen === 'list' && ctx.hasSavedViews,
+  },
+  {
+    id: 'save-view',
+    label: 'Save current view...',
+    category: 'Actions',
+    when: (ctx) => ctx.screen === 'list' && ctx.hasActiveFilters,
+  },
+  {
+    id: 'delete-view',
+    label: 'Delete view...',
+    category: 'Actions',
+    when: (ctx) => ctx.screen === 'list' && ctx.hasSavedViews,
   },
   // Other
   {

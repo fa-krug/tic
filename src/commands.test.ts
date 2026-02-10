@@ -46,6 +46,8 @@ function makeContext(overrides: Partial<CommandContext> = {}): CommandContext {
     activeType: 'issue',
     hasSyncManager: true,
     gitAvailable: true,
+    hasActiveFilters: false,
+    hasSavedViews: false,
     ...overrides,
   };
 }

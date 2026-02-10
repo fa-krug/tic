@@ -15,6 +15,10 @@ export type ActiveOverlay =
   | { type: 'assignee-input'; targetIds: string[] }
   | { type: 'labels-input'; targetIds: string[] }
   | { type: 'sort-picker' }
+  | { type: 'filter-picker' }
+  | { type: 'view-picker' }
+  | { type: 'save-view-input' }
+  | { type: 'delete-view-picker' }
   // Settings overlays
   | { type: 'default-type-picker' }
   | { type: 'default-iteration-picker' }
