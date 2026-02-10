@@ -574,6 +574,8 @@ export function WorkItemList() {
             process.cwd(),
             { itemUrl },
           );
+          // Restore raw mode after interactive shell changed terminal settings
+          process.stdin.setRawMode?.(true);
           let msg = result.resumed
             ? `Resumed work on #${item.id}`
             : `Started work on #${item.id}`;
@@ -582,6 +584,7 @@ export function WorkItemList() {
           }
           setWarning(msg);
         } catch (e) {
+          process.stdin.setRawMode?.(true);
           setWarning(
             e instanceof Error ? e.message : 'Failed to start implementation',
           );
@@ -839,6 +842,7 @@ export function WorkItemList() {
               process.cwd(),
               { itemUrl },
             );
+            process.stdin.setRawMode?.(true);
             let msg = result.resumed
               ? `Resumed work on #${item.id}`
               : `Started work on #${item.id}`;
@@ -847,6 +851,7 @@ export function WorkItemList() {
             }
             setWarning(msg);
           } catch (e) {
+            process.stdin.setRawMode?.(true);
             setWarning(
               e instanceof Error ? e.message : 'Failed to start implementation',
             );

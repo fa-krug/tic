@@ -1,6 +1,4 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import type { WorkItem, Comment } from './types.js';
 import {
@@ -191,8 +189,8 @@ export function beginImplementation(
     const shell = process.env['SHELL'] || '/bin/sh';
     const command = config.branchCommand;
 
-    if (command && options?.nonInteractive) {
-      // Non-interactive: just run the command directly (used in tests)
+    if (command) {
+      // Run the branchCommand via /bin/sh
       const result = spawnSync(command, [], {
         cwd: targetDir,
         stdio: 'inherit',
@@ -202,57 +200,10 @@ export function beginImplementation(
       if (result.status !== 0 && result.status !== null) {
         commandFailed = true;
       }
-    } else if (command) {
-      // Write a temporary rc file that sources the user's profile then runs
-      // the configured command. This gives us an interactive shell that
-      // executes the branchCommand on startup and stays open.
-      const rcFile = path.join(os.tmpdir(), `tic-rc-${process.pid}.sh`);
-      const rcContent = [
-        `[ -f ~/.bashrc ] && . ~/.bashrc`,
-        `[ -f ~/.zshrc ] && . ~/.zshrc`,
-        command,
-      ].join('\n');
-      fs.writeFileSync(rcFile, rcContent);
+    }
 
-      const shellName = path.basename(shell);
-      let result;
-      if (shellName === 'bash') {
-        result = spawnSync(shell, ['--init-file', rcFile], {
-          cwd: targetDir,
-          stdio: 'inherit',
-          env,
-        });
-      } else if (shellName === 'zsh') {
-        result = spawnSync(shell, [], {
-          cwd: targetDir,
-          stdio: 'inherit',
-          env: {
-            ...env,
-            ZDOTDIR_ORIG: process.env['ZDOTDIR'] || '',
-            ZDOTDIR: path.dirname(rcFile),
-            ENV: rcFile,
-          },
-        });
-      } else {
-        // POSIX sh fallback: ENV is sourced by interactive sh
-        result = spawnSync(shell, [], {
-          cwd: targetDir,
-          stdio: 'inherit',
-          env: { ...env, ENV: rcFile },
-        });
-      }
-
-      try {
-        fs.unlinkSync(rcFile);
-      } catch {
-        // ignore cleanup errors
-      }
-
-      if (result.status !== 0 && result.status !== null) {
-        commandFailed = true;
-      }
-    } else {
-      // No branchCommand: plain interactive shell
+    if (!options?.nonInteractive) {
+      // Open an interactive shell in the target directory
       spawnSync(shell, [], { cwd: targetDir, stdio: 'inherit', env });
     }
   }
