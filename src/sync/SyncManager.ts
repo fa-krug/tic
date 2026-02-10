@@ -7,6 +7,7 @@ import type {
   SyncResult,
   PushResult,
   SyncError,
+  SyncLogEntry,
 } from './types.js';
 import type { NewWorkItem } from '../types.js';
 import {
@@ -26,6 +27,7 @@ export class SyncManager {
   private queue: SyncQueueStore;
   private status: SyncStatus;
   private listeners: StatusListener[] = [];
+  private syncLog: SyncLogEntry[] = [];
 
   constructor(local: LocalBackend, remote: Backend, queue: SyncQueueStore) {
     this.local = local;
@@ -36,6 +38,8 @@ export class SyncManager {
       pendingCount: 0,
       lastSyncTime: null,
       errors: [],
+      progress: null,
+      syncLog: [],
     };
   }
 
@@ -54,14 +58,30 @@ export class SyncManager {
     }
   }
 
+  private appendLog(entry: SyncLogEntry): void {
+    this.syncLog.push(entry);
+    if (this.syncLog.length > 50) {
+      this.syncLog = this.syncLog.slice(-50);
+    }
+  }
+
   async pushPending(): Promise<PushResult> {
     this.updateStatus({ state: 'syncing' });
     const { pending } = await this.queue.read();
+    const total = pending.length;
+    let current = 0;
     let pushed = 0;
     const errors: SyncError[] = [];
     const idMappings = new Map<string, string>();
 
     for (const entry of pending) {
+      current++;
+      this.updateStatus({
+        state: 'syncing',
+        progress: { phase: 'push', current, total },
+        syncLog: [...this.syncLog],
+      });
+
       try {
         const resolvedId = await this.pushEntry(entry);
         await this.queue.remove(resolvedId, entry.action);
@@ -69,6 +89,13 @@ export class SyncManager {
           idMappings.set(entry.itemId, resolvedId);
         }
         pushed++;
+        this.appendLog({
+          phase: 'push',
+          action: entry.action,
+          itemId: entry.itemId,
+          result: 'success',
+          timestamp: new Date().toISOString(),
+        });
       } catch (e) {
         const isLocalMissing =
           e instanceof Error &&
@@ -83,6 +110,14 @@ export class SyncManager {
             message: e instanceof Error ? e.message : String(e),
             timestamp: new Date().toISOString(),
           });
+          this.appendLog({
+            phase: 'push',
+            action: entry.action,
+            itemId: entry.itemId,
+            result: 'error',
+            message: e instanceof Error ? e.message : String(e),
+            timestamp: new Date().toISOString(),
+          });
         }
       }
     }
@@ -91,6 +126,8 @@ export class SyncManager {
       state: errors.length > 0 ? 'error' : 'idle',
       pendingCount: (await this.queue.read()).pending.length,
       errors,
+      progress: null,
+      syncLog: [...this.syncLog],
     });
 
     return { pushed, failed: errors.length, errors, idMappings };
@@ -250,6 +287,8 @@ export class SyncManager {
       state: push.errors.length > 0 ? 'error' : 'idle',
       pendingCount: (await this.queue.read()).pending.length,
       lastSyncTime: new Date(),
+      progress: null,
+      syncLog: [...this.syncLog],
     });
 
     return { push, pullCount };
@@ -309,6 +348,15 @@ export class SyncManager {
         }
       }
     }
+
+    this.appendLog({
+      phase: 'pull',
+      action: 'update',
+      itemId: '',
+      result: 'success',
+      message: `${remoteItems.length} items`,
+      timestamp: new Date().toISOString(),
+    });
 
     return remoteItems.length;
   }
