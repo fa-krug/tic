@@ -67,6 +67,9 @@ export function StatusScreen() {
   const errors = syncStatus?.errors ?? [];
   const [scrollOffset, setScrollOffset] = useState(0);
 
+  const syncLog = syncStatus?.syncLog ?? [];
+  const [logScrollOffset, setLogScrollOffset] = useState(0);
+
   // chrome: header(2) + backend(2) + capabilities header(1) + 5 features + 5 fields + gap(1) + sync header(1) + sync lines(4) + help(2) = ~23
   const fixedLines = syncManager ? 23 : 17;
   const viewport = useScrollViewport({
@@ -76,6 +79,15 @@ export function StatusScreen() {
     linesPerItem: 2,
   });
   const maxScroll = Math.max(0, errors.length - viewport.maxVisible);
+
+  const logFixedLines = syncManager ? 27 : 17;
+  const logViewport = useScrollViewport({
+    totalItems: syncLog.length,
+    cursor: logScrollOffset,
+    chromeLines: logFixedLines,
+    linesPerItem: 1,
+  });
+  const maxLogScroll = Math.max(0, syncLog.length - logViewport.maxVisible);
 
   useInput((input, key) => {
     if (key.escape || input === 'q') {
@@ -94,16 +106,29 @@ export function StatusScreen() {
     }
 
     if (key.upArrow) {
-      setScrollOffset((o) => Math.max(0, o - 1));
+      if (syncLog.length > 0) {
+        setLogScrollOffset((o) => Math.max(0, o - 1));
+      } else {
+        setScrollOffset((o) => Math.max(0, o - 1));
+      }
     }
     if (key.downArrow) {
-      setScrollOffset((o) => Math.min(maxScroll, o + 1));
+      if (syncLog.length > 0) {
+        setLogScrollOffset((o) => Math.min(maxLogScroll, o + 1));
+      } else {
+        setScrollOffset((o) => Math.min(maxScroll, o + 1));
+      }
     }
   });
 
   const visibleErrors = errors.slice(
     scrollOffset,
     scrollOffset + viewport.maxVisible,
+  );
+
+  const visibleLogEntries = syncLog.slice(
+    logScrollOffset,
+    logScrollOffset + logViewport.maxVisible,
   );
 
   return (
@@ -184,6 +209,43 @@ export function StatusScreen() {
                 : 'never'}
             </Text>
           </Box>
+
+          {syncLog.length > 0 && (
+            <Box marginTop={1} flexDirection="column">
+              <Text bold>Sync Log:</Text>
+              {visibleLogEntries.map((entry, idx) => (
+                <Box key={logScrollOffset + idx} marginLeft={2}>
+                  <Text color={entry.result === 'success' ? 'green' : 'red'}>
+                    {entry.result === 'success' ? '✓' : '✗'}
+                  </Text>
+                  <Text>
+                    {' '}
+                    {entry.phase === 'pull'
+                      ? `pulled ${entry.message ?? ''}`
+                      : `${entry.action} #${entry.itemId}`}
+                    {entry.result === 'error' && entry.message
+                      ? ` — ${entry.message}`
+                      : ''}
+                  </Text>
+                  <Text dimColor>
+                    {' '}
+                    {new Date(entry.timestamp).toLocaleTimeString()}
+                  </Text>
+                </Box>
+              ))}
+              {syncLog.length > logViewport.maxVisible && (
+                <Text dimColor>
+                  {' '}
+                  ↑↓ scroll ({logScrollOffset + 1}-
+                  {Math.min(
+                    logScrollOffset + logViewport.maxVisible,
+                    syncLog.length,
+                  )}{' '}
+                  of {syncLog.length})
+                </Text>
+              )}
+            </Box>
+          )}
 
           {errors.length > 0 && (
             <Box marginTop={1} flexDirection="column">
