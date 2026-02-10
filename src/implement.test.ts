@@ -327,29 +327,18 @@ describe('beginImplementation', () => {
 
   it('returns commandFailed when branchCommand fails', () => {
     const item = makeItem();
-    // Set SHELL to /usr/bin/true so the fallback shell exits immediately
-    const origShell = process.env['SHELL'];
-    process.env['SHELL'] = '/usr/bin/true';
-    try {
-      const result = beginImplementation(
-        item,
-        [],
-        {
-          branchMode: 'worktree',
-          branchCommand: 'exit 1',
-          copyToClipboard: true,
-        },
-        tmpDir,
-        { skipClipboard: true },
-      );
-      expect(result.commandFailed).toBe(true);
-    } finally {
-      if (origShell !== undefined) {
-        process.env['SHELL'] = origShell;
-      } else {
-        delete process.env['SHELL'];
-      }
-    }
+    const result = beginImplementation(
+      item,
+      [],
+      {
+        branchMode: 'worktree',
+        branchCommand: 'exit 1',
+        copyToClipboard: true,
+      },
+      tmpDir,
+      { skipClipboard: true, nonInteractive: true },
+    );
+    expect(result.commandFailed).toBe(true);
   });
 
   it('respects copyToClipboard false', () => {
@@ -377,7 +366,7 @@ describe('beginImplementation', () => {
       [],
       { branchMode: 'worktree', branchCommand: `touch "${marker}"` },
       tmpDir,
-      { skipClipboard: true },
+      { skipClipboard: true, nonInteractive: true },
     );
     expect(fs.existsSync(marker)).toBe(true);
     expect(result.commandFailed).toBe(false);
@@ -403,7 +392,7 @@ describe('beginImplementation', () => {
         branchCommand: `env | grep ^TIC_ > "${envFile}"`,
       },
       tmpDir,
-      { skipClipboard: true },
+      { skipClipboard: true, nonInteractive: true },
     );
     const envContent = fs.readFileSync(envFile, 'utf-8');
     expect(envContent).toContain('TIC_ITEM_ID=42');

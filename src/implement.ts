@@ -1,4 +1,6 @@
 import { execFileSync, spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import type { WorkItem, Comment } from './types.js';
 import {
@@ -109,6 +111,8 @@ export function copyToClipboard(text: string): boolean {
 export interface ImplementOptions {
   skipShell?: boolean;
   skipClipboard?: boolean;
+  /** Run branchCommand non-interactively (no interactive shell wrapper). For testing. */
+  nonInteractive?: boolean;
   itemUrl?: string;
 }
 
@@ -184,23 +188,71 @@ export function beginImplementation(
       TIC_TARGET_DIR: targetDir,
     };
 
+    const shell = process.env['SHELL'] || '/bin/sh';
     const command = config.branchCommand;
-    if (command) {
+
+    if (command && options?.nonInteractive) {
+      // Non-interactive: just run the command directly (used in tests)
       const result = spawnSync(command, [], {
         cwd: targetDir,
         stdio: 'inherit',
         env,
-        shell: true,
+        shell: '/bin/sh',
       });
       if (result.status !== 0 && result.status !== null) {
         commandFailed = true;
-        // Fall back to plain shell
-        const shell = process.env['SHELL'] || '/bin/sh';
-        spawnSync(shell, [], { cwd: targetDir, stdio: 'inherit', env });
+      }
+    } else if (command) {
+      // Write a temporary rc file that sources the user's profile then runs
+      // the configured command. This gives us an interactive shell that
+      // executes the branchCommand on startup and stays open.
+      const rcFile = path.join(os.tmpdir(), `tic-rc-${process.pid}.sh`);
+      const rcContent = [
+        `[ -f ~/.bashrc ] && . ~/.bashrc`,
+        `[ -f ~/.zshrc ] && . ~/.zshrc`,
+        command,
+      ].join('\n');
+      fs.writeFileSync(rcFile, rcContent);
+
+      const shellName = path.basename(shell);
+      let result;
+      if (shellName === 'bash') {
+        result = spawnSync(shell, ['--init-file', rcFile], {
+          cwd: targetDir,
+          stdio: 'inherit',
+          env,
+        });
+      } else if (shellName === 'zsh') {
+        result = spawnSync(shell, [], {
+          cwd: targetDir,
+          stdio: 'inherit',
+          env: {
+            ...env,
+            ZDOTDIR_ORIG: process.env['ZDOTDIR'] || '',
+            ZDOTDIR: path.dirname(rcFile),
+            ENV: rcFile,
+          },
+        });
+      } else {
+        // POSIX sh fallback: ENV is sourced by interactive sh
+        result = spawnSync(shell, [], {
+          cwd: targetDir,
+          stdio: 'inherit',
+          env: { ...env, ENV: rcFile },
+        });
+      }
+
+      try {
+        fs.unlinkSync(rcFile);
+      } catch {
+        // ignore cleanup errors
+      }
+
+      if (result.status !== 0 && result.status !== null) {
+        commandFailed = true;
       }
     } else {
-      // Empty/unset branchCommand: plain shell
-      const shell = process.env['SHELL'] || '/bin/sh';
+      // No branchCommand: plain interactive shell
       spawnSync(shell, [], { cwd: targetDir, stdio: 'inherit', env });
     }
   }

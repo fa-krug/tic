@@ -32,7 +32,7 @@ export const defaultConfig: Config = {
   next_id: 1,
   branchMode: 'worktree',
   autoUpdate: true,
-  branchCommand: `bash --init-file <(echo "source ~/.bashrc; claude 'Brainstorm the implementation of issue #$TIC_ITEM_ID: $TIC_ITEM_TITLE. $TIC_ITEM_DESCRIPTION'")`,
+  branchCommand: `claude "Brainstorm the implementation of issue #$TIC_ITEM_ID: $TIC_ITEM_TITLE. $TIC_ITEM_DESCRIPTION"`,
   copyToClipboard: true,
 };
 
