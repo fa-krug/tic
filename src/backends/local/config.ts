@@ -32,6 +32,7 @@ export interface Config {
     };
     sort?: Array<{ column: string; direction: string }>;
   }>;
+  defaultView?: string;
 }
 
 export const defaultConfig: Config = {

@@ -147,6 +147,11 @@ export function OverlayPanel({
   });
 
   const handleQueryChange = (value: string) => {
+    // In multiSelect mode, space is used for toggling, not filtering
+    if (multiSelect) {
+      value = value.replaceAll(' ', '');
+      if (value === query) return;
+    }
     setQuery(value);
     setSelectedIndex(0);
   };

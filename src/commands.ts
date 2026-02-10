@@ -194,7 +194,7 @@ const commands: Command[] = [
     label: 'Load view...',
     category: 'Actions',
     shortcut: 'V',
-    when: (ctx) => ctx.screen === 'list' && ctx.hasSavedViews,
+    when: (ctx) => ctx.screen === 'list',
   },
   {
     id: 'save-view',
@@ -207,6 +207,12 @@ const commands: Command[] = [
     label: 'Delete view...',
     category: 'Actions',
     when: (ctx) => ctx.screen === 'list' && ctx.hasSavedViews,
+  },
+  {
+    id: 'set-default-view',
+    label: 'Set default view...',
+    category: 'Actions',
+    when: (ctx) => ctx.screen === 'list',
   },
   // Other
   {
