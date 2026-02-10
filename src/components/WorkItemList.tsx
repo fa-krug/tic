@@ -715,6 +715,8 @@ export function WorkItemList() {
     activeType,
     hasSyncManager: syncManager !== null,
     gitAvailable,
+    hasActiveFilters: false,
+    hasSavedViews: false,
   };
 
   const paletteCommands = useMemo(
