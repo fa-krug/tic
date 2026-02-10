@@ -874,7 +874,7 @@ describe('SyncManager progress reporting', () => {
     const log = manager.getStatus().syncLog;
     const pullEntries = log.filter((e) => e.phase === 'pull');
     expect(pullEntries).toHaveLength(1);
-    expect(pullEntries[0]!.message).toBe('1 items');
+    expect(pullEntries[0]!.message).toBe('1 item');
   });
 
   it('caps syncLog at 50 entries (FIFO)', async () => {

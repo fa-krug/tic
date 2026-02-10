@@ -104,6 +104,14 @@ export class SyncManager {
         if (isLocalMissing) {
           // Local item was deleted or never synced — drop unrecoverable entry
           await this.queue.remove(entry.itemId, entry.action);
+          this.appendLog({
+            phase: 'push',
+            action: entry.action,
+            itemId: entry.itemId,
+            result: 'success',
+            message: 'skipped (local item missing)',
+            timestamp: new Date().toISOString(),
+          });
         } else {
           errors.push({
             entry,
@@ -354,7 +362,7 @@ export class SyncManager {
       action: 'update',
       itemId: '',
       result: 'success',
-      message: `${remoteItems.length} items`,
+      message: `${remoteItems.length} item${remoteItems.length === 1 ? '' : 's'}`,
       timestamp: new Date().toISOString(),
     });
 
