@@ -31,6 +31,7 @@ function getStatusDisplay(
     state: string;
     pendingCount: number;
     errors: { message: string }[];
+    progress: { phase: string; current: number; total: number } | null;
   } | null,
 ): { showSpinner: boolean; text: string | null; isError?: boolean } {
   if (loading) {
@@ -40,6 +41,12 @@ function getStatusDisplay(
     return { showSpinner: false, text: `⚠ Connection failed`, isError: true };
   }
   if (syncStatus?.state === 'syncing') {
+    if (syncStatus.progress?.phase === 'push') {
+      return {
+        showSpinner: true,
+        text: `↑ ${syncStatus.progress.current}/${syncStatus.progress.total}`,
+      };
+    }
     return { showSpinner: true, text: 'Syncing...' };
   }
   if (syncStatus?.state === 'error') {
