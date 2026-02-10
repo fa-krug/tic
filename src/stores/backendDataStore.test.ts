@@ -118,6 +118,8 @@ describe('backendDataStore', () => {
       pendingCount: 3,
       lastSyncTime: null,
       errors: [],
+      progress: null,
+      syncLog: [],
     });
     expect(backendDataStore.getState().syncStatus?.state).toBe('syncing');
   });

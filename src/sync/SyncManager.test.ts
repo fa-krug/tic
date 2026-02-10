@@ -8,6 +8,7 @@ import { LocalBackend } from '../backends/local/index.js';
 import { configStore } from '../stores/configStore.js';
 import type { Backend } from '../backends/types.js';
 import type { WorkItem, NewWorkItem, NewComment, Comment } from '../types.js';
+import type { SyncStatus } from './types.js';
 
 function createMockRemote(items: WorkItem[] = []): Backend {
   const store = new Map(items.map((i) => [i.id, i]));
@@ -719,5 +720,180 @@ describe('SyncManager status callbacks', () => {
     // The delete entry gets processed successfully (remote.deleteWorkItem is a no-op),
     // so pending count should be 0 after push
     expect(manager.getStatus().pendingCount).toBe(0);
+  });
+});
+
+describe('SyncManager progress reporting', () => {
+  let tmpDir: string;
+  let local: LocalBackend;
+  let queueStore: SyncQueueStore;
+
+  beforeEach(async () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-sync-test-'));
+    fs.mkdirSync(path.join(tmpDir, '.tic'), { recursive: true });
+    local = await LocalBackend.create(tmpDir);
+    queueStore = new SyncQueueStore(tmpDir);
+  });
+
+  afterEach(() => {
+    configStore.getState().destroy();
+    fs.rmSync(tmpDir, { recursive: true });
+  });
+
+  it('emits push progress with correct current/total', async () => {
+    const remote = createMockRemote();
+    const manager = new SyncManager(local, remote, queueStore);
+
+    await queueStore.append({
+      action: 'delete',
+      itemId: 'del-1',
+      timestamp: new Date().toISOString(),
+    });
+    await queueStore.append({
+      action: 'delete',
+      itemId: 'del-2',
+      timestamp: new Date().toISOString(),
+    });
+
+    const progressUpdates: { current: number; total: number }[] = [];
+    manager.onStatusChange((status: SyncStatus) => {
+      if (status.progress) {
+        progressUpdates.push({
+          current: status.progress.current,
+          total: status.progress.total,
+        });
+      }
+    });
+
+    await manager.pushPending();
+
+    expect(progressUpdates).toContainEqual({ current: 1, total: 2 });
+    expect(progressUpdates).toContainEqual({ current: 2, total: 2 });
+  });
+
+  it('clears progress to null after push completes', async () => {
+    const remote = createMockRemote();
+    const manager = new SyncManager(local, remote, queueStore);
+
+    await queueStore.append({
+      action: 'delete',
+      itemId: 'del-1',
+      timestamp: new Date().toISOString(),
+    });
+
+    await manager.pushPending();
+
+    expect(manager.getStatus().progress).toBeNull();
+  });
+
+  it('appends success entries to syncLog during push', async () => {
+    const remote = createMockRemote();
+    const manager = new SyncManager(local, remote, queueStore);
+
+    await queueStore.append({
+      action: 'delete',
+      itemId: 'del-a',
+      timestamp: new Date().toISOString(),
+    });
+    await queueStore.append({
+      action: 'delete',
+      itemId: 'del-b',
+      timestamp: new Date().toISOString(),
+    });
+
+    await manager.pushPending();
+
+    const log = manager.getStatus().syncLog;
+    expect(log).toHaveLength(2);
+    expect(log[0]!.action).toBe('delete');
+    expect(log[0]!.itemId).toBe('del-a');
+    expect(log[0]!.result).toBe('success');
+    expect(log[1]!.action).toBe('delete');
+    expect(log[1]!.itemId).toBe('del-b');
+    expect(log[1]!.result).toBe('success');
+  });
+
+  it('appends error entries to syncLog on push failure', async () => {
+    const remote = createMockRemote();
+    // eslint-disable-next-line @typescript-eslint/require-await
+    remote.updateWorkItem = async () => {
+      throw new Error('Remote update failed');
+    };
+    const manager = new SyncManager(local, remote, queueStore);
+
+    // Create an item locally so the push reaches the remote call
+    await local.createWorkItem({
+      title: 'Will fail',
+      type: 'task',
+      status: 'backlog',
+      priority: 'medium',
+      assignee: '',
+      labels: [],
+      iteration: 'default',
+      description: '',
+      parent: null,
+      dependsOn: [],
+    });
+
+    await queueStore.append({
+      action: 'update',
+      itemId: '1',
+      timestamp: new Date().toISOString(),
+    });
+
+    await manager.pushPending();
+
+    const log = manager.getStatus().syncLog;
+    expect(log).toHaveLength(1);
+    expect(log[0]!.result).toBe('error');
+    expect(log[0]!.message).toBe('Remote update failed');
+  });
+
+  it('appends pull log entry during sync', async () => {
+    const remoteItem: WorkItem = {
+      id: '10',
+      title: 'Remote Task',
+      type: 'task',
+      status: 'todo',
+      iteration: 'default',
+      priority: 'medium',
+      assignee: '',
+      labels: [],
+      created: '2026-01-01T00:00:00Z',
+      updated: '2026-01-01T00:00:00Z',
+      description: 'From remote',
+      comments: [],
+      parent: null,
+      dependsOn: [],
+    };
+    const remote = createMockRemote([remoteItem]);
+    const manager = new SyncManager(local, remote, queueStore);
+
+    await manager.sync();
+
+    const log = manager.getStatus().syncLog;
+    const pullEntries = log.filter((e) => e.phase === 'pull');
+    expect(pullEntries).toHaveLength(1);
+    expect(pullEntries[0]!.message).toBe('1 items');
+  });
+
+  it('caps syncLog at 50 entries (FIFO)', async () => {
+    const remote = createMockRemote();
+    const manager = new SyncManager(local, remote, queueStore);
+
+    for (let i = 0; i < 55; i++) {
+      await queueStore.append({
+        action: 'delete',
+        itemId: `item-${i}`,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    await manager.pushPending();
+
+    const log = manager.getStatus().syncLog;
+    expect(log).toHaveLength(50);
+    expect(log[0]!.itemId).toBe('item-5');
+    expect(log[49]!.itemId).toBe('item-54');
   });
 });
