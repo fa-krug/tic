@@ -14,6 +14,11 @@ export type TicDatabase = BetterSQLite3Database<typeof schema> & {
   raw: Database.Database;
 };
 
+/** Transaction handle passed to `db.transaction()` callbacks. */
+export type TicTransaction = Parameters<
+  Parameters<TicDatabase['transaction']>[0]
+>[0];
+
 export function createDatabase(root: string): TicDatabase {
   const isMemory = root === ':memory:';
   let dbPath: string;

@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import type { Config } from '../local/config.js';
-import type { TicDatabase } from './db.js';
+import type { TicDatabase, TicTransaction } from './db.js';
 import * as schema from './schema.js';
 
 /**
@@ -151,15 +151,29 @@ export function readConfig(db: TicDatabase): Config {
 }
 
 /**
- * Write the full Config to the SQLite database, replacing all existing data.
- * Uses a transaction to keep tables consistent.
+ * Insert (or replace) the full Config into the database tables using
+ * the given transaction handle.  Shared by `writeConfig` and the legacy
+ * migration so the insertion logic is defined in exactly one place.
  */
-export function writeConfig(db: TicDatabase, config: Config): void {
-  db.transaction((tx) => {
-    // 1. Upsert projectConfig singleton
-    tx.insert(schema.projectConfig)
-      .values({
-        id: 1,
+export function insertConfigTx(tx: TicTransaction, config: Config): void {
+  // 1. Upsert projectConfig singleton
+  tx.insert(schema.projectConfig)
+    .values({
+      id: 1,
+      backend: config.backend,
+      currentIteration: config.current_iteration,
+      nextId: config.next_id,
+      branchMode: config.branchMode,
+      branchCommand: config.branchCommand ?? '',
+      copyToClipboard: config.copyToClipboard ?? true,
+      autoUpdate: config.autoUpdate,
+      defaultType: config.defaultType ?? '',
+      showDetailPanel: config.showDetailPanel ?? false,
+      defaultView: config.defaultView ?? '',
+    })
+    .onConflictDoUpdate({
+      target: schema.projectConfig.id,
+      set: {
         backend: config.backend,
         currentIteration: config.current_iteration,
         nextId: config.next_id,
@@ -170,120 +184,113 @@ export function writeConfig(db: TicDatabase, config: Config): void {
         defaultType: config.defaultType ?? '',
         showDetailPanel: config.showDetailPanel ?? false,
         defaultView: config.defaultView ?? '',
+      },
+    })
+    .run();
+
+  // 2. Replace statuses
+  tx.delete(schema.statuses).run();
+  for (let i = 0; i < config.statuses.length; i++) {
+    tx.insert(schema.statuses)
+      .values({ name: config.statuses[i]!, sortOrder: i })
+      .run();
+  }
+
+  // 3. Replace types
+  tx.delete(schema.workItemTypes).run();
+  for (let i = 0; i < config.types.length; i++) {
+    tx.insert(schema.workItemTypes)
+      .values({ name: config.types[i]!, sortOrder: i })
+      .run();
+  }
+
+  // 4. Replace iterations
+  tx.delete(schema.iterations).run();
+  for (let i = 0; i < config.iterations.length; i++) {
+    tx.insert(schema.iterations)
+      .values({ name: config.iterations[i]!, sortOrder: i })
+      .run();
+  }
+
+  // 5. Upsert jiraConfig
+  if (config.jira) {
+    tx.insert(schema.jiraConfig)
+      .values({
+        id: 1,
+        site: config.jira.site,
+        project: config.jira.project,
+        boardId:
+          config.jira.boardId !== undefined ? String(config.jira.boardId) : '',
       })
       .onConflictDoUpdate({
-        target: schema.projectConfig.id,
+        target: schema.jiraConfig.id,
         set: {
-          backend: config.backend,
-          currentIteration: config.current_iteration,
-          nextId: config.next_id,
-          branchMode: config.branchMode,
-          branchCommand: config.branchCommand ?? '',
-          copyToClipboard: config.copyToClipboard ?? true,
-          autoUpdate: config.autoUpdate,
-          defaultType: config.defaultType ?? '',
-          showDetailPanel: config.showDetailPanel ?? false,
-          defaultView: config.defaultView ?? '',
-        },
-      })
-      .run();
-
-    // 2. Replace statuses
-    tx.delete(schema.statuses).run();
-    for (let i = 0; i < config.statuses.length; i++) {
-      tx.insert(schema.statuses)
-        .values({ name: config.statuses[i]!, sortOrder: i })
-        .run();
-    }
-
-    // 3. Replace types
-    tx.delete(schema.workItemTypes).run();
-    for (let i = 0; i < config.types.length; i++) {
-      tx.insert(schema.workItemTypes)
-        .values({ name: config.types[i]!, sortOrder: i })
-        .run();
-    }
-
-    // 4. Replace iterations
-    tx.delete(schema.iterations).run();
-    for (let i = 0; i < config.iterations.length; i++) {
-      tx.insert(schema.iterations)
-        .values({ name: config.iterations[i]!, sortOrder: i })
-        .run();
-    }
-
-    // 5. Upsert jiraConfig
-    if (config.jira) {
-      tx.insert(schema.jiraConfig)
-        .values({
-          id: 1,
           site: config.jira.site,
           project: config.jira.project,
           boardId:
             config.jira.boardId !== undefined
               ? String(config.jira.boardId)
               : '',
-        })
-        .onConflictDoUpdate({
-          target: schema.jiraConfig.id,
-          set: {
-            site: config.jira.site,
-            project: config.jira.project,
-            boardId:
-              config.jira.boardId !== undefined
-                ? String(config.jira.boardId)
-                : '',
-          },
-        })
-        .run();
-    } else {
-      // Clear jira config by setting to empty values
-      tx.insert(schema.jiraConfig)
-        .values({ id: 1, site: '', project: '', boardId: '' })
-        .onConflictDoUpdate({
-          target: schema.jiraConfig.id,
-          set: { site: '', project: '', boardId: '' },
-        })
-        .run();
-    }
+        },
+      })
+      .run();
+  } else {
+    // Clear jira config by setting to empty values
+    tx.insert(schema.jiraConfig)
+      .values({ id: 1, site: '', project: '', boardId: '' })
+      .onConflictDoUpdate({
+        target: schema.jiraConfig.id,
+        set: { site: '', project: '', boardId: '' },
+      })
+      .run();
+  }
 
-    // 6. Replace saved views (cascade deletes filters and sort entries)
-    tx.delete(schema.savedViews).run();
+  // 6. Replace saved views (cascade deletes filters and sort entries)
+  tx.delete(schema.savedViews).run();
 
-    if (config.views && config.views.length > 0) {
-      for (const view of config.views) {
-        tx.insert(schema.savedViews).values({ name: view.name }).run();
+  if (config.views && config.views.length > 0) {
+    for (const view of config.views) {
+      tx.insert(schema.savedViews).values({ name: view.name }).run();
 
-        // Insert filters
-        const filters = view.filters;
-        if (filters) {
-          for (const [field, values] of Object.entries(filters)) {
-            if (values && values.length > 0) {
-              for (const value of values) {
-                tx.insert(schema.savedViewFilters)
-                  .values({ viewName: view.name, field, value })
-                  .run();
-              }
+      // Insert filters
+      const filters = view.filters;
+      if (filters) {
+        for (const [field, values] of Object.entries(filters)) {
+          if (values && values.length > 0) {
+            for (const value of values) {
+              tx.insert(schema.savedViewFilters)
+                .values({ viewName: view.name, field, value })
+                .run();
             }
           }
         }
+      }
 
-        // Insert sort entries
-        if (view.sort && view.sort.length > 0) {
-          for (let i = 0; i < view.sort.length; i++) {
-            const s = view.sort[i]!;
-            tx.insert(schema.savedViewSortEntries)
-              .values({
-                viewName: view.name,
-                column: s.column,
-                direction: s.direction,
-                sortOrder: i,
-              })
-              .run();
-          }
+      // Insert sort entries
+      if (view.sort && view.sort.length > 0) {
+        for (let i = 0; i < view.sort.length; i++) {
+          const s = view.sort[i]!;
+          tx.insert(schema.savedViewSortEntries)
+            .values({
+              viewName: view.name,
+              column: s.column,
+              direction: s.direction,
+              sortOrder: i,
+            })
+            .run();
         }
       }
     }
+  }
+}
+
+/**
+ * Write the full Config to the SQLite database, replacing all existing data.
+ * Uses a transaction to keep tables consistent.
+ */
+export function writeConfig(db: TicDatabase, config: Config): void {
+  db.transaction((tx) => {
+    insertConfigTx(tx, config);
   });
 }
 

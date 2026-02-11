@@ -1,11 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { TicDatabase } from './db.js';
+import type { TicDatabase, TicTransaction } from './db.js';
 import * as schema from './schema.js';
-import { readConfigSync, type Config } from '../local/config.js';
+import { insertConfigTx } from './config.js';
+import { readConfigSync } from '../local/config.js';
 import { parseWorkItemFile } from '../local/items.js';
 import { parseTemplateFile } from '../local/templates.js';
 import { contentHash } from '../files/hash.js';
+import type { WorkItem } from '../../types.js';
 import type { QueueEntry, SyncQueueData } from '../../sync/types.js';
 
 /**
@@ -41,7 +43,7 @@ export function migrateLegacyProject(root: string, db: TicDatabase): void {
   // 3. Write everything to the database in a single transaction
   db.transaction((tx) => {
     // --- Config tables ---
-    insertConfig(tx, config);
+    insertConfigTx(tx, config);
 
     // --- Work items ---
     for (const item of items) {
@@ -127,27 +129,10 @@ export function migrateLegacyProject(root: string, db: TicDatabase): void {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-interface ParsedItem {
-  id: string;
-  title: string;
-  type: string;
-  status: string;
-  iteration: string;
-  priority: string;
-  assignee: string;
-  labels: string[];
-  created: string;
-  updated: string;
-  description: string;
-  parent: string | null;
-  dependsOn: string[];
-  comments: Array<{ author: string; date: string; body: string }>;
-}
-
 /**
  * Validate that a parsed item has the minimum required fields for DB insertion.
  */
-function isValidItem(item: ParsedItem): boolean {
+function isValidItem(item: WorkItem): boolean {
   return (
     typeof item.id === 'string' &&
     item.id !== '' &&
@@ -170,8 +155,8 @@ function isValidItem(item: ParsedItem): boolean {
  * @param deletedAt — null for active items, ISO timestamp for trash items.
  */
 function insertWorkItem(
-  tx: Parameters<Parameters<TicDatabase['transaction']>[0]>[0],
-  item: ParsedItem,
+  tx: TicTransaction,
+  item: WorkItem,
   deletedAt: string | null,
 ): void {
   tx.insert(schema.workItems)
@@ -215,11 +200,11 @@ function insertWorkItem(
   }
 }
 
-function parseItemFiles(dir: string): ParsedItem[] {
+function parseItemFiles(dir: string): WorkItem[] {
   if (!fs.existsSync(dir)) return [];
 
   const entries = fs.readdirSync(dir).filter((f) => f.endsWith('.md'));
-  const items: ParsedItem[] = [];
+  const items: WorkItem[] = [];
 
   for (const file of entries) {
     try {
@@ -282,130 +267,6 @@ function computeItemFileHashes(dir: string): Map<string, string> {
   }
 
   return hashes;
-}
-
-/**
- * Insert a full Config into the database tables.
- * This replicates the writeConfig logic but operates on a transaction handle
- * so it participates in the outer migration transaction.
- */
-function insertConfig(
-  tx: Parameters<Parameters<TicDatabase['transaction']>[0]>[0],
-  config: Config,
-): void {
-  // Project config singleton
-  tx.insert(schema.projectConfig)
-    .values({
-      id: 1,
-      backend: config.backend,
-      currentIteration: config.current_iteration,
-      nextId: config.next_id,
-      branchMode: config.branchMode,
-      branchCommand: config.branchCommand ?? '',
-      copyToClipboard: config.copyToClipboard ?? true,
-      autoUpdate: config.autoUpdate,
-      defaultType: config.defaultType ?? '',
-      showDetailPanel: config.showDetailPanel ?? false,
-      defaultView: config.defaultView ?? '',
-    })
-    .onConflictDoUpdate({
-      target: schema.projectConfig.id,
-      set: {
-        backend: config.backend,
-        currentIteration: config.current_iteration,
-        nextId: config.next_id,
-        branchMode: config.branchMode,
-        branchCommand: config.branchCommand ?? '',
-        copyToClipboard: config.copyToClipboard ?? true,
-        autoUpdate: config.autoUpdate,
-        defaultType: config.defaultType ?? '',
-        showDetailPanel: config.showDetailPanel ?? false,
-        defaultView: config.defaultView ?? '',
-      },
-    })
-    .run();
-
-  // Statuses
-  tx.delete(schema.statuses).run();
-  for (let i = 0; i < config.statuses.length; i++) {
-    tx.insert(schema.statuses)
-      .values({ name: config.statuses[i]!, sortOrder: i })
-      .run();
-  }
-
-  // Types
-  tx.delete(schema.workItemTypes).run();
-  for (let i = 0; i < config.types.length; i++) {
-    tx.insert(schema.workItemTypes)
-      .values({ name: config.types[i]!, sortOrder: i })
-      .run();
-  }
-
-  // Iterations
-  tx.delete(schema.iterations).run();
-  for (let i = 0; i < config.iterations.length; i++) {
-    tx.insert(schema.iterations)
-      .values({ name: config.iterations[i]!, sortOrder: i })
-      .run();
-  }
-
-  // Jira config
-  if (config.jira) {
-    tx.insert(schema.jiraConfig)
-      .values({
-        id: 1,
-        site: config.jira.site,
-        project: config.jira.project,
-        boardId:
-          config.jira.boardId !== undefined ? String(config.jira.boardId) : '',
-      })
-      .onConflictDoUpdate({
-        target: schema.jiraConfig.id,
-        set: {
-          site: config.jira.site,
-          project: config.jira.project,
-          boardId:
-            config.jira.boardId !== undefined
-              ? String(config.jira.boardId)
-              : '',
-        },
-      })
-      .run();
-  }
-
-  // Saved views
-  if (config.views && config.views.length > 0) {
-    for (const view of config.views) {
-      tx.insert(schema.savedViews).values({ name: view.name }).run();
-
-      const filters = view.filters;
-      if (filters) {
-        for (const [field, values] of Object.entries(filters)) {
-          if (values && values.length > 0) {
-            for (const value of values) {
-              tx.insert(schema.savedViewFilters)
-                .values({ viewName: view.name, field, value })
-                .run();
-            }
-          }
-        }
-      }
-
-      if (view.sort && view.sort.length > 0) {
-        for (let i = 0; i < view.sort.length; i++) {
-          const s = view.sort[i]!;
-          tx.insert(schema.savedViewSortEntries)
-            .values({
-              viewName: view.name,
-              column: s.column,
-              direction: s.direction,
-              sortOrder: i,
-            })
-            .run();
-        }
-      }
-    }
-  }
 }
 
 /**
