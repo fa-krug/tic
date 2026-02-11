@@ -1,3 +1,4 @@
+import { spawn } from 'node:child_process';
 import { eq, and, isNull, isNotNull, inArray } from 'drizzle-orm';
 import { BaseBackend } from '../types.js';
 import type { BackendCapabilities, SoftDeleteBackend } from '../types.js';
@@ -31,22 +32,32 @@ const DEFAULT_AUTO_UPDATE = true;
 const DEFAULT_BRANCH_COMMAND = `claude "Brainstorm the implementation of issue #$TIC_ITEM_ID: $TIC_ITEM_TITLE. $TIC_ITEM_DESCRIPTION"`;
 const DEFAULT_COPY_TO_CLIPBOARD = true;
 
+export interface DrizzleBackendOptions {
+  tempIds?: boolean;
+}
+
 export class DrizzleBackend extends BaseBackend implements SoftDeleteBackend {
   private db: TicDatabase;
   private root: string;
+  private tempIds: boolean;
 
-  private constructor(db: TicDatabase, root: string) {
+  private constructor(
+    db: TicDatabase,
+    root: string,
+    options?: DrizzleBackendOptions,
+  ) {
     super(0); // No TTL — DB is always fresh
     this.db = db;
     this.root = root;
+    this.tempIds = options?.tempIds ?? false;
   }
 
   /**
    * Create a DrizzleBackend, initializing the database and seeding defaults.
    */
-  static create(root: string): DrizzleBackend {
+  static create(root: string, options?: DrizzleBackendOptions): DrizzleBackend {
     const db = createDatabase(root);
-    const backend = new DrizzleBackend(db, root);
+    const backend = new DrizzleBackend(db, root, options);
     backend.seedDefaults();
     return backend;
   }
@@ -54,8 +65,11 @@ export class DrizzleBackend extends BaseBackend implements SoftDeleteBackend {
   /**
    * Create a DrizzleBackend from an existing database instance (for testing).
    */
-  static createFromDb(db: TicDatabase): DrizzleBackend {
-    const backend = new DrizzleBackend(db, ':memory:');
+  static createFromDb(
+    db: TicDatabase,
+    options?: DrizzleBackendOptions,
+  ): DrizzleBackend {
+    const backend = new DrizzleBackend(db, ':memory:', options);
     backend.seedDefaults();
     return backend;
   }
@@ -526,7 +540,7 @@ export class DrizzleBackend extends BaseBackend implements SoftDeleteBackend {
       .where(eq(schema.projectConfig.id, 1))
       .get();
     const nextId = config?.nextId ?? 1;
-    const id = String(nextId);
+    const id = this.tempIds ? `local-${nextId}` : String(nextId);
 
     // Validate relationships before inserting
     this.validateRelationships(id, data.parent, data.dependsOn);
@@ -803,11 +817,19 @@ export class DrizzleBackend extends BaseBackend implements SoftDeleteBackend {
     this.invalidateCache();
   }
 
-  // ─── Stubs: not yet implemented ────────────────────────────────
+  // ─── Open item in editor ───────────────────────────────────────
 
-  // eslint-disable-next-line @typescript-eslint/require-await, @typescript-eslint/no-unused-vars
-  async openItem(_id: string): Promise<void> {
-    throw new Error('Not yet implemented');
+  async openItem(id: string): Promise<void> {
+    const filePath = this.getItemUrl(id);
+    const editor = process.env['VISUAL'] || process.env['EDITOR'] || 'vi';
+    return new Promise<void>((resolve, reject) => {
+      const child = spawn(editor, [filePath], { stdio: 'inherit' });
+      child.on('close', (code) => {
+        if (code === 0) resolve();
+        else reject(new Error(`Editor exited with code ${code}`));
+      });
+      child.on('error', reject);
+    });
   }
 
   // ─── Templates ─────────────────────────────────────────────────

@@ -1229,4 +1229,42 @@ describe('DrizzleBackend', () => {
       expect(t.slug).toBe('my-template-name');
     });
   });
+
+  // ─── Temp IDs ───────────────────────────────────────────────────
+
+  describe('temp IDs', () => {
+    it('prefixes IDs with local- when tempIds is true', async () => {
+      const tempDb = createDatabase(':memory:');
+      const tempBackend = DrizzleBackend.createFromDb(tempDb, {
+        tempIds: true,
+      });
+
+      const item = await tempBackend.createWorkItem(makeNewItem());
+      expect(item.id).toMatch(/^local-/);
+      expect(item.id).toBe('local-1');
+
+      const item2 = await tempBackend.createWorkItem(
+        makeNewItem({ title: 'Second' }),
+      );
+      expect(item2.id).toBe('local-2');
+
+      tempBackend.destroy();
+    });
+
+    it('uses numeric IDs when tempIds is false (default)', async () => {
+      const item = await backend.createWorkItem(makeNewItem());
+      expect(item.id).toBe('1');
+      expect(item.id).not.toMatch(/^local-/);
+    });
+  });
+
+  // ─── openItem ─────────────────────────────────────────────────
+
+  describe('openItem', () => {
+    it('getItemUrl returns expected path', () => {
+      // openItem relies on getItemUrl — verify it returns a path based on root
+      const url = backend.getItemUrl('42');
+      expect(url).toContain('.tic/items/42.md');
+    });
+  });
 });
