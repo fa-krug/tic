@@ -1,4 +1,4 @@
-import { eq, and, isNull, inArray } from 'drizzle-orm';
+import { eq, and, isNull, isNotNull, inArray } from 'drizzle-orm';
 import { BaseBackend } from '../types.js';
 import type { BackendCapabilities, SoftDeleteBackend } from '../types.js';
 import type {
@@ -12,10 +12,13 @@ import { createDatabase, type TicDatabase } from './db.js';
 import * as schema from './schema.js';
 import {
   rowToWorkItem,
+  rowToTemplate,
   type WorkItemRow,
   type WorkItemLabelRow,
   type WorkItemDepRow,
   type CommentRow,
+  type TemplateLabelRow,
+  type TemplateDepRow,
 } from './mappers.js';
 
 const DEFAULT_STATUSES = ['backlog', 'todo', 'in-progress', 'review', 'done'];
@@ -769,44 +772,252 @@ export class DrizzleBackend extends BaseBackend implements SoftDeleteBackend {
     };
   }
 
-  // ─── Stubs: not yet implemented ────────────────────────────────────
+  // ─── Write: restore (undo soft delete) ──────────────────────────
 
-  /* eslint-disable @typescript-eslint/require-await, @typescript-eslint/no-unused-vars */
-
-  async restoreWorkItem(_id: string): Promise<void> {
-    throw new Error('Not yet implemented');
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async restoreWorkItem(id: string): Promise<void> {
+    this.db
+      .update(schema.workItems)
+      .set({ deletedAt: null })
+      .where(eq(schema.workItems.id, id))
+      .run();
+    this.invalidateCache();
   }
 
-  async permanentlyDeleteWorkItem(_id: string): Promise<void> {
-    throw new Error('Not yet implemented');
+  // ─── Write: permanent delete ───────────────────────────────────
+
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async permanentlyDeleteWorkItem(id: string): Promise<void> {
+    this.db.delete(schema.workItems).where(eq(schema.workItems.id, id)).run();
+    this.invalidateCache();
   }
 
+  // ─── Write: cleanup all soft-deleted items ─────────────────────
+
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async cleanupTrash(): Promise<void> {
+    this.db
+      .delete(schema.workItems)
+      .where(isNotNull(schema.workItems.deletedAt))
+      .run();
+    this.invalidateCache();
+  }
+
+  // ─── Stubs: not yet implemented ────────────────────────────────
+
+  // eslint-disable-next-line @typescript-eslint/require-await, @typescript-eslint/no-unused-vars
   async openItem(_id: string): Promise<void> {
     throw new Error('Not yet implemented');
   }
 
+  // ─── Templates ─────────────────────────────────────────────────
+
+  /**
+   * Slugify a template name (same logic as LocalBackend).
+   */
+  private slugifyName(name: string): string {
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/[\s-]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }
+
+  // eslint-disable-next-line @typescript-eslint/require-await
   async listTemplates(): Promise<Template[]> {
-    throw new Error('Not yet implemented');
+    const templateRows = this.db.select().from(schema.templates).all();
+
+    if (templateRows.length === 0) return [];
+
+    const slugs = templateRows.map((r) => r.slug);
+
+    const labelRows = this.db
+      .select()
+      .from(schema.templateLabels)
+      .where(inArray(schema.templateLabels.templateSlug, slugs))
+      .all();
+
+    const depRows = this.db
+      .select()
+      .from(schema.templateDeps)
+      .where(inArray(schema.templateDeps.templateSlug, slugs))
+      .all();
+
+    const labelsBySlug = new Map<string, TemplateLabelRow[]>();
+    for (const l of labelRows) {
+      const arr = labelsBySlug.get(l.templateSlug);
+      if (arr) arr.push(l);
+      else labelsBySlug.set(l.templateSlug, [l]);
+    }
+
+    const depsBySlug = new Map<string, TemplateDepRow[]>();
+    for (const d of depRows) {
+      const arr = depsBySlug.get(d.templateSlug);
+      if (arr) arr.push(d);
+      else depsBySlug.set(d.templateSlug, [d]);
+    }
+
+    return templateRows.map((row) =>
+      rowToTemplate(
+        row,
+        labelsBySlug.get(row.slug) ?? [],
+        depsBySlug.get(row.slug) ?? [],
+      ),
+    );
   }
 
-  async getTemplate(_slug: string): Promise<Template> {
-    throw new Error('Not yet implemented');
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async getTemplate(slug: string): Promise<Template> {
+    const row = this.db
+      .select()
+      .from(schema.templates)
+      .where(eq(schema.templates.slug, slug))
+      .get();
+
+    if (!row) {
+      throw new Error(`Template '${slug}' not found`);
+    }
+
+    const labels = this.db
+      .select()
+      .from(schema.templateLabels)
+      .where(eq(schema.templateLabels.templateSlug, slug))
+      .all();
+
+    const deps = this.db
+      .select()
+      .from(schema.templateDeps)
+      .where(eq(schema.templateDeps.templateSlug, slug))
+      .all();
+
+    return rowToTemplate(row, labels, deps);
   }
 
-  async createTemplate(_template: Template): Promise<Template> {
-    throw new Error('Not yet implemented');
+  async createTemplate(template: Template): Promise<Template> {
+    const slug = this.slugifyName(template.name);
+
+    this.db.transaction((tx) => {
+      tx.insert(schema.templates)
+        .values({
+          slug,
+          name: template.name,
+          type: template.type ?? '',
+          status: template.status ?? '',
+          priority: template.priority ?? '',
+          assignee: template.assignee ?? '',
+          iteration: template.iteration ?? '',
+          parent: template.parent ?? null,
+          description: template.description ?? '',
+        })
+        .run();
+
+      if (template.labels && template.labels.length > 0) {
+        tx.insert(schema.templateLabels)
+          .values(
+            template.labels.map((label) => ({ templateSlug: slug, label })),
+          )
+          .run();
+      }
+
+      if (template.dependsOn && template.dependsOn.length > 0) {
+        tx.insert(schema.templateDeps)
+          .values(
+            template.dependsOn.map((dependsOnId) => ({
+              templateSlug: slug,
+              dependsOnId,
+            })),
+          )
+          .run();
+      }
+    });
+
+    return this.getTemplate(slug);
   }
 
-  async updateTemplate(
-    _oldSlug: string,
-    _template: Template,
-  ): Promise<Template> {
-    throw new Error('Not yet implemented');
+  async updateTemplate(oldSlug: string, template: Template): Promise<Template> {
+    const newSlug = this.slugifyName(template.name);
+
+    this.db.transaction((tx) => {
+      if (oldSlug !== newSlug) {
+        // Slug changed: delete old (cascade handles labels/deps), insert new
+        tx.delete(schema.templates)
+          .where(eq(schema.templates.slug, oldSlug))
+          .run();
+
+        tx.insert(schema.templates)
+          .values({
+            slug: newSlug,
+            name: template.name,
+            type: template.type ?? '',
+            status: template.status ?? '',
+            priority: template.priority ?? '',
+            assignee: template.assignee ?? '',
+            iteration: template.iteration ?? '',
+            parent: template.parent ?? null,
+            description: template.description ?? '',
+          })
+          .run();
+      } else {
+        // Same slug: update in place
+        tx.update(schema.templates)
+          .set({
+            name: template.name,
+            type: template.type ?? '',
+            status: template.status ?? '',
+            priority: template.priority ?? '',
+            assignee: template.assignee ?? '',
+            iteration: template.iteration ?? '',
+            parent: template.parent ?? null,
+            description: template.description ?? '',
+          })
+          .where(eq(schema.templates.slug, oldSlug))
+          .run();
+
+        // Delete and re-insert labels
+        tx.delete(schema.templateLabels)
+          .where(eq(schema.templateLabels.templateSlug, oldSlug))
+          .run();
+      }
+
+      // Insert labels (for both new slug and same slug cases)
+      if (template.labels && template.labels.length > 0) {
+        tx.insert(schema.templateLabels)
+          .values(
+            template.labels.map((label) => ({
+              templateSlug: newSlug,
+              label,
+            })),
+          )
+          .run();
+      }
+
+      // Delete and re-insert deps (only for same-slug; new slug cascade already handled it)
+      if (oldSlug === newSlug) {
+        tx.delete(schema.templateDeps)
+          .where(eq(schema.templateDeps.templateSlug, oldSlug))
+          .run();
+      }
+
+      if (template.dependsOn && template.dependsOn.length > 0) {
+        tx.insert(schema.templateDeps)
+          .values(
+            template.dependsOn.map((dependsOnId) => ({
+              templateSlug: newSlug,
+              dependsOnId,
+            })),
+          )
+          .run();
+      }
+    });
+
+    return this.getTemplate(newSlug);
   }
 
-  async deleteTemplate(_slug: string): Promise<void> {
-    throw new Error('Not yet implemented');
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async deleteTemplate(slug: string): Promise<void> {
+    this.db
+      .delete(schema.templates)
+      .where(eq(schema.templates.slug, slug))
+      .run();
   }
-
-  /* eslint-enable @typescript-eslint/require-await, @typescript-eslint/no-unused-vars */
 }

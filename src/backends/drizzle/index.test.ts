@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createDatabase, type TicDatabase } from './db.js';
 import { DrizzleBackend } from './index.js';
-import type { NewWorkItem } from '../../types.js';
+import { isSoftDeleteBackend } from '../types.js';
+import type { NewWorkItem, Template } from '../../types.js';
 
 function makeNewItem(overrides: Partial<NewWorkItem> = {}): NewWorkItem {
   return {
@@ -15,6 +16,23 @@ function makeNewItem(overrides: Partial<NewWorkItem> = {}): NewWorkItem {
     description: '',
     parent: null,
     dependsOn: [],
+    ...overrides,
+  };
+}
+
+function makeTemplate(overrides: Partial<Template> = {}): Template {
+  return {
+    slug: '',
+    name: 'Test Template',
+    type: 'task',
+    status: 'todo',
+    priority: 'medium',
+    assignee: '',
+    labels: [],
+    iteration: '',
+    parent: null,
+    dependsOn: [],
+    description: '',
     ...overrides,
   };
 }
@@ -889,6 +907,326 @@ describe('DrizzleBackend', () => {
       expect(statuses.count).toBe(5);
       // Suppress unused variable warning
       expect(backend2).toBeDefined();
+    });
+  });
+
+  // ─── SoftDeleteBackend ───────────────────────────────────────────
+
+  describe('SoftDeleteBackend', () => {
+    it('soft-deletes by setting deletedAt', async () => {
+      const item = await backend.createWorkItem(makeNewItem());
+      await backend.softDeleteWorkItem(item.id);
+
+      const items = await backend.listWorkItems();
+      expect(items).toHaveLength(0);
+    });
+
+    it('restores soft-deleted item', async () => {
+      const item = await backend.createWorkItem(
+        makeNewItem({ title: 'Restore me' }),
+      );
+      await backend.softDeleteWorkItem(item.id);
+
+      // Verify it's gone from list
+      let items = await backend.listWorkItems();
+      expect(items).toHaveLength(0);
+
+      // Restore it
+      await backend.restoreWorkItem(item.id);
+
+      // Verify it's back
+      items = await backend.listWorkItems();
+      expect(items).toHaveLength(1);
+      expect(items[0]!.id).toBe(item.id);
+      expect(items[0]!.title).toBe('Restore me');
+    });
+
+    it('permanently deletes from trash', async () => {
+      const item = await backend.createWorkItem(makeNewItem());
+      await backend.softDeleteWorkItem(item.id);
+      await backend.permanentlyDeleteWorkItem(item.id);
+
+      // Verify completely gone — even a direct DB query should return nothing
+      const row = db.raw
+        .prepare('SELECT COUNT(*) as count FROM work_items WHERE id = ?')
+        .get(item.id) as { count: number };
+      expect(row.count).toBe(0);
+    });
+
+    it('cleanup removes all soft-deleted items', async () => {
+      const item1 = await backend.createWorkItem(
+        makeNewItem({ title: 'Item 1' }),
+      );
+      const item2 = await backend.createWorkItem(
+        makeNewItem({ title: 'Item 2' }),
+      );
+      const item3 = await backend.createWorkItem(
+        makeNewItem({ title: 'Item 3 (keep)' }),
+      );
+      await backend.softDeleteWorkItem(item1.id);
+      await backend.softDeleteWorkItem(item2.id);
+
+      await backend.cleanupTrash();
+
+      // Both soft-deleted items should be permanently gone
+      const trashCount = db.raw
+        .prepare(
+          'SELECT COUNT(*) as count FROM work_items WHERE deleted_at IS NOT NULL',
+        )
+        .get() as { count: number };
+      expect(trashCount.count).toBe(0);
+
+      // The non-deleted item should still exist
+      const items = await backend.listWorkItems();
+      expect(items).toHaveLength(1);
+      expect(items[0]!.id).toBe(item3.id);
+    });
+
+    it('isSoftDeleteBackend returns true', () => {
+      expect(isSoftDeleteBackend(backend)).toBe(true);
+    });
+  });
+
+  // ─── Templates ──────────────────────────────────────────────────
+
+  describe('templates', () => {
+    it('lists templates (empty)', async () => {
+      const templates = await backend.listTemplates();
+      expect(templates).toEqual([]);
+    });
+
+    it('creates and retrieves template', async () => {
+      const t = await backend.createTemplate(
+        makeTemplate({ name: 'Bug Report' }),
+      );
+      expect(t.slug).toBe('bug-report');
+      expect(t.name).toBe('Bug Report');
+
+      const fetched = await backend.getTemplate('bug-report');
+      expect(fetched.name).toBe('Bug Report');
+      expect(fetched.slug).toBe('bug-report');
+    });
+
+    it('creates template with all fields', async () => {
+      const t = await backend.createTemplate(
+        makeTemplate({
+          name: 'Full Template',
+          type: 'issue',
+          status: 'in-progress',
+          priority: 'high',
+          assignee: 'Alice',
+          iteration: 'sprint-1',
+          parent: null,
+          description: 'Full description',
+        }),
+      );
+
+      const fetched = await backend.getTemplate(t.slug);
+      expect(fetched.type).toBe('issue');
+      expect(fetched.status).toBe('in-progress');
+      expect(fetched.priority).toBe('high');
+      expect(fetched.assignee).toBe('Alice');
+      expect(fetched.iteration).toBe('sprint-1');
+      expect(fetched.description).toBe('Full description');
+    });
+
+    it('creates template with labels and deps', async () => {
+      const t = await backend.createTemplate(
+        makeTemplate({
+          name: 'Feature',
+          labels: ['frontend', 'ux'],
+          dependsOn: ['1', '2'],
+        }),
+      );
+
+      const fetched = await backend.getTemplate(t.slug);
+      expect(fetched.labels).toEqual(['frontend', 'ux']);
+      expect(fetched.dependsOn).toEqual(['1', '2']);
+    });
+
+    it('lists multiple templates', async () => {
+      await backend.createTemplate(makeTemplate({ name: 'Bug Report' }));
+      await backend.createTemplate(makeTemplate({ name: 'Feature Request' }));
+
+      const templates = await backend.listTemplates();
+      expect(templates).toHaveLength(2);
+      const slugs = templates.map((t) => t.slug).sort();
+      expect(slugs).toEqual(['bug-report', 'feature-request']);
+    });
+
+    it('lists templates with labels and deps assembled', async () => {
+      await backend.createTemplate(
+        makeTemplate({
+          name: 'Labeled',
+          labels: ['important'],
+          dependsOn: ['dep-1'],
+        }),
+      );
+
+      const templates = await backend.listTemplates();
+      expect(templates).toHaveLength(1);
+      expect(templates[0]!.labels).toEqual(['important']);
+      expect(templates[0]!.dependsOn).toEqual(['dep-1']);
+    });
+
+    it('updates template (same slug)', async () => {
+      const t = await backend.createTemplate(
+        makeTemplate({ name: 'Bug Report', type: 'bug', priority: 'low' }),
+      );
+
+      const updated = await backend.updateTemplate(t.slug, {
+        ...t,
+        type: 'issue',
+        priority: 'high',
+      });
+
+      expect(updated.slug).toBe('bug-report');
+      expect(updated.type).toBe('issue');
+      expect(updated.priority).toBe('high');
+    });
+
+    it('updates template with slug rename', async () => {
+      const t = await backend.createTemplate(
+        makeTemplate({ name: 'Old Name', type: 'task' }),
+      );
+
+      const updated = await backend.updateTemplate(t.slug, {
+        ...t,
+        name: 'New Name',
+        type: 'issue',
+      });
+
+      expect(updated.slug).toBe('new-name');
+      expect(updated.name).toBe('New Name');
+      expect(updated.type).toBe('issue');
+
+      // Old slug gone
+      await expect(backend.getTemplate('old-name')).rejects.toThrow(
+        "Template 'old-name' not found",
+      );
+    });
+
+    it('updates template labels and deps', async () => {
+      const t = await backend.createTemplate(
+        makeTemplate({
+          name: 'With Relations',
+          labels: ['old-label'],
+          dependsOn: ['old-dep'],
+        }),
+      );
+
+      const updated = await backend.updateTemplate(t.slug, {
+        ...t,
+        labels: ['new-label-1', 'new-label-2'],
+        dependsOn: ['new-dep'],
+      });
+
+      expect(updated.labels).toEqual(['new-label-1', 'new-label-2']);
+      expect(updated.dependsOn).toEqual(['new-dep']);
+
+      // Verify old labels/deps are gone via direct fetch
+      const fetched = await backend.getTemplate(t.slug);
+      expect(fetched.labels).toEqual(['new-label-1', 'new-label-2']);
+      expect(fetched.dependsOn).toEqual(['new-dep']);
+    });
+
+    it('updates template with slug rename preserves labels and deps', async () => {
+      const t = await backend.createTemplate(
+        makeTemplate({
+          name: 'Rename Me',
+          labels: ['keep-label'],
+          dependsOn: ['keep-dep'],
+        }),
+      );
+
+      const updated = await backend.updateTemplate(t.slug, {
+        ...t,
+        name: 'Renamed Template',
+        labels: ['keep-label'],
+        dependsOn: ['keep-dep'],
+      });
+
+      expect(updated.slug).toBe('renamed-template');
+      expect(updated.labels).toEqual(['keep-label']);
+      expect(updated.dependsOn).toEqual(['keep-dep']);
+    });
+
+    it('deletes template', async () => {
+      const t = await backend.createTemplate(
+        makeTemplate({ name: 'Delete Me' }),
+      );
+
+      await backend.deleteTemplate(t.slug);
+
+      const templates = await backend.listTemplates();
+      expect(templates).toEqual([]);
+    });
+
+    it('deletes template cascades to labels and deps', async () => {
+      const t = await backend.createTemplate(
+        makeTemplate({
+          name: 'Cascade Delete',
+          labels: ['label-1'],
+          dependsOn: ['dep-1'],
+        }),
+      );
+
+      await backend.deleteTemplate(t.slug);
+
+      // Verify labels are gone
+      const labelCount = db.raw
+        .prepare(
+          'SELECT COUNT(*) as count FROM template_labels WHERE template_slug = ?',
+        )
+        .get(t.slug) as { count: number };
+      expect(labelCount.count).toBe(0);
+
+      // Verify deps are gone
+      const depCount = db.raw
+        .prepare(
+          'SELECT COUNT(*) as count FROM template_deps WHERE template_slug = ?',
+        )
+        .get(t.slug) as { count: number };
+      expect(depCount.count).toBe(0);
+    });
+
+    it('getTemplate throws for non-existent slug', async () => {
+      await expect(backend.getTemplate('non-existent')).rejects.toThrow(
+        "Template 'non-existent' not found",
+      );
+    });
+
+    it('handles template with optional fields undefined', async () => {
+      const t = await backend.createTemplate({
+        slug: '',
+        name: 'Minimal',
+      });
+
+      const fetched = await backend.getTemplate(t.slug);
+      expect(fetched.slug).toBe('minimal');
+      expect(fetched.name).toBe('Minimal');
+      // Optional fields should be undefined when not set
+      expect(fetched.type).toBeUndefined();
+      expect(fetched.status).toBeUndefined();
+      expect(fetched.priority).toBeUndefined();
+      expect(fetched.assignee).toBeUndefined();
+      expect(fetched.labels).toBeUndefined();
+      expect(fetched.iteration).toBeUndefined();
+      expect(fetched.description).toBeUndefined();
+    });
+
+    it('slugifies special characters in name', async () => {
+      const t = await backend.createTemplate(
+        makeTemplate({ name: 'Feature: Add Login' }),
+      );
+      expect(t.slug).toBe('feature-add-login');
+    });
+
+    it('slugifies multiple spaces and hyphens', async () => {
+      const t = await backend.createTemplate(
+        makeTemplate({ name: 'My  Template--Name' }),
+      );
+      expect(t.slug).toBe('my-template-name');
     });
   });
 });
