@@ -4,6 +4,9 @@ import path from 'node:path';
 import os from 'node:os';
 import { configStore } from './configStore.js';
 import { defaultConfig, writeConfig } from '../backends/local/config.js';
+import { createDatabase, type TicDatabase } from '../backends/drizzle/db.js';
+import { DrizzleBackend } from '../backends/drizzle/index.js';
+import { readConfig as readConfigFromDb } from '../backends/drizzle/config.js';
 
 describe('configStore', () => {
   let tmpDir: string;
@@ -92,5 +95,72 @@ describe('configStore', () => {
     });
     await new Promise((r) => setTimeout(r, 200));
     expect(configStore.getState().config.next_id).not.toBe(77);
+  });
+});
+
+describe('configStore with SQLite backing', () => {
+  let db: TicDatabase;
+
+  beforeEach(() => {
+    db = createDatabase(':memory:');
+    // Seed defaults by creating a DrizzleBackend (which runs seedDefaults).
+    // Don't call backend.destroy() — that closes the DB connection we still need.
+    DrizzleBackend.createFromDb(db);
+  });
+
+  afterEach(() => {
+    configStore.getState().destroy();
+    db.close();
+  });
+
+  it('reads config from database when setDatabase is called before init', async () => {
+    configStore.getState().setDatabase(db);
+    await configStore.getState().init('/fake/root');
+    const { config, loaded } = configStore.getState();
+    expect(loaded).toBe(true);
+    // Should read seeded defaults from DB
+    expect(config.statuses).toEqual([
+      'backlog',
+      'todo',
+      'in-progress',
+      'review',
+      'done',
+    ]);
+  });
+
+  it('writes config to database on update', async () => {
+    configStore.getState().setDatabase(db);
+    await configStore.getState().init('/fake/root');
+    await configStore.getState().update({ next_id: 42 });
+    const { config } = configStore.getState();
+    expect(config.next_id).toBe(42);
+
+    // Verify persistence: read directly from DB
+    const dbConfig = readConfigFromDb(db);
+    expect(dbConfig.next_id).toBe(42);
+  });
+
+  it('startWatching is no-op with database', async () => {
+    configStore.getState().setDatabase(db);
+    await configStore.getState().init('/fake/root');
+    // Should not throw (no file system operations)
+    configStore.getState().startWatching();
+  });
+
+  it('destroy resets database reference', async () => {
+    configStore.getState().setDatabase(db);
+    await configStore.getState().init('/fake/root');
+    configStore.getState().destroy();
+    expect(configStore.getState().loaded).toBe(false);
+  });
+
+  it('falls back to YAML when database is null', async () => {
+    // Don't set database — should use YAML path
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-cfg-'));
+    await configStore.getState().init(tmpDir);
+    const { config } = configStore.getState();
+    expect(config.statuses).toEqual(defaultConfig.statuses);
+    configStore.getState().destroy();
+    fs.rmSync(tmpDir, { recursive: true });
   });
 });

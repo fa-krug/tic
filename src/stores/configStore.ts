@@ -9,6 +9,11 @@ import {
   readConfig,
   writeConfig,
 } from '../backends/local/config.js';
+import {
+  readConfig as readConfigFromDb,
+  writeConfig as writeConfigToDb,
+} from '../backends/drizzle/config.js';
+import type { TicDatabase } from '../backends/drizzle/db.js';
 
 export interface ConfigStoreState {
   config: Config;
@@ -16,6 +21,7 @@ export interface ConfigStoreState {
   init(root: string): Promise<void>;
   startWatching(): void;
   update(partial: Partial<Config>): Promise<void>;
+  setDatabase(db: TicDatabase | null): void;
   destroy(): void;
 }
 
@@ -27,19 +33,29 @@ let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 let writingTimer: ReturnType<typeof setTimeout> | null = null;
 let writing = false;
 let currentRoot = '';
+let currentDb: TicDatabase | null = null;
 
 export const configStore = createStore<ConfigStoreState>((set, get) => ({
   config: { ...defaultConfig },
   loaded: false,
 
   async init(root: string) {
+    // Preserve database reference across the internal destroy
+    const db = currentDb;
     get().destroy();
+    currentDb = db;
     currentRoot = root;
-    const config = await readConfig(root);
-    set({ config, loaded: true });
+    if (currentDb) {
+      const config = readConfigFromDb(currentDb);
+      set({ config, loaded: true });
+    } else {
+      const config = await readConfig(root);
+      set({ config, loaded: true });
+    }
   },
 
   startWatching() {
+    if (currentDb) return; // No-op — DB is the source of truth
     if (watcher) return; // Already watching
     if (!currentRoot) return;
 
@@ -78,18 +94,27 @@ export const configStore = createStore<ConfigStoreState>((set, get) => ({
     const merged = { ...get().config, ...partial };
     set({ config: merged });
 
-    writing = true;
-    await writeConfig(currentRoot, merged);
+    if (currentDb) {
+      writeConfigToDb(currentDb, merged);
+    } else {
+      writing = true;
+      await writeConfig(currentRoot, merged);
 
-    // Keep the writing flag on long enough for the watcher to fire and be ignored
-    if (writingTimer) clearTimeout(writingTimer);
-    writingTimer = setTimeout(() => {
-      writing = false;
-      writingTimer = null;
-    }, WRITE_FLAG_DURATION_MS);
+      // Keep the writing flag on long enough for the watcher to fire and be ignored
+      if (writingTimer) clearTimeout(writingTimer);
+      writingTimer = setTimeout(() => {
+        writing = false;
+        writingTimer = null;
+      }, WRITE_FLAG_DURATION_MS);
+    }
+  },
+
+  setDatabase(db: TicDatabase | null) {
+    currentDb = db;
   },
 
   destroy() {
+    currentDb = null;
     if (watcher) {
       watcher.close();
       watcher = null;
