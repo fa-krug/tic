@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createDatabase, type TicDatabase } from './db.js';
-import { DrizzleBackend } from './index.js';
+import { Storage } from './index.js';
 import {
   pushUndoEntry,
   popUndoEntry,
   readUndoStack,
   clearUndoStack,
 } from './undo.js';
-import type { UndoEntry } from '../../stores/undoStore.js';
+import type { UndoEntry } from '../stores/undoStore.js';
 
 function makeEntry(overrides?: Partial<UndoEntry>): UndoEntry {
   return {
@@ -42,7 +42,7 @@ describe('undo persistence', () => {
 
   beforeEach(() => {
     db = createDatabase(':memory:');
-    DrizzleBackend.createFromDb(db);
+    Storage.createFromDb(db);
   });
 
   afterEach(() => {

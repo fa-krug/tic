@@ -4,9 +4,9 @@ import path from 'node:path';
 import os from 'node:os';
 import { configStore } from './configStore.js';
 import { defaultConfig, writeConfig } from '../backends/local/config.js';
-import { createDatabase, type TicDatabase } from '../backends/drizzle/db.js';
-import { DrizzleBackend } from '../backends/drizzle/index.js';
-import { readConfig as readConfigFromDb } from '../backends/drizzle/config.js';
+import { createDatabase, type TicDatabase } from '../storage/db.js';
+import { Storage } from '../storage/index.js';
+import { readConfig as readConfigFromDb } from '../storage/config.js';
 
 describe('configStore', () => {
   let tmpDir: string;
@@ -103,9 +103,9 @@ describe('configStore with SQLite backing', () => {
 
   beforeEach(() => {
     db = createDatabase(':memory:');
-    // Seed defaults by creating a DrizzleBackend (which runs seedDefaults).
+    // Seed defaults by creating a Storage (which runs seedDefaults).
     // Don't call backend.destroy() — that closes the DB connection we still need.
-    DrizzleBackend.createFromDb(db);
+    Storage.createFromDb(db);
   });
 
   afterEach(() => {

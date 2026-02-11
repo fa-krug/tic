@@ -3,8 +3,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { SyncManager } from './SyncManager.js';
-import { DrizzleBackend } from '../backends/drizzle/index.js';
-import { DrizzleSyncQueue } from '../backends/drizzle/syncQueue.js';
+import { Storage } from '../storage/index.js';
+import { SyncQueue } from '../storage/syncQueue.js';
 import type { Backend } from '../backends/types.js';
 import type { WorkItem, NewWorkItem, NewComment, Comment } from '../types.js';
 import type { SyncStatus } from './types.js';
@@ -163,16 +163,16 @@ function createMockRemote(items: WorkItem[] = []): Backend {
 
 describe('SyncManager push phase', () => {
   let tmpDir: string;
-  let local: DrizzleBackend;
+  let local: Storage;
   let remote: Backend;
   let manager: SyncManager;
-  let queueStore: DrizzleSyncQueue;
+  let queueStore: SyncQueue;
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-sync-test-'));
-    local = DrizzleBackend.create(tmpDir);
+    local = Storage.create(tmpDir);
     remote = createMockRemote();
-    queueStore = new DrizzleSyncQueue(local.getDatabase());
+    queueStore = new SyncQueue(local.getDatabase());
     manager = new SyncManager(local, remote, queueStore);
   });
 
@@ -393,13 +393,13 @@ describe('SyncManager push phase', () => {
 
 describe('SyncManager strips unsupported fields', () => {
   let tmpDir: string;
-  let local: DrizzleBackend;
-  let queueStore: DrizzleSyncQueue;
+  let local: Storage;
+  let queueStore: SyncQueue;
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-sync-test-'));
-    local = DrizzleBackend.create(tmpDir);
-    queueStore = new DrizzleSyncQueue(local.getDatabase());
+    local = Storage.create(tmpDir);
+    queueStore = new SyncQueue(local.getDatabase());
   });
 
   afterEach(() => {
@@ -498,13 +498,13 @@ describe('SyncManager strips unsupported fields', () => {
 
 describe('SyncManager pull phase (via sync)', () => {
   let tmpDir: string;
-  let local: DrizzleBackend;
-  let queueStore: DrizzleSyncQueue;
+  let local: Storage;
+  let queueStore: SyncQueue;
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-sync-test-'));
-    local = DrizzleBackend.create(tmpDir);
-    queueStore = new DrizzleSyncQueue(local.getDatabase());
+    local = Storage.create(tmpDir);
+    queueStore = new SyncQueue(local.getDatabase());
   });
 
   afterEach(() => {
@@ -632,13 +632,13 @@ describe('SyncManager pull phase (via sync)', () => {
 
 describe('SyncManager status callbacks', () => {
   let tmpDir: string;
-  let local: DrizzleBackend;
-  let queueStore: DrizzleSyncQueue;
+  let local: Storage;
+  let queueStore: SyncQueue;
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-sync-test-'));
-    local = DrizzleBackend.create(tmpDir);
-    queueStore = new DrizzleSyncQueue(local.getDatabase());
+    local = Storage.create(tmpDir);
+    queueStore = new SyncQueue(local.getDatabase());
   });
 
   afterEach(() => {
@@ -720,13 +720,13 @@ describe('SyncManager status callbacks', () => {
 
 describe('SyncManager progress reporting', () => {
   let tmpDir: string;
-  let local: DrizzleBackend;
-  let queueStore: DrizzleSyncQueue;
+  let local: Storage;
+  let queueStore: SyncQueue;
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-sync-test-'));
-    local = DrizzleBackend.create(tmpDir);
-    queueStore = new DrizzleSyncQueue(local.getDatabase());
+    local = Storage.create(tmpDir);
+    queueStore = new SyncQueue(local.getDatabase());
   });
 
   afterEach(() => {

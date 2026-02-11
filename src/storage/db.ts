@@ -44,7 +44,7 @@ export function createDatabase(root: string): TicDatabase {
   const db = drizzle(sqlite, { schema });
 
   // Apply migrations
-  const migrationsFolder = path.join(import.meta.dirname, '../../../drizzle');
+  const migrationsFolder = path.join(import.meta.dirname, '../../drizzle');
   migrate(db, { migrationsFolder });
 
   const ticDb = db as unknown as TicDatabase;

@@ -49,7 +49,7 @@ describe('backendDataStore', () => {
     expect(backendDataStore.getState().loading).toBe(true);
   });
 
-  it('loads data from DrizzleBackend', async () => {
+  it('loads data from Storage', async () => {
     backendDataStore.getState().init(tmpDir);
     await waitForLoad();
 

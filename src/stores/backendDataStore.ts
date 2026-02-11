@@ -70,8 +70,8 @@ async function createBackendAndSync(cwd: string): Promise<{
   syncManager: SyncManager | null;
   queue: SyncQueueAdapter | null;
 }> {
-  const { DrizzleBackend } = await import('../backends/drizzle/index.js');
-  const primary = DrizzleBackend.create(cwd);
+  const { Storage } = await import('../storage/index.js');
+  const primary = Storage.create(cwd);
 
   // Set up configStore with SQLite backing
   configStore.getState().setDatabase(primary.getDatabase());
@@ -84,9 +84,8 @@ async function createBackendAndSync(cwd: string): Promise<{
   let queue: SyncQueueAdapter | null = null;
   if (remote) {
     const { SyncManager: SM } = await import('../sync/SyncManager.js');
-    const { DrizzleSyncQueue } =
-      await import('../backends/drizzle/syncQueue.js');
-    queue = new DrizzleSyncQueue(primary.getDatabase());
+    const { SyncQueue } = await import('../storage/syncQueue.js');
+    queue = new SyncQueue(primary.getDatabase());
     syncManager = new SM(primary, remote, queue);
   }
 

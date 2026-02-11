@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createDatabase, type TicDatabase } from './db.js';
-import { DrizzleBackend } from './index.js';
-import { DrizzleSyncQueue } from './syncQueue.js';
-import type { QueueEntry } from '../../sync/types.js';
+import { Storage } from './index.js';
+import { SyncQueue } from './syncQueue.js';
+import type { QueueEntry } from '../sync/types.js';
 
 function makeEntry(overrides?: Partial<QueueEntry>): QueueEntry {
   return {
@@ -13,14 +13,14 @@ function makeEntry(overrides?: Partial<QueueEntry>): QueueEntry {
   };
 }
 
-describe('DrizzleSyncQueue', () => {
+describe('SyncQueue', () => {
   let db: TicDatabase;
-  let queue: DrizzleSyncQueue;
+  let queue: SyncQueue;
 
   beforeEach(() => {
     db = createDatabase(':memory:');
-    DrizzleBackend.createFromDb(db);
-    queue = new DrizzleSyncQueue(db);
+    Storage.createFromDb(db);
+    queue = new SyncQueue(db);
   });
 
   afterEach(() => {

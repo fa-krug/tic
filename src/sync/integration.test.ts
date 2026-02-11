@@ -2,9 +2,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { DrizzleBackend } from '../backends/drizzle/index.js';
+import { Storage } from '../storage/index.js';
 import { SyncManager } from './SyncManager.js';
-import { DrizzleSyncQueue } from '../backends/drizzle/syncQueue.js';
+import { SyncQueue } from '../storage/syncQueue.js';
 import type { Backend } from '../backends/types.js';
 import type { WorkItem, NewWorkItem, NewComment, Comment } from '../types.js';
 
@@ -142,7 +142,7 @@ function createMockRemote(items: WorkItem[] = []): Backend {
 
 describe('end-to-end sync', () => {
   let tmpDir: string;
-  let local: DrizzleBackend;
+  let local: Storage;
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-e2e-'));
@@ -154,9 +154,9 @@ describe('end-to-end sync', () => {
   });
 
   it('full cycle: create locally, push, pull, verify', async () => {
-    local = DrizzleBackend.create(tmpDir, { tempIds: true });
+    local = Storage.create(tmpDir, { tempIds: true });
     const remote = createMockRemote([]);
-    const queue = new DrizzleSyncQueue(local.getDatabase());
+    const queue = new SyncQueue(local.getDatabase());
     const manager = new SyncManager(local, remote, queue);
 
     const item = await local.createWorkItem({
@@ -191,8 +191,8 @@ describe('end-to-end sync', () => {
   });
 
   it('remote changes overwrite local on pull', async () => {
-    local = DrizzleBackend.create(tmpDir);
-    const queue = new DrizzleSyncQueue(local.getDatabase());
+    local = Storage.create(tmpDir);
+    const queue = new SyncQueue(local.getDatabase());
 
     await local.createWorkItem({
       title: 'Will be overwritten',

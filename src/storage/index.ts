@@ -1,14 +1,17 @@
 import { spawn } from 'node:child_process';
 import { eq, and, isNull, isNotNull, inArray } from 'drizzle-orm';
-import { BaseBackend } from '../types.js';
-import type { BackendCapabilities, SoftDeleteBackend } from '../types.js';
+import { BaseBackend } from '../backends/types.js';
+import type {
+  BackendCapabilities,
+  SoftDeleteBackend,
+} from '../backends/types.js';
 import type {
   WorkItem,
   NewWorkItem,
   NewComment,
   Comment,
   Template,
-} from '../../types.js';
+} from '../types.js';
 import { createDatabase, type TicDatabase } from './db.js';
 import * as schema from './schema.js';
 import {
@@ -32,20 +35,16 @@ const DEFAULT_AUTO_UPDATE = true;
 const DEFAULT_BRANCH_COMMAND = `claude "Brainstorm the implementation of issue #$TIC_ITEM_ID: $TIC_ITEM_TITLE. $TIC_ITEM_DESCRIPTION"`;
 const DEFAULT_COPY_TO_CLIPBOARD = true;
 
-export interface DrizzleBackendOptions {
+export interface StorageOptions {
   tempIds?: boolean;
 }
 
-export class DrizzleBackend extends BaseBackend implements SoftDeleteBackend {
+export class Storage extends BaseBackend implements SoftDeleteBackend {
   private db: TicDatabase;
   private root: string;
   private tempIds: boolean;
 
-  private constructor(
-    db: TicDatabase,
-    root: string,
-    options?: DrizzleBackendOptions,
-  ) {
+  private constructor(db: TicDatabase, root: string, options?: StorageOptions) {
     super(0); // No TTL — DB is always fresh
     this.db = db;
     this.root = root;
@@ -53,23 +52,20 @@ export class DrizzleBackend extends BaseBackend implements SoftDeleteBackend {
   }
 
   /**
-   * Create a DrizzleBackend, initializing the database and seeding defaults.
+   * Create a Storage instance, initializing the database and seeding defaults.
    */
-  static create(root: string, options?: DrizzleBackendOptions): DrizzleBackend {
+  static create(root: string, options?: StorageOptions): Storage {
     const db = createDatabase(root);
-    const backend = new DrizzleBackend(db, root, options);
+    const backend = new Storage(db, root, options);
     backend.seedDefaults();
     return backend;
   }
 
   /**
-   * Create a DrizzleBackend from an existing database instance (for testing).
+   * Create a Storage instance from an existing database instance (for testing).
    */
-  static createFromDb(
-    db: TicDatabase,
-    options?: DrizzleBackendOptions,
-  ): DrizzleBackend {
-    const backend = new DrizzleBackend(db, ':memory:', options);
+  static createFromDb(db: TicDatabase, options?: StorageOptions): Storage {
+    const backend = new Storage(db, ':memory:', options);
     backend.seedDefaults();
     return backend;
   }

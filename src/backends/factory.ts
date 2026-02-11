@@ -1,8 +1,8 @@
 import { execSync } from 'node:child_process';
 import type { Backend } from './types.js';
 import type { SyncQueueAdapter } from '../sync/types.js';
-import { DrizzleBackend } from './drizzle/index.js';
-import { DrizzleSyncQueue } from './drizzle/syncQueue.js';
+import { Storage } from '../storage/index.js';
+import { SyncQueue } from '../storage/syncQueue.js';
 import { configStore } from '../stores/configStore.js';
 import { SyncManager } from '../sync/SyncManager.js';
 
@@ -41,7 +41,7 @@ export async function createBackend(root: string): Promise<Backend> {
   if (!configStore.getState().loaded) {
     await configStore.getState().init(root);
   }
-  return DrizzleBackend.create(root);
+  return Storage.create(root);
 }
 
 export async function createRemoteBackend(
@@ -89,7 +89,7 @@ export async function createBackendWithSync(
     await configStore.getState().init(root);
   }
 
-  const primary = DrizzleBackend.create(root);
+  const primary = Storage.create(root);
   configStore.getState().setDatabase(primary.getDatabase());
 
   const config = configStore.getState().config;
@@ -98,7 +98,7 @@ export async function createBackendWithSync(
   let syncManager: SyncManager | null = null;
   let queue: SyncQueueAdapter | null = null;
   if (remote) {
-    queue = new DrizzleSyncQueue(primary.getDatabase());
+    queue = new SyncQueue(primary.getDatabase());
     syncManager = new SyncManager(primary, remote, queue);
   }
 

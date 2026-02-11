@@ -1,8 +1,8 @@
 import { eq, desc } from 'drizzle-orm';
 import type { TicDatabase } from './db.js';
-import type { UndoEntry, UndoActionType } from '../../stores/undoStore.js';
-import type { QueueAction } from '../../sync/types.js';
-import type { WorkItem } from '../../types.js';
+import type { UndoEntry, UndoActionType } from '../stores/undoStore.js';
+import type { QueueAction } from '../sync/types.js';
+import type { WorkItem } from '../types.js';
 import * as s from './schema.js';
 
 const MAX_DEPTH = 5;

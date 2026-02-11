@@ -38,7 +38,8 @@ npx vitest run src/backends/local/config.test.ts
 - **Language**: TypeScript 5.9 (strict mode via `@sindresorhus/tsconfig`)
 - **Module system**: ESM (`"type": "module"` in package.json)
 - **Testing**: Vitest 4
-- **Work item storage**: [gray-matter](https://github.com/jonschlinkert/gray-matter) (YAML frontmatter) + [yaml](https://github.com/eemeli/yaml) (serialization)
+- **Local storage**: [Drizzle ORM](https://orm.drizzle.team/) + [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) (SQLite with WAL mode)
+- **File sync**: [gray-matter](https://github.com/jonschlinkert/gray-matter) (YAML frontmatter) + [yaml](https://github.com/eemeli/yaml) (serialization) for `.tic/items/` markdown files
 
 ## Architecture
 
@@ -72,6 +73,11 @@ The app uses screen-based routing via React Context (`AppContext` in `src/app.ts
 - **GitLab** (`src/backends/gitlab/`) — reads/writes GitLab Issues via the `glab` CLI
 - **Azure DevOps** (`src/backends/ado/`) — reads/writes Azure DevOps Work Items via the `az` CLI
 - **Jira** (`src/backends/jira/`) — reads/writes Jira issues via REST API
+- **Files** (`src/backends/files/`) — filesystem sync destination that replicates items from `Storage` to `.tic/items/` markdown files via `SyncManager`
+
+### Storage (Local Persistence)
+
+`Storage` (`src/storage/`) is the SQLite-backed local persistence layer. It implements the `Backend` interface but is **not** a remote backend — it replaces `LocalBackend` as the primary local store. All data lives in `.tic/tic.db` (SQLite with WAL mode). Key modules: `schema.ts` (Drizzle ORM table definitions), `db.ts` (database creation and migration), `config.ts` (project config), `syncQueue.ts` (`SyncQueue` for queuing sync actions), `undo.ts` (undo log), and `mappers.ts` (row-to-domain conversions).
 
 ### Components
 

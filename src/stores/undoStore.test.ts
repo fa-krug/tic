@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { WorkItem } from '../types.js';
 import type { UndoEntry } from './undoStore.js';
 import { undoStore } from './undoStore.js';
-import { createDatabase, type TicDatabase } from '../backends/drizzle/db.js';
-import { DrizzleBackend } from '../backends/drizzle/index.js';
+import { createDatabase, type TicDatabase } from '../storage/db.js';
+import { Storage } from '../storage/index.js';
 
 const makeSnapshot = (id: string): WorkItem => ({
   id,
@@ -130,7 +130,7 @@ describe('undoStore with SQLite backing', () => {
 
   beforeEach(() => {
     db = createDatabase(':memory:');
-    DrizzleBackend.createFromDb(db);
+    Storage.createFromDb(db);
     undoStore.getState().setDatabase(db);
   });
 

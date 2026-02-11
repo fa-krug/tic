@@ -2,16 +2,16 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { DrizzleBackend } from '../../backends/drizzle/index.js';
+import { Storage } from '../../storage/index.js';
 import { runIterationList, runIterationSet } from '../commands/iteration.js';
 
 describe('iteration commands', () => {
   let tmpDir: string;
-  let backend: DrizzleBackend;
+  let backend: Storage;
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-cli-test-'));
-    backend = DrizzleBackend.create(tmpDir);
+    backend = Storage.create(tmpDir);
   });
 
   afterEach(() => {

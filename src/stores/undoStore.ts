@@ -2,13 +2,13 @@ import { createStore } from 'zustand/vanilla';
 import { useStore } from 'zustand';
 import type { WorkItem } from '../types.js';
 import type { QueueAction } from '../sync/types.js';
-import type { TicDatabase } from '../backends/drizzle/db.js';
+import type { TicDatabase } from '../storage/db.js';
 import {
   pushUndoEntry,
   popUndoEntry,
   readUndoStack,
   clearUndoStack,
-} from '../backends/drizzle/undo.js';
+} from '../storage/undo.js';
 
 export type UndoActionType = 'delete' | 'create' | 'update';
 

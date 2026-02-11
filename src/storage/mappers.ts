@@ -1,4 +1,4 @@
-import type { WorkItem, Comment, Template } from '../../types.js';
+import type { WorkItem, Comment, Template } from '../types.js';
 import type {
   workItems,
   workItemLabels,

@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import type { Config } from '../local/config.js';
+import type { Config } from '../backends/local/config.js';
 import type { TicDatabase, TicTransaction } from './db.js';
 import * as schema from './schema.js';
 

@@ -1,8 +1,8 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { eq } from 'drizzle-orm';
-import type { TicDatabase } from '../drizzle/db.js';
-import * as s from '../drizzle/schema.js';
+import type { TicDatabase } from '../../storage/db.js';
+import * as s from '../../storage/schema.js';
 import { listItemFiles } from '../local/items.js';
 import { contentHash } from './hash.js';
 

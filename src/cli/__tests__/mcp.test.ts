@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { DrizzleBackend } from '../../backends/drizzle/index.js';
+import { Storage } from '../../storage/index.js';
 import { configStore } from '../../stores/configStore.js';
 import type { WorkItem, Comment } from '../../types.js';
 import {
@@ -35,7 +35,7 @@ describe('MCP handlers', () => {
     fs.rmSync(tmpDir, { recursive: true });
   });
 
-  let backend: DrizzleBackend;
+  let backend: Storage;
 
   describe('handleInitProject', () => {
     it('initializes a new project', async () => {
@@ -63,7 +63,7 @@ describe('MCP handlers', () => {
   describe('handleGetConfig', () => {
     it('returns config from backend', async () => {
       await handleInitProject(tmpDir);
-      backend = DrizzleBackend.create(tmpDir);
+      backend = Storage.create(tmpDir);
       const result = await handleGetConfig(backend, tmpDir);
       expect(result.isError).toBeUndefined();
       const data = JSON.parse(result.content[0]!.text) as {
@@ -90,7 +90,7 @@ describe('MCP handlers', () => {
   describe('handleListItems', () => {
     beforeEach(async () => {
       await handleInitProject(tmpDir);
-      backend = DrizzleBackend.create(tmpDir);
+      backend = Storage.create(tmpDir);
     });
 
     it('lists items', async () => {
@@ -189,7 +189,7 @@ describe('MCP handlers', () => {
   describe('handleShowItem', () => {
     beforeEach(async () => {
       await handleInitProject(tmpDir);
-      backend = DrizzleBackend.create(tmpDir);
+      backend = Storage.create(tmpDir);
     });
 
     it('returns item details', async () => {
@@ -222,7 +222,7 @@ describe('MCP handlers', () => {
   describe('handleCreateItem', () => {
     beforeEach(async () => {
       await handleInitProject(tmpDir);
-      backend = DrizzleBackend.create(tmpDir);
+      backend = Storage.create(tmpDir);
     });
 
     it('creates with defaults', async () => {
@@ -289,7 +289,7 @@ describe('MCP handlers', () => {
   describe('handleUpdateItem', () => {
     beforeEach(async () => {
       await handleInitProject(tmpDir);
-      backend = DrizzleBackend.create(tmpDir);
+      backend = Storage.create(tmpDir);
     });
 
     it('updates fields', async () => {
@@ -394,7 +394,7 @@ describe('MCP handlers', () => {
 
     beforeEach(async () => {
       await handleInitProject(tmpDir);
-      backend = DrizzleBackend.create(tmpDir);
+      backend = Storage.create(tmpDir);
       pendingDeletes = createDeleteTracker();
     });
 
@@ -495,7 +495,7 @@ describe('MCP handlers', () => {
 
     beforeEach(async () => {
       await handleInitProject(tmpDir);
-      backend = DrizzleBackend.create(tmpDir);
+      backend = Storage.create(tmpDir);
       pendingDeletes = createDeleteTracker();
     });
 
@@ -572,7 +572,7 @@ describe('MCP handlers', () => {
   describe('handleAddComment', () => {
     beforeEach(async () => {
       await handleInitProject(tmpDir);
-      backend = DrizzleBackend.create(tmpDir);
+      backend = Storage.create(tmpDir);
     });
 
     it('adds comment to item', async () => {
@@ -633,7 +633,7 @@ describe('MCP handlers', () => {
   describe('handleSetIteration', () => {
     beforeEach(async () => {
       await handleInitProject(tmpDir);
-      backend = DrizzleBackend.create(tmpDir);
+      backend = Storage.create(tmpDir);
     });
 
     it('sets current iteration', async () => {
@@ -646,7 +646,7 @@ describe('MCP handlers', () => {
   describe('handleSearchItems', () => {
     beforeEach(async () => {
       await handleInitProject(tmpDir);
-      backend = DrizzleBackend.create(tmpDir);
+      backend = Storage.create(tmpDir);
       await backend.createWorkItem({
         title: 'Fix login bug',
         type: 'issue',
@@ -726,7 +726,7 @@ describe('MCP handlers', () => {
   describe('handleGetChildren', () => {
     beforeEach(async () => {
       await handleInitProject(tmpDir);
-      backend = DrizzleBackend.create(tmpDir);
+      backend = Storage.create(tmpDir);
     });
 
     it('returns children', async () => {
@@ -778,7 +778,7 @@ describe('MCP handlers', () => {
   describe('handleGetDependents', () => {
     beforeEach(async () => {
       await handleInitProject(tmpDir);
-      backend = DrizzleBackend.create(tmpDir);
+      backend = Storage.create(tmpDir);
     });
 
     it('returns dependents', async () => {
@@ -827,7 +827,7 @@ describe('MCP handlers', () => {
 
     beforeEach(async () => {
       await handleInitProject(tmpDir);
-      backend = DrizzleBackend.create(tmpDir);
+      backend = Storage.create(tmpDir);
     });
 
     it('returns items nested under parents', async () => {

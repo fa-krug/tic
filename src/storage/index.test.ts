@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createDatabase, type TicDatabase } from './db.js';
-import { DrizzleBackend } from './index.js';
-import { isSoftDeleteBackend } from '../types.js';
-import type { NewWorkItem, Template } from '../../types.js';
+import { Storage } from './index.js';
+import { isSoftDeleteBackend } from '../backends/types.js';
+import type { NewWorkItem, Template } from '../types.js';
 
 function makeNewItem(overrides: Partial<NewWorkItem> = {}): NewWorkItem {
   return {
@@ -37,13 +37,13 @@ function makeTemplate(overrides: Partial<Template> = {}): Template {
   };
 }
 
-describe('DrizzleBackend', () => {
+describe('Storage', () => {
   let db: TicDatabase;
-  let backend: DrizzleBackend;
+  let backend: Storage;
 
   beforeEach(() => {
     db = createDatabase(':memory:');
-    backend = DrizzleBackend.createFromDb(db);
+    backend = Storage.createFromDb(db);
   });
 
   afterEach(() => {
@@ -899,7 +899,7 @@ describe('DrizzleBackend', () => {
   describe('seedDefaults', () => {
     it('is idempotent — creating backend twice does not duplicate data', () => {
       // Create another backend from same DB — seedDefaults runs again
-      const backend2 = DrizzleBackend.createFromDb(db);
+      const backend2 = Storage.createFromDb(db);
       // Statuses should not be duplicated
       const statuses = db.raw
         .prepare('SELECT COUNT(*) as count FROM statuses')
@@ -1235,7 +1235,7 @@ describe('DrizzleBackend', () => {
   describe('temp IDs', () => {
     it('prefixes IDs with local- when tempIds is true', async () => {
       const tempDb = createDatabase(':memory:');
-      const tempBackend = DrizzleBackend.createFromDb(tempDb, {
+      const tempBackend = Storage.createFromDb(tempDb, {
         tempIds: true,
       });
 

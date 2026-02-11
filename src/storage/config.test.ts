@@ -1,16 +1,16 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createDatabase, type TicDatabase } from './db.js';
-import { DrizzleBackend } from './index.js';
+import { Storage } from './index.js';
 import { readConfig, writeConfig, updateConfig } from './config.js';
-import type { Config } from '../local/config.js';
+import type { Config } from '../backends/local/config.js';
 
 describe('drizzle config', () => {
   let db: TicDatabase;
-  let backend: DrizzleBackend;
+  let backend: Storage;
 
   beforeEach(() => {
     db = createDatabase(':memory:');
-    backend = DrizzleBackend.createFromDb(db);
+    backend = Storage.createFromDb(db);
   });
 
   afterEach(() => {

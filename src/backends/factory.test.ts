@@ -8,7 +8,7 @@ import {
   detectBackend,
   VALID_BACKENDS,
 } from './factory.js';
-import { DrizzleBackend } from './drizzle/index.js';
+import { Storage } from '../storage/index.js';
 import { SyncManager } from '../sync/SyncManager.js';
 import { writeConfig, defaultConfig } from './local/config.js';
 import { configStore } from '../stores/configStore.js';
@@ -47,17 +47,17 @@ describe('createBackend', () => {
     fs.rmSync(tmpDir, { recursive: true });
   });
 
-  it('always creates a DrizzleBackend as primary', async () => {
+  it('always creates a Storage as primary', async () => {
     await writeConfig(tmpDir, { ...defaultConfig, backend: 'none' });
     const backend = await createBackend(tmpDir);
-    expect(backend).toBeInstanceOf(DrizzleBackend);
+    expect(backend).toBeInstanceOf(Storage);
     expect(await backend.getStatuses()).toEqual(defaultConfig.statuses);
   });
 
-  it('creates DrizzleBackend regardless of config.backend setting', async () => {
+  it('creates Storage regardless of config.backend setting', async () => {
     await writeConfig(tmpDir, { ...defaultConfig, backend: 'github' });
     const backend = await createBackend(tmpDir);
-    expect(backend).toBeInstanceOf(DrizzleBackend);
+    expect(backend).toBeInstanceOf(Storage);
   });
 });
 
@@ -73,22 +73,22 @@ describe('createBackendWithSync', () => {
     fs.rmSync(tmpDir, { recursive: true });
   });
 
-  it('returns DrizzleBackend and null syncManager for none backend', async () => {
+  it('returns Storage and null syncManager for none backend', async () => {
     await writeConfig(tmpDir, { ...defaultConfig, backend: 'none' });
     const { backend, syncManager, queue } = await createBackendWithSync(tmpDir);
-    expect(backend).toBeInstanceOf(DrizzleBackend);
+    expect(backend).toBeInstanceOf(Storage);
     expect(syncManager).toBeNull();
     expect(queue).toBeNull();
   });
 
-  it('returns DrizzleBackend and SyncManager for github backend', async () => {
+  it('returns Storage and SyncManager for github backend', async () => {
     await writeConfig(tmpDir, { ...defaultConfig, backend: 'github' });
     // GitHubBackend constructor may throw if gh is not authenticated,
     // but we still expect the right types when it succeeds
     try {
       const { backend, syncManager, queue } =
         await createBackendWithSync(tmpDir);
-      expect(backend).toBeInstanceOf(DrizzleBackend);
+      expect(backend).toBeInstanceOf(Storage);
       expect(syncManager).toBeInstanceOf(SyncManager);
       expect(queue).not.toBeNull();
     } catch (e) {
@@ -97,7 +97,7 @@ describe('createBackendWithSync', () => {
     }
   });
 
-  it('returns DrizzleBackend and SyncManager for jira backend', async () => {
+  it('returns Storage and SyncManager for jira backend', async () => {
     await writeConfig(tmpDir, {
       ...defaultConfig,
       backend: 'jira',
@@ -109,7 +109,7 @@ describe('createBackendWithSync', () => {
     try {
       const { backend, syncManager, queue } =
         await createBackendWithSync(tmpDir);
-      expect(backend).toBeInstanceOf(DrizzleBackend);
+      expect(backend).toBeInstanceOf(Storage);
       expect(syncManager).toBeInstanceOf(SyncManager);
       expect(queue).not.toBeNull();
     } catch (e) {

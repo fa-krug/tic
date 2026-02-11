@@ -12,8 +12,8 @@ import {
 import {
   readConfig as readConfigFromDb,
   writeConfig as writeConfigToDb,
-} from '../backends/drizzle/config.js';
-import type { TicDatabase } from '../backends/drizzle/db.js';
+} from '../storage/config.js';
+import type { TicDatabase } from '../storage/db.js';
 
 export interface ConfigStoreState {
   config: Config;

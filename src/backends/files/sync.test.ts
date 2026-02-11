@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createDatabase, type TicDatabase } from '../drizzle/db.js';
-import { DrizzleBackend } from '../drizzle/index.js';
+import { createDatabase, type TicDatabase } from '../../storage/db.js';
+import { Storage } from '../../storage/index.js';
 import { writeWorkItem, readWorkItem } from '../local/items.js';
 import { contentHash } from './hash.js';
 import {
@@ -37,14 +37,14 @@ function makeItem(overrides: Partial<WorkItem> = {}): WorkItem {
 describe('file sync detection', () => {
   let tmpDir: string;
   let db: TicDatabase;
-  let backend: DrizzleBackend;
+  let backend: Storage;
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-sync-'));
     fs.mkdirSync(path.join(tmpDir, '.tic', 'items'), { recursive: true });
 
     db = createDatabase(':memory:');
-    backend = DrizzleBackend.createFromDb(db);
+    backend = Storage.createFromDb(db);
   });
 
   afterEach(() => {

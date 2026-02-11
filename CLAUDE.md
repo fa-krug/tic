@@ -61,8 +61,23 @@ Or add `.mcp.json` to the project root:
 - `GitLabBackend` (`src/backends/gitlab/`) — GitLab Issues via `glab` CLI
 - `AzureDevOpsBackend` (`src/backends/ado/`) — Azure DevOps Work Items via `az` CLI
 - `JiraBackend` (`src/backends/jira/`) — Jira issues via REST API
+- `FilesBackend` (`src/backends/files/`) — filesystem sync destination that delegates I/O to `local/items.ts` and `local/templates.ts`. Used by `SyncManager` to replicate items from `Storage` to `.tic/items/` markdown files.
 
 `src/backends/factory.ts` auto-detects the backend from git remotes (github.com → GitHub, gitlab.com → GitLab, dev.azure.com/visualstudio.com → Azure DevOps, fallback → local). Can be overridden via `backend` in `.tic/config.yml`. Jira is configured via the TUI settings screen.
+
+### Storage (Local Persistence)
+
+`Storage` (`src/storage/`) is the SQLite-backed local persistence layer. It is **not** a remote backend — it replaces `LocalBackend` as the primary local store and implements the `Backend` interface so it can be used interchangeably.
+
+Key modules in `src/storage/`:
+
+- `index.ts` — `Storage` class. Implements `Backend` + `SoftDeleteBackend`. All data lives in `.tic/tic.db` (SQLite with WAL mode). Manages work items, comments, templates, config, iterations, and auto-incrementing IDs.
+- `schema.ts` — Drizzle ORM table definitions (work items, labels, dependencies, comments, templates, config, undo log, sync queue).
+- `db.ts` — database creation, migration, and WAL setup via `createDatabase(root)`. Migrations live in `drizzle/` at the project root.
+- `config.ts` — project config stored in the `project_config` table (statuses, types, iterations, branch settings, views).
+- `syncQueue.ts` — `SyncQueue` class. Queues create/update/delete actions for `SyncManager` to push to remote backends and `FilesBackend`.
+- `undo.ts` — undo log stored in the `undo_log` table. Supports soft-delete (items moved to `deleted_at` column rather than removed).
+- `mappers.ts` — converts between Drizzle row types and `WorkItem`/`Template` domain objects.
 
 ### Components
 
@@ -104,7 +119,8 @@ Zustand vanilla stores in `src/stores/`:
 - **Language**: TypeScript 5.9 (strict, via `@sindresorhus/tsconfig`)
 - **Module system**: ESM (`"type": "module"` in package.json)
 - **Testing**: Vitest 4 (tests use temp directories for isolation)
-- **Work item storage**: gray-matter (YAML frontmatter) + yaml (serialization)
+- **Local storage**: Drizzle ORM + better-sqlite3 (SQLite with WAL mode) in `src/storage/`
+- **File sync**: gray-matter (YAML frontmatter) + yaml (serialization) for `.tic/items/` markdown files
 
 ## Conventions
 

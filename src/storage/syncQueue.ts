@@ -5,10 +5,10 @@ import type {
   QueueEntry,
   SyncQueueData,
   SyncQueueAdapter,
-} from '../../sync/types.js';
+} from '../sync/types.js';
 import * as s from './schema.js';
 
-export class DrizzleSyncQueue implements SyncQueueAdapter {
+export class SyncQueue implements SyncQueueAdapter {
   db: TicDatabase;
 
   constructor(db: TicDatabase) {
