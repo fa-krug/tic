@@ -4,7 +4,7 @@ import { detectBackend, VALID_BACKENDS } from '../backends/factory.js';
 import type { Backend, BackendCapabilities } from '../backends/types.js';
 import { BACKEND_CAPABILITIES } from '../backends/capabilities.js';
 import { readConfigSync } from '../backends/local/config.js';
-import { SyncQueueStore } from '../sync/queue.js';
+import type { SyncQueueAdapter } from '../sync/types.js';
 import type { SyncManager } from '../sync/SyncManager.js';
 import { formatTsvRow, formatTsvKeyValue, formatJson } from './format.js';
 import type {
@@ -82,13 +82,14 @@ async function createBackend(): Promise<Backend> {
 async function createBackendAndSync(): Promise<{
   backend: Backend;
   syncManager: SyncManager | null;
-  queueStore: SyncQueueStore | null;
+  queue: SyncQueueAdapter | null;
 }> {
   requireTicProject(process.cwd());
   const { createBackendWithSync } = await import('../backends/factory.js');
-  const { backend, syncManager } = await createBackendWithSync(process.cwd());
-  const queueStore = syncManager ? new SyncQueueStore(process.cwd()) : null;
-  return { backend, syncManager, queueStore };
+  const { backend, syncManager, queue } = await createBackendWithSync(
+    process.cwd(),
+  );
+  return { backend, syncManager, queue };
 }
 
 function tryGetCapabilities(): BackendCapabilities | null {
@@ -273,7 +274,7 @@ export function createProgram(): Command {
   create.action(async (title: string, opts: ItemCreateOptions) => {
     const parentOpts = program.opts<GlobalOpts>();
     try {
-      const { backend, syncManager, queueStore } = await createBackendAndSync();
+      const { backend, syncManager, queue } = await createBackendAndSync();
       const description = readStdin();
       const { runItemCreate } = await import('./commands/item.js');
       let wi = await runItemCreate(backend, title, {
@@ -281,8 +282,8 @@ export function createProgram(): Command {
         dependsOn: opts.dependsOn,
         description,
       });
-      if (queueStore && syncManager) {
-        await queueStore.append({
+      if (queue && syncManager) {
+        await queue.append({
           action: 'create',
           itemId: wi.id,
           timestamp: new Date().toISOString(),
@@ -322,7 +323,7 @@ export function createProgram(): Command {
   update.action(async (idStr: string, opts: ItemUpdateOptions) => {
     const parentOpts = program.opts<GlobalOpts>();
     try {
-      const { backend, syncManager, queueStore } = await createBackendAndSync();
+      const { backend, syncManager, queue } = await createBackendAndSync();
       const description = readStdin();
       const updateOpts: ItemUpdateOptions = {
         ...opts,
@@ -331,8 +332,8 @@ export function createProgram(): Command {
       };
       const { runItemUpdate } = await import('./commands/item.js');
       const wi = await runItemUpdate(backend, idStr, updateOpts);
-      if (queueStore && syncManager) {
-        await queueStore.append({
+      if (queue && syncManager) {
+        await queue.append({
           action: 'update',
           itemId: wi.id,
           timestamp: new Date().toISOString(),
@@ -352,12 +353,11 @@ export function createProgram(): Command {
     .action(async (idStr: string) => {
       const parentOpts = program.opts<GlobalOpts>();
       try {
-        const { backend, syncManager, queueStore } =
-          await createBackendAndSync();
+        const { backend, syncManager, queue } = await createBackendAndSync();
         const { runItemDelete } = await import('./commands/item.js');
         await runItemDelete(backend, idStr);
-        if (queueStore && syncManager) {
-          await queueStore.append({
+        if (queue && syncManager) {
+          await queue.append({
             action: 'delete',
             itemId: idStr,
             timestamp: new Date().toISOString(),
@@ -386,12 +386,11 @@ export function createProgram(): Command {
       .action(async (idStr: string, text: string, opts: ItemCommentOptions) => {
         const parentOpts = program.opts<GlobalOpts>();
         try {
-          const { backend, syncManager, queueStore } =
-            await createBackendAndSync();
+          const { backend, syncManager, queue } = await createBackendAndSync();
           const { runItemComment } = await import('./commands/item.js');
           const comment = await runItemComment(backend, idStr, text, opts);
-          if (queueStore && syncManager) {
-            await queueStore.append({
+          if (queue && syncManager) {
+            await queue.append({
               action: 'comment',
               itemId: idStr,
               timestamp: new Date().toISOString(),

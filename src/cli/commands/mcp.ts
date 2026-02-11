@@ -6,7 +6,7 @@ import {
   createBackendWithSync,
   VALID_BACKENDS,
 } from '../../backends/factory.js';
-import { SyncQueueStore } from '../../sync/queue.js';
+import type { SyncQueueAdapter } from '../../sync/types.js';
 import type { SyncManager } from '../../sync/SyncManager.js';
 import { readConfig, writeConfig } from '../../backends/local/config.js';
 import type { Backend } from '../../backends/types.js';
@@ -412,7 +412,7 @@ export async function handleGetItemTree(
 
 export interface SyncState {
   syncManager: SyncManager | null;
-  queueStore: SyncQueueStore | null;
+  queue: SyncQueueAdapter | null;
 }
 
 export function registerTools(
@@ -480,9 +480,9 @@ export function registerTools(
     },
     async (args) => {
       const result = await handleCreateItem(backend, args);
-      if (!result.isError && syncState?.queueStore && syncState?.syncManager) {
+      if (!result.isError && syncState?.queue && syncState?.syncManager) {
         const data = JSON.parse(result.content[0]!.text) as { id: string };
-        await syncState.queueStore.append({
+        await syncState.queue.append({
           action: 'create',
           itemId: data.id,
           timestamp: new Date().toISOString(),
@@ -531,9 +531,9 @@ export function registerTools(
     },
     async (args) => {
       const result = await handleUpdateItem(backend, args);
-      if (!result.isError && syncState?.queueStore && syncState?.syncManager) {
+      if (!result.isError && syncState?.queue && syncState?.syncManager) {
         const data = JSON.parse(result.content[0]!.text) as { id: string };
-        await syncState.queueStore.append({
+        await syncState.queue.append({
           action: 'update',
           itemId: data.id,
           timestamp: new Date().toISOString(),
@@ -563,8 +563,8 @@ export function registerTools(
     },
     async (args) => {
       const result = await handleConfirmDelete(backend, args, pendingDeletes);
-      if (!result.isError && syncState?.queueStore && syncState?.syncManager) {
-        await syncState.queueStore.append({
+      if (!result.isError && syncState?.queue && syncState?.syncManager) {
+        await syncState.queue.append({
           action: 'delete',
           itemId: args.id,
           timestamp: new Date().toISOString(),
@@ -615,16 +615,12 @@ export function registerTools(
       },
       async (args) => {
         const result = await handleAddComment(backend, args);
-        if (
-          !result.isError &&
-          syncState?.queueStore &&
-          syncState?.syncManager
-        ) {
+        if (!result.isError && syncState?.queue && syncState?.syncManager) {
           const data = JSON.parse(result.content[0]!.text) as {
             author: string;
             body: string;
           };
-          await syncState.queueStore.append({
+          await syncState.queue.append({
             action: 'comment',
             itemId: args.id,
             timestamp: new Date().toISOString(),
@@ -702,15 +698,13 @@ export async function startMcpServer(): Promise<void> {
   });
 
   let backend: Backend | null = null;
-  const syncState: SyncState = { syncManager: null, queueStore: null };
+  const syncState: SyncState = { syncManager: null, queue: null };
 
   if (isTicProject(root)) {
     const setup = await createBackendWithSync(root);
     backend = setup.backend;
     syncState.syncManager = setup.syncManager;
-    syncState.queueStore = syncState.syncManager
-      ? new SyncQueueStore(root)
-      : null;
+    syncState.queue = setup.queue;
   }
 
   const pendingDeletes = createDeleteTracker();
@@ -731,9 +725,7 @@ export async function startMcpServer(): Promise<void> {
       const setup = await createBackendWithSync(root);
       backend = setup.backend;
       syncState.syncManager = setup.syncManager;
-      syncState.queueStore = syncState.syncManager
-        ? new SyncQueueStore(root)
-        : null;
+      syncState.queue = setup.queue;
     }
     return result;
   });

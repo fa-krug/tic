@@ -5,28 +5,6 @@ import os from 'node:os';
 import { backendDataStore } from './backendDataStore.js';
 import { configStore } from './configStore.js';
 import { defaultConfig, writeConfig } from '../backends/local/config.js';
-import { writeWorkItem } from '../backends/local/items.js';
-import type { WorkItem } from '../types.js';
-
-function makeItem(id: string, overrides: Partial<WorkItem> = {}): WorkItem {
-  return {
-    id,
-    title: `Item ${id}`,
-    status: 'todo',
-    type: 'task',
-    iteration: 'default',
-    priority: 'medium',
-    assignee: '',
-    labels: [],
-    created: '2025-01-01T00:00:00Z',
-    updated: '2025-01-01T00:00:00Z',
-    description: '',
-    comments: [],
-    parent: null,
-    dependsOn: [],
-    ...overrides,
-  };
-}
 
 /** Wait for backendDataStore to finish loading after init */
 async function waitForLoad(): Promise<void> {
@@ -71,13 +49,26 @@ describe('backendDataStore', () => {
     expect(backendDataStore.getState().loading).toBe(true);
   });
 
-  it('loads data from local backend', async () => {
-    const item = makeItem('1');
-    await writeWorkItem(tmpDir, item);
-
+  it('loads data from DrizzleBackend', async () => {
     backendDataStore.getState().init(tmpDir);
     await waitForLoad();
 
+    // Create an item through the backend
+    const backend = backendDataStore.getState().backend!;
+    await backend.createWorkItem({
+      title: 'Item 1',
+      type: 'task',
+      status: 'todo',
+      priority: 'medium',
+      assignee: '',
+      labels: [],
+      iteration: 'default',
+      parent: null,
+      dependsOn: [],
+      description: '',
+    });
+
+    await backendDataStore.getState().refresh();
     const state = backendDataStore.getState();
     expect(state.loaded).toBe(true);
     expect(state.loading).toBe(false);
@@ -93,8 +84,20 @@ describe('backendDataStore', () => {
     await waitForLoad();
     expect(backendDataStore.getState().items).toHaveLength(0);
 
-    // Write an item and refresh
-    await writeWorkItem(tmpDir, makeItem('1'));
+    // Create an item through the backend and refresh
+    const backend = backendDataStore.getState().backend!;
+    await backend.createWorkItem({
+      title: 'Item 1',
+      type: 'task',
+      status: 'todo',
+      priority: 'medium',
+      assignee: '',
+      labels: [],
+      iteration: 'default',
+      parent: null,
+      dependsOn: [],
+      description: '',
+    });
     await backendDataStore.getState().refresh();
     expect(backendDataStore.getState().items).toHaveLength(1);
     expect(backendDataStore.getState().loading).toBe(false);
@@ -124,15 +127,15 @@ describe('backendDataStore', () => {
     expect(backendDataStore.getState().syncStatus?.state).toBe('syncing');
   });
 
-  it('handles backend init failure gracefully', async () => {
-    // Configure an invalid backend type that will fail in createBackendAndSync
+  it('completes init even with unknown remote backend', async () => {
+    // An unknown remote backend type returns null (no sync), but init succeeds
     await configStore.getState().update({ backend: 'nonexistent' });
     backendDataStore.getState().init(tmpDir);
     await waitForLoad();
-    // Should have an error but not throw
-    expect(backendDataStore.getState().error).toBeTruthy();
-    expect(backendDataStore.getState().error).toContain('Unknown backend');
+    // Should succeed — unknown remote just means no sync
+    expect(backendDataStore.getState().error).toBeNull();
     expect(backendDataStore.getState().loaded).toBe(true);
     expect(backendDataStore.getState().loading).toBe(false);
+    expect(backendDataStore.getState().syncManager).toBeNull();
   });
 });

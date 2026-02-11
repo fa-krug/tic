@@ -62,54 +62,58 @@ export interface BackendDataStoreState {
 let currentBackend: Backend | null = null;
 let initGeneration = 0;
 
+async function createRemoteBackend(
+  cwd: string,
+  backendType: string,
+): Promise<Backend | null> {
+  switch (backendType) {
+    case 'local':
+    case 'none':
+      return null;
+    case 'github': {
+      const { GitHubBackend } = await import('../backends/github/index.js');
+      return new GitHubBackend(cwd);
+    }
+    case 'gitlab': {
+      const { GitLabBackend } = await import('../backends/gitlab/index.js');
+      return new GitLabBackend(cwd);
+    }
+    case 'azure': {
+      const { AzureDevOpsBackend } = await import('../backends/ado/index.js');
+      return new AzureDevOpsBackend(cwd);
+    }
+    case 'jira': {
+      const { JiraBackend } = await import('../backends/jira/index.js');
+      return JiraBackend.create(cwd);
+    }
+    default:
+      return null;
+  }
+}
+
 async function createBackendAndSync(cwd: string): Promise<{
   backend: Backend;
   syncManager: SyncManager | null;
 }> {
-  const { LocalBackend } = await import('../backends/local/index.js');
-  const backendType = configStore.getState().config.backend ?? 'local';
+  const { DrizzleBackend } = await import('../backends/drizzle/index.js');
+  const primary = DrizzleBackend.create(cwd);
 
-  const local = await LocalBackend.create(cwd, {
-    tempIds: backendType !== 'local',
-  });
+  // Set up configStore with SQLite backing
+  configStore.getState().setDatabase(primary.getDatabase());
 
-  if (backendType === 'local') {
-    return { backend: local, syncManager: null };
+  const config = configStore.getState().config;
+  const remote = await createRemoteBackend(cwd, config.backend ?? 'none');
+
+  let syncManager: SyncManager | null = null;
+  if (remote) {
+    const { SyncManager: SM } = await import('../sync/SyncManager.js');
+    const { DrizzleSyncQueue } =
+      await import('../backends/drizzle/syncQueue.js');
+    const queue = new DrizzleSyncQueue(primary.getDatabase());
+    syncManager = new SM(primary, remote, queue);
   }
 
-  // Dynamic import of remote backend — this is the expensive part
-  let remote: Backend;
-  switch (backendType) {
-    case 'github': {
-      const { GitHubBackend } = await import('../backends/github/index.js');
-      remote = new GitHubBackend(cwd);
-      break;
-    }
-    case 'gitlab': {
-      const { GitLabBackend } = await import('../backends/gitlab/index.js');
-      remote = new GitLabBackend(cwd);
-      break;
-    }
-    case 'azure': {
-      const { AzureDevOpsBackend } = await import('../backends/ado/index.js');
-      remote = new AzureDevOpsBackend(cwd);
-      break;
-    }
-    case 'jira': {
-      const { JiraBackend } = await import('../backends/jira/index.js');
-      remote = await JiraBackend.create(cwd);
-      break;
-    }
-    default:
-      throw new Error(`Unknown backend "${backendType}"`);
-  }
-
-  const { SyncQueueStore } = await import('../sync/queue.js');
-  const { SyncManager } = await import('../sync/SyncManager.js');
-  const queueStore = new SyncQueueStore(cwd);
-  const syncManager = new SyncManager(local, remote, queueStore);
-
-  return { backend: local, syncManager };
+  return { backend: primary, syncManager };
 }
 
 export const backendDataStore = createStore<BackendDataStoreState>(

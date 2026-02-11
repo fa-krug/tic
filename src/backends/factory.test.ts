@@ -8,7 +8,7 @@ import {
   detectBackend,
   VALID_BACKENDS,
 } from './factory.js';
-import { LocalBackend } from './local/index.js';
+import { DrizzleBackend } from './drizzle/index.js';
 import { SyncManager } from '../sync/SyncManager.js';
 import { writeConfig, defaultConfig } from './local/config.js';
 import { configStore } from '../stores/configStore.js';
@@ -46,66 +46,17 @@ describe('createBackend', () => {
     fs.rmSync(tmpDir, { recursive: true });
   });
 
-  it('creates a LocalBackend when backend is local', async () => {
+  it('always creates a DrizzleBackend as primary', async () => {
     await writeConfig(tmpDir, { ...defaultConfig, backend: 'local' });
     const backend = await createBackend(tmpDir);
+    expect(backend).toBeInstanceOf(DrizzleBackend);
     expect(await backend.getStatuses()).toEqual(defaultConfig.statuses);
   });
 
-  it('attempts to create GitHubBackend when backend is github', async () => {
+  it('creates DrizzleBackend regardless of config.backend setting', async () => {
     await writeConfig(tmpDir, { ...defaultConfig, backend: 'github' });
-    // Throws because gh auth will fail in test env, but NOT "not yet implemented"
-    try {
-      await createBackend(tmpDir);
-    } catch (e) {
-      expect((e as Error).message).not.toContain('not yet implemented');
-    }
-  });
-
-  it('attempts to create GitLabBackend when backend is gitlab', async () => {
-    await writeConfig(tmpDir, { ...defaultConfig, backend: 'gitlab' });
-    // Throws because glab auth will fail in test env, but NOT "not yet implemented"
-    try {
-      await createBackend(tmpDir);
-    } catch (e) {
-      expect((e as Error).message).not.toContain('not yet implemented');
-    }
-  });
-
-  it(
-    'attempts to create AzureDevOpsBackend when backend is azure',
-    { timeout: 20_000 },
-    async () => {
-      await writeConfig(tmpDir, { ...defaultConfig, backend: 'azure' });
-      // Throws because az auth will fail in test env, but NOT "not yet implemented"
-      try {
-        await createBackend(tmpDir);
-      } catch (e) {
-        expect((e as Error).message).not.toContain('not yet implemented');
-      }
-    },
-  );
-
-  it('attempts to create JiraBackend when backend is jira', async () => {
-    await writeConfig(tmpDir, {
-      ...defaultConfig,
-      backend: 'jira',
-      jira: {
-        site: 'https://mycompany.atlassian.net',
-        project: 'TEAM',
-      },
-    });
-    try {
-      await createBackend(tmpDir);
-    } catch (e) {
-      expect((e as Error).message).not.toContain('not yet implemented');
-      expect((e as Error).message).not.toContain('Unknown backend');
-    }
-  });
-
-  it('throws for unknown backend values', async () => {
-    await writeConfig(tmpDir, { ...defaultConfig, backend: 'foobar' });
-    await expect(createBackend(tmpDir)).rejects.toThrow('Unknown backend');
+    const backend = await createBackend(tmpDir);
+    expect(backend).toBeInstanceOf(DrizzleBackend);
   });
 });
 
@@ -121,28 +72,31 @@ describe('createBackendWithSync', () => {
     fs.rmSync(tmpDir, { recursive: true });
   });
 
-  it('returns LocalBackend and null syncManager for local backend', async () => {
+  it('returns DrizzleBackend and null syncManager for local backend', async () => {
     await writeConfig(tmpDir, { ...defaultConfig, backend: 'local' });
-    const { backend, syncManager } = await createBackendWithSync(tmpDir);
-    expect(backend).toBeInstanceOf(LocalBackend);
+    const { backend, syncManager, queue } = await createBackendWithSync(tmpDir);
+    expect(backend).toBeInstanceOf(DrizzleBackend);
     expect(syncManager).toBeNull();
+    expect(queue).toBeNull();
   });
 
-  it('returns LocalBackend and SyncManager for github backend', async () => {
+  it('returns DrizzleBackend and SyncManager for github backend', async () => {
     await writeConfig(tmpDir, { ...defaultConfig, backend: 'github' });
     // GitHubBackend constructor may throw if gh is not authenticated,
     // but we still expect the right types when it succeeds
     try {
-      const { backend, syncManager } = await createBackendWithSync(tmpDir);
-      expect(backend).toBeInstanceOf(LocalBackend);
+      const { backend, syncManager, queue } =
+        await createBackendWithSync(tmpDir);
+      expect(backend).toBeInstanceOf(DrizzleBackend);
       expect(syncManager).toBeInstanceOf(SyncManager);
+      expect(queue).not.toBeNull();
     } catch (e) {
       // gh CLI not available in test env — verify it doesn't throw "Unknown backend"
       expect((e as Error).message).not.toContain('Unknown backend');
     }
   });
 
-  it('returns LocalBackend and SyncManager for jira backend', async () => {
+  it('returns DrizzleBackend and SyncManager for jira backend', async () => {
     await writeConfig(tmpDir, {
       ...defaultConfig,
       backend: 'jira',
@@ -152,9 +106,11 @@ describe('createBackendWithSync', () => {
       },
     });
     try {
-      const { backend, syncManager } = await createBackendWithSync(tmpDir);
-      expect(backend).toBeInstanceOf(LocalBackend);
+      const { backend, syncManager, queue } =
+        await createBackendWithSync(tmpDir);
+      expect(backend).toBeInstanceOf(DrizzleBackend);
       expect(syncManager).toBeInstanceOf(SyncManager);
+      expect(queue).not.toBeNull();
     } catch (e) {
       expect((e as Error).message).not.toContain('Unknown backend');
     }
