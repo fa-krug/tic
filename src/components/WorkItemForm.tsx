@@ -12,7 +12,6 @@ import {
   type FormDraft,
 } from '../stores/formStackStore.js';
 import type { Comment, WorkItem, Template } from '../types.js';
-import { SyncQueueStore } from '../sync/queue.js';
 import type { QueueAction } from '../sync/types.js';
 import { useScrollViewport } from '../hooks/useScrollViewport.js';
 import {
@@ -106,10 +105,7 @@ export function WorkItemForm() {
     })),
   );
 
-  const queueStore = useMemo(() => {
-    if (!syncManager) return null;
-    return new SyncQueueStore(process.cwd());
-  }, [syncManager]);
+  const queue = useBackendDataStore((s) => s.queue);
 
   const queueWrite = async (
     action: QueueAction,
@@ -119,8 +115,8 @@ export function WorkItemForm() {
       templateSlug?: string;
     },
   ) => {
-    if (queueStore) {
-      await queueStore.append({
+    if (queue) {
+      await queue.append({
         action,
         itemId,
         timestamp: new Date().toISOString(),

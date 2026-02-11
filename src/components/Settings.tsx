@@ -11,7 +11,6 @@ import { uiStore, useUIStore } from '../stores/uiStore.js';
 import { VALID_BACKENDS } from '../backends/factory.js';
 import type { BackendType } from '../backends/factory.js';
 import { checkAllBackendAvailability } from '../backends/availability.js';
-import { SyncQueueStore } from '../sync/queue.js';
 import type { Template } from '../types.js';
 import { checkForUpdate } from '../update-checker.js';
 import type { UpdateInfo } from '../update-checker.js';
@@ -58,12 +57,8 @@ export function Settings() {
   );
   const selectWorkItem = useNavigationStore((s) => s.selectWorkItem);
   const terminalWidth = useTerminalWidth();
-  const root = process.cwd();
 
-  const queueStore = useMemo(() => {
-    if (!syncManager) return null;
-    return new SyncQueueStore(root);
-  }, [syncManager, root]);
+  const queue = useBackendDataStore((s) => s.queue);
 
   const config = useConfigStore((s) => s.config);
   const configLoaded = useConfigStore((s) => s.loaded);
@@ -660,8 +655,8 @@ export function Settings() {
               if (backend) {
                 void backend.deleteTemplate(slug).then(async () => {
                   setTemplates((prev) => prev.filter((t) => t.slug !== slug));
-                  if (queueStore) {
-                    await queueStore.append({
+                  if (queue) {
+                    await queue.append({
                       action: 'template-delete',
                       itemId: slug,
                       timestamp: new Date().toISOString(),

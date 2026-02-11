@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { DrizzleBackend } from '../backends/drizzle/index.js';
 import { SyncManager } from './SyncManager.js';
-import { SyncQueueStore } from './queue.js';
+import { DrizzleSyncQueue } from '../backends/drizzle/syncQueue.js';
 import type { Backend } from '../backends/types.js';
 import type { WorkItem, NewWorkItem, NewComment, Comment } from '../types.js';
 
@@ -156,7 +156,7 @@ describe('end-to-end sync', () => {
   it('full cycle: create locally, push, pull, verify', async () => {
     local = DrizzleBackend.create(tmpDir, { tempIds: true });
     const remote = createMockRemote([]);
-    const queue = new SyncQueueStore(tmpDir);
+    const queue = new DrizzleSyncQueue(local.getDatabase());
     const manager = new SyncManager(local, remote, queue);
 
     const item = await local.createWorkItem({
@@ -173,7 +173,7 @@ describe('end-to-end sync', () => {
     });
     expect(item.id.startsWith('local-')).toBe(true);
 
-    await queue.append({
+    queue.append({
       action: 'create',
       itemId: item.id,
       timestamp: new Date().toISOString(),
@@ -192,7 +192,7 @@ describe('end-to-end sync', () => {
 
   it('remote changes overwrite local on pull', async () => {
     local = DrizzleBackend.create(tmpDir);
-    const queue = new SyncQueueStore(tmpDir);
+    const queue = new DrizzleSyncQueue(local.getDatabase());
 
     await local.createWorkItem({
       title: 'Will be overwritten',

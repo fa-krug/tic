@@ -18,7 +18,6 @@ import {
   backendDataStore,
 } from '../stores/backendDataStore.js';
 import { useShallow } from 'zustand/shallow';
-import { SyncQueueStore } from '../sync/queue.js';
 import type { QueueAction } from '../sync/types.js';
 import { buildTree, sortTree, type TreeItem } from './buildTree.js';
 import type { SortColumn, SortEntry } from '../stores/listViewStore.js';
@@ -244,14 +243,11 @@ export function WorkItemList() {
     }
   }, [savedViews, defaultView]);
 
-  const queueStore = useMemo(() => {
-    if (!syncManager) return null;
-    return new SyncQueueStore(process.cwd());
-  }, [syncManager]);
+  const queue = useBackendDataStore((s) => s.queue);
 
   const queueWrite = async (action: QueueAction, itemId: string) => {
-    if (queueStore) {
-      await queueStore.append({
+    if (queue) {
+      await queue.append({
         action,
         itemId,
         timestamp: new Date().toISOString(),
@@ -574,8 +570,8 @@ export function WorkItemList() {
                 await backend.restoreWorkItem(snap.id);
               }
             }
-            if (queueStore) {
-              await queueStore.removeByIds(entry.syncItemIds, 'delete');
+            if (queue) {
+              await queue.removeByIds(entry.syncItemIds, 'delete');
             }
             refreshData();
             setToast(
@@ -587,8 +583,8 @@ export function WorkItemList() {
             for (const id of entry.createdIds ?? []) {
               await backend.cachedDeleteWorkItem(id);
             }
-            if (queueStore) {
-              await queueStore.removeByIds(entry.syncItemIds, 'create');
+            if (queue) {
+              await queue.removeByIds(entry.syncItemIds, 'create');
             }
             refreshData();
             setToast(
@@ -600,8 +596,8 @@ export function WorkItemList() {
             for (const snap of entry.itemSnapshots) {
               await backend.cachedUpdateWorkItem(snap.id, snap);
             }
-            if (queueStore) {
-              await queueStore.removeByIds(entry.syncItemIds, 'update');
+            if (queue) {
+              await queue.removeByIds(entry.syncItemIds, 'update');
             }
             for (const snap of entry.itemSnapshots) {
               await queueWrite('update', snap.id);

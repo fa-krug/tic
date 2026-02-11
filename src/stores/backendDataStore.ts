@@ -2,7 +2,7 @@ import { createStore } from 'zustand/vanilla';
 import { useStore } from 'zustand';
 import type { Backend, BackendCapabilities } from '../backends/types.js';
 import type { WorkItem } from '../types.js';
-import type { SyncStatus } from '../sync/types.js';
+import type { SyncQueueAdapter, SyncStatus } from '../sync/types.js';
 import type { SyncManager } from '../sync/SyncManager.js';
 import { configStore } from './configStore.js';
 
@@ -51,6 +51,7 @@ export interface BackendDataStoreState {
   // Backend references
   backend: Backend | null;
   syncManager: SyncManager | null;
+  queue: SyncQueueAdapter | null;
 
   init(cwd: string): void;
   refresh(): Promise<void>;
@@ -67,6 +68,7 @@ let initGeneration = 0;
 async function createBackendAndSync(cwd: string): Promise<{
   backend: Backend;
   syncManager: SyncManager | null;
+  queue: SyncQueueAdapter | null;
 }> {
   const { DrizzleBackend } = await import('../backends/drizzle/index.js');
   const primary = DrizzleBackend.create(cwd);
@@ -79,15 +81,16 @@ async function createBackendAndSync(cwd: string): Promise<{
   const remote = await createRemoteBackend(cwd, config.backend ?? 'none');
 
   let syncManager: SyncManager | null = null;
+  let queue: SyncQueueAdapter | null = null;
   if (remote) {
     const { SyncManager: SM } = await import('../sync/SyncManager.js');
     const { DrizzleSyncQueue } =
       await import('../backends/drizzle/syncQueue.js');
-    const queue = new DrizzleSyncQueue(primary.getDatabase());
+    queue = new DrizzleSyncQueue(primary.getDatabase());
     syncManager = new SM(primary, remote, queue);
   }
 
-  return { backend: primary, syncManager };
+  return { backend: primary, syncManager, queue };
 }
 
 export const backendDataStore = createStore<BackendDataStoreState>(
@@ -108,6 +111,7 @@ export const backendDataStore = createStore<BackendDataStoreState>(
 
     backend: null,
     syncManager: null,
+    queue: null,
 
     init(cwd: string) {
       get().destroy();
@@ -115,10 +119,10 @@ export const backendDataStore = createStore<BackendDataStoreState>(
       set({ loading: true });
 
       void createBackendAndSync(cwd)
-        .then(({ backend, syncManager }) => {
+        .then(({ backend, syncManager, queue }) => {
           if (generation !== initGeneration) return;
           currentBackend = backend;
-          set({ backend, syncManager });
+          set({ backend, syncManager, queue });
 
           if (syncManager) {
             syncManager.onStatusChange((status: SyncStatus) => {
@@ -232,6 +236,7 @@ export const backendDataStore = createStore<BackendDataStoreState>(
         syncStatus: null,
         backend: null,
         syncManager: null,
+        queue: null,
       });
     },
   }),

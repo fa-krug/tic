@@ -3,8 +3,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { SyncManager } from './SyncManager.js';
-import { SyncQueueStore } from './queue.js';
 import { DrizzleBackend } from '../backends/drizzle/index.js';
+import { DrizzleSyncQueue } from '../backends/drizzle/syncQueue.js';
 import type { Backend } from '../backends/types.js';
 import type { WorkItem, NewWorkItem, NewComment, Comment } from '../types.js';
 import type { SyncStatus } from './types.js';
@@ -166,13 +166,13 @@ describe('SyncManager push phase', () => {
   let local: DrizzleBackend;
   let remote: Backend;
   let manager: SyncManager;
-  let queueStore: SyncQueueStore;
+  let queueStore: DrizzleSyncQueue;
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-sync-test-'));
     local = DrizzleBackend.create(tmpDir);
     remote = createMockRemote();
-    queueStore = new SyncQueueStore(tmpDir);
+    queueStore = new DrizzleSyncQueue(local.getDatabase());
     manager = new SyncManager(local, remote, queueStore);
   });
 
@@ -194,7 +194,7 @@ describe('SyncManager push phase', () => {
       parent: null,
       dependsOn: [],
     });
-    await queueStore.append({
+    queueStore.append({
       action: 'create',
       itemId: item.id,
       timestamp: new Date().toISOString(),
@@ -203,7 +203,7 @@ describe('SyncManager push phase', () => {
     const result = await manager.pushPending();
     expect(result.pushed).toBe(1);
     expect(result.failed).toBe(0);
-    expect((await queueStore.read()).pending).toHaveLength(0);
+    expect(queueStore.read().pending).toHaveLength(0);
   });
 
   it('returns idMappings when create produces a different remote ID', async () => {
@@ -220,7 +220,7 @@ describe('SyncManager push phase', () => {
       dependsOn: [],
     });
     const localId = item.id;
-    await queueStore.append({
+    queueStore.append({
       action: 'create',
       itemId: localId,
       timestamp: new Date().toISOString(),
@@ -253,7 +253,7 @@ describe('SyncManager push phase', () => {
     await remote.createWorkItem({ ...item });
 
     await local.updateWorkItem(item.id, { title: 'Updated' });
-    await queueStore.append({
+    queueStore.append({
       action: 'update',
       itemId: item.id,
       timestamp: new Date().toISOString(),
@@ -265,7 +265,7 @@ describe('SyncManager push phase', () => {
   });
 
   it('pushes a delete to remote', async () => {
-    await queueStore.append({
+    queueStore.append({
       action: 'delete',
       itemId: '99',
       timestamp: new Date().toISOString(),
@@ -273,12 +273,12 @@ describe('SyncManager push phase', () => {
 
     const result = await manager.pushPending();
     expect(result.pushed).toBe(1);
-    expect((await queueStore.read()).pending).toHaveLength(0);
+    expect(queueStore.read().pending).toHaveLength(0);
   });
 
   it('skips remote delete for local- prefixed IDs and removes entry from queue', async () => {
     const deleteSpy = vi.spyOn(remote, 'deleteWorkItem');
-    await queueStore.append({
+    queueStore.append({
       action: 'delete',
       itemId: 'local-6',
       timestamp: new Date().toISOString(),
@@ -287,7 +287,7 @@ describe('SyncManager push phase', () => {
     const result = await manager.pushPending();
     expect(result.pushed).toBe(1);
     expect(result.failed).toBe(0);
-    expect((await queueStore.read()).pending).toHaveLength(0);
+    expect(queueStore.read().pending).toHaveLength(0);
     expect(deleteSpy).not.toHaveBeenCalled();
   });
 
@@ -301,7 +301,7 @@ describe('SyncManager push phase', () => {
     };
     const notFoundManager = new SyncManager(local, notFoundRemote, queueStore);
 
-    await queueStore.append({
+    queueStore.append({
       action: 'delete',
       itemId: '1',
       timestamp: new Date().toISOString(),
@@ -310,7 +310,7 @@ describe('SyncManager push phase', () => {
     const result = await notFoundManager.pushPending();
     expect(result.pushed).toBe(1);
     expect(result.failed).toBe(0);
-    expect((await queueStore.read()).pending).toHaveLength(0);
+    expect(queueStore.read().pending).toHaveLength(0);
   });
 
   it('keeps failed entries in queue', async () => {
@@ -335,7 +335,7 @@ describe('SyncManager push phase', () => {
       dependsOn: [],
     });
 
-    await queueStore.append({
+    queueStore.append({
       action: 'update',
       itemId: '1',
       timestamp: new Date().toISOString(),
@@ -344,13 +344,13 @@ describe('SyncManager push phase', () => {
     const result = await failManager.pushPending();
     expect(result.failed).toBe(1);
     expect(result.errors).toHaveLength(1);
-    expect((await queueStore.read()).pending).toHaveLength(1);
+    expect(queueStore.read().pending).toHaveLength(1);
   });
 
   it('drops queue entries for locally deleted items', async () => {
     const failManager = new SyncManager(local, remote, queueStore);
 
-    await queueStore.append({
+    queueStore.append({
       action: 'update',
       itemId: 'gone',
       timestamp: new Date().toISOString(),
@@ -358,7 +358,7 @@ describe('SyncManager push phase', () => {
 
     const result = await failManager.pushPending();
     expect(result.failed).toBe(0);
-    expect((await queueStore.read()).pending).toHaveLength(0);
+    expect(queueStore.read().pending).toHaveLength(0);
   });
 
   it('processes queue in order, stops failed entry but continues others', async () => {
@@ -371,12 +371,12 @@ describe('SyncManager push phase', () => {
     };
     const failManager = new SyncManager(local, failingRemote, queueStore);
 
-    await queueStore.append({
+    queueStore.append({
       action: 'delete',
       itemId: 'a',
       timestamp: '2026-01-01T00:00:00Z',
     });
-    await queueStore.append({
+    queueStore.append({
       action: 'delete',
       itemId: 'b',
       timestamp: '2026-01-01T01:00:00Z',
@@ -385,7 +385,7 @@ describe('SyncManager push phase', () => {
     const result = await failManager.pushPending();
     expect(result.pushed).toBe(1);
     expect(result.failed).toBe(1);
-    const remaining = (await queueStore.read()).pending;
+    const remaining = queueStore.read().pending;
     expect(remaining).toHaveLength(1);
     expect(remaining[0]!.itemId).toBe('a');
   });
@@ -394,12 +394,12 @@ describe('SyncManager push phase', () => {
 describe('SyncManager strips unsupported fields', () => {
   let tmpDir: string;
   let local: DrizzleBackend;
-  let queueStore: SyncQueueStore;
+  let queueStore: DrizzleSyncQueue;
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-sync-test-'));
     local = DrizzleBackend.create(tmpDir);
-    queueStore = new SyncQueueStore(tmpDir);
+    queueStore = new DrizzleSyncQueue(local.getDatabase());
   });
 
   afterEach(() => {
@@ -439,7 +439,7 @@ describe('SyncManager strips unsupported fields', () => {
       dependsOn: [],
     });
 
-    await queueStore.append({
+    queueStore.append({
       action: 'create',
       itemId: item.id,
       timestamp: new Date().toISOString(),
@@ -477,7 +477,7 @@ describe('SyncManager strips unsupported fields', () => {
     const updateSpy = vi.spyOn(remote, 'updateWorkItem');
     const manager = new SyncManager(local, remote, queueStore);
 
-    await queueStore.append({
+    queueStore.append({
       action: 'update',
       itemId: item.id,
       timestamp: new Date().toISOString(),
@@ -499,12 +499,12 @@ describe('SyncManager strips unsupported fields', () => {
 describe('SyncManager pull phase (via sync)', () => {
   let tmpDir: string;
   let local: DrizzleBackend;
-  let queueStore: SyncQueueStore;
+  let queueStore: DrizzleSyncQueue;
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-sync-test-'));
     local = DrizzleBackend.create(tmpDir);
-    queueStore = new SyncQueueStore(tmpDir);
+    queueStore = new DrizzleSyncQueue(local.getDatabase());
   });
 
   afterEach(() => {
@@ -573,7 +573,7 @@ describe('SyncManager pull phase (via sync)', () => {
       dependsOn: [],
     });
 
-    await queueStore.append({
+    queueStore.append({
       action: 'create',
       itemId: localItem.id,
       timestamp: new Date().toISOString(),
@@ -633,12 +633,12 @@ describe('SyncManager pull phase (via sync)', () => {
 describe('SyncManager status callbacks', () => {
   let tmpDir: string;
   let local: DrizzleBackend;
-  let queueStore: SyncQueueStore;
+  let queueStore: DrizzleSyncQueue;
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-sync-test-'));
     local = DrizzleBackend.create(tmpDir);
-    queueStore = new SyncQueueStore(tmpDir);
+    queueStore = new DrizzleSyncQueue(local.getDatabase());
   });
 
   afterEach(() => {
@@ -682,7 +682,7 @@ describe('SyncManager status callbacks', () => {
       dependsOn: [],
     });
 
-    await queueStore.append({
+    queueStore.append({
       action: 'update',
       itemId: '1',
       timestamp: new Date().toISOString(),
@@ -703,7 +703,7 @@ describe('SyncManager status callbacks', () => {
 
     expect(manager.getStatus().pendingCount).toBe(0);
 
-    await queueStore.append({
+    queueStore.append({
       action: 'delete',
       itemId: 'x',
       timestamp: new Date().toISOString(),
@@ -721,12 +721,12 @@ describe('SyncManager status callbacks', () => {
 describe('SyncManager progress reporting', () => {
   let tmpDir: string;
   let local: DrizzleBackend;
-  let queueStore: SyncQueueStore;
+  let queueStore: DrizzleSyncQueue;
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-sync-test-'));
     local = DrizzleBackend.create(tmpDir);
-    queueStore = new SyncQueueStore(tmpDir);
+    queueStore = new DrizzleSyncQueue(local.getDatabase());
   });
 
   afterEach(() => {
@@ -738,12 +738,12 @@ describe('SyncManager progress reporting', () => {
     const remote = createMockRemote();
     const manager = new SyncManager(local, remote, queueStore);
 
-    await queueStore.append({
+    queueStore.append({
       action: 'delete',
       itemId: 'del-1',
       timestamp: new Date().toISOString(),
     });
-    await queueStore.append({
+    queueStore.append({
       action: 'delete',
       itemId: 'del-2',
       timestamp: new Date().toISOString(),
@@ -769,7 +769,7 @@ describe('SyncManager progress reporting', () => {
     const remote = createMockRemote();
     const manager = new SyncManager(local, remote, queueStore);
 
-    await queueStore.append({
+    queueStore.append({
       action: 'delete',
       itemId: 'del-1',
       timestamp: new Date().toISOString(),
@@ -784,12 +784,12 @@ describe('SyncManager progress reporting', () => {
     const remote = createMockRemote();
     const manager = new SyncManager(local, remote, queueStore);
 
-    await queueStore.append({
+    queueStore.append({
       action: 'delete',
       itemId: 'del-a',
       timestamp: new Date().toISOString(),
     });
-    await queueStore.append({
+    queueStore.append({
       action: 'delete',
       itemId: 'del-b',
       timestamp: new Date().toISOString(),
@@ -829,7 +829,7 @@ describe('SyncManager progress reporting', () => {
       dependsOn: [],
     });
 
-    await queueStore.append({
+    queueStore.append({
       action: 'update',
       itemId: '1',
       timestamp: new Date().toISOString(),
@@ -876,7 +876,7 @@ describe('SyncManager progress reporting', () => {
     const manager = new SyncManager(local, remote, queueStore);
 
     for (let i = 0; i < 55; i++) {
-      await queueStore.append({
+      queueStore.append({
         action: 'delete',
         itemId: `item-${i}`,
         timestamp: new Date().toISOString(),
