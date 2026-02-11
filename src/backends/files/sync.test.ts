@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createDatabase, type TicDatabase } from '../drizzle/db.js';
 import { DrizzleBackend } from '../drizzle/index.js';
-import { writeWorkItem } from '../local/items.js';
+import { writeWorkItem, readWorkItem } from '../local/items.js';
 import { contentHash } from './hash.js';
 import {
   computeFileHashes,
@@ -184,5 +184,34 @@ describe('file sync detection', () => {
     expect(result.changed).toEqual([]);
     expect(result.added).toEqual([]);
     expect(result.deleted).toEqual([]);
+  });
+
+  it('serialization round-trip produces stable hash', async () => {
+    // Write item → hash → read → re-serialize → hash again → must match
+    const item = makeItem({
+      id: '42',
+      title: 'Round-trip test',
+      labels: ['bug', 'urgent'],
+      parent: '1',
+      dependsOn: ['2', '3'],
+      description: 'A description\nwith multiple lines',
+    });
+
+    await writeWorkItem(tmpDir, item);
+
+    // Hash the written file
+    const filePath = path.join(tmpDir, '.tic', 'items', '42.md');
+    const raw1 = fs.readFileSync(filePath, 'utf-8');
+    const hash1 = contentHash(raw1);
+
+    // Read back, then re-write
+    const readBack = await readWorkItem(tmpDir, '42');
+    await writeWorkItem(tmpDir, readBack);
+
+    // Hash again
+    const raw2 = fs.readFileSync(filePath, 'utf-8');
+    const hash2 = contentHash(raw2);
+
+    expect(hash1).toBe(hash2);
   });
 });
