@@ -1,6 +1,6 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
-import { BaseBackend } from '../types.js';
+import { BaseBackend, UnsupportedOperationError } from '../types.js';
 import type { BackendCapabilities, SyncableBackend } from '../types.js';
 import type {
   WorkItem,
@@ -135,23 +135,9 @@ export class FilesBackend extends BaseBackend implements SyncableBackend {
     return readWorkItem(this.root, id);
   }
 
-  async createWorkItem(data: NewWorkItem): Promise<WorkItem> {
-    // When used as a sync destination, createWorkItem is called by SyncManager
-    // for items that don't exist locally yet. We need to generate a timestamp
-    // and write the item. The ID should be assigned by the caller/primary.
-    const now = new Date().toISOString();
-    const item: WorkItem = {
-      ...data,
-      id: '', // Will be set below
-      created: now,
-      updated: now,
-      comments: [],
-    };
-    // If this is being called through normal Backend interface,
-    // we can't generate IDs. This backend is primarily for sync usage.
-    // Write with whatever data we have.
-    await writeWorkItem(this.root, item);
-    return item;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async createWorkItem(_data: NewWorkItem): Promise<WorkItem> {
+    throw new UnsupportedOperationError('createWorkItem', 'FilesBackend');
   }
 
   async updateWorkItem(id: string, data: Partial<WorkItem>): Promise<WorkItem> {
@@ -193,18 +179,6 @@ export class FilesBackend extends BaseBackend implements SyncableBackend {
     item.updated = new Date().toISOString();
     await writeWorkItem(this.root, item);
     return newComment;
-  }
-
-  // --- Children/dependents: scan all items ---
-
-  override async getChildren(id: string): Promise<WorkItem[]> {
-    const all = await this.listWorkItems();
-    return all.filter((item) => item.parent === id);
-  }
-
-  override async getDependents(id: string): Promise<WorkItem[]> {
-    const all = await this.listWorkItems();
-    return all.filter((item) => item.dependsOn.includes(id));
   }
 
   // --- Item URL ---
