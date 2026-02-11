@@ -208,12 +208,6 @@ const commands: Command[] = [
     category: 'Actions',
     when: (ctx) => ctx.screen === 'list' && ctx.hasSavedViews,
   },
-  {
-    id: 'set-default-view',
-    label: 'Set default view...',
-    category: 'Actions',
-    when: (ctx) => ctx.screen === 'list',
-  },
   // Other
   {
     id: 'toggle-detail-panel',

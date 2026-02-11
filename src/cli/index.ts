@@ -3,7 +3,7 @@ import { VERSION } from '../version.js';
 import { detectBackend, VALID_BACKENDS } from '../backends/factory.js';
 import type { Backend, BackendCapabilities } from '../backends/types.js';
 import { BACKEND_CAPABILITIES } from '../backends/capabilities.js';
-import { readConfigSync } from '../backends/local/config.js';
+import { readBackendTypeSync } from '../storage/config.js';
 import type { SyncQueueAdapter } from '../sync/types.js';
 import type { SyncManager } from '../sync/SyncManager.js';
 import { formatTsvRow, formatTsvKeyValue, formatJson } from './format.js';
@@ -95,8 +95,7 @@ async function createBackendAndSync(): Promise<{
 function tryGetCapabilities(): BackendCapabilities | null {
   try {
     requireTicProject(process.cwd());
-    const config = readConfigSync(process.cwd());
-    const backendType = config.backend ?? 'none';
+    const backendType = readBackendTypeSync(process.cwd());
     return BACKEND_CAPABILITIES[backendType] ?? null;
   } catch {
     return null;

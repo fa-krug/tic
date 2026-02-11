@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createDatabase, type TicDatabase } from './db.js';
 import { Storage } from './index.js';
 import { readConfig, writeConfig, updateConfig } from './config.js';
-import type { Config } from '../backends/local/config.js';
+import type { Config } from './config.js';
 
 describe('drizzle config', () => {
   let db: TicDatabase;

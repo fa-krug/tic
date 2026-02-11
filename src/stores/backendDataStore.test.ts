@@ -4,7 +4,8 @@ import path from 'node:path';
 import os from 'node:os';
 import { backendDataStore } from './backendDataStore.js';
 import { configStore } from './configStore.js';
-import { defaultConfig, writeConfig } from '../backends/local/config.js';
+import { Storage } from '../storage/index.js';
+import { defaultConfig } from '../storage/config.js';
 
 /** Wait for backendDataStore to finish loading after init */
 async function waitForLoad(): Promise<void> {
@@ -26,8 +27,13 @@ describe('backendDataStore', () => {
 
   beforeEach(async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-bds-'));
-    await writeConfig(tmpDir, { ...defaultConfig });
+    // Create a Storage to initialize the DB (seed defaults)
+    const storage = Storage.create(tmpDir);
+    configStore.getState().setDatabase(storage.getDatabase());
     await configStore.getState().init(tmpDir);
+    // Close the storage — backendDataStore.init() will create its own
+    configStore.getState().setDatabase(null);
+    storage.destroy();
   });
 
   afterEach(() => {
@@ -205,7 +211,12 @@ describe('backendDataStore', () => {
 
   it('completes init even with unknown remote backend', async () => {
     // An unknown remote backend type returns null (no sync), but init succeeds
+    backendDataStore.getState().init(tmpDir);
+    await waitForLoad();
+    // Update config to nonexistent backend
     await configStore.getState().update({ backend: 'nonexistent' });
+    // Re-init with the bad backend
+    backendDataStore.getState().destroy();
     backendDataStore.getState().init(tmpDir);
     await waitForLoad();
     // Should succeed — unknown remote just means no sync

@@ -6,6 +6,8 @@ import type { ViewFilters, SavedView } from '../filters.js';
 export interface FilterStoreState {
   activeFilters: ViewFilters;
   activeViewName: string | null;
+  /** Remembers the last loaded view name even after filters diverge. */
+  lastViewName: string | null;
 
   setFilters: (filters: ViewFilters) => void;
   clearFilters: () => void;
@@ -16,11 +18,13 @@ export interface FilterStoreState {
 export const filterStore = createStore<FilterStoreState>((set) => ({
   activeFilters: {},
   activeViewName: null,
+  lastViewName: null,
 
   setFilters: (filters) =>
     set({ activeFilters: filters, activeViewName: null }),
 
-  clearFilters: () => set({ activeFilters: {}, activeViewName: null }),
+  clearFilters: () =>
+    set({ activeFilters: {}, activeViewName: null, lastViewName: null }),
 
   toggleFilter: (field, value) =>
     set((state) => {
@@ -42,7 +46,11 @@ export const filterStore = createStore<FilterStoreState>((set) => ({
     }),
 
   loadView: (view) =>
-    set({ activeFilters: { ...view.filters }, activeViewName: view.name }),
+    set({
+      activeFilters: { ...view.filters },
+      activeViewName: view.name,
+      lastViewName: view.name,
+    }),
 }));
 
 export function useFilterStore<T>(selector: (state: FilterStoreState) => T): T {

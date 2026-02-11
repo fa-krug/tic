@@ -157,10 +157,11 @@ export function WorkItemList() {
         sortStack: s.sortStack,
       })),
     );
-  const { activeFilters, activeViewName } = useFilterStore(
+  const { activeFilters, activeViewName, lastViewName } = useFilterStore(
     useShallow((s) => ({
       activeFilters: s.activeFilters,
       activeViewName: s.activeViewName,
+      lastViewName: s.lastViewName,
     })),
   );
   const filterCount = useMemo(
@@ -273,7 +274,10 @@ export function WorkItemList() {
   const gitAvailable = useMemo(() => isGitRepo(process.cwd()), []);
 
   useEffect(() => {
-    if (activeType === null && types.length > 0) {
+    if (
+      types.length > 0 &&
+      (activeType === null || !types.includes(activeType))
+    ) {
       setActiveType(
         defaultType && types.includes(defaultType) ? defaultType : types[0]!,
       );
@@ -945,7 +949,7 @@ export function WorkItemList() {
 
   const viewPickerItems: OverlayItem[] = useMemo(() => {
     const noFilterLabel = !defaultView ? 'No filters (default)' : 'No filters';
-    return [
+    const items: OverlayItem[] = [
       {
         id: '__no-filters__',
         label: noFilterLabel,
@@ -960,7 +964,24 @@ export function WorkItemList() {
           summarizeFilters(v.filters) + (v.name === activeViewName ? ' ●' : ''),
       })),
     ];
-  }, [savedViews, defaultView, activeViewName, filterCount]);
+    if (filterCount > 0) {
+      if (lastViewName) {
+        items.push({
+          id: '__save__',
+          label: `Save to "${lastViewName}"`,
+          value: '__save__',
+          category: 'Actions',
+        });
+      }
+      items.push({
+        id: '__new__',
+        label: 'New view...',
+        value: '__new__',
+        category: 'Actions',
+      });
+    }
+    return items;
+  }, [savedViews, defaultView, activeViewName, lastViewName, filterCount]);
 
   const handleCommandSelect = (command: Command) => {
     closeOverlay();
@@ -1102,9 +1123,6 @@ export function WorkItemList() {
         break;
       case 'delete-view':
         openOverlay({ type: 'delete-view-picker' });
-        break;
-      case 'set-default-view':
-        openOverlay({ type: 'set-default-view' });
         break;
       case 'quit':
         exit();
@@ -1740,6 +1758,29 @@ export function WorkItemList() {
                 setToast('Filters cleared');
                 return;
               }
+              if (item.value === '__save__' && lastViewName) {
+                const newView = {
+                  name: lastViewName,
+                  filters: { ...activeFilters },
+                  ...(sortStack.length > 0 ? { sort: [...sortStack] } : {}),
+                };
+                const existing = savedViews.filter(
+                  (v) => v.name !== lastViewName,
+                );
+                void configStore.getState().update({
+                  views: [...existing, newView],
+                });
+                filterStore.setState({
+                  activeViewName: lastViewName,
+                });
+                closeOverlay();
+                setToast(`View "${lastViewName}" saved`);
+                return;
+              }
+              if (item.value === '__new__') {
+                openOverlay({ type: 'save-view-input' });
+                return;
+              }
               const view = savedViews.find((v) => v.name === item.value);
               if (view) {
                 filterStore.getState().loadView(view as SavedView);
@@ -1752,12 +1793,20 @@ export function WorkItemList() {
                 setToast(`View "${view.name}" loaded`);
               }
             }}
+            onAction={(item) => {
+              if (
+                item.value === '__no-filters__' ||
+                item.value === defaultView
+              ) {
+                void configStore.getState().update({ defaultView: undefined });
+                setToast('Default view cleared');
+              } else {
+                void configStore.getState().update({ defaultView: item.value });
+                setToast(`View "${item.value}" set as default`);
+              }
+            }}
             onCancel={() => closeOverlay()}
-            footer={
-              savedViews.length === 0
-                ? 'Tip: press F to filter, then :save-view to save | enter select  esc cancel'
-                : 'enter select  esc cancel'
-            }
+            footer="↑↓ navigate  enter load  tab set default  esc cancel"
           />
         ) : activeOverlay?.type === 'save-view-input' ? (
           <OverlayPanel
@@ -1804,23 +1853,6 @@ export function WorkItemList() {
               }
               closeOverlay();
               setToast(`View "${item.value}" deleted`);
-            }}
-            onCancel={() => closeOverlay()}
-          />
-        ) : activeOverlay?.type === 'set-default-view' ? (
-          <OverlayPanel
-            title="Set Default View"
-            items={viewPickerItems}
-            onSelect={(item) => {
-              if (item.value === '__no-filters__') {
-                void configStore.getState().update({ defaultView: undefined });
-                closeOverlay();
-                setToast('Default view cleared');
-              } else {
-                void configStore.getState().update({ defaultView: item.value });
-                closeOverlay();
-                setToast(`View "${item.value}" set as default`);
-              }
             }}
             onCancel={() => closeOverlay()}
           />

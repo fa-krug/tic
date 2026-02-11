@@ -5,6 +5,7 @@ import type { WorkItem } from '../types.js';
 import type { SyncQueueAdapter, SyncStatus } from '../sync/types.js';
 import type { SyncManager } from '../sync/SyncManager.js';
 import { configStore } from './configStore.js';
+import { undoStore } from './undoStore.js';
 
 export const defaultCapabilities: BackendCapabilities = {
   relationships: false,
@@ -73,8 +74,12 @@ async function createBackendAndSync(cwd: string): Promise<{
   const { Storage } = await import('../storage/index.js');
   const primary = Storage.create(cwd);
 
-  // Set up configStore with SQLite backing
+  // Set up stores with SQLite backing
   configStore.getState().setDatabase(primary.getDatabase());
+  undoStore.getState().setDatabase(primary.getDatabase());
+
+  // Re-read config from DB (may have been loaded with defaults before DB was available)
+  await configStore.getState().init(cwd);
 
   const config = configStore.getState().config;
   const { createRemoteBackend } = await import('../backends/factory.js');
@@ -219,6 +224,12 @@ export const backendDataStore = createStore<BackendDataStoreState>(
 
     destroy() {
       ++initGeneration;
+      // Null out store DB references before closing the connection
+      undoStore.getState().destroy();
+      configStore.getState().setDatabase(null);
+      if (currentBackend && 'destroy' in currentBackend) {
+        (currentBackend as { destroy(): void }).destroy();
+      }
       currentBackend = null;
       set({
         items: [],

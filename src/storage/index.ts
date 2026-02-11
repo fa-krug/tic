@@ -1,4 +1,7 @@
 import { spawn } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import yaml from 'yaml';
 import { eq, and, isNull, isNotNull, inArray } from 'drizzle-orm';
 import { BaseBackend } from '../backends/types.js';
 import type {
@@ -14,6 +17,8 @@ import type {
 } from '../types.js';
 import { createDatabase, type TicDatabase } from './db.js';
 import * as schema from './schema.js';
+import { insertConfigTx } from './config.js';
+import type { Config } from './config.js';
 import {
   rowToWorkItem,
   rowToTemplate,
@@ -58,6 +63,7 @@ export class Storage extends BaseBackend implements SoftDeleteBackend {
     const db = createDatabase(root);
     const backend = new Storage(db, root, options);
     backend.seedDefaults();
+    backend.migrateFromYaml();
     return backend;
   }
 
@@ -123,6 +129,37 @@ export class Storage extends BaseBackend implements SoftDeleteBackend {
         .values({ name: DEFAULT_ITERATIONS[i]!, sortOrder: i })
         .onConflictDoNothing()
         .run();
+    }
+  }
+
+  /**
+   * If a legacy config.yml exists and the DB still has seed defaults,
+   * migrate the YAML config into the database and rename the file.
+   */
+  private migrateFromYaml(): void {
+    if (this.root === ':memory:') return;
+    const yamlPath = path.join(this.root, '.tic', 'config.yml');
+    if (!fs.existsSync(yamlPath)) return;
+
+    // Only migrate if DB still has the seed default backend ('drizzle')
+    const row = this.db
+      .select({ backend: schema.projectConfig.backend })
+      .from(schema.projectConfig)
+      .where(eq(schema.projectConfig.id, 1))
+      .get();
+    if (row?.backend !== 'drizzle') return;
+
+    try {
+      const raw = fs.readFileSync(yamlPath, 'utf-8');
+      const config = yaml.parse(raw) as Config;
+
+      this.db.transaction((tx) => {
+        insertConfigTx(tx, config);
+      });
+
+      fs.renameSync(yamlPath, yamlPath + '.migrated');
+    } catch {
+      // Migration failure is not fatal — continue with DB defaults
     }
   }
 

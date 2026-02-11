@@ -8,7 +8,7 @@ import {
 } from '../../backends/factory.js';
 import type { SyncQueueAdapter } from '../../sync/types.js';
 import type { SyncManager } from '../../sync/SyncManager.js';
-import { readConfig, writeConfig } from '../../backends/local/config.js';
+import { configStore } from '../../stores/configStore.js';
 import type { Backend } from '../../backends/types.js';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -68,10 +68,10 @@ export interface ListItemsArgs {
 
 export async function handleGetConfig(
   backend: Backend,
-  root: string,
+  _root: string, // eslint-disable-line @typescript-eslint/no-unused-vars
 ): Promise<ToolResult> {
   try {
-    const config = await readConfig(root);
+    const config = configStore.getState().config;
     return success({
       backend: config.backend,
       statuses: await backend.getStatuses(),
@@ -86,7 +86,7 @@ export async function handleGetConfig(
 }
 
 export async function handleSetBackend(
-  root: string,
+  _root: string,
   args: { backend: string },
 ): Promise<ToolResult> {
   try {
@@ -95,9 +95,7 @@ export async function handleSetBackend(
         `Invalid backend "${args.backend}". Valid backends: ${VALID_BACKENDS.join(', ')}`,
       );
     }
-    const config = await readConfig(root);
-    config.backend = args.backend;
-    await writeConfig(root, config);
+    await configStore.getState().update({ backend: args.backend });
     return success({ backend: args.backend });
   } catch (err) {
     return error(err instanceof Error ? err.message : String(err));

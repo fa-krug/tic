@@ -91,6 +91,7 @@ export interface SoftDeleteBackend extends Backend {
   softDeleteWorkItem(id: string): Promise<void>;
   restoreWorkItem(id: string): Promise<void>;
   permanentlyDeleteWorkItem(id: string): Promise<void>;
+  cleanupTrash(): Promise<void>;
 }
 
 export function isSoftDeleteBackend(
@@ -99,7 +100,8 @@ export function isSoftDeleteBackend(
   return (
     'softDeleteWorkItem' in backend &&
     'restoreWorkItem' in backend &&
-    'permanentlyDeleteWorkItem' in backend
+    'permanentlyDeleteWorkItem' in backend &&
+    'cleanupTrash' in backend
   );
 }
 

@@ -3,18 +3,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { runConfigGet, runConfigSet } from '../commands/config.js';
-import {
-  writeConfig,
-  defaultConfig,
-  readConfig,
-} from '../../backends/local/config.js';
+import { Storage } from '../../storage/index.js';
+import { readConfig as readConfigFromDb } from '../../storage/config.js';
 
 describe('tic config', () => {
   let tmpDir: string;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-config-test-'));
-    await writeConfig(tmpDir, { ...defaultConfig });
+    // Create DB with default config
+    const storage = Storage.create(tmpDir);
+    storage.destroy();
   });
 
   afterEach(() => {
@@ -24,7 +23,8 @@ describe('tic config', () => {
   describe('get', () => {
     it('returns the value of a config key', async () => {
       const value = await runConfigGet(tmpDir, 'backend');
-      expect(value).toBe('none');
+      // Seed default is 'drizzle'
+      expect(value).toBe('drizzle');
     });
 
     it('returns current_iteration', async () => {
@@ -42,8 +42,13 @@ describe('tic config', () => {
   describe('set', () => {
     it('sets a backend value', async () => {
       await runConfigSet(tmpDir, 'backend', 'github');
-      const config = await readConfig(tmpDir);
-      expect(config.backend).toBe('github');
+      const storage = Storage.create(tmpDir);
+      try {
+        const config = readConfigFromDb(storage.getDatabase());
+        expect(config.backend).toBe('github');
+      } finally {
+        storage.destroy();
+      }
     });
 
     it('validates backend values', async () => {
@@ -54,14 +59,24 @@ describe('tic config', () => {
 
     it('accepts jira as a valid backend', async () => {
       await runConfigSet(tmpDir, 'backend', 'jira');
-      const config = await readConfig(tmpDir);
-      expect(config.backend).toBe('jira');
+      const storage = Storage.create(tmpDir);
+      try {
+        const config = readConfigFromDb(storage.getDatabase());
+        expect(config.backend).toBe('jira');
+      } finally {
+        storage.destroy();
+      }
     });
 
     it('sets current_iteration', async () => {
       await runConfigSet(tmpDir, 'current_iteration', 'v2');
-      const config = await readConfig(tmpDir);
-      expect(config.current_iteration).toBe('v2');
+      const storage = Storage.create(tmpDir);
+      try {
+        const config = readConfigFromDb(storage.getDatabase());
+        expect(config.current_iteration).toBe('v2');
+      } finally {
+        storage.destroy();
+      }
     });
   });
 });

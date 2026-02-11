@@ -19,7 +19,6 @@ export type ActiveOverlay =
   | { type: 'view-picker' }
   | { type: 'save-view-input' }
   | { type: 'delete-view-picker' }
-  | { type: 'set-default-view' }
   // Settings overlays
   | { type: 'default-type-picker' }
   | { type: 'default-iteration-picker' }

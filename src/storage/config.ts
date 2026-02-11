@@ -1,7 +1,77 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { eq } from 'drizzle-orm';
-import type { Config } from '../backends/local/config.js';
-import type { TicDatabase, TicTransaction } from './db.js';
+import { createDatabase, type TicDatabase, type TicTransaction } from './db.js';
 import * as schema from './schema.js';
+
+export interface Config {
+  backend: string;
+  types: string[];
+  statuses: string[];
+  current_iteration: string;
+  iterations: string[];
+  next_id: number;
+  branchMode: 'worktree' | 'branch';
+  autoUpdate: boolean;
+  defaultType?: string;
+  showDetailPanel?: boolean;
+  branchCommand?: string;
+  copyToClipboard?: boolean;
+  jira?: {
+    site: string;
+    project: string;
+    boardId?: number;
+  };
+  views?: Array<{
+    name: string;
+    filters: {
+      statuses?: string[];
+      types?: string[];
+      priorities?: string[];
+      assignees?: string[];
+      labels?: string[];
+    };
+    sort?: Array<{ column: string; direction: string }>;
+  }>;
+  defaultView?: string;
+}
+
+export const defaultConfig: Config = {
+  backend: 'none',
+  types: ['epic', 'issue', 'task'],
+  statuses: ['backlog', 'todo', 'in-progress', 'review', 'done'],
+  current_iteration: 'default',
+  iterations: ['default'],
+  next_id: 1,
+  branchMode: 'worktree',
+  autoUpdate: true,
+  branchCommand: `claude "Brainstorm the implementation of issue #$TIC_ITEM_ID: $TIC_ITEM_TITLE. $TIC_ITEM_DESCRIPTION"`,
+  copyToClipboard: true,
+};
+
+/**
+ * Read just the backend type from the SQLite database synchronously.
+ * Used by CLI's `tryGetCapabilities()` which runs at startup before
+ * any async work.  Returns 'none' if the DB doesn't exist yet.
+ */
+export function readBackendTypeSync(root: string): string {
+  const dbPath = path.join(root, '.tic', 'tic.db');
+  if (!fs.existsSync(dbPath)) return 'none';
+
+  const db = createDatabase(root);
+  try {
+    const row = db
+      .select({ backend: schema.projectConfig.backend })
+      .from(schema.projectConfig)
+      .where(eq(schema.projectConfig.id, 1))
+      .get();
+    const backend = row?.backend ?? 'none';
+    // 'drizzle' is the seed default — treat it as 'none' for capability lookup
+    return backend === 'drizzle' ? 'none' : backend;
+  } finally {
+    db.close();
+  }
+}
 
 /**
  * Read the full Config from the SQLite database.

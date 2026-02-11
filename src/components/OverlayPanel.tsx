@@ -26,6 +26,7 @@ export interface OverlayPanelProps {
   allowFreeform?: boolean;
   onSubmitFreeform?: (text: string) => void;
   onConfirm?: (items: OverlayItem[]) => void;
+  onAction?: (item: OverlayItem) => void;
   placeholder?: string;
   initialQuery?: string;
   emptyMessage?: string;
@@ -68,6 +69,7 @@ export function OverlayPanel({
   allowFreeform = false,
   onSubmitFreeform,
   onConfirm,
+  onAction,
   placeholder = 'Type to filter...',
   initialQuery = '',
   emptyMessage = 'No matches',
@@ -127,6 +129,15 @@ export function OverlayPanel({
       } else if (allowFreeform && query.trim() !== '' && onSubmitFreeform) {
         onSubmitFreeform(query.trim());
       }
+      return;
+    }
+    if (
+      key.tab &&
+      onAction &&
+      flatItems.length > 0 &&
+      flatItems[clampedIndex]
+    ) {
+      onAction(flatItems[clampedIndex]);
       return;
     }
     if (_input === ' ' && multiSelect) {

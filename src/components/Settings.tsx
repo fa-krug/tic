@@ -18,7 +18,7 @@ import { VERSION } from '../version.js';
 import { requestUpdate } from '../updater.js';
 import { OverlayPanel } from './OverlayPanel.js';
 import { openInEditor } from '../editor.js';
-import { defaultConfig } from '../backends/local/config.js';
+import { defaultConfig } from '../storage/config.js';
 import { useTerminalWidth } from '../hooks/useTerminalWidth.js';
 
 type NavItem =

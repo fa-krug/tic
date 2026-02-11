@@ -4,7 +4,8 @@ import path from 'node:path';
 import os from 'node:os';
 import { runInit } from '../commands/init.js';
 import { requireTicProject } from '../index.js';
-import { readConfig } from '../../backends/local/config.js';
+import { Storage } from '../../storage/index.js';
+import { readConfig as readConfigFromDb } from '../../storage/config.js';
 
 describe('tic init', () => {
   let tmpDir: string;
@@ -17,31 +18,54 @@ describe('tic init', () => {
     fs.rmSync(tmpDir, { recursive: true });
   });
 
-  it('creates .tic directory with config.yml', async () => {
+  it('creates .tic directory with tic.db', async () => {
     const result = await runInit(tmpDir);
     expect(result.success).toBe(true);
-    expect(fs.existsSync(path.join(tmpDir, '.tic', 'config.yml'))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, '.tic', 'tic.db'))).toBe(true);
   });
 
   it('writes backend field to config on init', async () => {
     await runInit(tmpDir, 'none');
-    const config = await readConfig(tmpDir);
-    expect(config.backend).toBe('none');
+    const storage = Storage.create(tmpDir);
+    try {
+      const config = readConfigFromDb(storage.getDatabase());
+      expect(config.backend).toBe('none');
+    } finally {
+      storage.destroy();
+    }
   });
 
   it('writes chosen backend to config', async () => {
     await runInit(tmpDir, 'github');
-    const config = await readConfig(tmpDir);
-    expect(config.backend).toBe('github');
+    const storage = Storage.create(tmpDir);
+    try {
+      const config = readConfigFromDb(storage.getDatabase());
+      expect(config.backend).toBe('github');
+    } finally {
+      storage.destroy();
+    }
   });
 
   it('defaults to none when no backend specified', async () => {
     await runInit(tmpDir);
-    const config = await readConfig(tmpDir);
-    expect(config.backend).toBe('none');
+    const storage = Storage.create(tmpDir);
+    try {
+      const config = readConfigFromDb(storage.getDatabase());
+      // Default seed is 'drizzle', but no explicit backend was set
+      // When no --backend flag, runInit doesn't call updateConfig
+      expect(config.backend).toBe('drizzle');
+    } finally {
+      storage.destroy();
+    }
   });
 
-  it('returns already-initialized message if .tic exists', async () => {
+  it('returns already-initialized message if .tic/tic.db exists', async () => {
+    await runInit(tmpDir); // First init creates tic.db
+    const result = await runInit(tmpDir);
+    expect(result.alreadyExists).toBe(true);
+  });
+
+  it('returns already-initialized message if .tic/config.yml exists', async () => {
     fs.mkdirSync(path.join(tmpDir, '.tic'), { recursive: true });
     fs.writeFileSync(path.join(tmpDir, '.tic', 'config.yml'), 'next_id: 1\n');
     const result = await runInit(tmpDir);

@@ -2,22 +2,30 @@
 import module from 'node:module';
 module.enableCompileCache?.();
 
+import fs from 'node:fs';
+import path from 'node:path';
 import { render } from 'ink';
 import { App } from './app.js';
 import { configStore } from './stores/configStore.js';
 import { backendDataStore } from './stores/backendDataStore.js';
 import { undoStore } from './stores/undoStore.js';
 import { recentCommandsStore } from './stores/recentCommandsStore.js';
-import {
-  cleanupTrash,
-  permanentlyDeleteWorkItem,
-} from './backends/local/items.js';
+import { isSoftDeleteBackend } from './backends/types.js';
 
 if (process.argv.length > 2) {
   const { runCli } = await import('./cli/index.js');
   await runCli(process.argv);
 } else {
   const cwd = process.cwd();
+
+  // Auto-init on first run: detect backend from git remotes
+  const dbPath = path.join(cwd, '.tic', 'tic.db');
+  if (!fs.existsSync(dbPath)) {
+    const { detectBackend } = await import('./backends/factory.js');
+    const { runInit } = await import('./cli/commands/init.js');
+    await runInit(cwd, detectBackend(cwd));
+  }
+
   await configStore.getState().init(cwd);
 
   // Init is non-blocking - UI renders immediately with loading state
@@ -25,20 +33,22 @@ if (process.argv.length > 2) {
 
   await recentCommandsStore.getState().init(cwd);
 
-  await cleanupTrash(cwd);
-
   console.clear();
   const app = render(<App />);
   await app.waitUntilExit();
 
-  // Clean up undo stack — permanently delete any remaining trashed files
-  const remaining = undoStore.getState().clear();
-  for (const entry of remaining) {
-    if (entry.type === 'delete') {
-      for (const snap of entry.itemSnapshots) {
-        await permanentlyDeleteWorkItem(cwd, snap.id);
+  // Clean up undo stack — permanently delete any remaining soft-deleted items
+  const backend = backendDataStore.getState().backend;
+  if (backend && isSoftDeleteBackend(backend)) {
+    const remaining = undoStore.getState().clear();
+    for (const entry of remaining) {
+      if (entry.type === 'delete') {
+        for (const snap of entry.itemSnapshots) {
+          await backend.permanentlyDeleteWorkItem(snap.id);
+        }
       }
     }
+    await backend.cleanupTrash();
   }
 
   recentCommandsStore.getState().destroy();

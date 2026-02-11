@@ -1,24 +1,27 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import fs from 'node:fs';
-import path from 'node:path';
-import os from 'node:os';
 import { readJiraConfig } from './config.js';
-import { writeConfig, defaultConfig, type Config } from '../local/config.js';
+import { configStore } from '../../stores/configStore.js';
+import { createDatabase, type TicDatabase } from '../../storage/db.js';
+import { Storage } from '../../storage/index.js';
+import { updateConfig } from '../../storage/config.js';
+import type { Config } from '../../storage/config.js';
 
 describe('readJiraConfig', () => {
-  let tmpDir: string;
+  let db: TicDatabase;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-jira-config-'));
+    db = createDatabase(':memory:');
+    Storage.createFromDb(db);
+    configStore.getState().setDatabase(db);
   });
 
   afterEach(() => {
-    fs.rmSync(tmpDir, { recursive: true });
+    configStore.getState().destroy();
+    db.close();
   });
 
-  it('reads jira config from .tic/config.yml', async () => {
-    await writeConfig(tmpDir, {
-      ...defaultConfig,
+  it('reads jira config from configStore', async () => {
+    updateConfig(db, {
       backend: 'jira',
       jira: {
         site: 'https://mycompany.atlassian.net',
@@ -26,49 +29,51 @@ describe('readJiraConfig', () => {
         boardId: 6,
       },
     });
-    const config = await readJiraConfig(tmpDir);
+    await configStore.getState().init('/fake/root');
+    const config = await readJiraConfig('/fake/root');
     expect(config.site).toBe('https://mycompany.atlassian.net');
     expect(config.project).toBe('TEAM');
     expect(config.boardId).toBe(6);
   });
 
   it('throws when jira config is missing', async () => {
-    await writeConfig(tmpDir, { ...defaultConfig, backend: 'jira' });
-    await expect(readJiraConfig(tmpDir)).rejects.toThrow(
+    updateConfig(db, { backend: 'jira' });
+    await configStore.getState().init('/fake/root');
+    await expect(readJiraConfig('/fake/root')).rejects.toThrow(
       'Jira backend requires "jira" configuration',
     );
   });
 
   it('throws when site is missing', async () => {
-    const config = {
-      ...defaultConfig,
+    updateConfig(db, {
       backend: 'jira',
-      jira: { project: 'TEAM' },
-    } as unknown as Config;
-    await writeConfig(tmpDir, config);
-    await expect(readJiraConfig(tmpDir)).rejects.toThrow('jira.site');
+      jira: { project: 'TEAM' } as unknown as Config['jira'],
+    });
+    await configStore.getState().init('/fake/root');
+    await expect(readJiraConfig('/fake/root')).rejects.toThrow(
+      'Jira backend requires "jira" configuration',
+    );
   });
 
   it('throws when project is missing', async () => {
-    const config = {
-      ...defaultConfig,
+    updateConfig(db, {
       backend: 'jira',
-      jira: { site: 'https://x.atlassian.net' },
-    } as unknown as Config;
-    await writeConfig(tmpDir, config);
-    await expect(readJiraConfig(tmpDir)).rejects.toThrow('jira.project');
+      jira: { site: 'https://x.atlassian.net' } as unknown as Config['jira'],
+    });
+    await configStore.getState().init('/fake/root');
+    await expect(readJiraConfig('/fake/root')).rejects.toThrow('jira.project');
   });
 
   it('allows boardId to be optional', async () => {
-    await writeConfig(tmpDir, {
-      ...defaultConfig,
+    updateConfig(db, {
       backend: 'jira',
       jira: {
         site: 'https://mycompany.atlassian.net',
         project: 'TEAM',
       },
     });
-    const config = await readJiraConfig(tmpDir);
+    await configStore.getState().init('/fake/root');
+    const config = await readJiraConfig('/fake/root');
     expect(config.boardId).toBeUndefined();
   });
 });

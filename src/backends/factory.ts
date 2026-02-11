@@ -38,10 +38,12 @@ export function detectBackend(root: string): BackendType {
 }
 
 export async function createBackend(root: string): Promise<Backend> {
+  const primary = Storage.create(root);
+  configStore.getState().setDatabase(primary.getDatabase());
   if (!configStore.getState().loaded) {
     await configStore.getState().init(root);
   }
-  return Storage.create(root);
+  return primary;
 }
 
 export async function createRemoteBackend(
@@ -85,12 +87,12 @@ export interface BackendSetup {
 export async function createBackendWithSync(
   root: string,
 ): Promise<BackendSetup> {
+  const primary = Storage.create(root);
+  configStore.getState().setDatabase(primary.getDatabase());
+
   if (!configStore.getState().loaded) {
     await configStore.getState().init(root);
   }
-
-  const primary = Storage.create(root);
-  configStore.getState().setDatabase(primary.getDatabase());
 
   const config = configStore.getState().config;
   const remote = await createRemoteBackend(root, config.backend ?? 'none');

@@ -46,7 +46,7 @@ describe('MCP handlers', () => {
         alreadyExists?: boolean;
       };
       expect(data.initialized).toBe(true);
-      expect(fs.existsSync(path.join(tmpDir, '.tic', 'config.yml'))).toBe(true);
+      expect(fs.existsSync(path.join(tmpDir, '.tic', 'tic.db'))).toBe(true);
     });
 
     it('returns alreadyExists for existing project', async () => {

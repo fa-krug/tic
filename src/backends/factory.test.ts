@@ -10,7 +10,7 @@ import {
 } from './factory.js';
 import { Storage } from '../storage/index.js';
 import { SyncManager } from '../sync/SyncManager.js';
-import { writeConfig, defaultConfig } from './local/config.js';
+import { updateConfig } from '../storage/config.js';
 import { configStore } from '../stores/configStore.js';
 
 describe('VALID_BACKENDS', () => {
@@ -40,6 +40,10 @@ describe('createBackend', () => {
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-factory-'));
+    // Initialize DB with config
+    const storage = Storage.create(tmpDir);
+    updateConfig(storage.getDatabase(), { backend: 'none' });
+    storage.destroy();
   });
 
   afterEach(() => {
@@ -48,14 +52,23 @@ describe('createBackend', () => {
   });
 
   it('always creates a Storage as primary', async () => {
-    await writeConfig(tmpDir, { ...defaultConfig, backend: 'none' });
     const backend = await createBackend(tmpDir);
     expect(backend).toBeInstanceOf(Storage);
-    expect(await backend.getStatuses()).toEqual(defaultConfig.statuses);
+    expect(await backend.getStatuses()).toEqual([
+      'backlog',
+      'todo',
+      'in-progress',
+      'review',
+      'done',
+    ]);
   });
 
   it('creates Storage regardless of config.backend setting', async () => {
-    await writeConfig(tmpDir, { ...defaultConfig, backend: 'github' });
+    // Re-init with github backend
+    const storage = Storage.create(tmpDir);
+    updateConfig(storage.getDatabase(), { backend: 'github' });
+    storage.destroy();
+
     const backend = await createBackend(tmpDir);
     expect(backend).toBeInstanceOf(Storage);
   });
@@ -66,6 +79,10 @@ describe('createBackendWithSync', () => {
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-factory-sync-'));
+    // Initialize DB with config
+    const storage = Storage.create(tmpDir);
+    updateConfig(storage.getDatabase(), { backend: 'none' });
+    storage.destroy();
   });
 
   afterEach(() => {
@@ -74,7 +91,6 @@ describe('createBackendWithSync', () => {
   });
 
   it('returns Storage and null syncManager for none backend', async () => {
-    await writeConfig(tmpDir, { ...defaultConfig, backend: 'none' });
     const { backend, syncManager, queue } = await createBackendWithSync(tmpDir);
     expect(backend).toBeInstanceOf(Storage);
     expect(syncManager).toBeNull();
@@ -82,7 +98,10 @@ describe('createBackendWithSync', () => {
   });
 
   it('returns Storage and SyncManager for github backend', async () => {
-    await writeConfig(tmpDir, { ...defaultConfig, backend: 'github' });
+    const storage = Storage.create(tmpDir);
+    updateConfig(storage.getDatabase(), { backend: 'github' });
+    storage.destroy();
+
     // GitHubBackend constructor may throw if gh is not authenticated,
     // but we still expect the right types when it succeeds
     try {
@@ -98,14 +117,16 @@ describe('createBackendWithSync', () => {
   });
 
   it('returns Storage and SyncManager for jira backend', async () => {
-    await writeConfig(tmpDir, {
-      ...defaultConfig,
+    const storage = Storage.create(tmpDir);
+    updateConfig(storage.getDatabase(), {
       backend: 'jira',
       jira: {
         site: 'https://mycompany.atlassian.net',
         project: 'TEAM',
       },
     });
+    storage.destroy();
+
     try {
       const { backend, syncManager, queue } =
         await createBackendWithSync(tmpDir);
