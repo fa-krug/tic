@@ -6,7 +6,8 @@ import os from 'node:os';
 import { VERSION } from '../version.js';
 
 export const BACKEND_LABELS: Record<string, string> = {
-  local: 'Local',
+  none: 'Local',
+  filesystem: 'Local (filesystem)',
   github: 'GitHub',
   gitlab: 'GitLab',
   azure: 'Azure DevOps',
@@ -65,7 +66,7 @@ function getStatusDisplay(
 }
 
 export function Header() {
-  const backendType = useConfigStore((s) => s.config.backend ?? 'local');
+  const backendType = useConfigStore((s) => s.config.backend ?? 'none');
   const loading = useBackendDataStore((s) => s.loading);
   const initError = useBackendDataStore((s) => s.error);
   const syncStatus = useBackendDataStore((s) => s.syncStatus);

@@ -9,7 +9,6 @@ import { SyncManager } from '../sync/SyncManager.js';
 export const VALID_BACKENDS = [
   'none',
   'filesystem',
-  'local',
   'github',
   'gitlab',
   'azure',
@@ -35,7 +34,7 @@ export function detectBackend(root: string): BackendType {
   } catch {
     // Not a git repo or git not available
   }
-  return 'local';
+  return 'none';
 }
 
 export async function createBackend(root: string): Promise<Backend> {
@@ -50,7 +49,6 @@ export async function createRemoteBackend(
   backendType: string,
 ): Promise<Backend | null> {
   switch (backendType) {
-    case 'local':
     case 'none':
       return null;
     case 'filesystem': {

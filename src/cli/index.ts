@@ -96,7 +96,7 @@ function tryGetCapabilities(): BackendCapabilities | null {
   try {
     requireTicProject(process.cwd());
     const config = readConfigSync(process.cwd());
-    const backendType = config.backend ?? 'local';
+    const backendType = config.backend ?? 'none';
     return BACKEND_CAPABILITIES[backendType] ?? null;
   } catch {
     return null;

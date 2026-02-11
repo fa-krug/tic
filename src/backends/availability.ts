@@ -7,7 +7,6 @@ import type { BackendType } from './factory.js';
 export const BACKEND_CLI: Record<BackendType, string | null> = {
   none: null,
   filesystem: null,
-  local: null,
   github: 'gh',
   gitlab: 'glab',
   azure: 'az',
@@ -46,7 +45,6 @@ export async function checkAllBackendAvailability(): Promise<
   const backends: BackendType[] = [
     'none',
     'filesystem',
-    'local',
     'github',
     'gitlab',
     'azure',

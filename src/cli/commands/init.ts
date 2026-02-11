@@ -15,6 +15,6 @@ export async function runInit(
   if (fs.existsSync(configPath)) {
     return { success: true, alreadyExists: true };
   }
-  await writeConfig(root, { ...defaultConfig, backend: backend ?? 'local' });
+  await writeConfig(root, { ...defaultConfig, backend: backend ?? 'none' });
   return { success: true, alreadyExists: false };
 }

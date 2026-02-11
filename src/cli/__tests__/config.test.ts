@@ -24,7 +24,7 @@ describe('tic config', () => {
   describe('get', () => {
     it('returns the value of a config key', async () => {
       const value = await runConfigGet(tmpDir, 'backend');
-      expect(value).toBe('local');
+      expect(value).toBe('none');
     });
 
     it('returns current_iteration', async () => {

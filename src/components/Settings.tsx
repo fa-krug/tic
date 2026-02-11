@@ -86,7 +86,6 @@ export function Settings() {
   >({
     none: 'available',
     filesystem: 'available',
-    local: 'available',
     github: 'checking',
     gitlab: 'checking',
     azure: 'checking',

@@ -58,7 +58,7 @@ export function StatusScreen() {
     [backend],
   );
 
-  const backendType = useConfigStore((s) => s.config.backend ?? 'local');
+  const backendType = useConfigStore((s) => s.config.backend ?? 'none');
   const backendName = BACKEND_LABELS[backendType] ?? backendType;
 
   const initError = useBackendDataStore((s) => s.error);

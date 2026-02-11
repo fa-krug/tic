@@ -36,7 +36,7 @@ export interface Config {
 }
 
 export const defaultConfig: Config = {
-  backend: 'local',
+  backend: 'none',
   types: ['epic', 'issue', 'task'],
   statuses: ['backlog', 'todo', 'in-progress', 'review', 'done'],
   current_iteration: 'default',

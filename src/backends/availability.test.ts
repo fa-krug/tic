@@ -27,8 +27,12 @@ function simulateFailure() {
 }
 
 describe('BACKEND_CLI', () => {
-  it('maps local to null (no CLI needed)', () => {
-    expect(BACKEND_CLI.local).toBeNull();
+  it('maps none to null (no CLI needed)', () => {
+    expect(BACKEND_CLI.none).toBeNull();
+  });
+
+  it('maps filesystem to null (no CLI needed)', () => {
+    expect(BACKEND_CLI.filesystem).toBeNull();
   });
 
   it('maps github to gh', () => {
@@ -53,8 +57,14 @@ describe('checkBackendAvailability', () => {
     vi.clearAllMocks();
   });
 
-  it('returns true for local (no CLI required)', async () => {
-    const result = await checkBackendAvailability('local');
+  it('returns true for none (no CLI required)', async () => {
+    const result = await checkBackendAvailability('none');
+    expect(result).toBe(true);
+    expect(mockExecFile).not.toHaveBeenCalled();
+  });
+
+  it('returns true for filesystem (no CLI required)', async () => {
+    const result = await checkBackendAvailability('filesystem');
     expect(result).toBe(true);
     expect(mockExecFile).not.toHaveBeenCalled();
   });
@@ -131,7 +141,6 @@ describe('checkAllBackendAvailability', () => {
     expect(result).toEqual({
       none: true,
       filesystem: true,
-      local: true,
       github: true,
       gitlab: true,
       azure: true,
@@ -147,7 +156,6 @@ describe('checkAllBackendAvailability', () => {
     expect(result).toEqual({
       none: true,
       filesystem: true,
-      local: true,
       github: false,
       gitlab: false,
       azure: false,

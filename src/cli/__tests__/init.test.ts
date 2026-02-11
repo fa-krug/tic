@@ -24,9 +24,9 @@ describe('tic init', () => {
   });
 
   it('writes backend field to config on init', async () => {
-    await runInit(tmpDir, 'local');
+    await runInit(tmpDir, 'none');
     const config = await readConfig(tmpDir);
-    expect(config.backend).toBe('local');
+    expect(config.backend).toBe('none');
   });
 
   it('writes chosen backend to config', async () => {
@@ -35,10 +35,10 @@ describe('tic init', () => {
     expect(config.backend).toBe('github');
   });
 
-  it('defaults to local when no backend specified', async () => {
+  it('defaults to none when no backend specified', async () => {
     await runInit(tmpDir);
     const config = await readConfig(tmpDir);
-    expect(config.backend).toBe('local');
+    expect(config.backend).toBe('none');
   });
 
   it('returns already-initialized message if .tic exists', async () => {

@@ -18,7 +18,6 @@ describe('VALID_BACKENDS', () => {
     expect(VALID_BACKENDS).toEqual([
       'none',
       'filesystem',
-      'local',
       'github',
       'gitlab',
       'azure',
@@ -28,10 +27,10 @@ describe('VALID_BACKENDS', () => {
 });
 
 describe('detectBackend', () => {
-  it('returns local when git remote fails', () => {
+  it('returns none when git remote fails', () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-detect-'));
     const result = detectBackend(tmpDir);
-    expect(result).toBe('local');
+    expect(result).toBe('none');
     fs.rmSync(tmpDir, { recursive: true });
   });
 });
@@ -49,7 +48,7 @@ describe('createBackend', () => {
   });
 
   it('always creates a DrizzleBackend as primary', async () => {
-    await writeConfig(tmpDir, { ...defaultConfig, backend: 'local' });
+    await writeConfig(tmpDir, { ...defaultConfig, backend: 'none' });
     const backend = await createBackend(tmpDir);
     expect(backend).toBeInstanceOf(DrizzleBackend);
     expect(await backend.getStatuses()).toEqual(defaultConfig.statuses);
@@ -74,8 +73,8 @@ describe('createBackendWithSync', () => {
     fs.rmSync(tmpDir, { recursive: true });
   });
 
-  it('returns DrizzleBackend and null syncManager for local backend', async () => {
-    await writeConfig(tmpDir, { ...defaultConfig, backend: 'local' });
+  it('returns DrizzleBackend and null syncManager for none backend', async () => {
+    await writeConfig(tmpDir, { ...defaultConfig, backend: 'none' });
     const { backend, syncManager, queue } = await createBackendWithSync(tmpDir);
     expect(backend).toBeInstanceOf(DrizzleBackend);
     expect(syncManager).toBeNull();

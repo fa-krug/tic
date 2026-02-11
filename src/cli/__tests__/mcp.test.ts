@@ -73,7 +73,7 @@ describe('MCP handlers', () => {
         iterations: string[];
         currentIteration: string;
       };
-      expect(data.backend).toBe('local');
+      expect(data.backend).toBe('none');
       expect(data.statuses).toEqual([
         'backlog',
         'todo',

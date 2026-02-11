@@ -74,7 +74,7 @@ describe('config', () => {
 
   it('returns default config with backend field', async () => {
     const config = await readConfig(tmpDir);
-    expect(config.backend).toBe('local');
+    expect(config.backend).toBe('none');
   });
 
   it('reads config with custom backend', async () => {
