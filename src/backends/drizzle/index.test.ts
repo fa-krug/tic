@@ -1,7 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import yaml from 'yaml';
 import { createDatabase, type TicDatabase } from './db.js';
 import { DrizzleBackend } from './index.js';
 import { isSoftDeleteBackend } from '../types.js';
+import { stringifyFrontmatter } from '../local/frontmatter.js';
 import type { NewWorkItem, Template } from '../../types.js';
 
 function makeNewItem(overrides: Partial<NewWorkItem> = {}): NewWorkItem {
@@ -1265,6 +1270,175 @@ describe('DrizzleBackend', () => {
       // openItem relies on getItemUrl — verify it returns a path based on root
       const url = backend.getItemUrl('42');
       expect(url).toContain('.tic/items/42.md');
+    });
+  });
+
+  // ─── Auto-migration on create() ──────────────────────────────
+
+  describe('auto-migration on create()', () => {
+    let tmpDir: string;
+
+    beforeEach(() => {
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-auto-migrate-'));
+    });
+
+    afterEach(() => {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    });
+
+    /**
+     * Helper: write a legacy config.yml into .tic/
+     */
+    function writeConfigYml(
+      root: string,
+      config: Record<string, unknown>,
+    ): void {
+      const ticDir = path.join(root, '.tic');
+      fs.mkdirSync(ticDir, { recursive: true });
+      fs.writeFileSync(path.join(ticDir, 'config.yml'), yaml.stringify(config));
+    }
+
+    /**
+     * Helper: write a work item .md file with frontmatter
+     */
+    function writeItemFile(
+      root: string,
+      id: string,
+      frontmatter: Record<string, unknown>,
+      body: string,
+    ): void {
+      const dir = path.join(root, '.tic', 'items');
+      fs.mkdirSync(dir, { recursive: true });
+      const content = stringifyFrontmatter(body, frontmatter);
+      fs.writeFileSync(path.join(dir, `${id}.md`), content);
+    }
+
+    it('auto-migrates legacy project on first create', async () => {
+      // Set up a temp dir with legacy .tic/ files (config.yml, items/*.md)
+      writeConfigYml(tmpDir, {
+        backend: 'local',
+        statuses: ['todo', 'done'],
+        types: ['issue'],
+        current_iteration: 'default',
+        iterations: ['default'],
+        next_id: 3,
+        branchMode: 'worktree',
+        autoUpdate: true,
+      });
+
+      writeItemFile(
+        tmpDir,
+        '1',
+        {
+          id: 1,
+          title: 'Legacy item one',
+          type: 'issue',
+          status: 'todo',
+          iteration: 'default',
+          priority: 'medium',
+          assignee: '',
+          labels: ['bug'],
+          created: '2025-01-01T00:00:00.000Z',
+          updated: '2025-01-01T00:00:00.000Z',
+        },
+        'First item description.',
+      );
+
+      writeItemFile(
+        tmpDir,
+        '2',
+        {
+          id: 2,
+          title: 'Legacy item two',
+          type: 'issue',
+          status: 'done',
+          iteration: 'default',
+          priority: 'high',
+          assignee: 'alice',
+          labels: [],
+          created: '2025-01-02T00:00:00.000Z',
+          updated: '2025-01-03T00:00:00.000Z',
+        },
+        'Second item description.',
+      );
+
+      const migratedBackend = DrizzleBackend.create(tmpDir);
+      const items = await migratedBackend.listWorkItems();
+      expect(items.length).toBeGreaterThan(0);
+      expect(items).toHaveLength(2);
+      expect(items.map((i) => i.title).sort()).toEqual([
+        'Legacy item one',
+        'Legacy item two',
+      ]);
+      migratedBackend.destroy();
+    });
+
+    it('works for a fresh project (no .tic/ at all)', async () => {
+      // tmpDir exists but has no .tic/ directory
+      const freshBackend = DrizzleBackend.create(tmpDir);
+
+      // Should have defaults seeded
+      const statuses = await freshBackend.getStatuses();
+      expect(statuses).toEqual([
+        'backlog',
+        'todo',
+        'in-progress',
+        'review',
+        'done',
+      ]);
+
+      const items = await freshBackend.listWorkItems();
+      expect(items).toEqual([]);
+
+      freshBackend.destroy();
+    });
+
+    it('does not re-migrate an already-migrated project', async () => {
+      // First create — sets up a fresh DB with defaults
+      const firstBackend = DrizzleBackend.create(tmpDir);
+      await firstBackend.createWorkItem({
+        title: 'DB item',
+        type: 'task',
+        status: 'todo',
+        iteration: 'default',
+        priority: 'medium',
+        assignee: '',
+        labels: [],
+        description: '',
+        parent: null,
+        dependsOn: [],
+      });
+      firstBackend.destroy();
+
+      // tic.db now exists. Even if items/ directory also exists (leftover),
+      // it should NOT trigger migration because tic.db is present.
+      const itemsDir = path.join(tmpDir, '.tic', 'items');
+      fs.mkdirSync(itemsDir, { recursive: true });
+      writeItemFile(
+        tmpDir,
+        '99',
+        {
+          id: 99,
+          title: 'Should not appear',
+          type: 'issue',
+          status: 'todo',
+          iteration: 'default',
+          priority: 'low',
+          assignee: '',
+          labels: [],
+          created: '2025-01-01T00:00:00.000Z',
+          updated: '2025-01-01T00:00:00.000Z',
+        },
+        'Leftover file.',
+      );
+
+      const secondBackend = DrizzleBackend.create(tmpDir);
+      const items = await secondBackend.listWorkItems();
+
+      // Should only have the DB item, not the leftover .md file
+      expect(items).toHaveLength(1);
+      expect(items[0]!.title).toBe('DB item');
+      secondBackend.destroy();
     });
   });
 });
