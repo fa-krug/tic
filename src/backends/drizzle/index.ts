@@ -74,6 +74,14 @@ export class DrizzleBackend extends BaseBackend implements SoftDeleteBackend {
     return backend;
   }
 
+  getDatabase(): TicDatabase {
+    return this.db;
+  }
+
+  getRoot(): string {
+    return this.root;
+  }
+
   /**
    * Seed default configuration, statuses, types, and iterations using INSERT OR IGNORE.
    */
@@ -614,6 +622,98 @@ export class DrizzleBackend extends BaseBackend implements SoftDeleteBackend {
       updated: now,
       comments: [],
     };
+  }
+
+  // ─── Write: importWorkItem (for sync) ───────────────────────────────
+
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async importWorkItem(item: WorkItem): Promise<WorkItem> {
+    this.db.transaction((tx) => {
+      // Ensure iteration exists
+      if (item.iteration) {
+        tx.insert(schema.iterations)
+          .values({ name: item.iteration, sortOrder: 0 })
+          .onConflictDoNothing()
+          .run();
+      }
+
+      // Upsert work item
+      tx.insert(schema.workItems)
+        .values({
+          id: item.id,
+          title: item.title,
+          type: item.type,
+          status: item.status,
+          iteration: item.iteration,
+          priority: item.priority,
+          assignee: item.assignee,
+          description: item.description,
+          parent: item.parent,
+          created: item.created,
+          updated: item.updated,
+        })
+        .onConflictDoUpdate({
+          target: schema.workItems.id,
+          set: {
+            title: item.title,
+            type: item.type,
+            status: item.status,
+            iteration: item.iteration,
+            priority: item.priority,
+            assignee: item.assignee,
+            description: item.description,
+            parent: item.parent,
+            created: item.created,
+            updated: item.updated,
+          },
+        })
+        .run();
+
+      // Replace labels
+      tx.delete(schema.workItemLabels)
+        .where(eq(schema.workItemLabels.workItemId, item.id))
+        .run();
+      if (item.labels.length > 0) {
+        tx.insert(schema.workItemLabels)
+          .values(item.labels.map((label) => ({ workItemId: item.id, label })))
+          .run();
+      }
+
+      // Replace deps
+      tx.delete(schema.workItemDeps)
+        .where(eq(schema.workItemDeps.workItemId, item.id))
+        .run();
+      if (item.dependsOn.length > 0) {
+        tx.insert(schema.workItemDeps)
+          .values(
+            item.dependsOn.map((dependsOnId) => ({
+              workItemId: item.id,
+              dependsOnId,
+            })),
+          )
+          .run();
+      }
+
+      // Replace comments
+      tx.delete(schema.comments)
+        .where(eq(schema.comments.workItemId, item.id))
+        .run();
+      if (item.comments.length > 0) {
+        for (const c of item.comments) {
+          tx.insert(schema.comments)
+            .values({
+              workItemId: item.id,
+              author: c.author,
+              body: c.body,
+              created: c.date,
+            })
+            .run();
+        }
+      }
+    });
+
+    this.invalidateCache();
+    return item;
   }
 
   // ─── Write: updateWorkItem ────────────────────────────────────────

@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import type {
   QueueEntry,
-  SyncQueue,
+  SyncQueueData,
   SyncStatus,
   SyncResult,
   PushResult,
@@ -21,8 +21,8 @@ describe('sync types', () => {
     expect(entry.timestamp).toBeDefined();
   });
 
-  it('SyncQueue has pending array', () => {
-    const queue: SyncQueue = { pending: [] };
+  it('SyncQueueData has pending array', () => {
+    const queue: SyncQueueData = { pending: [] };
     expect(queue.pending).toEqual([]);
   });
 

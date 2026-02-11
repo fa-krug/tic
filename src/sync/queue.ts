@@ -1,18 +1,23 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import type { QueueAction, QueueEntry, SyncQueue } from './types.js';
+import type {
+  QueueAction,
+  QueueEntry,
+  SyncQueueData,
+  SyncQueueAdapter,
+} from './types.js';
 
-export class SyncQueueStore {
+export class SyncQueueStore implements SyncQueueAdapter {
   private filePath: string;
 
   constructor(root: string) {
     this.filePath = path.join(root, '.tic', 'sync-queue.json');
   }
 
-  async read(): Promise<SyncQueue> {
+  async read(): Promise<SyncQueueData> {
     try {
       const raw = await fs.readFile(this.filePath, 'utf-8');
-      const data = JSON.parse(raw) as SyncQueue;
+      const data = JSON.parse(raw) as SyncQueueData;
       if (!Array.isArray(data.pending)) return { pending: [] };
       return data;
     } catch {
@@ -20,7 +25,7 @@ export class SyncQueueStore {
     }
   }
 
-  private async write(queue: SyncQueue): Promise<void> {
+  private async write(queue: SyncQueueData): Promise<void> {
     const dir = path.dirname(this.filePath);
     await fs.mkdir(dir, { recursive: true });
     await fs.writeFile(this.filePath, JSON.stringify(queue, null, 2));

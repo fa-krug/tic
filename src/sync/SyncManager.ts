@@ -1,6 +1,6 @@
 import type { Backend } from '../backends/types.js';
-import { LocalBackend } from '../backends/local/index.js';
-import type { SyncQueueStore } from './queue.js';
+import { isSyncableBackend } from '../backends/types.js';
+import type { SyncQueueAdapter } from './types.js';
 import type {
   QueueEntry,
   SyncStatus,
@@ -9,28 +9,20 @@ import type {
   SyncError,
   SyncLogEntry,
 } from './types.js';
-import type { NewWorkItem } from '../types.js';
-import {
-  writeWorkItem,
-  deleteWorkItem as removeWorkItemFile,
-} from '../backends/local/items.js';
-import {
-  writeTemplate,
-  deleteTemplate as removeTemplateFile,
-} from '../backends/local/templates.js';
+import type { NewWorkItem, WorkItem } from '../types.js';
 
 type StatusListener = (status: SyncStatus) => void;
 
 export class SyncManager {
-  private local: LocalBackend;
+  private primary: Backend;
   private remote: Backend;
-  private queue: SyncQueueStore;
+  private queue: SyncQueueAdapter;
   private status: SyncStatus;
   private listeners: StatusListener[] = [];
   private syncLog: SyncLogEntry[] = [];
 
-  constructor(local: LocalBackend, remote: Backend, queue: SyncQueueStore) {
-    this.local = local;
+  constructor(primary: Backend, remote: Backend, queue: SyncQueueAdapter) {
+    this.primary = primary;
     this.remote = remote;
     this.queue = queue;
     this.status = {
@@ -101,7 +93,11 @@ export class SyncManager {
           e instanceof Error &&
           'code' in e &&
           (e as NodeJS.ErrnoException).code === 'ENOENT';
-        if (isLocalMissing) {
+        const isNotFound =
+          e instanceof Error &&
+          (e.message.includes('not found') ||
+            e.message.includes('does not exist'));
+        if (isLocalMissing || isNotFound) {
           // Local item was deleted or never synced — drop unrecoverable entry
           await this.queue.remove(entry.itemId, entry.action);
           this.appendLog({
@@ -166,7 +162,7 @@ export class SyncManager {
   private async pushEntry(entry: QueueEntry): Promise<string> {
     switch (entry.action) {
       case 'create': {
-        const localItem = await this.local.getWorkItem(entry.itemId);
+        const localItem = await this.primary.getWorkItem(entry.itemId);
         const remoteItem = await this.remote.createWorkItem(
           this.stripUnsupportedFields({
             title: localItem.title,
@@ -189,7 +185,7 @@ export class SyncManager {
         return entry.itemId;
       }
       case 'update': {
-        const localItem = await this.local.getWorkItem(entry.itemId);
+        const localItem = await this.primary.getWorkItem(entry.itemId);
         await this.remote.updateWorkItem(
           entry.itemId,
           this.stripUnsupportedFields({
@@ -232,12 +228,12 @@ export class SyncManager {
         return entry.itemId;
       }
       case 'template-create': {
-        const template = await this.local.getTemplate(entry.templateSlug!);
+        const template = await this.primary.getTemplate(entry.templateSlug!);
         await this.remote.createTemplate(template);
         return entry.itemId;
       }
       case 'template-update': {
-        const template = await this.local.getTemplate(entry.templateSlug!);
+        const template = await this.primary.getTemplate(entry.templateSlug!);
         await this.remote.updateTemplate(entry.templateSlug!, template);
         return entry.itemId;
       }
@@ -263,24 +259,33 @@ export class SyncManager {
   }
 
   private async renameLocalItem(oldId: string, newId: string): Promise<void> {
-    const item = await this.local.getWorkItem(oldId);
-    const root = this.local.getRoot();
+    const item = await this.primary.getWorkItem(oldId);
     const renamedItem = { ...item, id: newId };
-    await writeWorkItem(root, renamedItem);
-    await removeWorkItemFile(root, oldId);
-    const allItems = await this.local.listWorkItems();
+
+    if (isSyncableBackend(this.primary)) {
+      await this.primary.importWorkItem(renamedItem);
+    } else {
+      await this.primary.createWorkItem(renamedItem as unknown as NewWorkItem);
+    }
+    await this.primary.deleteWorkItem(oldId);
+
+    // Fix references from other items
+    const allItems = await this.primary.listWorkItems();
     for (const other of allItems) {
+      const changes: Partial<WorkItem> = {};
       let changed = false;
       if (other.parent === oldId) {
-        other.parent = newId;
+        changes.parent = newId;
         changed = true;
       }
       if (other.dependsOn.includes(oldId)) {
-        other.dependsOn = other.dependsOn.map((d) => (d === oldId ? newId : d));
+        changes.dependsOn = other.dependsOn.map((d) =>
+          d === oldId ? newId : d,
+        );
         changed = true;
       }
       if (changed) {
-        await writeWorkItem(root, other);
+        await this.primary.updateWorkItem(other.id, changes);
       }
     }
   }
@@ -303,30 +308,55 @@ export class SyncManager {
   }
 
   private async pull(): Promise<number> {
-    await this.local.syncConfigFromRemote({
-      iterations: await this.remote.getIterations(),
-      currentIteration: await this.remote.getCurrentIteration(),
-      statuses: await this.remote.getStatuses(),
-      types: await this.remote.getWorkItemTypes(),
+    // Sync config from remote via configStore
+    const [
+      remoteIterations,
+      remoteCurrentIteration,
+      remoteStatuses,
+      remoteTypes,
+    ] = await Promise.all([
+      this.remote.getIterations(),
+      this.remote.getCurrentIteration(),
+      this.remote.getStatuses(),
+      this.remote.getWorkItemTypes(),
+    ]);
+
+    const { configStore } = await import('../stores/configStore.js');
+    await configStore.getState().update({
+      iterations: remoteIterations,
+      current_iteration: remoteCurrentIteration,
+      statuses: remoteStatuses,
+      types: remoteTypes,
     });
 
     const remoteItems = await this.remote.listWorkItems();
-    const root = this.local.getRoot();
     const pendingIds = new Set(
       (await this.queue.read()).pending.map((e) => e.itemId),
     );
 
-    const localItems = await this.local.listWorkItems();
+    const localItems = await this.primary.listWorkItems();
     const localIds = new Set(localItems.map((i) => i.id));
     const remoteIds = new Set(remoteItems.map((i) => i.id));
 
-    for (const item of remoteItems) {
-      await writeWorkItem(root, item);
+    // Upsert remote items locally
+    if (isSyncableBackend(this.primary)) {
+      for (const item of remoteItems) {
+        await this.primary.importWorkItem(item);
+      }
+    } else {
+      for (const item of remoteItems) {
+        if (localIds.has(item.id)) {
+          await this.primary.updateWorkItem(item.id, item);
+        } else {
+          await this.primary.createWorkItem(item as unknown as NewWorkItem);
+        }
+      }
     }
 
+    // Delete local items not on remote (unless pending)
     for (const localId of localIds) {
       if (!remoteIds.has(localId) && !pendingIds.has(localId)) {
-        await removeWorkItemFile(root, localId);
+        await this.primary.deleteWorkItem(localId);
       }
     }
 
@@ -334,13 +364,17 @@ export class SyncManager {
     const remoteCaps = this.remote.getCapabilities();
     if (remoteCaps.templates) {
       const remoteTemplates = await this.remote.listTemplates();
-      const localTemplates = await this.local.listTemplates();
+      const localTemplates = await this.primary.listTemplates();
       const localSlugs = new Set(localTemplates.map((t) => t.slug));
       const remoteSlugs = new Set(remoteTemplates.map((t) => t.slug));
 
       // Write/update remote templates locally
       for (const rt of remoteTemplates) {
-        await writeTemplate(this.local.getRoot(), rt);
+        if (localSlugs.has(rt.slug)) {
+          await this.primary.updateTemplate(rt.slug, rt);
+        } else {
+          await this.primary.createTemplate(rt);
+        }
       }
 
       // Delete local templates not on remote (unless pending in queue)
@@ -352,7 +386,7 @@ export class SyncManager {
       );
       for (const slug of localSlugs) {
         if (!remoteSlugs.has(slug) && !pendingTemplateSlugs.has(slug)) {
-          await removeTemplateFile(this.local.getRoot(), slug);
+          await this.primary.deleteTemplate(slug);
         }
       }
     }

@@ -243,6 +243,12 @@ export class LocalBackend extends BaseBackend {
     return item;
   }
 
+  async importWorkItem(item: WorkItem): Promise<WorkItem> {
+    await writeWorkItem(this.root, item);
+    this.invalidateCache();
+    return item;
+  }
+
   async updateWorkItem(id: string, data: Partial<WorkItem>): Promise<WorkItem> {
     this.validateFields(data);
     const item = await this.getWorkItem(id);

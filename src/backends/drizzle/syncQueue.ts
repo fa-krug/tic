@@ -1,16 +1,21 @@
 import { eq, and, inArray, asc } from 'drizzle-orm';
 import type { TicDatabase } from './db.js';
-import type { QueueAction, QueueEntry, SyncQueue } from '../../sync/types.js';
+import type {
+  QueueAction,
+  QueueEntry,
+  SyncQueueData,
+  SyncQueueAdapter,
+} from '../../sync/types.js';
 import * as s from './schema.js';
 
-export class DrizzleSyncQueue {
+export class DrizzleSyncQueue implements SyncQueueAdapter {
   db: TicDatabase;
 
   constructor(db: TicDatabase) {
     this.db = db;
   }
 
-  read(): SyncQueue {
+  read(): SyncQueueData {
     const rows = this.db
       .select()
       .from(s.syncQueue)

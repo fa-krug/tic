@@ -17,8 +17,17 @@ export interface QueueEntry {
   templateSlug?: string;
 }
 
-export interface SyncQueue {
+export interface SyncQueueData {
   pending: QueueEntry[];
+}
+
+export interface SyncQueueAdapter {
+  read(): SyncQueueData | Promise<SyncQueueData>;
+  append(entry: QueueEntry): void | Promise<void>;
+  remove(itemId: string, action: QueueAction): void | Promise<void>;
+  removeByIds(itemIds: string[], action: QueueAction): void | Promise<void>;
+  clear(): void | Promise<void>;
+  renameItem(oldId: string, newId: string): void | Promise<void>;
 }
 
 export interface SyncError {

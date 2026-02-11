@@ -70,6 +70,23 @@ export interface Backend {
   deleteTemplate(slug: string): Promise<void>;
 }
 
+/**
+ * Backend that supports importing work items with a specific ID.
+ * Used by SyncManager to write remote items to the primary backend
+ * preserving their original IDs, and to rename local items when
+ * the remote assigns a different ID during push.
+ */
+export interface SyncableBackend extends Backend {
+  /** Write a complete WorkItem preserving its existing id. */
+  importWorkItem(item: WorkItem): Promise<WorkItem>;
+}
+
+export function isSyncableBackend(
+  backend: Backend,
+): backend is SyncableBackend {
+  return 'importWorkItem' in backend;
+}
+
 export interface SoftDeleteBackend extends Backend {
   softDeleteWorkItem(id: string): Promise<void>;
   restoreWorkItem(id: string): Promise<void>;
