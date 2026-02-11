@@ -1,10 +1,7 @@
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import path from 'node:path';
 import { eq, and, isNull, isNotNull, inArray } from 'drizzle-orm';
 import { BaseBackend } from '../types.js';
 import type { BackendCapabilities, SoftDeleteBackend } from '../types.js';
-import { migrateLegacyProject } from './migrate-legacy.js';
 import type {
   WorkItem,
   NewWorkItem,
@@ -57,23 +54,11 @@ export class DrizzleBackend extends BaseBackend implements SoftDeleteBackend {
 
   /**
    * Create a DrizzleBackend, initializing the database and seeding defaults.
-   * If the project has a legacy filesystem-based `.tic/` layout (items/ but no
-   * tic.db), automatically migrate it into the new SQLite database.
    */
   static create(root: string, options?: DrizzleBackendOptions): DrizzleBackend {
-    const dbPath = path.join(root, '.tic', 'tic.db');
-    const isLegacy =
-      !existsSync(dbPath) && existsSync(path.join(root, '.tic', 'items'));
-
     const db = createDatabase(root);
     const backend = new DrizzleBackend(db, root, options);
-
-    if (isLegacy) {
-      migrateLegacyProject(root, db);
-    } else {
-      backend.seedDefaults();
-    }
-
+    backend.seedDefaults();
     return backend;
   }
 
