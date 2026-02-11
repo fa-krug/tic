@@ -26,6 +26,7 @@ export interface SyncQueueAdapter {
   append(entry: QueueEntry): void | Promise<void>;
   remove(itemId: string, action: QueueAction): void | Promise<void>;
   removeByIds(itemIds: string[], action: QueueAction): void | Promise<void>;
+  claimNext(): QueueEntry | null | Promise<QueueEntry | null>;
   clear(): void | Promise<void>;
   renameItem(oldId: string, newId: string): void | Promise<void>;
 }

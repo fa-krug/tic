@@ -117,6 +117,36 @@ describe('SyncQueueStore', () => {
     expect(queue.pending.map((e) => e.itemId)).toEqual(['a', 'c']);
   });
 
+  it('claimNext returns each entry exactly once', async () => {
+    await store.append({
+      action: 'create',
+      itemId: 'a',
+      timestamp: '2026-01-01T00:00:00Z',
+    });
+    await store.append({
+      action: 'update',
+      itemId: 'b',
+      timestamp: '2026-01-01T01:00:00Z',
+    });
+
+    const first = await store.claimNext();
+    expect(first).not.toBeNull();
+    expect(first!.itemId).toBe('a');
+    expect(first!.action).toBe('create');
+
+    const second = await store.claimNext();
+    expect(second).not.toBeNull();
+    expect(second!.itemId).toBe('b');
+    expect(second!.action).toBe('update');
+
+    const third = await store.claimNext();
+    expect(third).toBeNull();
+
+    // Queue should be empty
+    const queue = await store.read();
+    expect(queue.pending).toHaveLength(0);
+  });
+
   it('renames an itemId across all pending entries', async () => {
     await store.append({
       action: 'create',

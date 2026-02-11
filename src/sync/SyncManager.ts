@@ -59,14 +59,17 @@ export class SyncManager {
 
   async pushPending(): Promise<PushResult> {
     this.updateStatus({ state: 'syncing' });
-    const { pending } = await this.queue.read();
-    const total = pending.length;
+    const total = (await this.queue.read()).pending.length;
     let current = 0;
     let pushed = 0;
     const errors: SyncError[] = [];
     const idMappings = new Map<string, string>();
+    const failedEntries: QueueEntry[] = [];
 
-    for (const entry of pending) {
+    while (true) {
+      const entry = await this.queue.claimNext();
+      if (!entry) break;
+
       current++;
       this.updateStatus({
         state: 'syncing',
@@ -76,7 +79,6 @@ export class SyncManager {
 
       try {
         const resolvedId = await this.pushEntry(entry);
-        await this.queue.remove(resolvedId, entry.action);
         if (resolvedId !== entry.itemId) {
           idMappings.set(entry.itemId, resolvedId);
         }
@@ -98,8 +100,7 @@ export class SyncManager {
           (e.message.includes('not found') ||
             e.message.includes('does not exist'));
         if (isLocalMissing || isNotFound) {
-          // Local item was deleted or never synced — drop unrecoverable entry
-          await this.queue.remove(entry.itemId, entry.action);
+          // Local item was deleted or never synced — already claimed (removed) from queue
           this.appendLog({
             phase: 'push',
             action: entry.action,
@@ -122,8 +123,15 @@ export class SyncManager {
             message: e instanceof Error ? e.message : String(e),
             timestamp: new Date().toISOString(),
           });
+          // Collect failed entry for re-queuing after the loop
+          failedEntries.push(entry);
         }
       }
+    }
+
+    // Re-queue all failed entries after the loop to avoid infinite re-claiming
+    for (const failed of failedEntries) {
+      await this.queue.append(failed);
     }
 
     this.updateStatus({

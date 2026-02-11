@@ -62,6 +62,14 @@ export class SyncQueueStore implements SyncQueueAdapter {
     await this.write({ pending: [] });
   }
 
+  async claimNext(): Promise<QueueEntry | null> {
+    const data = await this.read();
+    if (data.pending.length === 0) return null;
+    const entry = data.pending[0]!;
+    await this.remove(entry.itemId, entry.action);
+    return entry;
+  }
+
   async renameItem(oldId: string, newId: string): Promise<void> {
     const queue = await this.read();
     for (const entry of queue.pending) {
