@@ -135,7 +135,7 @@ export class FilesBackend extends BaseBackend implements SyncableBackend {
     return readWorkItem(this.root, id);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/require-await
   async createWorkItem(_data: NewWorkItem): Promise<WorkItem> {
     throw new UnsupportedOperationError('createWorkItem', 'FilesBackend');
   }
