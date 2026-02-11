@@ -614,8 +614,9 @@ export function WorkItemList() {
 
       if (input === 'o' && treeItems.length > 0 && backend) {
         void (async () => {
-          await backend.openItem(treeItems[cursor]!.item.id);
-          refreshData();
+          const itemId = treeItems[cursor]!.item.id;
+          await backend.openItem(itemId);
+          void backendDataStore.getState().reloadItem(itemId);
         })();
       }
 
@@ -646,7 +647,7 @@ export function WorkItemList() {
             e instanceof Error ? e.message : 'Failed to start implementation',
           );
         }
-        refreshData();
+        void backendDataStore.getState().reloadItem(item.id);
       }
 
       if (input === 'S') {
@@ -990,8 +991,9 @@ export function WorkItemList() {
       case 'open':
         if (treeItems[cursor] && backend) {
           void (async () => {
-            await backend.openItem(treeItems[cursor]!.item.id);
-            refreshData();
+            const itemId = treeItems[cursor]!.item.id;
+            await backend.openItem(itemId);
+            void backendDataStore.getState().reloadItem(itemId);
           })();
         }
         break;
@@ -1022,7 +1024,7 @@ export function WorkItemList() {
               e instanceof Error ? e.message : 'Failed to start implementation',
             );
           }
-          refreshData();
+          void backendDataStore.getState().reloadItem(item.id);
         }
         break;
       case 'sync':
@@ -1371,7 +1373,9 @@ export function WorkItemList() {
                   });
                   await queueWrite('update', id);
                 }
-                refreshData();
+                for (const id of targetIds) {
+                  await backendDataStore.getState().reloadItem(id);
+                }
                 setToast(
                   targetIds.length === 1
                     ? 'Status updated — press u to undo'
@@ -1401,7 +1405,9 @@ export function WorkItemList() {
                   });
                   await queueWrite('update', id);
                 }
-                refreshData();
+                for (const id of targetIds) {
+                  await backendDataStore.getState().reloadItem(id);
+                }
                 setToast(
                   targetIds.length === 1
                     ? 'Type updated — press u to undo'
@@ -1435,7 +1441,9 @@ export function WorkItemList() {
                   await backend.cachedUpdateWorkItem(id, { priority });
                   await queueWrite('update', id);
                 }
-                refreshData();
+                for (const id of targetIds) {
+                  await backendDataStore.getState().reloadItem(id);
+                }
                 setToast(
                   targetIds.length === 1
                     ? 'Priority updated — press u to undo'
@@ -1500,7 +1508,9 @@ export function WorkItemList() {
                   setWarning(e instanceof Error ? e.message : 'Invalid parent');
                 }
                 closeOverlay();
-                refreshData();
+                for (const id of targetIds) {
+                  await backendDataStore.getState().reloadItem(id);
+                }
                 setToast(
                   targetIds.length === 1
                     ? 'Parent updated — press u to undo'
@@ -1532,7 +1542,9 @@ export function WorkItemList() {
                   setWarning(e instanceof Error ? e.message : 'Invalid parent');
                 }
                 closeOverlay();
-                refreshData();
+                for (const id of targetIds) {
+                  await backendDataStore.getState().reloadItem(id);
+                }
                 setToast(
                   targetIds.length === 1
                     ? 'Parent updated — press u to undo'
@@ -1561,7 +1573,9 @@ export function WorkItemList() {
                   });
                   await queueWrite('update', id);
                 }
-                refreshData();
+                for (const id of targetIds) {
+                  await backendDataStore.getState().reloadItem(id);
+                }
                 setToast(
                   targetIds.length === 1
                     ? 'Assignee updated — press u to undo'
@@ -1581,7 +1595,9 @@ export function WorkItemList() {
                   });
                   await queueWrite('update', id);
                 }
-                refreshData();
+                for (const id of targetIds) {
+                  await backendDataStore.getState().reloadItem(id);
+                }
                 setToast(
                   targetIds.length === 1
                     ? 'Assignee updated — press u to undo'
@@ -1614,7 +1630,9 @@ export function WorkItemList() {
                   await backend.cachedUpdateWorkItem(id, { labels });
                   await queueWrite('update', id);
                 }
-                refreshData();
+                for (const id of targetIds) {
+                  await backendDataStore.getState().reloadItem(id);
+                }
                 setToast(
                   targetIds.length === 1
                     ? 'Labels updated — press u to undo'
@@ -1636,7 +1654,9 @@ export function WorkItemList() {
                   await backend.cachedUpdateWorkItem(id, { labels });
                   await queueWrite('update', id);
                 }
-                refreshData();
+                for (const id of targetIds) {
+                  await backendDataStore.getState().reloadItem(id);
+                }
                 setToast(
                   targetIds.length === 1
                     ? 'Labels updated — press u to undo'
@@ -1854,7 +1874,9 @@ export function WorkItemList() {
                     removeDeletedItem(id);
                   }
                   setCursor(Math.max(0, cursor - 1));
-                  refreshData();
+                  for (const id of targetIds) {
+                    backendDataStore.getState().removeItem(id);
+                  }
                   setToast(
                     targetIds.length === 1
                       ? `Item #${targetIds[0]} deleted${softDelete ? ' — press u to undo' : ''}`

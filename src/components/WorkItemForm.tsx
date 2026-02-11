@@ -15,7 +15,10 @@ import type { Comment, WorkItem, Template } from '../types.js';
 import { SyncQueueStore } from '../sync/queue.js';
 import type { QueueAction } from '../sync/types.js';
 import { useScrollViewport } from '../hooks/useScrollViewport.js';
-import { useBackendDataStore } from '../stores/backendDataStore.js';
+import {
+  useBackendDataStore,
+  backendDataStore,
+} from '../stores/backendDataStore.js';
 import { useShallow } from 'zustand/shallow';
 import { openInEditor } from '../editor.js';
 import { slugifyTemplateName } from '../backends/local/templates.js';
@@ -548,6 +551,7 @@ export function WorkItemForm() {
         setComments((prev) => [...prev, added]);
         setNewComment('');
       }
+      await backendDataStore.getState().reloadItem(selectedWorkItemId);
       uiStore
         .getState()
         .setToast(`Item #${selectedWorkItemId} updated — press u to undo`);
@@ -583,6 +587,7 @@ export function WorkItemForm() {
           commentData: { author: 'me', body: newComment.trim() },
         });
       }
+      await backendDataStore.getState().reloadItem(created.id);
       uiStore
         .getState()
         .setToast(`Item #${created.id} created — press u to undo`);
