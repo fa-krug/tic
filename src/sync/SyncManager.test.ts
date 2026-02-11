@@ -4,8 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { SyncManager } from './SyncManager.js';
 import { SyncQueueStore } from './queue.js';
-import { LocalBackend } from '../backends/local/index.js';
-import { configStore } from '../stores/configStore.js';
+import { DrizzleBackend } from '../backends/drizzle/index.js';
 import type { Backend } from '../backends/types.js';
 import type { WorkItem, NewWorkItem, NewComment, Comment } from '../types.js';
 import type { SyncStatus } from './types.js';
@@ -164,22 +163,21 @@ function createMockRemote(items: WorkItem[] = []): Backend {
 
 describe('SyncManager push phase', () => {
   let tmpDir: string;
-  let local: LocalBackend;
+  let local: DrizzleBackend;
   let remote: Backend;
   let manager: SyncManager;
   let queueStore: SyncQueueStore;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-sync-test-'));
-    fs.mkdirSync(path.join(tmpDir, '.tic'), { recursive: true });
-    local = await LocalBackend.create(tmpDir);
+    local = DrizzleBackend.create(tmpDir);
     remote = createMockRemote();
     queueStore = new SyncQueueStore(tmpDir);
     manager = new SyncManager(local, remote, queueStore);
   });
 
   afterEach(() => {
-    configStore.getState().destroy();
+    local.destroy();
     fs.rmSync(tmpDir, { recursive: true });
   });
 
@@ -395,18 +393,17 @@ describe('SyncManager push phase', () => {
 
 describe('SyncManager strips unsupported fields', () => {
   let tmpDir: string;
-  let local: LocalBackend;
+  let local: DrizzleBackend;
   let queueStore: SyncQueueStore;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-sync-test-'));
-    fs.mkdirSync(path.join(tmpDir, '.tic'), { recursive: true });
-    local = await LocalBackend.create(tmpDir);
+    local = DrizzleBackend.create(tmpDir);
     queueStore = new SyncQueueStore(tmpDir);
   });
 
   afterEach(() => {
-    configStore.getState().destroy();
+    local.destroy();
     fs.rmSync(tmpDir, { recursive: true });
   });
 
@@ -501,18 +498,17 @@ describe('SyncManager strips unsupported fields', () => {
 
 describe('SyncManager pull phase (via sync)', () => {
   let tmpDir: string;
-  let local: LocalBackend;
+  let local: DrizzleBackend;
   let queueStore: SyncQueueStore;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-sync-test-'));
-    fs.mkdirSync(path.join(tmpDir, '.tic'), { recursive: true });
-    local = await LocalBackend.create(tmpDir);
+    local = DrizzleBackend.create(tmpDir);
     queueStore = new SyncQueueStore(tmpDir);
   });
 
   afterEach(() => {
-    configStore.getState().destroy();
+    local.destroy();
     fs.rmSync(tmpDir, { recursive: true });
   });
 
@@ -636,18 +632,17 @@ describe('SyncManager pull phase (via sync)', () => {
 
 describe('SyncManager status callbacks', () => {
   let tmpDir: string;
-  let local: LocalBackend;
+  let local: DrizzleBackend;
   let queueStore: SyncQueueStore;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-sync-test-'));
-    fs.mkdirSync(path.join(tmpDir, '.tic'), { recursive: true });
-    local = await LocalBackend.create(tmpDir);
+    local = DrizzleBackend.create(tmpDir);
     queueStore = new SyncQueueStore(tmpDir);
   });
 
   afterEach(() => {
-    configStore.getState().destroy();
+    local.destroy();
     fs.rmSync(tmpDir, { recursive: true });
   });
 
@@ -725,18 +720,17 @@ describe('SyncManager status callbacks', () => {
 
 describe('SyncManager progress reporting', () => {
   let tmpDir: string;
-  let local: LocalBackend;
+  let local: DrizzleBackend;
   let queueStore: SyncQueueStore;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-sync-test-'));
-    fs.mkdirSync(path.join(tmpDir, '.tic'), { recursive: true });
-    local = await LocalBackend.create(tmpDir);
+    local = DrizzleBackend.create(tmpDir);
     queueStore = new SyncQueueStore(tmpDir);
   });
 
   afterEach(() => {
-    configStore.getState().destroy();
+    local.destroy();
     fs.rmSync(tmpDir, { recursive: true });
   });
 

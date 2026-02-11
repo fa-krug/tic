@@ -2,8 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { LocalBackend } from '../backends/local/index.js';
-import { configStore } from '../stores/configStore.js';
+import { DrizzleBackend } from '../backends/drizzle/index.js';
 import { SyncManager } from './SyncManager.js';
 import { SyncQueueStore } from './queue.js';
 import type { Backend } from '../backends/types.js';
@@ -143,19 +142,19 @@ function createMockRemote(items: WorkItem[] = []): Backend {
 
 describe('end-to-end sync', () => {
   let tmpDir: string;
+  let local: DrizzleBackend;
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-e2e-'));
-    fs.mkdirSync(path.join(tmpDir, '.tic'), { recursive: true });
   });
 
   afterEach(() => {
-    configStore.getState().destroy();
+    local.destroy();
     fs.rmSync(tmpDir, { recursive: true });
   });
 
   it('full cycle: create locally, push, pull, verify', async () => {
-    const local = await LocalBackend.create(tmpDir, { tempIds: true });
+    local = DrizzleBackend.create(tmpDir, { tempIds: true });
     const remote = createMockRemote([]);
     const queue = new SyncQueueStore(tmpDir);
     const manager = new SyncManager(local, remote, queue);
@@ -192,7 +191,7 @@ describe('end-to-end sync', () => {
   });
 
   it('remote changes overwrite local on pull', async () => {
-    const local = await LocalBackend.create(tmpDir);
+    local = DrizzleBackend.create(tmpDir);
     const queue = new SyncQueueStore(tmpDir);
 
     await local.createWorkItem({

@@ -2,21 +2,20 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { LocalBackend } from '../../backends/local/index.js';
-import { configStore } from '../../stores/configStore.js';
+import { DrizzleBackend } from '../../backends/drizzle/index.js';
 import { runIterationList, runIterationSet } from '../commands/iteration.js';
 
 describe('iteration commands', () => {
   let tmpDir: string;
-  let backend: LocalBackend;
+  let backend: DrizzleBackend;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-cli-test-'));
-    backend = await LocalBackend.create(tmpDir);
+    backend = DrizzleBackend.create(tmpDir);
   });
 
   afterEach(() => {
-    configStore.getState().destroy();
+    backend.destroy();
     fs.rmSync(tmpDir, { recursive: true });
   });
 
