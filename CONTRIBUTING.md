@@ -29,7 +29,7 @@ npm run format:check   # Check formatting without writing
 Run a single test file:
 
 ```bash
-npx vitest run src/backends/local/config.test.ts
+npx vitest run src/storage/config.test.ts
 ```
 
 ## Tech Stack
@@ -68,7 +68,7 @@ The app uses screen-based routing via React Context (`AppContext` in `src/app.ts
 
 **Implemented backends:**
 
-- **Local** (`src/backends/local/`) — stores work items as markdown files with YAML frontmatter in a `.tic/` directory (`.tic/config.yml` for config, `.tic/items/{id}.md` for items)
+- **Storage** (`src/storage/`) — SQLite-backed local persistence (always the primary backend)
 - **GitHub** (`src/backends/github/`) — reads/writes GitHub Issues via the `gh` CLI
 - **GitLab** (`src/backends/gitlab/`) — reads/writes GitLab Issues via the `glab` CLI
 - **Azure DevOps** (`src/backends/ado/`) — reads/writes Azure DevOps Work Items via the `az` CLI
@@ -99,9 +99,9 @@ The app uses screen-based routing via React Context (`AppContext` in `src/app.ts
 
 State is managed via Zustand vanilla stores in `src/stores/`:
 
-- **backendDataStore** — single source of truth for backend data (items, statuses, types, assignees, labels, capabilities, sync status). Initialized with `init(cwd)` which creates backends asynchronously. Components subscribe via `useBackendDataStore(selector)`.
-- **configStore** — single source of truth for `.tic/config.yml`. Reads config on `init(root)` and watches for external file changes via `startWatching()`.
-- **undoStore** — undo action stack (max depth 5). Supports delete (soft-delete to `.tic/trash/`), create, and update operations via whole-item snapshots.
+- **backendDataStore** — single source of truth for backend data (items, statuses, types, assignees, labels, capabilities, sync status). Initialized with `init(cwd)` which creates backends asynchronously (Storage + optional remote + SyncManager). Components subscribe via `useBackendDataStore(selector)`.
+- **configStore** — single source of truth for project config. Reads/writes exclusively via SQLite (`project_config` table). `startWatching()` is a no-op (DB is the source of truth).
+- **undoStore** — undo action stack (max depth 5). Supports delete (soft-delete via `deleted_at` column), create, and update operations via whole-item snapshots.
 - **formStackStore** — form navigation stack and field state for drill-down into related items.
 - **listViewStore** — list view state (cursor position, expanded/collapsed items, marked items, scroll offset).
 - **navigationStore** — screen routing and work item selection.

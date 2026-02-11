@@ -1,15 +1,15 @@
 # tic
 
-A terminal UI for issue tracking, built for developers who live in the terminal. Track work items across multiple backends — local markdown files, GitHub Issues, GitLab Issues, Azure DevOps Work Items, and Jira.
+A terminal UI for issue tracking, built for developers who live in the terminal. Track work items across multiple backends — GitHub Issues, GitLab Issues, Azure DevOps Work Items, and Jira — with local SQLite storage.
 
 Built with TypeScript and [Ink](https://github.com/vadimdemedes/ink).
 
 ## Features
 
 - **Keyboard-driven TUI** — browse, create, edit, and manage work items without leaving the terminal
-- **Multiple backends** — local markdown, GitHub (via `gh`), GitLab (via `glab`), Azure DevOps (via `az`), Jira (via REST API)
+- **Multiple backends** — GitHub (via `gh`), GitLab (via `glab`), Azure DevOps (via `az`), Jira (via REST API)
 - **Automatic backend detection** — selects backend based on git remote, or configure manually
-- **Local markdown storage** — work items stored as markdown files with YAML frontmatter in a `.tic/` directory
+- **SQLite storage** — all data stored locally in `.tic/tic.db` with optional sync to remote backends
 - **CLI commands** — scriptable commands for all operations (`tic item list`, `tic item create`, etc.)
 - **Work item types** — organize by epic, issue, and task (configurable)
 - **Iterations** — group work into sprints or milestones
@@ -39,15 +39,17 @@ tic init           # Initialize (auto-detects backend from git remote)
 tic                # Launch the TUI
 ```
 
-For local storage, `tic init` creates a `.tic/` directory to store your work items. For GitHub, GitLab, or Azure DevOps projects, it detects the backend from the git remote automatically. You can also specify a backend explicitly:
+`tic init` creates a `.tic/` directory with a SQLite database to store your work items. For GitHub, GitLab, or Azure DevOps projects, it detects the backend from the git remote automatically. You can also specify a backend explicitly:
 
 ```bash
 tic init --backend github
 tic init --backend gitlab
 tic init --backend azure
 tic init --backend jira
-tic init --backend local
+tic init --backend none
 ```
+
+The TUI also auto-initializes on first run if no `.tic/` directory exists.
 
 ## Usage
 
@@ -123,70 +125,22 @@ Deleting an item automatically cleans up references — children have their pare
 
 ## Storage
 
-Work items live in `.tic/` at the root of your project:
+All data lives in `.tic/` at the root of your project:
 
 ```
 .tic/
-├── config.yml          # Types, statuses, iterations, settings
-├── items/
-│   ├── 1.md            # Work item #1
-│   ├── 2.md            # Work item #2
-│   └── ...
-├── templates/          # Work item templates
-│   └── bug-report.md   # Template with YAML frontmatter
-└── trash/              # Soft-deleted items (for undo)
+├── tic.db              # SQLite database (all items, config, undo log)
+└── items/              # Markdown mirrors (for sync / human-readable export)
+    ├── 1.md
+    ├── 2.md
+    └── ...
 ```
 
-Each item is a markdown file with YAML frontmatter:
+The SQLite database (`.tic/tic.db`) is the single source of truth for work items, config, templates, and undo history. When a remote backend is configured, `SyncManager` also writes markdown mirrors to `.tic/items/` via `FilesBackend`.
 
-```markdown
----
-id: 1
-title: Implement user login
-type: task
-status: in-progress
-iteration: sprint-1
-priority: high
-assignee: alice
-labels: auth, backend
-parent: 3
-depends_on:
-  - 2
-created: 2026-01-15T10:00:00.000Z
-updated: 2026-01-20T14:30:00.000Z
----
+Configuration (types, statuses, iterations, etc.) is stored in the `project_config` table and managed via the TUI settings screen or `tic config` CLI commands.
 
-Full description of the work item goes here.
-
-## Comments
-
----
-author: alice
-date: 2026-01-18T09:00:00.000Z
-
-Decided to use JWT tokens for this.
-```
-
-Configuration in `.tic/config.yml`:
-
-```yaml
-types:
-  - epic
-  - issue
-  - task
-statuses:
-  - backlog
-  - todo
-  - in-progress
-  - review
-  - done
-iterations:
-  - default
-current_iteration: default
-next_id: 1
-```
-
-You can edit these files directly — they're plain text. Customize types, statuses, and iterations by editing `config.yml`.
+If upgrading from a legacy `.tic/config.yml` setup, the database will automatically migrate the YAML config on first open.
 
 ## Claude Code Integration
 
@@ -240,7 +194,7 @@ Add `--json` to any command for machine-readable output, or `--quiet` to suppres
 
 | Backend | CLI Tool | Detection |
 |---------|----------|-----------|
-| Local markdown | — | Default fallback |
+| Local only (SQLite) | — | Default fallback |
 | GitHub Issues | [`gh`](https://cli.github.com/) | `github.com` in git remote |
 | GitLab Issues | [`glab`](https://gitlab.com/gitlab-org/cli) | `gitlab.com` in git remote |
 | Azure DevOps Work Items | [`az`](https://learn.microsoft.com/en-us/cli/azure/) | `dev.azure.com` or `visualstudio.com` in git remote |

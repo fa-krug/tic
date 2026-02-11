@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**tic** is a terminal UI for issue tracking across multiple backends (GitHub, GitLab, Azure DevOps, Jira, local markdown). Built with TypeScript and Ink (React for the terminal). All five backends are implemented.
+**tic** is a terminal UI for issue tracking across multiple backends (GitHub, GitLab, Azure DevOps, Jira). Built with TypeScript and Ink (React for the terminal). All data is stored locally in SQLite (`.tic/tic.db`) and optionally synced to a remote backend.
 
 ## Commands
 
@@ -13,7 +13,7 @@ npm run build        # Compile TypeScript (tsc)
 npm run dev          # Watch mode (tsc --watch)
 npm start            # Run the TUI (node dist/index.js)
 npm test             # Run all tests (vitest run --exclude 'dist/**')
-npx vitest run src/backends/local/config.test.ts   # Run a single test file
+npx vitest run src/storage/config.test.ts   # Run a single test file
 npm run lint         # Run ESLint on src/
 npm run lint:fix     # Run ESLint with auto-fix
 npm run format       # Format src/ with Prettier
@@ -46,7 +46,7 @@ Or add `.mcp.json` to the project root:
 
 ### Entry Point & Rendering
 
-`src/index.tsx` is the CLI entry point. It renders `<App>` using Ink's `render()`. The app uses screen-based routing via React Context (`AppContext` in `src/app.tsx`), with screens: `list`, `form`, `iteration-picker`, `settings`, `status`, `help`.
+`src/index.tsx` is the CLI entry point. It renders `<App>` using Ink's `render()`. On first run, the TUI auto-initializes by detecting the backend from git remotes and creating `.tic/tic.db`. The app uses screen-based routing via React Context (`AppContext` in `src/app.tsx`), with screens: `list`, `form`, `iteration-picker`, `settings`, `status`, `help`.
 
 ### Backend Abstraction
 
@@ -56,14 +56,14 @@ Or add `.mcp.json` to the project root:
 
 **Implemented backends:**
 
-- `LocalBackend` (`src/backends/local/`) — markdown files with YAML frontmatter in `.tic/` (`.tic/config.yml` for config, `.tic/items/{id}.md` for items)
+- `Storage` (`src/storage/`) — SQLite-backed local persistence (always the primary backend)
 - `GitHubBackend` (`src/backends/github/`) — GitHub Issues via `gh` CLI
 - `GitLabBackend` (`src/backends/gitlab/`) — GitLab Issues via `glab` CLI
 - `AzureDevOpsBackend` (`src/backends/ado/`) — Azure DevOps Work Items via `az` CLI
 - `JiraBackend` (`src/backends/jira/`) — Jira issues via REST API
 - `FilesBackend` (`src/backends/files/`) — filesystem sync destination that delegates I/O to `local/items.ts` and `local/templates.ts`. Used by `SyncManager` to replicate items from `Storage` to `.tic/items/` markdown files.
 
-`src/backends/factory.ts` auto-detects the backend from git remotes (github.com → GitHub, gitlab.com → GitLab, dev.azure.com/visualstudio.com → Azure DevOps, fallback → local). Can be overridden via `backend` in `.tic/config.yml`. Jira is configured via the TUI settings screen.
+`src/backends/factory.ts` auto-detects the remote backend from git remotes (github.com → GitHub, gitlab.com → GitLab, dev.azure.com/visualstudio.com → Azure DevOps, fallback → none). Can be overridden via the `backend` config field in SQLite. Jira is configured via the TUI settings screen.
 
 ### Storage (Local Persistence)
 
@@ -74,7 +74,7 @@ Key modules in `src/storage/`:
 - `index.ts` — `Storage` class. Implements `Backend` + `SoftDeleteBackend`. All data lives in `.tic/tic.db` (SQLite with WAL mode). Manages work items, comments, templates, config, iterations, and auto-incrementing IDs.
 - `schema.ts` — Drizzle ORM table definitions (work items, labels, dependencies, comments, templates, config, undo log, sync queue).
 - `db.ts` — database creation, migration, and WAL setup via `createDatabase(root)`. Migrations live in `drizzle/` at the project root.
-- `config.ts` — project config stored in the `project_config` table (statuses, types, iterations, branch settings, views).
+- `config.ts` — `Config` type, `defaultConfig`, and SQLite read/write functions. Project config stored in the `project_config` table (statuses, types, iterations, branch settings, views). Also provides `readBackendTypeSync()` for CLI startup.
 - `syncQueue.ts` — `SyncQueue` class. Queues create/update/delete actions for `SyncManager` to push to remote backends and `FilesBackend`.
 - `undo.ts` — undo log stored in the `undo_log` table. Supports soft-delete (items moved to `deleted_at` column rather than removed).
 - `mappers.ts` — converts between Drizzle row types and `WorkItem`/`Template` domain objects.
@@ -97,9 +97,9 @@ Key modules in `src/storage/`:
 
 Zustand vanilla stores in `src/stores/`:
 
-- `backendDataStore` — single source of truth for backend data (items, statuses, types, assignees, labels, capabilities, sync status). Initialized with `init(cwd)` which creates backends asynchronously (LocalBackend + optional remote + SyncManager). Components subscribe via `useBackendDataStore(selector)`. Has `initGeneration` counter to prevent stale async init from overwriting store after destroy.
-- `configStore` — single source of truth for `.tic/config.yml`. `init(root)` reads config, `startWatching()` watches for external changes. In TUI, watching is deferred to after first render. Store must be `destroy()`'d on exit.
-- `undoStore` — undo action stack (max depth 5). Delete uses soft-delete (`.tic/trash/`), create/update use whole-item snapshots. `u` keybinding in WorkItemList pops and reverses.
+- `backendDataStore` — single source of truth for backend data (items, statuses, types, assignees, labels, capabilities, sync status). Initialized with `init(cwd)` which creates backends asynchronously (Storage + optional remote + SyncManager). Components subscribe via `useBackendDataStore(selector)`. Has `initGeneration` counter to prevent stale async init from overwriting store after destroy.
+- `configStore` — single source of truth for project config. Reads/writes exclusively via SQLite (the `project_config` table). `init(root)` reads config from DB, `startWatching()` is a no-op (DB is the source of truth). Store must be `destroy()`'d on exit.
+- `undoStore` — undo action stack (max depth 5). Delete uses soft-delete (`deleted_at` column in SQLite), create/update use whole-item snapshots. `u` keybinding in WorkItemList pops and reverses.
 - `formStackStore` — form navigation stack and field state for drill-down into related items.
 - `listViewStore` — list view state (cursor position, expanded/collapsed items, marked items, scroll offset).
 - `navigationStore` — screen routing and work item selection.

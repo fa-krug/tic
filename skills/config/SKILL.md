@@ -16,7 +16,7 @@ Creates a `.tic/` directory in the current project. Call this first if other too
 ### get_config
 
 Returns project configuration:
-- `backend` — current backend type (local, github, gitlab, azure, jira)
+- `backend` — current backend type (none, github, gitlab, azure, jira)
 - `statuses` — available status values
 - `types` — available work item types
 - `iterations` — configured iterations
@@ -27,7 +27,7 @@ Returns project configuration:
 
 ### set_backend
 
-Switch between backends: `local`, `github`, `gitlab`, `azure`, `jira`.
+Switch between backends: `none`, `github`, `gitlab`, `azure`, `jira`.
 
 The backend is auto-detected from git remotes, but can be overridden.
 
