@@ -405,7 +405,111 @@ export class DrizzleBackend extends BaseBackend implements SoftDeleteBackend {
     return `${this.root}/.tic/items/${id}.md`;
   }
 
-  // ─── Write: createWorkItem (needed for testing reads) ──────────────
+  // ─── Relationship validation ─────────────────────────────────────
+
+  private validateRelationships(
+    id: string,
+    parent: string | null | undefined,
+    dependsOn: string[] | undefined,
+  ): void {
+    // Validate parent
+    if (parent !== null && parent !== undefined) {
+      if (parent === id) {
+        throw new Error(`Work item #${id} cannot be its own parent`);
+      }
+
+      const parentRow = this.db
+        .select({ id: schema.workItems.id })
+        .from(schema.workItems)
+        .where(
+          and(
+            eq(schema.workItems.id, parent),
+            isNull(schema.workItems.deletedAt),
+          ),
+        )
+        .get();
+      if (!parentRow) {
+        throw new Error(`Parent #${parent} does not exist`);
+      }
+
+      // Walk up the parent chain to detect circular references
+      let current: string | null = parent;
+      const visited = new Set<string>();
+      while (current !== null) {
+        if (current === id) {
+          throw new Error(`Circular parent chain detected for #${id}`);
+        }
+        if (visited.has(current)) break;
+        visited.add(current);
+        const row = this.db
+          .select({ parent: schema.workItems.parent })
+          .from(schema.workItems)
+          .where(
+            and(
+              eq(schema.workItems.id, current),
+              isNull(schema.workItems.deletedAt),
+            ),
+          )
+          .get();
+        current = row?.parent ?? null;
+      }
+    }
+
+    // Validate dependencies
+    if (dependsOn !== undefined && dependsOn.length > 0) {
+      for (const depId of dependsOn) {
+        if (depId === id) {
+          throw new Error(`Work item #${id} cannot depend on itself`);
+        }
+      }
+
+      // Check all deps exist in one query
+      const existingRows = this.db
+        .select({ id: schema.workItems.id })
+        .from(schema.workItems)
+        .where(
+          and(
+            inArray(schema.workItems.id, dependsOn),
+            isNull(schema.workItems.deletedAt),
+          ),
+        )
+        .all();
+      const existingIds = new Set(existingRows.map((r) => r.id));
+      for (const depId of dependsOn) {
+        if (!existingIds.has(depId)) {
+          throw new Error(`Dependency #${depId} does not exist`);
+        }
+      }
+
+      // Check for circular dependency chains
+      const hasCycle = (startId: string, targetId: string): boolean => {
+        const visited = new Set<string>();
+        const stack = [startId];
+        while (stack.length > 0) {
+          const current = stack.pop()!;
+          if (current === targetId) return true;
+          if (visited.has(current)) continue;
+          visited.add(current);
+          const deps = this.db
+            .select({ dependsOnId: schema.workItemDeps.dependsOnId })
+            .from(schema.workItemDeps)
+            .where(eq(schema.workItemDeps.workItemId, current))
+            .all();
+          for (const dep of deps) {
+            stack.push(dep.dependsOnId);
+          }
+        }
+        return false;
+      };
+      for (const depId of dependsOn) {
+        if (hasCycle(depId, id)) {
+          throw new Error(`Circular dependency chain detected for #${id}`);
+        }
+      }
+    }
+  }
+
+  // ─── Write: createWorkItem ────────────────────────────────────────
 
   // eslint-disable-next-line @typescript-eslint/require-await
   async createWorkItem(data: NewWorkItem): Promise<WorkItem> {
@@ -421,59 +525,59 @@ export class DrizzleBackend extends BaseBackend implements SoftDeleteBackend {
     const nextId = config?.nextId ?? 1;
     const id = String(nextId);
 
-    this.db
-      .update(schema.projectConfig)
-      .set({ nextId: nextId + 1 })
-      .where(eq(schema.projectConfig.id, 1))
-      .run();
+    // Validate relationships before inserting
+    this.validateRelationships(id, data.parent, data.dependsOn);
 
-    // Ensure iteration exists
-    if (data.iteration) {
-      this.db
-        .insert(schema.iterations)
-        .values({ name: data.iteration, sortOrder: 0 })
-        .onConflictDoNothing()
+    this.db.transaction((tx) => {
+      tx.update(schema.projectConfig)
+        .set({ nextId: nextId + 1 })
+        .where(eq(schema.projectConfig.id, 1))
         .run();
-    }
 
-    // Insert work item
-    this.db
-      .insert(schema.workItems)
-      .values({
-        id,
-        title: data.title,
-        type: data.type,
-        status: data.status,
-        iteration: data.iteration,
-        priority: data.priority,
-        assignee: data.assignee,
-        description: data.description,
-        parent: data.parent,
-        created: now,
-        updated: now,
-      })
-      .run();
+      // Ensure iteration exists
+      if (data.iteration) {
+        tx.insert(schema.iterations)
+          .values({ name: data.iteration, sortOrder: 0 })
+          .onConflictDoNothing()
+          .run();
+      }
 
-    // Insert labels
-    if (data.labels.length > 0) {
-      this.db
-        .insert(schema.workItemLabels)
-        .values(data.labels.map((label) => ({ workItemId: id, label })))
+      // Insert work item
+      tx.insert(schema.workItems)
+        .values({
+          id,
+          title: data.title,
+          type: data.type,
+          status: data.status,
+          iteration: data.iteration,
+          priority: data.priority,
+          assignee: data.assignee,
+          description: data.description,
+          parent: data.parent,
+          created: now,
+          updated: now,
+        })
         .run();
-    }
 
-    // Insert deps
-    if (data.dependsOn.length > 0) {
-      this.db
-        .insert(schema.workItemDeps)
-        .values(
-          data.dependsOn.map((dependsOnId) => ({
-            workItemId: id,
-            dependsOnId,
-          })),
-        )
-        .run();
-    }
+      // Insert labels
+      if (data.labels.length > 0) {
+        tx.insert(schema.workItemLabels)
+          .values(data.labels.map((label) => ({ workItemId: id, label })))
+          .run();
+      }
+
+      // Insert deps
+      if (data.dependsOn.length > 0) {
+        tx.insert(schema.workItemDeps)
+          .values(
+            data.dependsOn.map((dependsOnId) => ({
+              workItemId: id,
+              dependsOnId,
+            })),
+          )
+          .run();
+      }
+    });
 
     this.invalidateCache();
 
@@ -495,7 +599,123 @@ export class DrizzleBackend extends BaseBackend implements SoftDeleteBackend {
     };
   }
 
-  // ─── Write: soft delete (needed for testing "excludes deleted") ────
+  // ─── Write: updateWorkItem ────────────────────────────────────────
+
+  async updateWorkItem(id: string, data: Partial<WorkItem>): Promise<WorkItem> {
+    this.validateFields(data);
+
+    // 1. Read existing item (throw if not found)
+    const existingRow = this.db
+      .select()
+      .from(schema.workItems)
+      .where(
+        and(eq(schema.workItems.id, id), isNull(schema.workItems.deletedAt)),
+      )
+      .get();
+
+    if (!existingRow) {
+      throw new Error(`Work item #${id} not found`);
+    }
+
+    // 2. Validate relationships if parent/dependsOn changed
+    const newParent = 'parent' in data ? data.parent : undefined;
+    const newDepsOn = 'dependsOn' in data ? data.dependsOn : undefined;
+    if (newParent !== undefined || newDepsOn !== undefined) {
+      this.validateRelationships(
+        id,
+        newParent !== undefined ? (newParent ?? null) : undefined,
+        newDepsOn,
+      );
+    }
+
+    const now = new Date().toISOString();
+
+    // 3. In a transaction: update workItems row, delete+re-insert labels/deps
+    this.db.transaction((tx) => {
+      // Build the set of fields to update on the work_items row
+      const updateSet: Record<string, unknown> = { updated: now };
+      if ('title' in data) updateSet['title'] = data.title;
+      if ('type' in data) updateSet['type'] = data.type;
+      if ('status' in data) updateSet['status'] = data.status;
+      if ('iteration' in data) updateSet['iteration'] = data.iteration;
+      if ('priority' in data) updateSet['priority'] = data.priority;
+      if ('assignee' in data) updateSet['assignee'] = data.assignee;
+      if ('description' in data) updateSet['description'] = data.description;
+      if ('parent' in data) updateSet['parent'] = data.parent ?? null;
+
+      tx.update(schema.workItems)
+        .set(updateSet)
+        .where(eq(schema.workItems.id, id))
+        .run();
+
+      // Replace labels if changed
+      if ('labels' in data && data.labels !== undefined) {
+        tx.delete(schema.workItemLabels)
+          .where(eq(schema.workItemLabels.workItemId, id))
+          .run();
+        if (data.labels.length > 0) {
+          tx.insert(schema.workItemLabels)
+            .values(data.labels.map((label) => ({ workItemId: id, label })))
+            .run();
+        }
+      }
+
+      // Replace deps if changed
+      if ('dependsOn' in data && data.dependsOn !== undefined) {
+        tx.delete(schema.workItemDeps)
+          .where(eq(schema.workItemDeps.workItemId, id))
+          .run();
+        if (data.dependsOn.length > 0) {
+          tx.insert(schema.workItemDeps)
+            .values(
+              data.dependsOn.map((dependsOnId) => ({
+                workItemId: id,
+                dependsOnId,
+              })),
+            )
+            .run();
+        }
+      }
+
+      // Ensure iteration exists if changed
+      if ('iteration' in data && data.iteration) {
+        tx.insert(schema.iterations)
+          .values({ name: data.iteration, sortOrder: 0 })
+          .onConflictDoNothing()
+          .run();
+      }
+    });
+
+    this.invalidateCache();
+
+    // 4. Return updated item
+    return this.getWorkItem(id);
+  }
+
+  // ─── Write: deleteWorkItem ────────────────────────────────────────
+
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async deleteWorkItem(id: string): Promise<void> {
+    this.db.transaction((tx) => {
+      // 1. Null out parent on children
+      tx.update(schema.workItems)
+        .set({ parent: null })
+        .where(eq(schema.workItems.parent, id))
+        .run();
+
+      // 2. Remove deps referencing this item (other items depending on this one)
+      tx.delete(schema.workItemDeps)
+        .where(eq(schema.workItemDeps.dependsOnId, id))
+        .run();
+
+      // 3. Delete the item (cascade handles labels, deps, comments of this item)
+      tx.delete(schema.workItems).where(eq(schema.workItems.id, id)).run();
+    });
+
+    this.invalidateCache();
+  }
+
+  // ─── Write: soft delete ───────────────────────────────────────────
 
   // eslint-disable-next-line @typescript-eslint/require-await
   async softDeleteWorkItem(id: string): Promise<void> {
@@ -508,33 +728,56 @@ export class DrizzleBackend extends BaseBackend implements SoftDeleteBackend {
     this.invalidateCache();
   }
 
+  // ─── Write: addComment ────────────────────────────────────────────
+
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async addComment(workItemId: string, comment: NewComment): Promise<Comment> {
+    // 1. Verify item exists
+    const row = this.db
+      .select({ id: schema.workItems.id })
+      .from(schema.workItems)
+      .where(
+        and(
+          eq(schema.workItems.id, workItemId),
+          isNull(schema.workItems.deletedAt),
+        ),
+      )
+      .get();
+
+    if (!row) {
+      throw new Error(`Work item #${workItemId} not found`);
+    }
+
+    // 2. Insert comment (do NOT update work item's updated timestamp)
+    const now = new Date().toISOString();
+    this.db
+      .insert(schema.comments)
+      .values({
+        workItemId,
+        author: comment.author,
+        body: comment.body,
+        created: now,
+      })
+      .run();
+
+    this.invalidateCache();
+
+    return {
+      author: comment.author,
+      date: now,
+      body: comment.body,
+    };
+  }
+
   // ─── Stubs: not yet implemented ────────────────────────────────────
 
   /* eslint-disable @typescript-eslint/require-await, @typescript-eslint/no-unused-vars */
-
-  async updateWorkItem(
-    _id: string,
-    _data: Partial<WorkItem>,
-  ): Promise<WorkItem> {
-    throw new Error('Not yet implemented');
-  }
-
-  async deleteWorkItem(_id: string): Promise<void> {
-    throw new Error('Not yet implemented');
-  }
 
   async restoreWorkItem(_id: string): Promise<void> {
     throw new Error('Not yet implemented');
   }
 
   async permanentlyDeleteWorkItem(_id: string): Promise<void> {
-    throw new Error('Not yet implemented');
-  }
-
-  async addComment(
-    _workItemId: string,
-    _comment: NewComment,
-  ): Promise<Comment> {
     throw new Error('Not yet implemented');
   }
 

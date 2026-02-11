@@ -473,6 +473,409 @@ describe('DrizzleBackend', () => {
     });
   });
 
+  // ─── createWorkItem (relationship validation) ─────────────────────
+
+  describe('createWorkItem (relationship validation)', () => {
+    it('rejects self-referencing parent', async () => {
+      // Create an item first so we know what ID "2" would be
+      const item = await backend.createWorkItem(makeNewItem());
+      // Now try to create an item that would be its own parent
+      // Since the next ID will be "2", we can't directly self-reference on create
+      // But we CAN verify it rejects a non-existent parent (which covers the lookup)
+      // A more realistic scenario: set parent = the item's own id via update
+      // For create, self-reference is tricky because the ID hasn't been assigned yet.
+      // The validation runs after ID assignment, so let's test via update instead.
+      // However, we can test the case where parent is set to a future ID
+      // that doesn't exist yet — that should fail with "does not exist"
+      expect(item).toBeDefined();
+
+      // The most realistic self-ref test is via updateWorkItem
+      await expect(
+        backend.updateWorkItem(item.id, { parent: item.id }),
+      ).rejects.toThrow(`Work item #${item.id} cannot be its own parent`);
+    });
+
+    it('rejects non-existent parent', async () => {
+      await expect(
+        backend.createWorkItem(makeNewItem({ parent: '999' })),
+      ).rejects.toThrow('Parent #999 does not exist');
+    });
+
+    it('rejects circular parent chain', async () => {
+      const grandparent = await backend.createWorkItem(
+        makeNewItem({ title: 'Grandparent' }),
+      );
+      const parent = await backend.createWorkItem(
+        makeNewItem({ title: 'Parent', parent: grandparent.id }),
+      );
+      const child = await backend.createWorkItem(
+        makeNewItem({ title: 'Child', parent: parent.id }),
+      );
+
+      // Now try to set grandparent's parent to child — creates a cycle
+      await expect(
+        backend.updateWorkItem(grandparent.id, { parent: child.id }),
+      ).rejects.toThrow(
+        `Circular parent chain detected for #${grandparent.id}`,
+      );
+    });
+
+    it('rejects self-referencing dependency', async () => {
+      // Create an item, then try to make it depend on itself via update
+      const item = await backend.createWorkItem(makeNewItem());
+      await expect(
+        backend.updateWorkItem(item.id, { dependsOn: [item.id] }),
+      ).rejects.toThrow(`Work item #${item.id} cannot depend on itself`);
+    });
+
+    it('rejects non-existent dependency', async () => {
+      await expect(
+        backend.createWorkItem(makeNewItem({ dependsOn: ['999'] })),
+      ).rejects.toThrow('Dependency #999 does not exist');
+    });
+
+    it('rejects circular dependency chain', async () => {
+      const a = await backend.createWorkItem(makeNewItem({ title: 'A' }));
+      const b = await backend.createWorkItem(
+        makeNewItem({ title: 'B', dependsOn: [a.id] }),
+      );
+      const c = await backend.createWorkItem(
+        makeNewItem({ title: 'C', dependsOn: [b.id] }),
+      );
+
+      // Now try to make A depend on C — creates a cycle: A -> C -> B -> A
+      await expect(
+        backend.updateWorkItem(a.id, { dependsOn: [c.id] }),
+      ).rejects.toThrow(`Circular dependency chain detected for #${a.id}`);
+    });
+  });
+
+  // ─── updateWorkItem ──────────────────────────────────────────────
+
+  describe('updateWorkItem', () => {
+    it('updates title', async () => {
+      const item = await backend.createWorkItem(
+        makeNewItem({ title: 'Original' }),
+      );
+      const updated = await backend.updateWorkItem(item.id, {
+        title: 'Updated',
+      });
+      expect(updated.title).toBe('Updated');
+
+      // Verify persisted
+      const fetched = await backend.getWorkItem(item.id);
+      expect(fetched.title).toBe('Updated');
+    });
+
+    it('updates status', async () => {
+      const item = await backend.createWorkItem(
+        makeNewItem({ status: 'todo' }),
+      );
+      const updated = await backend.updateWorkItem(item.id, {
+        status: 'in-progress',
+      });
+      expect(updated.status).toBe('in-progress');
+    });
+
+    it('updates priority', async () => {
+      const item = await backend.createWorkItem(
+        makeNewItem({ priority: 'low' }),
+      );
+      const updated = await backend.updateWorkItem(item.id, {
+        priority: 'high',
+      });
+      expect(updated.priority).toBe('high');
+    });
+
+    it('updates assignee', async () => {
+      const item = await backend.createWorkItem(
+        makeNewItem({ assignee: 'Alice' }),
+      );
+      const updated = await backend.updateWorkItem(item.id, {
+        assignee: 'Bob',
+      });
+      expect(updated.assignee).toBe('Bob');
+    });
+
+    it('replaces labels', async () => {
+      const item = await backend.createWorkItem(
+        makeNewItem({ labels: ['old-label', 'keep-label'] }),
+      );
+      const updated = await backend.updateWorkItem(item.id, {
+        labels: ['new-label', 'another-label'],
+      });
+      expect(updated.labels.sort()).toEqual(
+        ['another-label', 'new-label'].sort(),
+      );
+
+      // Verify old labels are gone
+      const fetched = await backend.getWorkItem(item.id);
+      expect(fetched.labels.sort()).toEqual(
+        ['another-label', 'new-label'].sort(),
+      );
+      expect(fetched.labels).not.toContain('old-label');
+      expect(fetched.labels).not.toContain('keep-label');
+    });
+
+    it('replaces dependencies', async () => {
+      const dep1 = await backend.createWorkItem(
+        makeNewItem({ title: 'Dep 1' }),
+      );
+      const dep2 = await backend.createWorkItem(
+        makeNewItem({ title: 'Dep 2' }),
+      );
+      const dep3 = await backend.createWorkItem(
+        makeNewItem({ title: 'Dep 3' }),
+      );
+      const item = await backend.createWorkItem(
+        makeNewItem({ title: 'Main', dependsOn: [dep1.id, dep2.id] }),
+      );
+
+      const updated = await backend.updateWorkItem(item.id, {
+        dependsOn: [dep2.id, dep3.id],
+      });
+      expect(updated.dependsOn).toEqual([dep2.id, dep3.id]);
+
+      // Verify dep1 is no longer referenced
+      const fetched = await backend.getWorkItem(item.id);
+      expect(fetched.dependsOn).toEqual([dep2.id, dep3.id]);
+      expect(fetched.dependsOn).not.toContain(dep1.id);
+    });
+
+    it('validates relationships on update', async () => {
+      const item = await backend.createWorkItem(makeNewItem());
+
+      // Non-existent parent
+      await expect(
+        backend.updateWorkItem(item.id, { parent: '999' }),
+      ).rejects.toThrow('Parent #999 does not exist');
+
+      // Non-existent dependency
+      await expect(
+        backend.updateWorkItem(item.id, { dependsOn: ['999'] }),
+      ).rejects.toThrow('Dependency #999 does not exist');
+    });
+
+    it('sets updated timestamp', async () => {
+      const item = await backend.createWorkItem(makeNewItem());
+      const originalUpdated = item.updated;
+
+      // Small delay to ensure timestamp differs
+      await new Promise((r) => setTimeout(r, 10));
+
+      const updated = await backend.updateWorkItem(item.id, {
+        title: 'Changed',
+      });
+      expect(updated.updated).not.toBe(originalUpdated);
+      expect(new Date(updated.updated).getTime()).toBeGreaterThan(
+        new Date(originalUpdated).getTime(),
+      );
+    });
+
+    it('does not change created timestamp', async () => {
+      const item = await backend.createWorkItem(makeNewItem());
+      const originalCreated = item.created;
+
+      await new Promise((r) => setTimeout(r, 10));
+
+      const updated = await backend.updateWorkItem(item.id, {
+        title: 'Changed',
+      });
+      expect(updated.created).toBe(originalCreated);
+    });
+
+    it('throws when work item not found', async () => {
+      await expect(
+        backend.updateWorkItem('999', { title: 'Nope' }),
+      ).rejects.toThrow('Work item #999 not found');
+    });
+
+    it('handles partial updates without affecting other fields', async () => {
+      const item = await backend.createWorkItem(
+        makeNewItem({
+          title: 'Original',
+          status: 'todo',
+          priority: 'high',
+          assignee: 'Alice',
+          labels: ['bug'],
+          description: 'Some description',
+        }),
+      );
+
+      // Only update title
+      const updated = await backend.updateWorkItem(item.id, {
+        title: 'New Title',
+      });
+
+      expect(updated.title).toBe('New Title');
+      expect(updated.status).toBe('todo');
+      expect(updated.priority).toBe('high');
+      expect(updated.assignee).toBe('Alice');
+      expect(updated.labels).toEqual(['bug']);
+      expect(updated.description).toBe('Some description');
+    });
+  });
+
+  // ─── deleteWorkItem ──────────────────────────────────────────────
+
+  describe('deleteWorkItem', () => {
+    it('removes item', async () => {
+      const item = await backend.createWorkItem(makeNewItem());
+      await backend.deleteWorkItem(item.id);
+
+      await expect(backend.getWorkItem(item.id)).rejects.toThrow(
+        `Work item #${item.id} not found`,
+      );
+    });
+
+    it('cascade deletes labels of the deleted item', async () => {
+      const item = await backend.createWorkItem(
+        makeNewItem({ labels: ['bug', 'feature'] }),
+      );
+      await backend.deleteWorkItem(item.id);
+
+      // Verify labels are gone from the database
+      const labelCount = db.raw
+        .prepare(
+          'SELECT COUNT(*) as count FROM work_item_labels WHERE work_item_id = ?',
+        )
+        .get(item.id) as { count: number };
+      expect(labelCount.count).toBe(0);
+    });
+
+    it('cascade deletes deps of the deleted item', async () => {
+      const dep = await backend.createWorkItem(
+        makeNewItem({ title: 'Dep target' }),
+      );
+      const item = await backend.createWorkItem(
+        makeNewItem({ dependsOn: [dep.id] }),
+      );
+      await backend.deleteWorkItem(item.id);
+
+      // Verify deps are gone
+      const depCount = db.raw
+        .prepare(
+          'SELECT COUNT(*) as count FROM work_item_deps WHERE work_item_id = ?',
+        )
+        .get(item.id) as { count: number };
+      expect(depCount.count).toBe(0);
+    });
+
+    it('cascade deletes comments of the deleted item', async () => {
+      const item = await backend.createWorkItem(makeNewItem());
+      await backend.addComment(item.id, {
+        author: 'Alice',
+        body: 'A comment',
+      });
+      await backend.deleteWorkItem(item.id);
+
+      // Verify comments are gone
+      const commentCount = db.raw
+        .prepare(
+          'SELECT COUNT(*) as count FROM comments WHERE work_item_id = ?',
+        )
+        .get(item.id) as { count: number };
+      expect(commentCount.count).toBe(0);
+    });
+
+    it('cleans up parent references (children get parent = null)', async () => {
+      const parent = await backend.createWorkItem(
+        makeNewItem({ title: 'Parent' }),
+      );
+      const child = await backend.createWorkItem(
+        makeNewItem({ title: 'Child', parent: parent.id }),
+      );
+
+      await backend.deleteWorkItem(parent.id);
+
+      const fetchedChild = await backend.getWorkItem(child.id);
+      expect(fetchedChild.parent).toBeNull();
+    });
+
+    it('cleans up dependency references (deps pointing to deleted item removed)', async () => {
+      const target = await backend.createWorkItem(
+        makeNewItem({ title: 'Target' }),
+      );
+      const dependent = await backend.createWorkItem(
+        makeNewItem({ title: 'Dependent', dependsOn: [target.id] }),
+      );
+
+      await backend.deleteWorkItem(target.id);
+
+      const fetchedDependent = await backend.getWorkItem(dependent.id);
+      expect(fetchedDependent.dependsOn).toEqual([]);
+    });
+  });
+
+  // ─── addComment ──────────────────────────────────────────────────
+
+  describe('addComment', () => {
+    it('adds comment to existing item', async () => {
+      const item = await backend.createWorkItem(makeNewItem());
+      const comment = await backend.addComment(item.id, {
+        author: 'Alice',
+        body: 'This is a comment',
+      });
+
+      expect(comment.author).toBe('Alice');
+      expect(comment.body).toBe('This is a comment');
+      expect(comment.date).toBeDefined();
+      expect(new Date(comment.date).toISOString()).toBe(comment.date);
+    });
+
+    it('comment has author, date, and body', async () => {
+      const item = await backend.createWorkItem(makeNewItem());
+      const comment = await backend.addComment(item.id, {
+        author: 'Bob',
+        body: 'Hello world',
+      });
+
+      expect(comment).toHaveProperty('author', 'Bob');
+      expect(comment).toHaveProperty('body', 'Hello world');
+      expect(comment).toHaveProperty('date');
+    });
+
+    it('comment is retrievable via getWorkItem', async () => {
+      const item = await backend.createWorkItem(makeNewItem());
+      await backend.addComment(item.id, {
+        author: 'Alice',
+        body: 'First comment',
+      });
+      await backend.addComment(item.id, {
+        author: 'Bob',
+        body: 'Second comment',
+      });
+
+      const fetched = await backend.getWorkItem(item.id);
+      expect(fetched.comments).toHaveLength(2);
+      expect(fetched.comments[0]!.author).toBe('Alice');
+      expect(fetched.comments[0]!.body).toBe('First comment');
+      expect(fetched.comments[1]!.author).toBe('Bob');
+      expect(fetched.comments[1]!.body).toBe('Second comment');
+    });
+
+    it('does not change item updated timestamp', async () => {
+      const item = await backend.createWorkItem(makeNewItem());
+      const originalUpdated = item.updated;
+
+      await new Promise((r) => setTimeout(r, 10));
+
+      await backend.addComment(item.id, {
+        author: 'Alice',
+        body: 'A comment',
+      });
+
+      const fetched = await backend.getWorkItem(item.id);
+      expect(fetched.updated).toBe(originalUpdated);
+    });
+
+    it('throws if item does not exist', async () => {
+      await expect(
+        backend.addComment('999', { author: 'Alice', body: 'Nope' }),
+      ).rejects.toThrow('Work item #999 not found');
+    });
+  });
+
   // ─── seedDefaults (idempotency) ─────────────────────────────────
 
   describe('seedDefaults', () => {
