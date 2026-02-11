@@ -54,6 +54,8 @@ export interface BackendDataStoreState {
 
   init(cwd: string): void;
   refresh(): Promise<void>;
+  reloadItem(id: string): Promise<void>;
+  removeItem(id: string): void;
   setSyncStatus(status: SyncStatus): void;
   destroy(): void;
 }
@@ -203,6 +205,37 @@ export const backendDataStore = createStore<BackendDataStoreState>(
       } catch (e) {
         set({ error: e instanceof Error ? e.message : String(e) });
       }
+    },
+
+    async reloadItem(id: string) {
+      if (!currentBackend) return;
+      try {
+        const item = await currentBackend.getWorkItem(id);
+        set((state) => {
+          const idx = state.items.findIndex((i) => i.id === id);
+          const items = [...state.items];
+          if (idx >= 0) {
+            items[idx] = item;
+          } else {
+            items.push(item);
+          }
+          return { items };
+        });
+        // Refresh dynamic lists that may have changed
+        const [assignees, labels] = await Promise.all([
+          currentBackend.getAssignees().catch(() => [] as string[]),
+          currentBackend.getLabels().catch(() => [] as string[]),
+        ]);
+        set({ assignees, labels });
+      } catch (e) {
+        set({ error: e instanceof Error ? e.message : String(e) });
+      }
+    },
+
+    removeItem(id: string) {
+      set((state) => ({
+        items: state.items.filter((i) => i.id !== id),
+      }));
     },
 
     setSyncStatus(status: SyncStatus) {

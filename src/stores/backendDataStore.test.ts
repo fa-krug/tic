@@ -127,6 +127,82 @@ describe('backendDataStore', () => {
     expect(backendDataStore.getState().syncStatus?.state).toBe('syncing');
   });
 
+  it('reloadItem updates a single item in the store', async () => {
+    backendDataStore.getState().init(tmpDir);
+    await waitForLoad();
+
+    const backend = backendDataStore.getState().backend!;
+    const item = await backend.createWorkItem({
+      title: 'Original',
+      type: 'task',
+      status: 'todo',
+      priority: 'medium',
+      assignee: '',
+      labels: [],
+      iteration: 'default',
+      parent: null,
+      dependsOn: [],
+      description: '',
+    });
+    await backendDataStore.getState().refresh();
+    expect(backendDataStore.getState().items).toHaveLength(1);
+
+    // Mutate through backend and do targeted reload
+    await backend.updateWorkItem(item.id, { title: 'Updated' });
+    await backendDataStore.getState().reloadItem(item.id);
+
+    const items = backendDataStore.getState().items;
+    expect(items).toHaveLength(1);
+    expect(items[0]!.title).toBe('Updated');
+  });
+
+  it('reloadItem adds a new item if not in store', async () => {
+    backendDataStore.getState().init(tmpDir);
+    await waitForLoad();
+    expect(backendDataStore.getState().items).toHaveLength(0);
+
+    const backend = backendDataStore.getState().backend!;
+    const item = await backend.createWorkItem({
+      title: 'New',
+      type: 'task',
+      status: 'todo',
+      priority: 'medium',
+      assignee: '',
+      labels: [],
+      iteration: 'default',
+      parent: null,
+      dependsOn: [],
+      description: '',
+    });
+    await backendDataStore.getState().reloadItem(item.id);
+    expect(backendDataStore.getState().items).toHaveLength(1);
+    expect(backendDataStore.getState().items[0]!.title).toBe('New');
+  });
+
+  it('removeItem filters item from store', async () => {
+    backendDataStore.getState().init(tmpDir);
+    await waitForLoad();
+
+    const backend = backendDataStore.getState().backend!;
+    await backend.createWorkItem({
+      title: 'To remove',
+      type: 'task',
+      status: 'todo',
+      priority: 'medium',
+      assignee: '',
+      labels: [],
+      iteration: 'default',
+      parent: null,
+      dependsOn: [],
+      description: '',
+    });
+    await backendDataStore.getState().refresh();
+    expect(backendDataStore.getState().items).toHaveLength(1);
+
+    backendDataStore.getState().removeItem('1');
+    expect(backendDataStore.getState().items).toHaveLength(0);
+  });
+
   it('completes init even with unknown remote backend', async () => {
     // An unknown remote backend type returns null (no sync), but init succeeds
     await configStore.getState().update({ backend: 'nonexistent' });
