@@ -129,6 +129,8 @@ describe('checkAllBackendAvailability', () => {
     simulateSuccess();
     const result = await checkAllBackendAvailability();
     expect(result).toEqual({
+      none: true,
+      filesystem: true,
       local: true,
       github: true,
       gitlab: true,
@@ -143,6 +145,8 @@ describe('checkAllBackendAvailability', () => {
     simulateFailure();
     const result = await checkAllBackendAvailability();
     expect(result).toEqual({
+      none: true,
+      filesystem: true,
       local: true,
       github: false,
       gitlab: false,

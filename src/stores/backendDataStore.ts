@@ -64,35 +64,6 @@ export interface BackendDataStoreState {
 let currentBackend: Backend | null = null;
 let initGeneration = 0;
 
-async function createRemoteBackend(
-  cwd: string,
-  backendType: string,
-): Promise<Backend | null> {
-  switch (backendType) {
-    case 'local':
-    case 'none':
-      return null;
-    case 'github': {
-      const { GitHubBackend } = await import('../backends/github/index.js');
-      return new GitHubBackend(cwd);
-    }
-    case 'gitlab': {
-      const { GitLabBackend } = await import('../backends/gitlab/index.js');
-      return new GitLabBackend(cwd);
-    }
-    case 'azure': {
-      const { AzureDevOpsBackend } = await import('../backends/ado/index.js');
-      return new AzureDevOpsBackend(cwd);
-    }
-    case 'jira': {
-      const { JiraBackend } = await import('../backends/jira/index.js');
-      return JiraBackend.create(cwd);
-    }
-    default:
-      return null;
-  }
-}
-
 async function createBackendAndSync(cwd: string): Promise<{
   backend: Backend;
   syncManager: SyncManager | null;
@@ -104,6 +75,7 @@ async function createBackendAndSync(cwd: string): Promise<{
   configStore.getState().setDatabase(primary.getDatabase());
 
   const config = configStore.getState().config;
+  const { createRemoteBackend } = await import('../backends/factory.js');
   const remote = await createRemoteBackend(cwd, config.backend ?? 'none');
 
   let syncManager: SyncManager | null = null;

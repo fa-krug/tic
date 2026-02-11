@@ -84,6 +84,8 @@ export function Settings() {
   const [availability, setAvailability] = useState<
     Record<BackendType, AvailabilityStatus>
   >({
+    none: 'available',
+    filesystem: 'available',
     local: 'available',
     github: 'checking',
     gitlab: 'checking',

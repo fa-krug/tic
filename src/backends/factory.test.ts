@@ -14,8 +14,10 @@ import { writeConfig, defaultConfig } from './local/config.js';
 import { configStore } from '../stores/configStore.js';
 
 describe('VALID_BACKENDS', () => {
-  it('contains the five known backends', () => {
+  it('contains all known backends', () => {
     expect(VALID_BACKENDS).toEqual([
+      'none',
+      'filesystem',
       'local',
       'github',
       'gitlab',

@@ -7,6 +7,8 @@ import { configStore } from '../stores/configStore.js';
 import { SyncManager } from '../sync/SyncManager.js';
 
 export const VALID_BACKENDS = [
+  'none',
+  'filesystem',
   'local',
   'github',
   'gitlab',
@@ -43,7 +45,7 @@ export async function createBackend(root: string): Promise<Backend> {
   return DrizzleBackend.create(root);
 }
 
-async function createRemoteBackend(
+export async function createRemoteBackend(
   root: string,
   backendType: string,
 ): Promise<Backend | null> {
@@ -51,6 +53,10 @@ async function createRemoteBackend(
     case 'local':
     case 'none':
       return null;
+    case 'filesystem': {
+      const { FilesBackend } = await import('./files/index.js');
+      return new FilesBackend(root);
+    }
     case 'github': {
       const { GitHubBackend } = await import('./github/index.js');
       return new GitHubBackend(root);

@@ -5,6 +5,8 @@ import type { BackendType } from './factory.js';
  * Maps each backend to the CLI binary it requires, or null if no CLI is needed.
  */
 export const BACKEND_CLI: Record<BackendType, string | null> = {
+  none: null,
+  filesystem: null,
   local: null,
   github: 'gh',
   gitlab: 'glab',
@@ -42,6 +44,8 @@ export async function checkAllBackendAvailability(): Promise<
   Record<BackendType, boolean>
 > {
   const backends: BackendType[] = [
+    'none',
+    'filesystem',
     'local',
     'github',
     'gitlab',
