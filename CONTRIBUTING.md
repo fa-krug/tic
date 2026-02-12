@@ -40,6 +40,7 @@ npx vitest run src/storage/config.test.ts
 - **Testing**: Vitest 4
 - **Local storage**: [Drizzle ORM](https://orm.drizzle.team/) + [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) (SQLite with WAL mode)
 - **File sync**: [gray-matter](https://github.com/jonschlinkert/gray-matter) (YAML frontmatter) + [yaml](https://github.com/eemeli/yaml) (serialization) for `.tic/items/` markdown files
+- **Auth**: [@napi-rs/keyring](https://github.com/nicolo-ribaudo/keyring-rs-napi) (OS keychain), [open](https://github.com/sindresorhus/open) (browser launching for OAuth flows)
 
 ## Architecture
 
@@ -69,9 +70,9 @@ The app uses screen-based routing via React Context (`AppContext` in `src/app.ts
 **Implemented backends:**
 
 - **Storage** (`src/storage/`) — SQLite-backed local persistence (always the primary backend)
-- **GitHub** (`src/backends/github/`) — reads/writes GitHub Issues via the `gh` CLI
+- **GitHub** (`src/backends/github/`) — reads/writes GitHub Issues via REST/GraphQL API (OAuth device flow or `gh` token)
 - **GitLab** (`src/backends/gitlab/`) — reads/writes GitLab Issues via the `glab` CLI
-- **Azure DevOps** (`src/backends/ado/`) — reads/writes Azure DevOps Work Items via the `az` CLI
+- **Azure DevOps** (`src/backends/ado/`) — reads/writes Azure DevOps Work Items via REST API (Entra ID OAuth or PAT)
 - **Jira** (`src/backends/jira/`) — reads/writes Jira issues via REST API
 - **Files** (`src/backends/files/`) — filesystem sync destination that replicates items from `Storage` to `.tic/items/` markdown files via `SyncManager`
 
@@ -89,6 +90,7 @@ The app uses screen-based routing via React Context (`AppContext` in `src/app.ts
 - **Settings** (`src/components/Settings.tsx`) — backend selector with Jira configuration fields.
 - **StatusScreen** (`src/components/StatusScreen.tsx`) — sync status display with error details.
 - **HelpScreen** (`src/components/HelpScreen.tsx`) — context-sensitive keyboard shortcut reference.
+- **AuthPrompt** (`src/components/AuthPrompt.tsx`) — full-screen authentication flow UI with device code display, verification URI, and spinner during OAuth flows.
 - **Breadcrumbs** (`src/components/Breadcrumbs.tsx`) — breadcrumb navigation for form drill-down stack.
 - **AutocompleteInput** (`src/components/AutocompleteInput.tsx`) — single-value fuzzy autocomplete input.
 - **MultiAutocompleteInput** (`src/components/MultiAutocompleteInput.tsx`) — comma-separated multi-value autocomplete (used for labels).
@@ -99,17 +101,29 @@ The app uses screen-based routing via React Context (`AppContext` in `src/app.ts
 
 State is managed via Zustand vanilla stores in `src/stores/`:
 
-- **backendDataStore** — single source of truth for backend data (items, statuses, types, assignees, labels, capabilities, sync status). Initialized with `init(cwd)` which creates backends asynchronously (Storage + optional remote + SyncManager). Components subscribe via `useBackendDataStore(selector)`.
+- **backendDataStore** — single source of truth for backend data (items, statuses, types, assignees, labels, capabilities, sync status). Also manages auth state (`authPrompt`, `authFlow`, `authDismissed`) for in-TUI authentication flows. Initialized with `init(cwd)` which creates backends asynchronously (Storage + optional remote + SyncManager). Components subscribe via `useBackendDataStore(selector)`.
 - **configStore** — single source of truth for project config. Reads/writes exclusively via SQLite (`project_config` table). `startWatching()` is a no-op (DB is the source of truth).
 - **undoStore** — undo action stack (max depth 5). Supports delete (soft-delete via `deleted_at` column), create, and update operations via whole-item snapshots.
 - **formStackStore** — form navigation stack and field state for drill-down into related items.
 - **listViewStore** — list view state (cursor position, expanded/collapsed items, marked items, scroll offset).
 - **navigationStore** — screen routing and work item selection.
 - **uiStore** — UI state (active overlay, warnings, toasts).
+- **filterStore** — saved views and active filters (status, type, priority, assignee, label filtering).
+- **recentCommandsStore** — tracks recently used command palette items (persisted to `.tic/recent-commands.json`).
 
 ### CLI
 
-`src/cli/index.ts` defines the CLI commands using Commander. Commands include `init`, `item` (list/show/create/update/delete/open/comment), `iteration` (list/set), `config` (get/set), and `mcp serve`. Global options: `--json`, `--quiet`.
+`src/cli/index.ts` defines the CLI commands using Commander. Commands include `init`, `item` (list/show/create/update/delete/open/comment), `iteration` (list/set), `config` (get/set), `auth` (login/status/logout), and `mcp serve`. Global options: `--json`, `--quiet`.
+
+### Authentication
+
+`src/auth/` provides credential management for remote backends:
+
+- `keychain.ts` — wrapper around `@napi-rs/keyring` for secure OS keychain storage
+- `github.ts` — GitHub OAuth device flow authentication
+- `ado.ts` — Azure DevOps Entra ID device code flow + PAT fallback with token refresh
+
+`src/backends/shared/api-client.ts` defines `BaseApiClient` — an abstract base class with common fetch, retry, and error handling. `GitHubApiClient` (`src/backends/github/api.ts`) and `AdoApiClient` (`src/backends/ado/api.ts`) extend it. Both `GitHubBackend` and `AzureDevOpsBackend` use private constructors with static `create()` factory methods that resolve auth tokens before instantiation.
 
 ### Types
 

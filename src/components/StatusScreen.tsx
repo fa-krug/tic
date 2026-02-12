@@ -63,6 +63,7 @@ export function StatusScreen() {
 
   const initError = useBackendDataStore((s) => s.error);
   const syncStatus = useBackendDataStore((s) => s.syncStatus);
+  const authDismissed = useBackendDataStore((s) => s.authDismissed);
 
   const errors = syncStatus?.errors ?? [];
   const [scrollOffset, setScrollOffset] = useState(0);
@@ -281,7 +282,14 @@ export function StatusScreen() {
         <Box marginTop={1} flexDirection="column">
           <Text bold>Sync:</Text>
           <Box marginLeft={2}>
-            <Text dimColor>Not available (local-only mode)</Text>
+            {authDismissed ? (
+              <Text dimColor>
+                Not available — not authenticated. Run{' '}
+                <Text bold>tic auth login github</Text> to authenticate.
+              </Text>
+            ) : (
+              <Text dimColor>Not available (local-only mode)</Text>
+            )}
           </Box>
         </Box>
       )}

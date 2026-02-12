@@ -34,6 +34,7 @@ function getStatusDisplay(
     errors: { message: string }[];
     progress: { phase: string; current: number; total: number } | null;
   } | null,
+  authDismissed: boolean,
 ): { showSpinner: boolean; text: string | null; isError?: boolean } {
   if (loading) {
     return { showSpinner: true, text: 'Loading...' };
@@ -62,6 +63,13 @@ function getStatusDisplay(
   if (syncStatus) {
     return { showSpinner: false, text: '✓ Synced' };
   }
+  if (authDismissed) {
+    return {
+      showSpinner: false,
+      text: '⚠ Not authenticated',
+      isError: true,
+    };
+  }
   return { showSpinner: false, text: null };
 }
 
@@ -70,6 +78,7 @@ export function Header() {
   const loading = useBackendDataStore((s) => s.loading);
   const initError = useBackendDataStore((s) => s.error);
   const syncStatus = useBackendDataStore((s) => s.syncStatus);
+  const authDismissed = useBackendDataStore((s) => s.authDismissed);
   const backendLabel = BACKEND_LABELS[backendType] ?? backendType;
   const root = process.cwd();
   const projectPath = shortenPath(root);
@@ -78,7 +87,7 @@ export function Header() {
     showSpinner,
     text: statusText,
     isError,
-  } = getStatusDisplay(loading, initError, syncStatus);
+  } = getStatusDisplay(loading, initError, syncStatus, authDismissed);
 
   return (
     <Box marginTop={1} marginBottom={1}>

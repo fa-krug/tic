@@ -57,9 +57,9 @@ Or add `.mcp.json` to the project root:
 **Implemented backends:**
 
 - `Storage` (`src/storage/`) — SQLite-backed local persistence (always the primary backend)
-- `GitHubBackend` (`src/backends/github/`) — GitHub Issues via `gh` CLI
+- `GitHubBackend` (`src/backends/github/`) — GitHub Issues via REST/GraphQL API (OAuth device flow or `gh` token)
 - `GitLabBackend` (`src/backends/gitlab/`) — GitLab Issues via `glab` CLI
-- `AzureDevOpsBackend` (`src/backends/ado/`) — Azure DevOps Work Items via `az` CLI
+- `AzureDevOpsBackend` (`src/backends/ado/`) — Azure DevOps Work Items via REST API (Entra ID OAuth or PAT)
 - `JiraBackend` (`src/backends/jira/`) — Jira issues via REST API
 - `FilesBackend` (`src/backends/files/`) — filesystem sync destination that delegates I/O to `local/items.ts` and `local/templates.ts`. Used by `SyncManager` to replicate items from `Storage` to `.tic/items/` markdown files.
 
@@ -85,6 +85,7 @@ Key modules in `src/storage/`:
 - `WorkItemForm` — multi-field form for create/edit with dropdowns, autocomplete inputs, multi-autocomplete (labels), and external `$EDITOR` for descriptions. Navigable relationship links allow drilling into related items with a back-stack. Also serves as the template editor via `formMode`.
 - `OverlayPanel` — unified overlay component for search, bulk actions, and all property pickers. Supports single-select, multi-select, and freeform input modes with fuzzy filtering and category grouping.
 - `DetailPanel` — inline preview panel showing selected item metadata and description with scroll support.
+- `AuthPrompt` — full-screen authentication flow UI. Displays device code, verification URI, and spinner during OAuth flows. Integrated into `App` via lazy loading. States: waiting, code-ready, success, error.
 - `Breadcrumbs` — breadcrumb navigation for form drill-down stack.
 - `IterationPicker` — select from configured iterations
 - `Settings` — backend selector and Jira configuration
@@ -97,17 +98,29 @@ Key modules in `src/storage/`:
 
 Zustand vanilla stores in `src/stores/`:
 
-- `backendDataStore` — single source of truth for backend data (items, statuses, types, assignees, labels, capabilities, sync status). Initialized with `init(cwd)` which creates backends asynchronously (Storage + optional remote + SyncManager). Components subscribe via `useBackendDataStore(selector)`. Has `initGeneration` counter to prevent stale async init from overwriting store after destroy.
+- `backendDataStore` — single source of truth for backend data (items, statuses, types, assignees, labels, capabilities, sync status). Also manages auth state (`authPrompt`, `authFlow`, `authDismissed`) for in-TUI authentication flows. Initialized with `init(cwd)` which creates backends asynchronously (Storage + optional remote + SyncManager). Components subscribe via `useBackendDataStore(selector)`. Has `initGeneration` counter to prevent stale async init from overwriting store after destroy.
 - `configStore` — single source of truth for project config. Reads/writes exclusively via SQLite (the `project_config` table). `init(root)` reads config from DB, `startWatching()` is a no-op (DB is the source of truth). Store must be `destroy()`'d on exit.
 - `undoStore` — undo action stack (max depth 5). Delete uses soft-delete (`deleted_at` column in SQLite), create/update use whole-item snapshots. `u` keybinding in WorkItemList pops and reverses.
 - `formStackStore` — form navigation stack and field state for drill-down into related items.
 - `listViewStore` — list view state (cursor position, expanded/collapsed items, marked items, scroll offset).
 - `navigationStore` — screen routing and work item selection.
 - `uiStore` — UI state (active overlay, warnings, toasts).
+- `filterStore` — saved views and active filters (status, type, priority, assignee, label filtering).
+- `recentCommandsStore` — tracks recently used command palette items (persisted to `.tic/recent-commands.json`).
 
 ### CLI
 
-`src/cli/index.ts` defines CLI commands via Commander: `init` (with `--backend`), `item` (list/show/create/update/delete/open/comment), `iteration` (list/set), `config` (get/set), `mcp serve`. Global options: `--json`, `--quiet`.
+`src/cli/index.ts` defines CLI commands via Commander: `init` (with `--backend`), `item` (list/show/create/update/delete/open/comment), `iteration` (list/set), `config` (get/set), `auth` (login/status/logout), `mcp serve`. Global options: `--json`, `--quiet`.
+
+### Authentication
+
+`src/auth/` provides credential management for remote backends:
+
+- `keychain.ts` — wrapper around `@napi-rs/keyring` for secure OS keychain storage
+- `github.ts` — GitHub OAuth device flow authentication
+- `ado.ts` — Azure DevOps Entra ID device code flow + PAT fallback with token refresh
+
+`src/backends/shared/api-client.ts` defines `BaseApiClient` with common fetch, retry, and error handling logic. `GitHubApiClient` (REST + GraphQL) and `AdoApiClient` (WIQL, batch, pagination) extend it. Both `GitHubBackend` and `AzureDevOpsBackend` use private constructors with static `create()` factory methods that resolve auth tokens before instantiation.
 
 ### Shared Types
 
@@ -121,6 +134,7 @@ Zustand vanilla stores in `src/stores/`:
 - **Testing**: Vitest 4 (tests use temp directories for isolation)
 - **Local storage**: Drizzle ORM + better-sqlite3 (SQLite with WAL mode) in `src/storage/`
 - **File sync**: gray-matter (YAML frontmatter) + yaml (serialization) for `.tic/items/` markdown files
+- **Auth**: @napi-rs/keyring (OS keychain), open (browser launching for OAuth flows)
 
 ## Conventions
 

@@ -7,7 +7,8 @@ Built with TypeScript and [Ink](https://github.com/vadimdemedes/ink).
 ## Features
 
 - **Keyboard-driven TUI** — browse, create, edit, and manage work items without leaving the terminal
-- **Multiple backends** — GitHub (via `gh`), GitLab (via `glab`), Azure DevOps (via `az`), Jira (via REST API)
+- **Multiple backends** — GitHub (REST/GraphQL API), GitLab (via `glab`), Azure DevOps (REST API), Jira (REST API)
+- **Built-in authentication** — OAuth device flow for GitHub and Azure DevOps, with PAT fallback
 - **Automatic backend detection** — selects backend based on git remote, or configure manually
 - **SQLite storage** — all data stored locally in `.tic/tic.db` with optional sync to remote backends
 - **CLI commands** — scriptable commands for all operations (`tic item list`, `tic item create`, etc.)
@@ -186,40 +187,54 @@ tic iteration list                   # List iterations
 tic iteration set sprint-2           # Set current iteration
 tic config get backend               # Get config value
 tic config set backend github        # Set config value
+tic auth login github                # Authenticate with GitHub (OAuth device flow)
+tic auth login azure                 # Authenticate with Azure DevOps (Entra ID)
+tic auth login azure --pat           # Authenticate with a Personal Access Token
+tic auth status                      # Show authentication status
+tic auth logout github               # Remove stored credentials
 ```
 
 Add `--json` to any command for machine-readable output, or `--quiet` to suppress non-essential output.
 
 ## Backends
 
-| Backend | CLI Tool | Detection |
-|---------|----------|-----------|
+| Backend | Auth Method | Detection |
+|---------|-------------|-----------|
 | Local only (SQLite) | — | Default fallback |
-| GitHub Issues | [`gh`](https://cli.github.com/) | `github.com` in git remote |
-| GitLab Issues | [`glab`](https://gitlab.com/gitlab-org/cli) | `gitlab.com` in git remote |
-| Azure DevOps Work Items | [`az`](https://learn.microsoft.com/en-us/cli/azure/) | `dev.azure.com` or `visualstudio.com` in git remote |
-| Jira | REST API | Configured via settings |
+| GitHub Issues | `tic auth login github` (OAuth) or existing `gh` token | `github.com` in git remote |
+| GitLab Issues | [`glab`](https://gitlab.com/gitlab-org/cli) CLI | `gitlab.com` in git remote |
+| Azure DevOps Work Items | `tic auth login azure` (Entra ID) or `--pat` | `dev.azure.com` or `visualstudio.com` in git remote |
+| Jira | REST API (configured in settings) | Configured via settings |
 
 Each backend supports a different set of capabilities (types, statuses, iterations, relationships, etc.). The TUI and CLI automatically adapt to show only what the active backend supports.
 
 You can switch backends from within the TUI by pressing `,` to open settings. For Jira, you'll need to configure your site URL, project key, and optionally a board ID.
 
-### Azure DevOps Authentication
+### Authentication
 
-Azure DevOps requires the [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/) (`az`) with the `azure-devops` extension. There are two authentication methods, and **both are recommended** for full functionality:
+GitHub and Azure DevOps use tic's built-in authentication with credentials stored securely in your OS keychain. If not already authenticated, the TUI will prompt you to log in when a remote backend is detected.
 
-| Method | Command | What it enables |
-|--------|---------|-----------------|
-| PAT (Personal Access Token) | `az devops login` | Work items, queries, iterations, relations |
-| Azure AD / Entra ID | `az login` | Comments (read and write) |
-
-The Work Item Comments API is a preview endpoint that requires Azure AD tokens. If you only use `az devops login`, everything works except comments — they will silently be unavailable when viewing items and explicitly fail when adding comments.
-
-For full functionality:
+**GitHub:**
 
 ```bash
-az login                # Azure AD — needed for comments
-az devops login         # PAT — needed for work items
+tic auth login github   # Opens browser for OAuth device flow
+```
+
+Falls back to an existing `gh` CLI token if available.
+
+**Azure DevOps:**
+
+```bash
+tic auth login azure        # Entra ID device code flow (recommended)
+tic auth login azure --pat  # Personal Access Token
+```
+
+**Managing credentials:**
+
+```bash
+tic auth status             # Show auth status for all providers
+tic auth logout github      # Remove stored credentials
+tic auth logout azure
 ```
 
 ## Contributing

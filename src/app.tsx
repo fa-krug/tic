@@ -3,6 +3,7 @@ import { Box } from 'ink';
 import { WorkItemList } from './components/WorkItemList.js';
 import { Header } from './components/Header.js';
 import { useConfigStore } from './stores/configStore.js';
+import { useBackendDataStore } from './stores/backendDataStore.js';
 import {
   navigationStore,
   useNavigationStore,
@@ -35,11 +36,17 @@ const HelpScreen = lazy(() =>
     default: m.HelpScreen,
   })),
 );
+const AuthPrompt = lazy(() =>
+  import('./components/AuthPrompt.js').then((m) => ({
+    default: m.AuthPrompt,
+  })),
+);
 
 export function App() {
   const screen = useNavigationStore((s) => s.screen);
   const previousScreen = useNavigationStore((s) => s.previousScreen);
   const autoUpdate = useConfigStore((s) => s.config.autoUpdate);
+  const authPrompt = useBackendDataStore((s) => s.authPrompt);
 
   // Update check on mount
   useEffect(() => {
@@ -55,14 +62,22 @@ export function App() {
   return (
     <Box flexDirection="column">
       <Header />
-      {screen === 'list' && <WorkItemList />}
-      <Suspense fallback={null}>
-        {screen === 'form' && <WorkItemForm />}
-        {screen === 'iteration-picker' && <IterationPicker />}
-        {screen === 'settings' && <Settings />}
-        {screen === 'status' && <StatusScreen />}
-        {screen === 'help' && <HelpScreen sourceScreen={previousScreen} />}
-      </Suspense>
+      {authPrompt ? (
+        <Suspense fallback={null}>
+          <AuthPrompt />
+        </Suspense>
+      ) : (
+        <>
+          {screen === 'list' && <WorkItemList />}
+          <Suspense fallback={null}>
+            {screen === 'form' && <WorkItemForm />}
+            {screen === 'iteration-picker' && <IterationPicker />}
+            {screen === 'settings' && <Settings />}
+            {screen === 'status' && <StatusScreen />}
+            {screen === 'help' && <HelpScreen sourceScreen={previousScreen} />}
+          </Suspense>
+        </>
+      )}
     </Box>
   );
 }

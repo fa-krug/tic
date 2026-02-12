@@ -34,6 +34,18 @@ export const defaultCapabilities: BackendCapabilities = {
   },
 };
 
+export interface AuthPromptInfo {
+  backendType: string;
+  message: string;
+}
+
+export interface AuthFlowState {
+  state: 'waiting' | 'code-ready' | 'success' | 'error';
+  userCode?: string;
+  verificationUri?: string;
+  error?: string;
+}
+
 export interface BackendDataStoreState {
   items: WorkItem[];
   capabilities: BackendCapabilities;
@@ -49,6 +61,11 @@ export interface BackendDataStoreState {
   error: string | null;
   syncStatus: SyncStatus | null;
 
+  // Auth state
+  authPrompt: AuthPromptInfo | null;
+  authFlow: AuthFlowState | null;
+  authDismissed: boolean;
+
   // Backend references
   backend: Backend | null;
   syncManager: SyncManager | null;
@@ -59,18 +76,23 @@ export interface BackendDataStoreState {
   reloadItem(id: string): Promise<void>;
   removeItem(id: string): void;
   setSyncStatus(status: SyncStatus): void;
+  dismissAuthPrompt(): void;
+  startAuthFlow(): Promise<void>;
   destroy(): void;
 }
 
 // Module-level references (not reactive state)
 let currentBackend: Backend | null = null;
+let currentCwd: string | null = null;
 let initGeneration = 0;
 
 async function createBackendAndSync(cwd: string): Promise<{
   backend: Backend;
   syncManager: SyncManager | null;
   queue: SyncQueueAdapter | null;
+  authError: AuthPromptInfo | null;
 }> {
+  currentCwd = cwd;
   const { Storage } = await import('../storage/index.js');
   const primary = Storage.create(cwd);
 
@@ -82,16 +104,25 @@ async function createBackendAndSync(cwd: string): Promise<{
   await configStore.getState().init(cwd);
 
   const config = configStore.getState().config;
+  const backendType = config.backend ?? 'none';
   const { createRemoteBackend } = await import('../backends/factory.js');
   let remote: Backend | null = null;
+  let authError: AuthPromptInfo | null = null;
   try {
-    remote = await createRemoteBackend(cwd, config.backend ?? 'none', {
+    remote = await createRemoteBackend(cwd, backendType, {
       skipAuth: true,
     });
   } catch (err: unknown) {
     // Auth errors are non-fatal — local backend still works, sync is just disabled
     const { AuthError } = await import('../backends/shared/api-client.js');
-    if (!(err instanceof AuthError)) throw err;
+    if (err instanceof AuthError) {
+      authError = {
+        backendType,
+        message: err.message,
+      };
+    } else {
+      throw err;
+    }
   }
 
   let syncManager: SyncManager | null = null;
@@ -103,7 +134,7 @@ async function createBackendAndSync(cwd: string): Promise<{
     syncManager = new SM(primary, remote, queue);
   }
 
-  return { backend: primary, syncManager, queue };
+  return { backend: primary, syncManager, queue, authError };
 }
 
 export const backendDataStore = createStore<BackendDataStoreState>(
@@ -122,6 +153,10 @@ export const backendDataStore = createStore<BackendDataStoreState>(
     error: null,
     syncStatus: null,
 
+    authPrompt: null,
+    authFlow: null,
+    authDismissed: false,
+
     backend: null,
     syncManager: null,
     queue: null,
@@ -132,10 +167,10 @@ export const backendDataStore = createStore<BackendDataStoreState>(
       set({ loading: true });
 
       void createBackendAndSync(cwd)
-        .then(({ backend, syncManager, queue }) => {
+        .then(({ backend, syncManager, queue, authError }) => {
           if (generation !== initGeneration) return;
           currentBackend = backend;
-          set({ backend, syncManager, queue });
+          set({ backend, syncManager, queue, authPrompt: authError });
 
           if (syncManager) {
             syncManager.onStatusChange((status: SyncStatus) => {
@@ -231,6 +266,75 @@ export const backendDataStore = createStore<BackendDataStoreState>(
       set({ syncStatus: status });
     },
 
+    dismissAuthPrompt() {
+      set({ authPrompt: null, authFlow: null, authDismissed: true });
+    },
+
+    async startAuthFlow() {
+      const { authPrompt } = get();
+      if (!authPrompt || !currentCwd) return;
+
+      set({ authFlow: { state: 'waiting' } });
+
+      try {
+        const { authenticateGitHub } = await import('../auth/github.js');
+        await authenticateGitHub({
+          onCode: (userCode, verificationUri) => {
+            set({
+              authFlow: {
+                state: 'code-ready',
+                userCode,
+                verificationUri,
+              },
+            });
+          },
+        });
+
+        // Auth succeeded — create remote backend and sync
+        const generation = initGeneration;
+        const { createRemoteBackend } = await import('../backends/factory.js');
+        const remote = await createRemoteBackend(
+          currentCwd,
+          authPrompt.backendType,
+        );
+
+        if (generation !== initGeneration || !remote || !currentBackend) {
+          return;
+        }
+
+        const { SyncManager: SM } = await import('../sync/SyncManager.js');
+        const { SyncQueue } = await import('../storage/syncQueue.js');
+        type StorageType = import('../storage/index.js').Storage;
+        const primary = currentBackend as StorageType;
+        const queue = new SyncQueue(primary.getDatabase());
+        const syncManager = new SM(primary, remote, queue);
+
+        syncManager.onStatusChange((status: SyncStatus) => {
+          if (generation !== initGeneration) return;
+          get().setSyncStatus(status);
+          if (status.state === 'idle') {
+            void get().refresh();
+          }
+        });
+
+        set({
+          syncManager,
+          queue,
+          authPrompt: null,
+          authFlow: null,
+        });
+
+        syncManager.sync().catch(() => {});
+      } catch (err: unknown) {
+        set({
+          authFlow: {
+            state: 'error',
+            error: err instanceof Error ? err.message : String(err),
+          },
+        });
+      }
+    },
+
     destroy() {
       ++initGeneration;
       // Null out store DB references before closing the connection
@@ -240,6 +344,7 @@ export const backendDataStore = createStore<BackendDataStoreState>(
         (currentBackend as { destroy(): void }).destroy();
       }
       currentBackend = null;
+      currentCwd = null;
       set({
         items: [],
         capabilities: { ...defaultCapabilities },
@@ -253,6 +358,9 @@ export const backendDataStore = createStore<BackendDataStoreState>(
         loading: false,
         error: null,
         syncStatus: null,
+        authPrompt: null,
+        authFlow: null,
+        authDismissed: false,
         backend: null,
         syncManager: null,
         queue: null,
