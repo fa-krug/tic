@@ -9,9 +9,16 @@ vi.mock('./glab.js', () => ({
   glabSync: vi.fn(),
 }));
 
-// Mock the group detection
-vi.mock('./group.js', () => ({
-  detectGroup: vi.fn().mockReturnValue('mygroup'),
+// Mock the remote detection
+vi.mock('./remote.js', () => ({
+  parseGitLabRemote: vi
+    .fn()
+    .mockReturnValue({
+      host: 'gitlab.com',
+      group: 'mygroup',
+      project: 'myproject',
+      fullPath: 'mygroup/myproject',
+    }),
 }));
 
 // Mock node:child_process for the direct execFile import in index.ts (used by openItem for epics)

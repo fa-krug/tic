@@ -12,7 +12,7 @@ import type {
   Template,
 } from '../../types.js';
 import { glab, glabExec, glabExecSync, glabSync } from './glab.js';
-import { detectGroup } from './group.js';
+import { parseGitLabRemote } from './remote.js';
 import { slugifyTemplateName } from '../local/templates.js';
 import {
   mapIssueToWorkItem,
@@ -55,7 +55,7 @@ export class GitLabBackend extends BaseBackend {
     super(60_000);
     this.cwd = cwd;
     glabExecSync(['auth', 'status'], cwd);
-    this.group = detectGroup(cwd);
+    this.group = parseGitLabRemote(cwd).group;
   }
 
   protected override onCacheInvalidate(): void {
