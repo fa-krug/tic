@@ -524,6 +524,64 @@ export function createProgram(): Command {
       await startMcpServer();
     });
 
+  // tic auth ...
+  const auth = program.command('auth').description('Manage authentication');
+
+  auth
+    .command('login')
+    .description('Authenticate with a backend provider')
+    .argument('<provider>', 'Provider (github)')
+    .action(async (provider: string) => {
+      const parentOpts = program.opts<GlobalOpts>();
+      try {
+        const { runAuthLogin } = await import('./commands/auth.js');
+        await runAuthLogin(provider);
+        if (!parentOpts.quiet) {
+          console.log(`Authenticated with ${provider}`);
+        }
+      } catch (err) {
+        handleError(err, parentOpts.json);
+      }
+    });
+
+  auth
+    .command('status')
+    .description('Show authentication status for all providers')
+    .action(async () => {
+      const parentOpts = program.opts<GlobalOpts>();
+      try {
+        const { runAuthStatus } = await import('./commands/auth.js');
+        const results = runAuthStatus();
+        if (parentOpts.json) {
+          console.log(formatJson(results));
+        } else {
+          for (const r of results) {
+            const icon = r.authenticated ? '+' : '-';
+            console.log(`${icon}\t${r.provider}`);
+          }
+        }
+      } catch (err) {
+        handleError(err, parentOpts.json);
+      }
+    });
+
+  auth
+    .command('logout')
+    .description('Remove stored credentials for a provider')
+    .argument('<provider>', 'Provider (github)')
+    .action(async (provider: string) => {
+      const parentOpts = program.opts<GlobalOpts>();
+      try {
+        const { runAuthLogout } = await import('./commands/auth.js');
+        runAuthLogout(provider);
+        if (!parentOpts.quiet) {
+          console.log(`Logged out of ${provider}`);
+        }
+      } catch (err) {
+        handleError(err, parentOpts.json);
+      }
+    });
+
   // Global options
   program.option('--json', 'Output as JSON');
   program.option('--quiet', 'Suppress output on mutations');
