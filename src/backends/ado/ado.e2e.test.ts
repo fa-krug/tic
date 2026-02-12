@@ -157,7 +157,7 @@ describeE2e('ADO E2E', () => {
   let depSourceId: string;
   let depTargetId: string;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     // Create isolated project
     projectName = randomProjectName();
     console.log(`Creating ADO project: ${projectName} in ${org}`);
@@ -182,7 +182,7 @@ describeE2e('ADO E2E', () => {
 
     // Construct backend
     try {
-      backend = new AzureDevOpsBackend(tmpDir);
+      backend = await AzureDevOpsBackend.create(tmpDir);
     } catch (err: unknown) {
       throw new Error(
         `Failed to initialize AzureDevOpsBackend for project ${projectName}: ${String(err)}`,
