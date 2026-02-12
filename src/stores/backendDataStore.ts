@@ -83,7 +83,16 @@ async function createBackendAndSync(cwd: string): Promise<{
 
   const config = configStore.getState().config;
   const { createRemoteBackend } = await import('../backends/factory.js');
-  const remote = await createRemoteBackend(cwd, config.backend ?? 'none');
+  let remote: Backend | null = null;
+  try {
+    remote = await createRemoteBackend(cwd, config.backend ?? 'none', {
+      skipAuth: true,
+    });
+  } catch (err: unknown) {
+    // Auth errors are non-fatal — local backend still works, sync is just disabled
+    const { AuthError } = await import('../backends/shared/api-client.js');
+    if (!(err instanceof AuthError)) throw err;
+  }
 
   let syncManager: SyncManager | null = null;
   let queue: SyncQueueAdapter | null = null;

@@ -1,4 +1,8 @@
-import { AuthError, BaseApiClient } from '../shared/api-client.js';
+import {
+  AuthError,
+  RateLimitError,
+  BaseApiClient,
+} from '../shared/api-client.js';
 
 const GITHUB_API_VERSION = '2022-11-28';
 
@@ -39,7 +43,6 @@ export class GitHubApiClient extends BaseApiClient {
       const remaining = response.headers.get('X-RateLimit-Remaining');
       const reset = response.headers.get('X-RateLimit-Reset');
       if (remaining === '0' && reset) {
-        const { RateLimitError } = await import('../shared/api-client.js');
         throw new RateLimitError(new Date(Number(reset) * 1000));
       }
     }
@@ -60,6 +63,13 @@ export class GitHubApiClient extends BaseApiClient {
     query: string,
     variables?: Record<string, unknown>,
   ): Promise<T> {
+    return this.retry(() => this.graphqlFetch<T>(query, variables));
+  }
+
+  private async graphqlFetch<T>(
+    query: string,
+    variables?: Record<string, unknown>,
+  ): Promise<T> {
     const url = this.baseUrl + '/graphql';
 
     const headers: Record<string, string> = {
@@ -75,8 +85,18 @@ export class GitHubApiClient extends BaseApiClient {
       body: JSON.stringify({ query, variables }),
     });
 
+    this.checkRateLimit(response.headers);
+
     if (response.status === 401) {
       throw new AuthError();
+    }
+
+    if (response.status === 403) {
+      const remaining = response.headers.get('X-RateLimit-Remaining');
+      const reset = response.headers.get('X-RateLimit-Reset');
+      if (remaining === '0' && reset) {
+        throw new RateLimitError(new Date(Number(reset) * 1000));
+      }
     }
 
     if (!response.ok) {
@@ -113,6 +133,10 @@ export class GitHubApiClient extends BaseApiClient {
       });
 
       this.checkRateLimit(response.headers);
+
+      if (response.status === 401) {
+        throw new AuthError();
+      }
 
       if (!response.ok) {
         const text = await response.text();
