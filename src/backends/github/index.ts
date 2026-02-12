@@ -10,6 +10,7 @@ import type {
   Template,
 } from '../../types.js';
 import { getGitHubToken, authenticateGitHub } from '../../auth/github.js';
+import { AuthError } from '../shared/api-client.js';
 import { GitHubApiClient } from './api.js';
 import { mapIssueToWorkItem } from './mappers.js';
 import type { GhIssue, GhMilestone } from './mappers.js';
@@ -121,6 +122,10 @@ interface PatchIssueBody {
   milestone?: number | null;
 }
 
+export interface GitHubBackendOptions {
+  skipAuth?: boolean;
+}
+
 export class GitHubBackend extends BaseBackend {
   private api: GitHubApiClient;
   private owner: string;
@@ -134,10 +139,18 @@ export class GitHubBackend extends BaseBackend {
     this.repo = repo;
   }
 
-  static async create(cwd: string): Promise<GitHubBackend> {
+  static async create(
+    cwd: string,
+    options?: GitHubBackendOptions,
+  ): Promise<GitHubBackend> {
     const { owner, repo } = GitHubBackend.detectOwnerRepo(cwd);
     let token = getGitHubToken();
     if (!token) {
+      if (options?.skipAuth) {
+        throw new AuthError(
+          'GitHub authentication required. Run "tic auth login github" to authenticate.',
+        );
+      }
       token = await authenticateGitHub({
         onCode: (code, url) => {
           console.log(`\nGitHub authentication required.`);

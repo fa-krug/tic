@@ -16,6 +16,10 @@ export const VALID_BACKENDS = [
 ] as const;
 export type BackendType = (typeof VALID_BACKENDS)[number];
 
+export interface RemoteBackendOptions {
+  skipAuth?: boolean;
+}
+
 export function detectBackend(root: string): BackendType {
   try {
     const output = execSync('git remote -v', {
@@ -49,6 +53,7 @@ export async function createBackend(root: string): Promise<Backend> {
 export async function createRemoteBackend(
   root: string,
   backendType: string,
+  options?: RemoteBackendOptions,
 ): Promise<Backend | null> {
   switch (backendType) {
     case 'none':
@@ -59,7 +64,7 @@ export async function createRemoteBackend(
     }
     case 'github': {
       const { GitHubBackend } = await import('./github/index.js');
-      return GitHubBackend.create(root);
+      return GitHubBackend.create(root, options);
     }
     case 'gitlab': {
       const { GitLabBackend } = await import('./gitlab/index.js');
@@ -86,6 +91,7 @@ export interface BackendSetup {
 
 export async function createBackendWithSync(
   root: string,
+  options?: RemoteBackendOptions,
 ): Promise<BackendSetup> {
   const primary = Storage.create(root);
   configStore.getState().setDatabase(primary.getDatabase());
@@ -95,7 +101,11 @@ export async function createBackendWithSync(
   }
 
   const config = configStore.getState().config;
-  const remote = await createRemoteBackend(root, config.backend ?? 'none');
+  const remote = await createRemoteBackend(
+    root,
+    config.backend ?? 'none',
+    options,
+  );
 
   let syncManager: SyncManager | null = null;
   let queue: SyncQueueAdapter | null = null;

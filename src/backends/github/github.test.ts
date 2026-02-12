@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { GitHubBackend } from './index.js';
+import { AuthError } from '../shared/api-client.js';
 
 const mockRest = vi.fn();
 const mockGraphql = vi.fn();
@@ -117,6 +118,25 @@ describe('GitHubBackend', () => {
       const backend = await createBackend();
       expect(backend).toBeInstanceOf(GitHubBackend);
       expect(authenticateGitHub).toHaveBeenCalled();
+    });
+
+    it('throws AuthError when skipAuth is true and no token is stored', async () => {
+      const { getGitHubToken } = await import('../../auth/github.js');
+      const { authenticateGitHub } = await import('../../auth/github.js');
+      vi.mocked(getGitHubToken).mockReturnValueOnce(null);
+
+      const promise = GitHubBackend.create('/repo', { skipAuth: true });
+      await expect(promise).rejects.toThrow(AuthError);
+      expect(authenticateGitHub).not.toHaveBeenCalled();
+    });
+
+    it('includes helpful message in AuthError when skipAuth is true', async () => {
+      const { getGitHubToken } = await import('../../auth/github.js');
+      vi.mocked(getGitHubToken).mockReturnValueOnce(null);
+
+      await expect(
+        GitHubBackend.create('/repo', { skipAuth: true }),
+      ).rejects.toThrow('Run "tic auth login github" to authenticate');
     });
 
     it('throws when git remotes do not contain github.com', async () => {

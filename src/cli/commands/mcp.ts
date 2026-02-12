@@ -6,6 +6,7 @@ import {
   createBackendWithSync,
   VALID_BACKENDS,
 } from '../../backends/factory.js';
+import { AuthError } from '../../backends/shared/api-client.js';
 import type { SyncQueueAdapter } from '../../sync/types.js';
 import type { SyncManager } from '../../sync/SyncManager.js';
 import { configStore } from '../../stores/configStore.js';
@@ -699,10 +700,21 @@ export async function startMcpServer(): Promise<void> {
   const syncState: SyncState = { syncManager: null, queue: null };
 
   if (isTicProject(root)) {
-    const setup = await createBackendWithSync(root);
-    backend = setup.backend;
-    syncState.syncManager = setup.syncManager;
-    syncState.queue = setup.queue;
+    try {
+      const setup = await createBackendWithSync(root, { skipAuth: true });
+      backend = setup.backend;
+      syncState.syncManager = setup.syncManager;
+      syncState.queue = setup.queue;
+    } catch (err) {
+      if (err instanceof AuthError) {
+        // Backend requires auth — will return error on tool calls
+        console.error(
+          `GitHub authentication required. Run "tic auth login github" to authenticate.`,
+        );
+      } else {
+        throw err;
+      }
+    }
   }
 
   const pendingDeletes = createDeleteTracker();
@@ -720,10 +732,19 @@ export async function startMcpServer(): Promise<void> {
   server.tool('init_project', 'Initialize a new tic project', async () => {
     const result = await handleInitProject(root);
     if (!result.isError && !backend && isTicProject(root)) {
-      const setup = await createBackendWithSync(root);
-      backend = setup.backend;
-      syncState.syncManager = setup.syncManager;
-      syncState.queue = setup.queue;
+      try {
+        const setup = await createBackendWithSync(root, { skipAuth: true });
+        backend = setup.backend;
+        syncState.syncManager = setup.syncManager;
+        syncState.queue = setup.queue;
+      } catch (err) {
+        if (err instanceof AuthError) {
+          return error(
+            'GitHub authentication required. Run "tic auth login github" to authenticate.',
+          );
+        }
+        throw err;
+      }
     }
     return result;
   });
