@@ -145,12 +145,12 @@ describe('getShortcuts', () => {
     );
   });
 
-  it('includes command palette shortcut on list screen', () => {
+  it('includes command bar shortcut on list screen', () => {
     const groups = getShortcuts('list', fullCapabilities, true, true);
     const allShortcuts = groups.flatMap((g) => g.shortcuts);
-    const commandPaletteShortcut = allShortcuts.find((s) => s.key === ':');
-    expect(commandPaletteShortcut).toBeDefined();
-    expect(commandPaletteShortcut?.description).toBe('Command palette');
+    const commandBarShortcut = allShortcuts.find((s) => s.key === '/');
+    expect(commandBarShortcut).toBeDefined();
+    expect(commandBarShortcut?.description).toBe('Command bar');
   });
 });
 

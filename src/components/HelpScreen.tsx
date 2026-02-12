@@ -53,8 +53,7 @@ export function getShortcuts(
       actions.push({ key: 'O', description: 'Order by column' });
       actions.push({ key: 'F', description: 'Filter items' });
       actions.push({ key: 'X', description: 'Clear all filters' });
-      actions.push({ key: '/', description: 'Quick search' });
-      actions.push({ key: ':', description: 'Command palette' });
+      actions.push({ key: '/', description: 'Command bar' });
       if (capabilities.fields.parent) {
         actions.push({ key: 'p', description: 'Set parent' });
       }

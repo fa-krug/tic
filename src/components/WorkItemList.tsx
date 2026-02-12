@@ -75,7 +75,7 @@ export function buildHelpText(availableWidth: number): string {
     { key: 'c', label: 'create' },
     { key: 'd', label: 'delete' },
     { key: 'u', label: 'undo' },
-    { key: '/', label: 'search' },
+    { key: '/', label: 'commands' },
     { key: ',', label: 'settings' },
     { key: '?', label: 'help' },
   ];

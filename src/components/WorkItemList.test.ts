@@ -49,9 +49,9 @@ describe('buildHelpText', () => {
     expect(text).toContain('navigate  ←→');
   });
 
-  it('includes delete and search shortcuts', () => {
+  it('includes delete and command bar shortcuts', () => {
     const text = buildHelpText(200);
     expect(text).toContain('d delete');
-    expect(text).toContain('/ search');
+    expect(text).toContain('/ commands');
   });
 });
