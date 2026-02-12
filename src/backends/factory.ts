@@ -68,7 +68,7 @@ export async function createRemoteBackend(
     }
     case 'gitlab': {
       const { GitLabBackend } = await import('./gitlab/index.js');
-      return new GitLabBackend(root);
+      return GitLabBackend.create(root, options);
     }
     case 'azure': {
       const { AzureDevOpsBackend } = await import('./ado/index.js');

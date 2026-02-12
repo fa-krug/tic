@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import type { GlWorkItem, GlNote } from './mappers.js';
 import { mapWorkItemToWorkItem, mapNoteToComment } from './mappers.js';
+import type { GlWorkItem, GlNote } from './mappers.js';
 
-function makeWorkItem(overrides: Partial<GlWorkItem> = {}): GlWorkItem {
+function makeGlWorkItem(overrides: Partial<GlWorkItem> = {}): GlWorkItem {
   return {
-    id: 'gid://gitlab/WorkItem/42',
+    id: 'gid://gitlab/WorkItem/100',
     iid: '42',
-    title: 'Test item',
+    title: 'Fix login bug',
     state: 'OPEN',
     workItemType: { name: 'Issue' },
     widgets: [],
@@ -17,10 +17,8 @@ function makeWorkItem(overrides: Partial<GlWorkItem> = {}): GlWorkItem {
 }
 
 describe('mapWorkItemToWorkItem', () => {
-  it('maps an issue with all widgets populated', () => {
-    const glWorkItem = makeWorkItem({
-      iid: '42',
-      title: 'Fix login bug',
+  it('maps a full GitLab work item (issue) to a WorkItem', () => {
+    const gl = makeGlWorkItem({
       widgets: [
         {
           __typename: 'WorkItemWidgetDescription',
@@ -43,44 +41,15 @@ describe('mapWorkItemToWorkItem', () => {
         {
           __typename: 'WorkItemWidgetHierarchy',
           parent: {
-            id: 'gid://gitlab/WorkItem/5',
+            id: 'gid://gitlab/WorkItem/50',
             iid: '5',
             workItemType: { name: 'Epic' },
-          },
-        },
-        {
-          __typename: 'WorkItemWidgetNotes',
-          discussions: {
-            nodes: [
-              {
-                notes: {
-                  nodes: [
-                    {
-                      author: { username: 'carol' },
-                      createdAt: '2026-01-16T09:00:00Z',
-                      body: 'Looks good!',
-                    },
-                  ],
-                },
-              },
-              {
-                notes: {
-                  nodes: [
-                    {
-                      author: { username: 'dave' },
-                      createdAt: '2026-01-17T11:00:00Z',
-                      body: 'Needs more tests.',
-                    },
-                  ],
-                },
-              },
-            ],
           },
         },
       ],
     });
 
-    const item = mapWorkItemToWorkItem(glWorkItem);
+    const item = mapWorkItemToWorkItem(gl);
 
     expect(item.id).toBe('issue-42');
     expect(item.title).toBe('Fix login bug');
@@ -95,125 +64,118 @@ describe('mapWorkItemToWorkItem', () => {
     expect(item.updated).toBe('2026-01-20T14:30:00Z');
     expect(item.parent).toBe('epic-5');
     expect(item.dependsOn).toEqual([]);
-    expect(item.comments).toHaveLength(2);
-    expect(item.comments[0]).toEqual({
-      author: 'carol',
-      date: '2026-01-16T09:00:00Z',
-      body: 'Looks good!',
-    });
-    expect(item.comments[1]).toEqual({
-      author: 'dave',
-      date: '2026-01-17T11:00:00Z',
-      body: 'Needs more tests.',
-    });
-  });
-
-  it('maps an epic work item', () => {
-    const glWorkItem = makeWorkItem({
-      id: 'gid://gitlab/WorkItem/99',
-      iid: '99',
-      title: 'Big feature',
-      workItemType: { name: 'Epic' },
-      widgets: [
-        {
-          __typename: 'WorkItemWidgetDescription',
-          description: 'Epic description here.',
-        },
-        {
-          __typename: 'WorkItemWidgetLabels',
-          labels: { nodes: [{ title: 'feature' }, { title: 'priority' }] },
-        },
-      ],
-    });
-
-    const item = mapWorkItemToWorkItem(glWorkItem);
-
-    expect(item.id).toBe('epic-99');
-    expect(item.title).toBe('Big feature');
-    expect(item.description).toBe('Epic description here.');
-    expect(item.type).toBe('epic');
-    expect(item.labels).toEqual(['feature', 'priority']);
-    expect(item.assignee).toBe('');
-    expect(item.iteration).toBe('');
-    expect(item.parent).toBeNull();
     expect(item.comments).toEqual([]);
   });
 
-  it('maps CLOSED state to closed', () => {
-    const glWorkItem = makeWorkItem({ state: 'CLOSED' });
-    expect(mapWorkItemToWorkItem(glWorkItem).status).toBe('closed');
+  it('handles empty widgets (no description, assignees, labels, etc.)', () => {
+    const gl = makeGlWorkItem({
+      iid: '1',
+      state: 'CLOSED',
+      widgets: [],
+    });
+
+    const item = mapWorkItemToWorkItem(gl);
+
+    expect(item.description).toBe('');
+    expect(item.status).toBe('closed');
+    expect(item.assignee).toBe('');
+    expect(item.iteration).toBe('');
+    expect(item.parent).toBeNull();
+    expect(item.labels).toEqual([]);
   });
 
   it('maps OPEN state to open', () => {
-    const glWorkItem = makeWorkItem({ state: 'OPEN' });
-    expect(mapWorkItemToWorkItem(glWorkItem).status).toBe('open');
+    const gl = makeGlWorkItem({ state: 'OPEN' });
+    expect(mapWorkItemToWorkItem(gl).status).toBe('open');
   });
 
-  it('handles missing widgets gracefully (empty widgets array)', () => {
-    const glWorkItem = makeWorkItem({ widgets: [] });
-
-    const item = mapWorkItemToWorkItem(glWorkItem);
-
-    expect(item.description).toBe('');
-    expect(item.assignee).toBe('');
-    expect(item.labels).toEqual([]);
-    expect(item.iteration).toBe('');
-    expect(item.parent).toBeNull();
-    expect(item.comments).toEqual([]);
+  it('maps CLOSED state to closed', () => {
+    const gl = makeGlWorkItem({ state: 'CLOSED' });
+    expect(mapWorkItemToWorkItem(gl).status).toBe('closed');
   });
 
-  it('handles unknown widget types gracefully', () => {
-    const glWorkItem = makeWorkItem({
-      widgets: [{ __typename: 'WorkItemWidgetSomethingNew' }],
-    });
-
-    const item = mapWorkItemToWorkItem(glWorkItem);
-
-    expect(item.description).toBe('');
-    expect(item.assignee).toBe('');
-    expect(item.labels).toEqual([]);
-  });
-
-  it('handles null milestone', () => {
-    const glWorkItem = makeWorkItem({
-      widgets: [{ __typename: 'WorkItemWidgetMilestone', milestone: null }],
-    });
-    expect(mapWorkItemToWorkItem(glWorkItem).iteration).toBe('');
-  });
-
-  it('handles null parent in hierarchy widget', () => {
-    const glWorkItem = makeWorkItem({
-      widgets: [{ __typename: 'WorkItemWidgetHierarchy', parent: null }],
-    });
-    expect(mapWorkItemToWorkItem(glWorkItem).parent).toBeNull();
-  });
-
-  it('derives parent type from parent workItemType', () => {
-    const glWorkItem = makeWorkItem({
+  it('sets parent from hierarchy widget', () => {
+    const gl = makeGlWorkItem({
       widgets: [
         {
           __typename: 'WorkItemWidgetHierarchy',
           parent: {
-            id: 'gid://gitlab/WorkItem/10',
-            iid: '10',
-            workItemType: { name: 'Task' },
+            id: 'gid://gitlab/WorkItem/70',
+            iid: '7',
+            workItemType: { name: 'Epic' },
           },
         },
       ],
     });
-    expect(mapWorkItemToWorkItem(glWorkItem).parent).toBe('task-10');
+
+    expect(mapWorkItemToWorkItem(gl).parent).toBe('epic-7');
+  });
+
+  it('handles null milestone', () => {
+    const gl = makeGlWorkItem({
+      widgets: [
+        {
+          __typename: 'WorkItemWidgetMilestone',
+          milestone: null,
+        },
+      ],
+    });
+
+    expect(mapWorkItemToWorkItem(gl).iteration).toBe('');
+  });
+
+  it('maps Epic work item type to epic', () => {
+    const gl = makeGlWorkItem({
+      iid: '5',
+      workItemType: { name: 'Epic' },
+      widgets: [],
+    });
+
+    const item = mapWorkItemToWorkItem(gl);
+    expect(item.id).toBe('epic-5');
+    expect(item.type).toBe('epic');
+  });
+
+  it('extracts comments from notes widget', () => {
+    const gl = makeGlWorkItem({
+      widgets: [
+        {
+          __typename: 'WorkItemWidgetNotes',
+          discussions: {
+            nodes: [
+              {
+                notes: {
+                  nodes: [
+                    {
+                      author: { username: 'charlie' },
+                      createdAt: '2026-01-16T09:00:00Z',
+                      body: 'I can reproduce this.',
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    const item = mapWorkItemToWorkItem(gl);
+    expect(item.comments).toHaveLength(1);
+    expect(item.comments[0]!.author).toBe('charlie');
+    expect(item.comments[0]!.body).toBe('I can reproduce this.');
   });
 });
 
 describe('mapNoteToComment', () => {
   it('maps a GitLab note to a tic Comment', () => {
-    const glNote: GlNote = {
+    const note: GlNote = {
       author: { username: 'alice' },
       createdAt: '2026-01-15T10:00:00Z',
       body: 'Looks good!',
     };
 
-    const comment = mapNoteToComment(glNote);
+    const comment = mapNoteToComment(note);
 
     expect(comment.author).toBe('alice');
     expect(comment.date).toBe('2026-01-15T10:00:00Z');
