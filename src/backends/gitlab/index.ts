@@ -16,7 +16,11 @@ import { parseGitLabRemote } from './remote.js';
 import { mapWorkItemToWorkItem, mapNoteToComment } from './mappers.js';
 import type { GlWorkItem } from './mappers.js';
 import { AuthError } from '../shared/api-client.js';
-import { getGitLabToken, getGitLabPat } from '../../auth/gitlab.js';
+import {
+  getGitLabToken,
+  getGitLabPat,
+  authenticateGitLab,
+} from '../../auth/gitlab.js';
 import { slugifyTemplateName } from '../local/templates.js';
 
 const WORK_ITEM_FIELDS = `
@@ -30,7 +34,7 @@ const WORK_ITEM_FIELDS = `
     ... on WorkItemWidgetHierarchy {
       parent { id iid workItemType { name } }
     }
-    type: __typename
+    __typename
   }
 `;
 
@@ -51,13 +55,13 @@ const WORK_ITEM_DETAIL_FIELDS = `
         nodes { notes { nodes { author { username } createdAt body } } }
       }
     }
-    type: __typename
+    __typename
   }
 `;
 
 const LIST_PROJECT_ISSUES = `query($fullPath: ID!, $cursor: String) {
   project(fullPath: $fullPath) {
-    workItems(types: [ISSUE], first: 100, after: $cursor) {
+    workItems(types: [ISSUE, TASK], first: 100, after: $cursor) {
       nodes { ${WORK_ITEM_FIELDS} }
       pageInfo { hasNextPage endCursor }
     }
@@ -268,14 +272,20 @@ export class GitLabBackend extends BaseBackend {
     options?: GitLabBackendOptions,
   ): Promise<GitLabBackend> {
     const remote = parseGitLabRemote(cwd);
-    const token = getGitLabToken() ?? getGitLabPat();
+    let token = getGitLabToken();
+    if (!token) token = getGitLabPat();
     if (!token) {
       if (options?.skipAuth) {
-        throw new AuthError('GitLab authentication required');
+        throw new AuthError(
+          'GitLab authentication required. Run "tic auth login gitlab" to authenticate.',
+        );
       }
-      throw new AuthError(
-        'GitLab authentication required. Run "tic auth login gitlab" to authenticate.',
-      );
+      token = await authenticateGitLab({
+        onCode: (code, url) => {
+          console.log(`\nGitLab authentication required.`);
+          console.log(`Visit ${url} and enter code: ${code}\n`);
+        },
+      });
     }
     const api = new GitLabApiClient(token);
     const typeIds = await queryWorkItemTypes(api, remote.fullPath);
@@ -546,7 +556,7 @@ export class GitLabBackend extends BaseBackend {
             assignee: '',
             labels: [],
             iteration: '',
-            priority: 'medium',
+            priority: 'medium' as const,
             created: '',
             updated: '',
             parent: id,

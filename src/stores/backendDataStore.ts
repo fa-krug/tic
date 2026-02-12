@@ -277,18 +277,37 @@ export const backendDataStore = createStore<BackendDataStoreState>(
       set({ authFlow: { state: 'waiting' } });
 
       try {
-        const { authenticateGitHub } = await import('../auth/github.js');
-        await authenticateGitHub({
-          onCode: (userCode, verificationUri) => {
-            set({
-              authFlow: {
-                state: 'code-ready',
-                userCode,
-                verificationUri,
-              },
-            });
-          },
-        });
+        const onCode = (userCode: string, verificationUri: string) => {
+          set({
+            authFlow: {
+              state: 'code-ready',
+              userCode,
+              verificationUri,
+            },
+          });
+        };
+
+        switch (authPrompt.backendType) {
+          case 'github': {
+            const { authenticateGitHub } = await import('../auth/github.js');
+            await authenticateGitHub({ onCode });
+            break;
+          }
+          case 'gitlab': {
+            const { authenticateGitLab } = await import('../auth/gitlab.js');
+            await authenticateGitLab({ onCode });
+            break;
+          }
+          case 'azure': {
+            const { authenticateAdo } = await import('../auth/ado.js');
+            await authenticateAdo({ onCode });
+            break;
+          }
+          default:
+            throw new Error(
+              `Unsupported auth provider: ${authPrompt.backendType}`,
+            );
+        }
 
         // Auth succeeded — create remote backend and sync
         const generation = initGeneration;
