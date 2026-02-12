@@ -246,7 +246,7 @@ export async function handleDeleteItem(
         id: d.id,
         title: d.title,
       })),
-      message: 'Use confirm_delete to proceed with deletion.',
+      message: 'Use tic-confirm_delete to proceed with deletion.',
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -424,12 +424,12 @@ export function registerTools(
 ): void {
   const caps = backend.getCapabilities();
 
-  server.tool('get_config', 'Get project configuration', async () => {
+  server.tool('tic-get_config', 'Get project configuration', async () => {
     return handleGetConfig(backend, root);
   });
 
   server.tool(
-    'list_items',
+    'tic-list_items',
     'List work items with optional filters',
     {
       type: z.string().optional().describe('Filter by work item type'),
@@ -444,7 +444,7 @@ export function registerTools(
   );
 
   server.tool(
-    'show_item',
+    'tic-show_item',
     'Show work item details',
     {
       id: z.string().describe('Work item ID'),
@@ -455,7 +455,7 @@ export function registerTools(
   );
 
   server.tool(
-    'create_item',
+    'tic-create_item',
     'Create a new work item',
     {
       title: z.string().describe('Work item title'),
@@ -499,7 +499,7 @@ export function registerTools(
   );
 
   server.tool(
-    'update_item',
+    'tic-update_item',
     'Update an existing work item',
     {
       id: z.string().describe('Work item ID'),
@@ -545,8 +545,8 @@ export function registerTools(
   );
 
   server.tool(
-    'delete_item',
-    'Preview deleting a work item (requires confirm_delete to finalize)',
+    'tic-delete_item',
+    'Preview deleting a work item (requires tic-confirm_delete to finalize)',
     {
       id: z.string().describe('Work item ID'),
     },
@@ -556,7 +556,7 @@ export function registerTools(
   );
 
   server.tool(
-    'confirm_delete',
+    'tic-confirm_delete',
     'Confirm and execute a pending item deletion',
     {
       id: z.string().describe('Work item ID'),
@@ -576,7 +576,7 @@ export function registerTools(
   );
 
   server.tool(
-    'search_items',
+    'tic-search_items',
     'Search work items by text query',
     {
       query: z.string().describe('Search query'),
@@ -592,7 +592,7 @@ export function registerTools(
   );
 
   server.tool(
-    'set_backend',
+    'tic-set_backend',
     'Set the backend type for this project',
     {
       backend: z
@@ -606,7 +606,7 @@ export function registerTools(
 
   if (caps.comments) {
     server.tool(
-      'add_comment',
+      'tic-add_comment',
       'Add a comment to a work item',
       {
         id: z.string().describe('Work item ID'),
@@ -635,7 +635,7 @@ export function registerTools(
 
   if (caps.iterations) {
     server.tool(
-      'set_iteration',
+      'tic-set_iteration',
       'Set the current iteration',
       {
         name: z.string().describe('Iteration name'),
@@ -648,7 +648,7 @@ export function registerTools(
 
   if (caps.relationships) {
     server.tool(
-      'get_children',
+      'tic-get_children',
       'Get child items of a work item',
       {
         id: z.string().describe('Work item ID'),
@@ -659,7 +659,7 @@ export function registerTools(
     );
 
     server.tool(
-      'get_dependents',
+      'tic-get_dependents',
       'Get items that depend on a work item',
       {
         id: z.string().describe('Work item ID'),
@@ -670,7 +670,7 @@ export function registerTools(
     );
 
     server.tool(
-      'get_item_tree',
+      'tic-get_item_tree',
       'Get work items as a hierarchical tree',
       {
         type: z.string().optional().describe('Filter by work item type'),
@@ -722,14 +722,16 @@ export async function startMcpServer(): Promise<void> {
   const guardedBackend = new Proxy({} as Backend, {
     get(_target, prop: string | symbol) {
       if (!backend) {
-        throw new Error('Not a tic project. Use the init_project tool first.');
+        throw new Error(
+          'Not a tic project. Use the tic-init_project tool first.',
+        );
       }
       return (backend as unknown as Record<string | symbol, unknown>)[prop];
     },
   });
 
   // Register init_project separately so it can re-initialize the backend
-  server.tool('init_project', 'Initialize a new tic project', async () => {
+  server.tool('tic-init_project', 'Initialize a new tic project', async () => {
     const result = await handleInitProject(root);
     if (!result.isError && !backend && isTicProject(root)) {
       try {
