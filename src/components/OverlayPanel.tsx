@@ -32,6 +32,8 @@ export interface OverlayPanelProps {
   initialQuery?: string;
   emptyMessage?: string;
   footer?: string;
+  externalFilter?: boolean;
+  onQueryChange?: (query: string) => void;
 }
 
 export function filterItems(
@@ -75,6 +77,8 @@ export function OverlayPanel({
   initialQuery = '',
   emptyMessage = 'No matches',
   footer,
+  externalFilter = false,
+  onQueryChange,
 }: OverlayPanelProps) {
   const [query, setQuery] = useState(initialQuery);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -83,7 +87,10 @@ export function OverlayPanel({
     return new Set(items.filter((i) => i.selected).map((i) => i.id));
   });
 
-  const filtered = useMemo(() => filterItems(items, query), [items, query]);
+  const filtered = useMemo(
+    () => (externalFilter ? items : filterItems(items, query)),
+    [items, query, externalFilter],
+  );
   const groups = useMemo(() => groupByCategory(filtered), [filtered]);
   const flatItems = useMemo(() => groups.flatMap((g) => g.items), [groups]);
 
@@ -166,6 +173,7 @@ export function OverlayPanel({
     }
     setQuery(value);
     setSelectedIndex(0);
+    if (onQueryChange) onQueryChange(value);
   };
 
   const defaultFooter = multiSelect

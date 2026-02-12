@@ -187,6 +187,7 @@ export function WorkItemList() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [descriptionScrollOffset, setDescriptionScrollOffset] = useState(0);
+  const [commandBarQuery, setCommandBarQuery] = useState('');
 
   // UI overlay state from store
   const { activeOverlay, warning, toast } = useUIStore(
@@ -439,7 +440,7 @@ export function WorkItemList() {
   // Block 3: Main input handler — only active when no overlay is open
   useInput(
     (input, key) => {
-      if (input === '/' || input === ':') {
+      if (input === '/') {
         openOverlay({ type: 'command-bar' });
         return;
       }
@@ -766,13 +767,10 @@ export function WorkItemList() {
   );
 
   const handleSearchSelect = (item: WorkItem) => {
+    setCommandBarQuery('');
     closeOverlay();
     selectWorkItem(item.id);
     navigate('form');
-  };
-
-  const handleSearchCancel = () => {
-    closeOverlay();
   };
 
   const commandContext: CommandContext = {
@@ -803,16 +801,10 @@ export function WorkItemList() {
 
   const recentIds = useRecentCommandsStore((s) => s.recentIds);
 
-  const paletteItems: OverlayItem[] = useMemo(() => {
-    const commandItems = paletteCommands.map((cmd) => ({
-      id: cmd.id,
-      label: cmd.label,
-      value: cmd.id,
-      hint: cmd.shortcut,
-      category: cmd.category,
-    }));
+  const commandBarItems: OverlayItem[] = useMemo(() => {
+    const query = commandBarQuery.toLowerCase();
 
-    // Build "Recent" items from IDs that exist in current visible commands
+    // Build command items (recent + categorized)
     const commandMap = new Map(paletteCommands.map((c) => [c.id, c]));
     const recentItems: OverlayItem[] = [];
     for (const id of recentIds) {
@@ -822,14 +814,50 @@ export function WorkItemList() {
           id: `recent-${cmd.id}`,
           label: cmd.label,
           value: cmd.id,
-          hint: cmd.shortcut,
           category: 'Recent',
+          kind: 'command',
         });
       }
     }
 
-    return [...recentItems, ...commandItems];
-  }, [paletteCommands, recentIds]);
+    const commandItems: OverlayItem[] = paletteCommands.map((cmd) => ({
+      id: cmd.id,
+      label: cmd.label,
+      value: cmd.id,
+      category: cmd.category,
+      kind: 'command' as const,
+    }));
+
+    let allItems = [...recentItems, ...commandItems];
+
+    // Filter commands by query
+    if (query) {
+      allItems = allItems.filter((item) =>
+        item.label.toLowerCase().includes(query),
+      );
+
+      // Add up to 5 matching issues
+      const matchingIssues = allSearchItems
+        .filter(
+          (item) =>
+            item.title.toLowerCase().includes(query) ||
+            item.id.toLowerCase().includes(query),
+        )
+        .slice(0, 5)
+        .map((item) => ({
+          id: `issue-${item.id}`,
+          label: `#${item.id} ${item.title}`,
+          value: item.id,
+          hint: item.type,
+          category: 'Issues',
+          kind: 'issue' as const,
+        }));
+
+      allItems = [...allItems, ...matchingIssues];
+    }
+
+    return allItems;
+  }, [paletteCommands, recentIds, commandBarQuery, allSearchItems]);
 
   const sortPickerItems: OverlayItem[] = useMemo(() => {
     const columns: { column: SortColumn; label: string }[] = [
@@ -979,6 +1007,7 @@ export function WorkItemList() {
   }, [savedViews, defaultView, activeViewName, lastViewName, filterCount]);
 
   const handleCommandSelect = (command: Command) => {
+    setCommandBarQuery('');
     closeOverlay();
     recentCommandsStore.getState().addRecent(command.id);
     switch (command.id) {
@@ -1133,10 +1162,6 @@ export function WorkItemList() {
         break;
     }
   };
-  // TODO: paletteItems and handleCommandSelect will be used by the unified command-bar (next task)
-  void paletteItems;
-  void handleCommandSelect;
-
   const handleBulkAction = (action: BulkAction) => {
     const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
     if (targetIds.length === 0) return;
@@ -1256,32 +1281,28 @@ export function WorkItemList() {
             {positionText && <Text dimColor> {positionText}</Text>}
           </Box>
         ) : activeOverlay?.type === 'command-bar' ? (
-          (() => {
-            const searchItems: OverlayItem[] = allSearchItems.map((item) => ({
-              id: item.id,
-              label: `#${item.id} ${item.title}`,
-              value: item.id,
-              hint: item.type,
-              category:
-                item.iteration === iteration
-                  ? 'Current iteration'
-                  : (item.iteration ?? 'No iteration'),
-            }));
-            return (
-              <OverlayPanel
-                title="Search"
-                items={searchItems}
-                placeholder="Type to search..."
-                onSelect={(selected) => {
-                  const item = allSearchItems.find(
-                    (i) => i.id === selected.value,
-                  );
-                  if (item) handleSearchSelect(item);
-                }}
-                onCancel={handleSearchCancel}
-              />
-            );
-          })()
+          <OverlayPanel
+            title="Commands"
+            items={commandBarItems}
+            placeholder="Type to search..."
+            externalFilter
+            onQueryChange={setCommandBarQuery}
+            onSelect={(item) => {
+              if (item.kind === 'issue') {
+                const workItem = allSearchItems.find(
+                  (i) => i.id === item.value,
+                );
+                if (workItem) handleSearchSelect(workItem);
+              } else {
+                const cmd = paletteCommands.find((c) => c.id === item.value);
+                if (cmd) handleCommandSelect(cmd);
+              }
+            }}
+            onCancel={() => {
+              setCommandBarQuery('');
+              closeOverlay();
+            }}
+          />
         ) : activeOverlay?.type === 'bulk-menu' ? (
           (() => {
             const bulkItems: OverlayItem[] = [];
