@@ -8,6 +8,7 @@ interface MultiAutocompleteInputProps {
   value: string;
   onChange: (value: string) => void;
   onSubmit: () => void;
+  onCancel?: () => void;
   suggestions: string[];
   focus: boolean;
 }
@@ -58,6 +59,7 @@ export function MultiAutocompleteInput({
   value,
   onChange,
   onSubmit,
+  onCancel,
   suggestions,
   focus,
 }: MultiAutocompleteInputProps) {
@@ -73,6 +75,10 @@ export function MultiAutocompleteInput({
       }
       if (key.upArrow) {
         setHighlightIndex((i) => (i > -1 ? i - 1 : -1));
+      }
+      if (key.escape) {
+        (onCancel ?? onSubmit)();
+        return;
       }
       if (key.return) {
         if (highlightIndex >= 0 && highlightIndex < visible.length) {

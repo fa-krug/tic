@@ -8,6 +8,7 @@ interface AutocompleteInputProps {
   value: string;
   onChange: (value: string) => void;
   onSubmit: () => void;
+  onCancel?: () => void;
   suggestions: string[];
   focus: boolean;
 }
@@ -29,6 +30,7 @@ export function AutocompleteInput({
   value,
   onChange,
   onSubmit,
+  onCancel,
   suggestions,
   focus,
 }: AutocompleteInputProps) {
@@ -43,6 +45,10 @@ export function AutocompleteInput({
       }
       if (key.upArrow) {
         setHighlightIndex((i) => (i > -1 ? i - 1 : -1));
+      }
+      if (key.escape) {
+        (onCancel ?? onSubmit)();
+        return;
       }
       if (key.return) {
         if (highlightIndex >= 0 && highlightIndex < visible.length) {

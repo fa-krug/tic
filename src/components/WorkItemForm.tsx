@@ -1092,6 +1092,10 @@ export function WorkItemForm() {
                 onSubmit={() => {
                   setEditing(false);
                 }}
+                onCancel={() => {
+                  setAssignee(preEditValue);
+                  setEditing(false);
+                }}
                 suggestions={assignees}
                 focus={true}
               />
@@ -1128,6 +1132,10 @@ export function WorkItemForm() {
                 value={parentId}
                 onChange={setParentId}
                 onSubmit={() => {
+                  setEditing(false);
+                }}
+                onCancel={() => {
+                  setParentId(preEditValue);
                   setEditing(false);
                 }}
                 suggestions={parentSuggestions}
@@ -1193,6 +1201,10 @@ export function WorkItemForm() {
                 onSubmit={() => {
                   setEditing(false);
                 }}
+                onCancel={() => {
+                  setDependsOn(preEditValue);
+                  setEditing(false);
+                }}
                 suggestions={parentSuggestions}
                 focus={true}
               />
@@ -1229,6 +1241,10 @@ export function WorkItemForm() {
                 value={labels}
                 onChange={setLabels}
                 onSubmit={() => {
+                  setEditing(false);
+                }}
+                onCancel={() => {
+                  setLabels(preEditValue);
                   setEditing(false);
                 }}
                 suggestions={labelSuggestions}
