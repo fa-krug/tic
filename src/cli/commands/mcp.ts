@@ -3,6 +3,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import {
+  createBackend,
   createBackendWithSync,
   VALID_BACKENDS,
 } from '../../backends/factory.js';
@@ -707,10 +708,9 @@ export async function startMcpServer(): Promise<void> {
       syncState.queue = setup.queue;
     } catch (err) {
       if (err instanceof AuthError) {
-        // Backend requires auth — will return error on tool calls
-        console.error(
-          `GitHub authentication required. Run "tic auth login github" to authenticate.`,
-        );
+        // Remote backend requires auth — fall back to local-only so local operations still work
+        console.error(err.message);
+        backend = await createBackend(root);
       } else {
         throw err;
       }
@@ -739,9 +739,9 @@ export async function startMcpServer(): Promise<void> {
         syncState.queue = setup.queue;
       } catch (err) {
         if (err instanceof AuthError) {
-          return error(
-            'GitHub authentication required. Run "tic auth login github" to authenticate.',
-          );
+          // Remote backend requires auth — fall back to local-only
+          backend = await createBackend(root);
+          return error(err.message);
         }
         throw err;
       }
