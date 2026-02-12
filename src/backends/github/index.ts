@@ -1,3 +1,5 @@
+import { execSync } from 'node:child_process';
+import open from 'open';
 import { BaseBackend, UnsupportedOperationError } from '../types.js';
 import type { BackendCapabilities } from '../types.js';
 import type {
@@ -7,7 +9,8 @@ import type {
   Comment,
   Template,
 } from '../../types.js';
-import { gh, ghExec, ghGraphQL, ghExecSync, ghSync } from './gh.js';
+import { getGitHubToken, authenticateGitHub } from '../../auth/github.js';
+import { GitHubApiClient } from './api.js';
 import { mapIssueToWorkItem } from './mappers.js';
 import type { GhIssue, GhMilestone } from './mappers.js';
 
@@ -72,6 +75,14 @@ const REMOVE_SUB_ISSUE_MUTATION = `
   }
 `;
 
+const DELETE_ISSUE_MUTATION = `
+  mutation($issueId: ID!) {
+    deleteIssue(input: { issueId: $issueId }) {
+      repository { name }
+    }
+  }
+`;
+
 interface ListIssuesResponse {
   repository: {
     issues: {
@@ -93,15 +104,67 @@ interface GetIssueNodeIdResponse {
   };
 }
 
+interface CreateIssueBody {
+  title: string;
+  body: string;
+  assignees?: string[];
+  labels?: string[];
+  milestone?: number;
+}
+
+interface PatchIssueBody {
+  state?: string;
+  title?: string;
+  body?: string;
+  assignees?: string[];
+  labels?: string[];
+  milestone?: number | null;
+}
+
 export class GitHubBackend extends BaseBackend {
-  private cwd: string;
-  private ownerRepo: { owner: string; repo: string } | null = null;
+  private api: GitHubApiClient;
+  private owner: string;
+  private repo: string;
   private cachedMilestones: GhMilestone[] | null = null;
 
-  constructor(cwd: string) {
+  private constructor(api: GitHubApiClient, owner: string, repo: string) {
     super(60_000);
-    this.cwd = cwd;
-    ghExecSync(['auth', 'status'], cwd);
+    this.api = api;
+    this.owner = owner;
+    this.repo = repo;
+  }
+
+  static async create(cwd: string): Promise<GitHubBackend> {
+    const { owner, repo } = GitHubBackend.detectOwnerRepo(cwd);
+    let token = getGitHubToken();
+    if (!token) {
+      token = await authenticateGitHub({
+        onCode: (code, url) => {
+          console.log(`\nGitHub authentication required.`);
+          console.log(`Visit ${url} and enter code: ${code}\n`);
+        },
+      });
+    }
+    const api = new GitHubApiClient(token);
+    return new GitHubBackend(api, owner, repo);
+  }
+
+  private static detectOwnerRepo(cwd: string): {
+    owner: string;
+    repo: string;
+  } {
+    const output = execSync('git remote -v', {
+      cwd,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    const match = output.match(
+      /github\.com[:/]([^/\s]+)\/([^/\s.]+?)(?:\.git)?(?:\s|$)/,
+    );
+    if (!match) {
+      throw new Error('Could not detect GitHub owner/repo from git remotes');
+    }
+    return { owner: match[1]!, repo: match[2]! };
   }
 
   protected override onCacheInvalidate(): void {
@@ -149,11 +212,12 @@ export class GitHubBackend extends BaseBackend {
 
   async getAssignees(): Promise<string[]> {
     try {
-      const { owner, repo } = await this.getOwnerRepo();
-      const collaborators = await gh<{ login: string }[]>(
-        ['api', `repos/${owner}/${repo}/collaborators`, '--jq', '.'],
-        this.cwd,
-      );
+      const collaborators: { login: string }[] = [];
+      for await (const page of this.api.paginate<{ login: string }>(
+        `/repos/${this.owner}/${this.repo}/collaborators`,
+      )) {
+        collaborators.push(...page);
+      }
       return collaborators.map((c) => c.login);
     } catch {
       return [];
@@ -181,16 +245,16 @@ export class GitHubBackend extends BaseBackend {
   }
 
   async listWorkItems(iteration?: string): Promise<WorkItem[]> {
-    const { owner, repo } = await this.getOwnerRepo();
     const allIssues: GhIssue[] = [];
     let cursor: string | null = null;
 
     do {
-      const data: ListIssuesResponse = await ghGraphQL<ListIssuesResponse>(
-        LIST_ISSUES_QUERY,
-        { owner, repo, cursor },
-        this.cwd,
-      );
+      const data: ListIssuesResponse =
+        await this.api.graphql<ListIssuesResponse>(LIST_ISSUES_QUERY, {
+          owner: this.owner,
+          repo: this.repo,
+          cursor,
+        });
       allIssues.push(...data.repository.issues.nodes);
       cursor = data.repository.issues.pageInfo.hasNextPage
         ? data.repository.issues.pageInfo.endCursor
@@ -205,19 +269,22 @@ export class GitHubBackend extends BaseBackend {
   }
 
   async getWorkItem(id: string): Promise<WorkItem> {
-    const { owner, repo } = await this.getOwnerRepo();
-    const data = await ghGraphQL<GetIssueResponse>(
-      GET_ISSUE_QUERY,
-      { owner, repo, number: Number(id) },
-      this.cwd,
-    );
+    const data = await this.api.graphql<GetIssueResponse>(GET_ISSUE_QUERY, {
+      owner: this.owner,
+      repo: this.repo,
+      number: Number(id),
+    });
     return mapIssueToWorkItem(data.repository.issue);
   }
 
   private async ensureLabels(labels: string[]): Promise<void> {
     for (const label of labels) {
       try {
-        await ghExec(['label', 'create', label], this.cwd);
+        await this.api.rest(
+          'POST',
+          `/repos/${this.owner}/${this.repo}/labels`,
+          { name: label },
+        );
       } catch {
         // Label already exists — ignore
       }
@@ -229,38 +296,39 @@ export class GitHubBackend extends BaseBackend {
     if (data.labels.length > 0) {
       await this.ensureLabels(data.labels);
     }
-    const args = [
-      'issue',
-      'create',
-      '--title',
-      data.title,
-      '--body',
-      data.description || '',
-    ];
+
+    const issueBody: CreateIssueBody = {
+      title: data.title,
+      body: data.description || '',
+    };
+
     if (data.assignee) {
-      args.push('--assignee', data.assignee);
+      issueBody.assignees = [data.assignee];
+    }
+    if (data.labels.length > 0) {
+      issueBody.labels = data.labels;
     }
     if (data.iteration) {
-      args.push('--milestone', data.iteration);
-    }
-    for (const label of data.labels) {
-      args.push('--label', label);
+      const milestones = await this.fetchMilestones();
+      const milestone = milestones.find((m) => m.title === data.iteration);
+      if (milestone) {
+        issueBody.milestone = milestone.number;
+      }
     }
 
-    const output = await ghExec(args, this.cwd);
-    // gh issue create prints the URL: https://github.com/owner/repo/issues/123
-    const match = output.match(/\/issues\/(\d+)/);
-    if (!match) {
-      throw new Error('Failed to parse issue number from gh output');
-    }
-    const id = match[1]!;
+    const result = await this.api.rest<{ number: number }>(
+      'POST',
+      `/repos/${this.owner}/${this.repo}/issues`,
+      issueBody,
+    );
+    const id = String(result.number);
 
     if (data.parent) {
       try {
         await this.addSubIssue(data.parent, id);
       } catch (err) {
         try {
-          await ghExec(['issue', 'delete', id, '--yes'], this.cwd);
+          await this.deleteWorkItem(id);
         } catch {
           // Best-effort cleanup
         }
@@ -296,61 +364,68 @@ export class GitHubBackend extends BaseBackend {
       }
     }
 
-    // Handle status changes via close/reopen
-    if (data.status === 'closed') {
-      await ghExec(['issue', 'close', id], this.cwd);
-    } else if (data.status === 'open') {
-      await ghExec(['issue', 'reopen', id], this.cwd);
+    // Build PATCH body for REST API
+    const patchBody: PatchIssueBody = {};
+    let hasPatch = false;
+
+    if (data.status !== undefined) {
+      patchBody.state = data.status === 'closed' ? 'closed' : 'open';
+      hasPatch = true;
     }
-
-    // Handle field edits
-    const editArgs = ['issue', 'edit', id];
-    let hasEdits = false;
-
     if (data.title !== undefined) {
-      editArgs.push('--title', data.title);
-      hasEdits = true;
+      patchBody.title = data.title;
+      hasPatch = true;
     }
     if (data.description !== undefined) {
-      editArgs.push('--body', data.description);
-      hasEdits = true;
+      patchBody.body = data.description;
+      hasPatch = true;
     }
     if (data.iteration !== undefined) {
       if (data.iteration) {
-        editArgs.push('--milestone', data.iteration);
+        const milestones = await this.fetchMilestones();
+        const milestone = milestones.find((m) => m.title === data.iteration);
+        if (milestone) {
+          patchBody.milestone = milestone.number;
+        }
       } else {
-        editArgs.push('--remove-milestone');
+        patchBody.milestone = null;
       }
-      hasEdits = true;
+      hasPatch = true;
     }
     if (data.assignee !== undefined) {
       if (data.assignee) {
-        editArgs.push('--add-assignee', data.assignee);
+        patchBody.assignees = [data.assignee];
+      } else {
+        patchBody.assignees = [];
       }
-      hasEdits = true;
+      hasPatch = true;
     }
     if (data.labels !== undefined) {
-      for (const label of data.labels) {
-        editArgs.push('--add-label', label);
-      }
-      hasEdits = true;
+      patchBody.labels = data.labels;
+      hasPatch = true;
     }
 
-    if (hasEdits) {
-      await ghExec(editArgs, this.cwd);
+    if (hasPatch) {
+      await this.api.rest(
+        'PATCH',
+        `/repos/${this.owner}/${this.repo}/issues/${id}`,
+        patchBody,
+      );
     }
 
     return this.getWorkItem(id);
   }
 
   async deleteWorkItem(id: string): Promise<void> {
-    await ghExec(['issue', 'delete', id, '--yes'], this.cwd);
+    const nodeId = await this.getIssueNodeId(Number(id));
+    await this.api.graphql(DELETE_ISSUE_MUTATION, { issueId: nodeId });
   }
 
   async addComment(workItemId: string, comment: NewComment): Promise<Comment> {
-    await ghExec(
-      ['issue', 'comment', workItemId, '--body', comment.body],
-      this.cwd,
+    await this.api.rest(
+      'POST',
+      `/repos/${this.owner}/${this.repo}/issues/${workItemId}/comments`,
+      { body: comment.body },
     );
     return {
       author: comment.author,
@@ -360,15 +435,12 @@ export class GitHubBackend extends BaseBackend {
   }
 
   getItemUrl(id: string): string {
-    const result = ghSync<{ url: string }>(
-      ['issue', 'view', id, '--json', 'url'],
-      this.cwd,
-    );
-    return result.url;
+    return `https://github.com/${this.owner}/${this.repo}/issues/${id}`;
   }
 
   async openItem(id: string): Promise<void> {
-    await ghExec(['issue', 'view', id, '--web'], this.cwd);
+    const url = this.getItemUrl(id);
+    await open(url);
   }
 
   /* eslint-disable @typescript-eslint/require-await, @typescript-eslint/no-unused-vars */
@@ -393,11 +465,9 @@ export class GitHubBackend extends BaseBackend {
   /* eslint-enable @typescript-eslint/require-await, @typescript-eslint/no-unused-vars */
 
   private async getIssueNodeId(issueNumber: number): Promise<string> {
-    const { owner, repo } = await this.getOwnerRepo();
-    const data = await ghGraphQL<GetIssueNodeIdResponse>(
+    const data = await this.api.graphql<GetIssueNodeIdResponse>(
       GET_ISSUE_NODE_ID_QUERY,
-      { owner, repo, number: issueNumber },
-      this.cwd,
+      { owner: this.owner, repo: this.repo, number: issueNumber },
     );
     return data.repository.issue.id;
   }
@@ -408,7 +478,7 @@ export class GitHubBackend extends BaseBackend {
   ): Promise<void> {
     const parentId = await this.getIssueNodeId(Number(parentNumber));
     const childId = await this.getIssueNodeId(Number(childNumber));
-    await ghGraphQL(ADD_SUB_ISSUE_MUTATION, { parentId, childId }, this.cwd);
+    await this.api.graphql(ADD_SUB_ISSUE_MUTATION, { parentId, childId });
   }
 
   private async removeSubIssue(
@@ -417,25 +487,18 @@ export class GitHubBackend extends BaseBackend {
   ): Promise<void> {
     const parentId = await this.getIssueNodeId(Number(parentNumber));
     const childId = await this.getIssueNodeId(Number(childNumber));
-    await ghGraphQL(REMOVE_SUB_ISSUE_MUTATION, { parentId, childId }, this.cwd);
-  }
-
-  private async getOwnerRepo(): Promise<{ owner: string; repo: string }> {
-    if (!this.ownerRepo) {
-      const nwo = await this.getRepoNwo();
-      const [owner, repo] = nwo.split('/');
-      this.ownerRepo = { owner: owner!, repo: repo! };
-    }
-    return this.ownerRepo;
+    await this.api.graphql(REMOVE_SUB_ISSUE_MUTATION, { parentId, childId });
   }
 
   private async fetchMilestones(): Promise<GhMilestone[]> {
     if (this.cachedMilestones) return this.cachedMilestones;
-    const { owner, repo } = await this.getOwnerRepo();
-    this.cachedMilestones = await gh<GhMilestone[]>(
-      ['api', `repos/${owner}/${repo}/milestones`, '--jq', '.'],
-      this.cwd,
-    );
+    const milestones: GhMilestone[] = [];
+    for await (const page of this.api.paginate<GhMilestone>(
+      `/repos/${this.owner}/${this.repo}/milestones`,
+    )) {
+      milestones.push(...page);
+    }
+    this.cachedMilestones = milestones;
     return this.cachedMilestones;
   }
 
@@ -449,13 +512,5 @@ export class GitHubBackend extends BaseBackend {
         if (!b.due_on) return -1;
         return a.due_on.localeCompare(b.due_on);
       });
-  }
-
-  private async getRepoNwo(): Promise<string> {
-    const result = await gh<{ nameWithOwner: string }>(
-      ['repo', 'view', '--json', 'nameWithOwner'],
-      this.cwd,
-    );
-    return result.nameWithOwner;
   }
 }

@@ -102,8 +102,9 @@ describe('createBackendWithSync', () => {
     updateConfig(storage.getDatabase(), { backend: 'github' });
     storage.destroy();
 
-    // GitHubBackend constructor may throw if gh is not authenticated,
-    // but we still expect the right types when it succeeds
+    // GitHubBackend.create() may throw if git remote doesn't contain
+    // github.com or if not authenticated, but we verify it doesn't
+    // throw "Unknown backend"
     try {
       const { backend, syncManager, queue } =
         await createBackendWithSync(tmpDir);
@@ -111,7 +112,7 @@ describe('createBackendWithSync', () => {
       expect(syncManager).toBeInstanceOf(SyncManager);
       expect(queue).not.toBeNull();
     } catch (e) {
-      // gh CLI not available in test env — verify it doesn't throw "Unknown backend"
+      // No github.com remote in test env — verify it doesn't throw "Unknown backend"
       expect((e as Error).message).not.toContain('Unknown backend');
     }
   });

@@ -59,7 +59,7 @@ export async function createRemoteBackend(
     }
     case 'github': {
       const { GitHubBackend } = await import('./github/index.js');
-      return new GitHubBackend(root);
+      return GitHubBackend.create(root);
     }
     case 'gitlab': {
       const { GitLabBackend } = await import('./gitlab/index.js');

@@ -21,6 +21,7 @@ export interface GhComment {
 }
 
 export interface GhMilestone {
+  number: number;
   title: string;
   state: string;
   due_on: string | null;

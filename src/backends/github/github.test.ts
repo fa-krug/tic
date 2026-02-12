@@ -1,22 +1,38 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { GitHubBackend } from './index.js';
 
-// Mock the gh wrapper
-vi.mock('./gh.js', () => ({
-  gh: vi.fn(),
-  ghExec: vi.fn(),
-  ghExecSync: vi.fn(),
-  ghGraphQL: vi.fn(),
-  ghSync: vi.fn(),
+const mockRest = vi.fn();
+const mockGraphql = vi.fn();
+const mockPaginateResults: unknown[][] = [];
+// eslint-disable-next-line @typescript-eslint/require-await
+const mockPaginate = vi.fn(async function* () {
+  for (const page of mockPaginateResults) {
+    yield page;
+  }
+});
+
+vi.mock('./api.js', () => {
+  return {
+    GitHubApiClient: class MockGitHubApiClient {
+      rest = mockRest;
+      graphql = mockGraphql;
+      paginate = mockPaginate;
+    },
+  };
+});
+
+vi.mock('../../auth/github.js', () => ({
+  getGitHubToken: vi.fn().mockReturnValue('mock-token'),
+  authenticateGitHub: vi.fn(),
 }));
 
-import { gh, ghExec, ghExecSync, ghGraphQL, ghSync } from './gh.js';
+vi.mock('open', () => ({ default: vi.fn() }));
 
-const mockGh = vi.mocked(gh);
-const mockGhExec = vi.mocked(ghExec);
-const mockGhExecSync = vi.mocked(ghExecSync);
-const mockGhGraphQL = vi.mocked(ghGraphQL);
-const mockGhSync = vi.mocked(ghSync);
+vi.mock('node:child_process', () => ({
+  execSync: vi
+    .fn()
+    .mockReturnValue('origin\tgit@github.com:owner/repo.git (fetch)\n'),
+}));
 
 /** Helper to build a GhIssue in the GraphQL response shape */
 function makeGhIssue(overrides: {
@@ -76,32 +92,48 @@ function makeGetResponse(issue: ReturnType<typeof makeGhIssue>) {
   };
 }
 
+async function createBackend(): Promise<GitHubBackend> {
+  return GitHubBackend.create('/repo');
+}
+
 describe('GitHubBackend', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Constructor calls ghExecSync for auth check
-    mockGhExecSync.mockReturnValue('');
-    // Most methods call getOwnerRepo -> getRepoNwo, so set a default
-    mockGh.mockResolvedValue({ nameWithOwner: 'owner/repo' });
+    mockPaginateResults.length = 0;
   });
 
-  describe('constructor', () => {
-    it('verifies gh auth on construction', () => {
-      new GitHubBackend('/repo');
-      expect(mockGhExecSync).toHaveBeenCalledWith(['auth', 'status'], '/repo');
+  describe('create', () => {
+    it('creates a backend with token from keychain', async () => {
+      const backend = await createBackend();
+      expect(backend).toBeInstanceOf(GitHubBackend);
     });
 
-    it('throws when gh auth fails', () => {
-      mockGhExecSync.mockImplementation(() => {
-        throw new Error('not logged in');
-      });
-      expect(() => new GitHubBackend('/repo')).toThrow();
+    it('triggers auth flow when no token is stored', async () => {
+      const { getGitHubToken } = await import('../../auth/github.js');
+      const { authenticateGitHub } = await import('../../auth/github.js');
+      vi.mocked(getGitHubToken).mockReturnValueOnce(null);
+      vi.mocked(authenticateGitHub).mockResolvedValueOnce('new-token');
+
+      const backend = await createBackend();
+      expect(backend).toBeInstanceOf(GitHubBackend);
+      expect(authenticateGitHub).toHaveBeenCalled();
+    });
+
+    it('throws when git remotes do not contain github.com', async () => {
+      const { execSync } = await import('node:child_process');
+      vi.mocked(execSync).mockReturnValueOnce(
+        'origin\tgit@gitlab.com:owner/repo.git (fetch)\n',
+      );
+
+      await expect(createBackend()).rejects.toThrow(
+        'Could not detect GitHub owner/repo',
+      );
     });
   });
 
   describe('getCapabilities', () => {
-    it('returns GitHub-specific capabilities', () => {
-      const backend = new GitHubBackend('/repo');
+    it('returns GitHub-specific capabilities', async () => {
+      const backend = await createBackend();
       const caps = backend.getCapabilities();
       expect(caps.relationships).toBe(true);
       expect(caps.customTypes).toBe(false);
@@ -118,71 +150,73 @@ describe('GitHubBackend', () => {
 
   describe('getStatuses', () => {
     it('returns open and closed', async () => {
-      const backend = new GitHubBackend('/repo');
+      const backend = await createBackend();
       expect(await backend.getStatuses()).toEqual(['open', 'closed']);
     });
   });
 
   describe('getWorkItemTypes', () => {
     it('returns issue', async () => {
-      const backend = new GitHubBackend('/repo');
+      const backend = await createBackend();
       expect(await backend.getWorkItemTypes()).toEqual(['issue']);
     });
   });
 
   describe('getIterations', () => {
     it('returns milestone titles', async () => {
-      const backend = new GitHubBackend('/repo');
-      mockGh
-        .mockResolvedValueOnce({ nameWithOwner: 'owner/repo' })
-        .mockResolvedValueOnce([
-          { title: 'v1.0', state: 'open', due_on: null },
-          { title: 'v2.0', state: 'open', due_on: null },
-        ]);
+      const backend = await createBackend();
+      mockPaginateResults.push([
+        { number: 1, title: 'v1.0', state: 'open', due_on: null },
+        { number: 2, title: 'v2.0', state: 'open', due_on: null },
+      ]);
       expect(await backend.getIterations()).toEqual(['v1.0', 'v2.0']);
     });
 
     it('returns empty array when no milestones', async () => {
-      const backend = new GitHubBackend('/repo');
-      mockGh
-        .mockResolvedValueOnce({ nameWithOwner: 'owner/repo' })
-        .mockResolvedValueOnce([]);
+      const backend = await createBackend();
+      // No pages pushed to mockPaginateResults means empty
       expect(await backend.getIterations()).toEqual([]);
     });
   });
 
   describe('getCurrentIteration', () => {
     it('returns first open milestone sorted by due date', async () => {
-      const backend = new GitHubBackend('/repo');
-      mockGh
-        .mockResolvedValueOnce({ nameWithOwner: 'owner/repo' })
-        .mockResolvedValueOnce([
-          { title: 'v1.0', state: 'open', due_on: '2026-03-01T00:00:00Z' },
-          { title: 'v2.0', state: 'open', due_on: '2026-06-01T00:00:00Z' },
-        ]);
+      const backend = await createBackend();
+      mockPaginateResults.push([
+        {
+          number: 1,
+          title: 'v1.0',
+          state: 'open',
+          due_on: '2026-03-01T00:00:00Z',
+        },
+        {
+          number: 2,
+          title: 'v2.0',
+          state: 'open',
+          due_on: '2026-06-01T00:00:00Z',
+        },
+      ]);
       expect(await backend.getCurrentIteration()).toBe('v1.0');
     });
 
     it('returns empty string when no open milestones', async () => {
-      const backend = new GitHubBackend('/repo');
-      mockGh
-        .mockResolvedValueOnce({ nameWithOwner: 'owner/repo' })
-        .mockResolvedValueOnce([]);
+      const backend = await createBackend();
+      // No pages
       expect(await backend.getCurrentIteration()).toBe('');
     });
   });
 
   describe('setCurrentIteration', () => {
     it('is a no-op', async () => {
-      const backend = new GitHubBackend('/repo');
+      const backend = await createBackend();
       await expect(backend.setCurrentIteration('v1.0')).resolves.not.toThrow();
     });
   });
 
   describe('listWorkItems', () => {
     it('returns all issues mapped to WorkItems', async () => {
-      const backend = new GitHubBackend('/repo');
-      mockGhGraphQL.mockResolvedValue(
+      const backend = await createBackend();
+      mockGraphql.mockResolvedValue(
         makeListResponse([
           makeGhIssue({
             number: 1,
@@ -213,8 +247,8 @@ describe('GitHubBackend', () => {
     });
 
     it('filters by iteration client-side', async () => {
-      const backend = new GitHubBackend('/repo');
-      mockGhGraphQL.mockResolvedValue(
+      const backend = await createBackend();
+      mockGraphql.mockResolvedValue(
         makeListResponse([
           makeGhIssue({ number: 1, milestone: 'v1.0' }),
           makeGhIssue({ number: 2, milestone: 'v2.0' }),
@@ -227,8 +261,8 @@ describe('GitHubBackend', () => {
     });
 
     it('paginates through multiple pages', async () => {
-      const backend = new GitHubBackend('/repo');
-      mockGhGraphQL
+      const backend = await createBackend();
+      mockGraphql
         .mockResolvedValueOnce(
           makeListResponse([makeGhIssue({ number: 1 })], true, 'cursor1'),
         )
@@ -236,12 +270,12 @@ describe('GitHubBackend', () => {
 
       const items = await backend.listWorkItems();
       expect(items).toHaveLength(2);
-      expect(mockGhGraphQL).toHaveBeenCalledTimes(2);
+      expect(mockGraphql).toHaveBeenCalledTimes(2);
     });
 
     it('includes parent info from GraphQL response', async () => {
-      const backend = new GitHubBackend('/repo');
-      mockGhGraphQL.mockResolvedValue(
+      const backend = await createBackend();
+      mockGraphql.mockResolvedValue(
         makeListResponse([
           makeGhIssue({ number: 2, parent: { number: 1 } }),
           makeGhIssue({ number: 1, parent: null }),
@@ -256,8 +290,8 @@ describe('GitHubBackend', () => {
 
   describe('getWorkItem', () => {
     it('returns a single issue as WorkItem', async () => {
-      const backend = new GitHubBackend('/repo');
-      mockGhGraphQL.mockResolvedValue(
+      const backend = await createBackend();
+      mockGraphql.mockResolvedValue(
         makeGetResponse(
           makeGhIssue({
             number: 42,
@@ -286,8 +320,8 @@ describe('GitHubBackend', () => {
     });
 
     it('returns parent info', async () => {
-      const backend = new GitHubBackend('/repo');
-      mockGhGraphQL.mockResolvedValue(
+      const backend = await createBackend();
+      mockGraphql.mockResolvedValue(
         makeGetResponse(makeGhIssue({ number: 5, parent: { number: 3 } })),
       );
 
@@ -298,10 +332,14 @@ describe('GitHubBackend', () => {
 
   describe('createWorkItem', () => {
     it('creates an issue and returns the WorkItem', async () => {
-      const backend = new GitHubBackend('/repo');
+      const backend = await createBackend();
 
-      mockGhExec.mockResolvedValue('https://github.com/owner/repo/issues/10\n');
-      mockGhGraphQL.mockResolvedValue(
+      // ensureLabels REST call, then issue create REST call
+      mockRest
+        .mockResolvedValueOnce({}) // label create 'bug'
+        .mockResolvedValueOnce({ number: 10 }); // issue create
+      // GraphQL getWorkItem
+      mockGraphql.mockResolvedValue(
         makeGetResponse(
           makeGhIssue({
             number: 10,
@@ -317,7 +355,7 @@ describe('GitHubBackend', () => {
         title: 'New issue',
         type: 'issue',
         status: 'open',
-        iteration: 'v1.0',
+        iteration: '',
         priority: 'medium',
         assignee: 'alice',
         labels: ['bug'],
@@ -330,12 +368,48 @@ describe('GitHubBackend', () => {
       expect(item.title).toBe('New issue');
     });
 
-    it('adds sub-issue relationship when parent is specified', async () => {
-      const backend = new GitHubBackend('/repo');
+    it('resolves milestone title to number when iteration is set', async () => {
+      const backend = await createBackend();
 
-      mockGhExec.mockResolvedValue('https://github.com/owner/repo/issues/10\n');
+      // fetchMilestones via paginate
+      mockPaginateResults.push([
+        { number: 3, title: 'v1.0', state: 'open', due_on: null },
+      ]);
+      // REST create
+      mockRest.mockResolvedValueOnce({ number: 10 });
+      // GraphQL getWorkItem
+      mockGraphql.mockResolvedValue(
+        makeGetResponse(makeGhIssue({ number: 10, milestone: 'v1.0' })),
+      );
+
+      await backend.createWorkItem({
+        title: 'New issue',
+        type: 'issue',
+        status: 'open',
+        iteration: 'v1.0',
+        priority: 'medium',
+        assignee: '',
+        labels: [],
+        description: '',
+        parent: null,
+        dependsOn: [],
+      });
+
+      // Verify milestone number was passed in the REST body
+      expect(mockRest).toHaveBeenCalledWith(
+        'POST',
+        '/repos/owner/repo/issues',
+        expect.objectContaining({ milestone: 3 }),
+      );
+    });
+
+    it('adds sub-issue relationship when parent is specified', async () => {
+      const backend = await createBackend();
+
+      // REST create
+      mockRest.mockResolvedValueOnce({ number: 10 });
       // getIssueNodeId for parent #5, then for child #10, then addSubIssue, then getWorkItem
-      mockGhGraphQL
+      mockGraphql
         .mockResolvedValueOnce({
           repository: { issue: { id: 'NODE_5' } },
         })
@@ -366,14 +440,18 @@ describe('GitHubBackend', () => {
       });
 
       expect(item.parent).toBe('5');
-      expect(mockGhGraphQL).toHaveBeenCalledTimes(4);
+      expect(mockGraphql).toHaveBeenCalledTimes(4);
     });
 
     it('ensures labels exist before creating an issue', async () => {
-      const backend = new GitHubBackend('/repo');
+      const backend = await createBackend();
 
-      mockGhExec.mockResolvedValue('https://github.com/owner/repo/issues/10\n');
-      mockGhGraphQL.mockResolvedValue(
+      // ensureLabels (2 REST calls), then create (1 REST call)
+      mockRest
+        .mockResolvedValueOnce({}) // label create 'bug'
+        .mockResolvedValueOnce({}) // label create 'ux'
+        .mockResolvedValueOnce({ number: 10 }); // issue create
+      mockGraphql.mockResolvedValue(
         makeGetResponse(makeGhIssue({ number: 10, labels: ['bug', 'ux'] })),
       );
 
@@ -390,23 +468,25 @@ describe('GitHubBackend', () => {
         dependsOn: [],
       });
 
-      expect(mockGhExec).toHaveBeenCalledWith(
-        ['label', 'create', 'bug'],
-        '/repo',
+      expect(mockRest).toHaveBeenCalledWith(
+        'POST',
+        '/repos/owner/repo/labels',
+        { name: 'bug' },
       );
-      expect(mockGhExec).toHaveBeenCalledWith(
-        ['label', 'create', 'ux'],
-        '/repo',
+      expect(mockRest).toHaveBeenCalledWith(
+        'POST',
+        '/repos/owner/repo/labels',
+        { name: 'ux' },
       );
     });
 
     it('ignores errors when ensuring labels that already exist', async () => {
-      const backend = new GitHubBackend('/repo');
+      const backend = await createBackend();
 
-      mockGhExec
-        .mockRejectedValueOnce(new Error('label already exists'))
-        .mockResolvedValue('https://github.com/owner/repo/issues/10\n');
-      mockGhGraphQL.mockResolvedValue(
+      mockRest
+        .mockRejectedValueOnce(new Error('label already exists')) // label create fails
+        .mockResolvedValueOnce({ number: 10 }); // issue create succeeds
+      mockGraphql.mockResolvedValue(
         makeGetResponse(makeGhIssue({ number: 10, labels: ['bug'] })),
       );
 
@@ -427,15 +507,23 @@ describe('GitHubBackend', () => {
     });
 
     it('rolls back created issue when parent linking fails', async () => {
-      const backend = new GitHubBackend('/repo');
+      const backend = await createBackend();
 
-      mockGhExec.mockResolvedValue('https://github.com/owner/repo/issues/10\n');
-      // addSubIssue calls: getIssueNodeId(parent), getIssueNodeId(child), then mutation
-      mockGhGraphQL
+      // REST create succeeds
+      mockRest.mockResolvedValueOnce({ number: 10 });
+      // addSubIssue: getIssueNodeId(parent=5) succeeds, getIssueNodeId(child=10) fails
+      mockGraphql
         .mockResolvedValueOnce({
           repository: { issue: { id: 'NODE_5' } },
         })
-        .mockRejectedValueOnce(new Error('GraphQL error: parent not found'));
+        .mockRejectedValueOnce(new Error('GraphQL error: parent not found'))
+        // deleteWorkItem rollback: getIssueNodeId(10), deleteIssue mutation
+        .mockResolvedValueOnce({
+          repository: { issue: { id: 'NODE_10' } },
+        })
+        .mockResolvedValueOnce({
+          deleteIssue: { repository: { name: 'repo' } },
+        });
 
       await expect(
         backend.createWorkItem({
@@ -451,19 +539,13 @@ describe('GitHubBackend', () => {
           dependsOn: [],
         }),
       ).rejects.toThrow('issue was rolled back');
-
-      // Verify delete was called to rollback
-      expect(mockGhExec).toHaveBeenCalledWith(
-        ['issue', 'delete', '10', '--yes'],
-        '/repo',
-      );
     });
 
     it('skips ensureLabels when no labels provided', async () => {
-      const backend = new GitHubBackend('/repo');
+      const backend = await createBackend();
 
-      mockGhExec.mockResolvedValue('https://github.com/owner/repo/issues/10\n');
-      mockGhGraphQL.mockResolvedValue(
+      mockRest.mockResolvedValueOnce({ number: 10 });
+      mockGraphql.mockResolvedValue(
         makeGetResponse(makeGhIssue({ number: 10 })),
       );
 
@@ -481,19 +563,20 @@ describe('GitHubBackend', () => {
       });
 
       // Only the issue create call, no label create calls
-      expect(mockGhExec).not.toHaveBeenCalledWith(
-        expect.arrayContaining(['label', 'create']),
+      expect(mockRest).not.toHaveBeenCalledWith(
+        'POST',
+        '/repos/owner/repo/labels',
         expect.anything(),
       );
     });
   });
 
   describe('updateWorkItem', () => {
-    it('updates title and body', async () => {
-      const backend = new GitHubBackend('/repo');
+    it('updates title and body via PATCH', async () => {
+      const backend = await createBackend();
 
-      mockGhExec.mockResolvedValue('');
-      mockGhGraphQL.mockResolvedValue(
+      mockRest.mockResolvedValue({});
+      mockGraphql.mockResolvedValue(
         makeGetResponse(
           makeGhIssue({
             number: 5,
@@ -510,41 +593,54 @@ describe('GitHubBackend', () => {
 
       expect(item.title).toBe('Updated title');
       expect(item.description).toBe('Updated body');
+      expect(mockRest).toHaveBeenCalledWith(
+        'PATCH',
+        '/repos/owner/repo/issues/5',
+        expect.objectContaining({
+          title: 'Updated title',
+          body: 'Updated body',
+        }),
+      );
     });
 
     it('closes an issue when status changes to closed', async () => {
-      const backend = new GitHubBackend('/repo');
-      mockGhExec.mockResolvedValue('');
-      mockGhGraphQL.mockResolvedValue(
+      const backend = await createBackend();
+      mockRest.mockResolvedValue({});
+      mockGraphql.mockResolvedValue(
         makeGetResponse(makeGhIssue({ number: 5, state: 'CLOSED' })),
       );
 
       const item = await backend.updateWorkItem('5', { status: 'closed' });
       expect(item.status).toBe('closed');
-      expect(mockGhExec).toHaveBeenCalledWith(['issue', 'close', '5'], '/repo');
+      expect(mockRest).toHaveBeenCalledWith(
+        'PATCH',
+        '/repos/owner/repo/issues/5',
+        expect.objectContaining({ state: 'closed' }),
+      );
     });
 
     it('reopens an issue when status changes to open', async () => {
-      const backend = new GitHubBackend('/repo');
-      mockGhExec.mockResolvedValue('');
-      mockGhGraphQL.mockResolvedValue(
+      const backend = await createBackend();
+      mockRest.mockResolvedValue({});
+      mockGraphql.mockResolvedValue(
         makeGetResponse(makeGhIssue({ number: 5 })),
       );
 
       const item = await backend.updateWorkItem('5', { status: 'open' });
       expect(item.status).toBe('open');
-      expect(mockGhExec).toHaveBeenCalledWith(
-        ['issue', 'reopen', '5'],
-        '/repo',
+      expect(mockRest).toHaveBeenCalledWith(
+        'PATCH',
+        '/repos/owner/repo/issues/5',
+        expect.objectContaining({ state: 'open' }),
       );
     });
 
     it('sets parent via addSubIssue when parent is added', async () => {
-      const backend = new GitHubBackend('/repo');
-      mockGhExec.mockResolvedValue('');
+      const backend = await createBackend();
+      mockRest.mockResolvedValue({});
 
       // getWorkItem (current, no parent), getIssueNodeId x2, addSubIssue, getWorkItem (final)
-      mockGhGraphQL
+      mockGraphql
         .mockResolvedValueOnce(
           makeGetResponse(makeGhIssue({ number: 5, parent: null })),
         )
@@ -569,11 +665,11 @@ describe('GitHubBackend', () => {
     });
 
     it('removes parent via removeSubIssue when parent is cleared', async () => {
-      const backend = new GitHubBackend('/repo');
-      mockGhExec.mockResolvedValue('');
+      const backend = await createBackend();
+      mockRest.mockResolvedValue({});
 
       // getWorkItem (current, has parent #3), getIssueNodeId x2, removeSubIssue, getWorkItem (final)
-      mockGhGraphQL
+      mockGraphql
         .mockResolvedValueOnce(
           makeGetResponse(makeGhIssue({ number: 5, parent: { number: 3 } })),
         )
@@ -598,11 +694,11 @@ describe('GitHubBackend', () => {
     });
 
     it('changes parent by removing old and adding new', async () => {
-      const backend = new GitHubBackend('/repo');
-      mockGhExec.mockResolvedValue('');
+      const backend = await createBackend();
+      mockRest.mockResolvedValue({});
 
       // getWorkItem (current, parent #3), remove(#3,#5), add(#7,#5), getWorkItem (final)
-      mockGhGraphQL
+      mockGraphql
         .mockResolvedValueOnce(
           makeGetResponse(makeGhIssue({ number: 5, parent: { number: 3 } })),
         )
@@ -642,46 +738,53 @@ describe('GitHubBackend', () => {
     });
 
     it('ensures labels exist before updating', async () => {
-      const backend = new GitHubBackend('/repo');
-      mockGhExec.mockResolvedValue('');
-      mockGhGraphQL.mockResolvedValue(
+      const backend = await createBackend();
+      mockRest.mockResolvedValue({});
+      mockGraphql.mockResolvedValue(
         makeGetResponse(makeGhIssue({ number: 5, labels: ['new-label'] })),
       );
 
       await backend.updateWorkItem('5', { labels: ['new-label'] });
 
-      expect(mockGhExec).toHaveBeenCalledWith(
-        ['label', 'create', 'new-label'],
-        '/repo',
+      expect(mockRest).toHaveBeenCalledWith(
+        'POST',
+        '/repos/owner/repo/labels',
+        { name: 'new-label' },
       );
     });
   });
 
   describe('deleteWorkItem', () => {
-    it('deletes an issue', async () => {
-      const backend = new GitHubBackend('/repo');
-      mockGhExec.mockResolvedValue('');
+    it('deletes an issue via GraphQL mutation', async () => {
+      const backend = await createBackend();
+      // getIssueNodeId, then deleteIssue mutation
+      mockGraphql
+        .mockResolvedValueOnce({
+          repository: { issue: { id: 'NODE_7' } },
+        })
+        .mockResolvedValueOnce({
+          deleteIssue: { repository: { name: 'repo' } },
+        });
+
       await backend.deleteWorkItem('7');
-      expect(mockGhExec).toHaveBeenCalledWith(
-        ['issue', 'delete', '7', '--yes'],
-        '/repo',
-      );
+      expect(mockGraphql).toHaveBeenCalledTimes(2);
     });
   });
 
   describe('addComment', () => {
     it('adds a comment and returns it', async () => {
-      const backend = new GitHubBackend('/repo');
-      mockGhExec.mockResolvedValue('');
+      const backend = await createBackend();
+      mockRest.mockResolvedValue({});
 
       const comment = await backend.addComment('3', {
         author: 'alice',
         body: 'This is a comment.',
       });
 
-      expect(mockGhExec).toHaveBeenCalledWith(
-        ['issue', 'comment', '3', '--body', 'This is a comment.'],
-        '/repo',
+      expect(mockRest).toHaveBeenCalledWith(
+        'POST',
+        '/repos/owner/repo/issues/3/comments',
+        { body: 'This is a comment.' },
       );
       expect(comment.author).toBe('alice');
       expect(comment.body).toBe('This is a comment.');
@@ -690,12 +793,8 @@ describe('GitHubBackend', () => {
   });
 
   describe('getItemUrl', () => {
-    it('returns the GitHub issue URL', () => {
-      const backend = new GitHubBackend('/repo');
-      mockGhSync.mockReturnValue({
-        url: 'https://github.com/owner/repo/issues/5',
-      });
-
+    it('returns the GitHub issue URL', async () => {
+      const backend = await createBackend();
       const url = backend.getItemUrl('5');
       expect(url).toBe('https://github.com/owner/repo/issues/5');
     });
@@ -703,21 +802,20 @@ describe('GitHubBackend', () => {
 
   describe('openItem', () => {
     it('opens the issue in the browser', async () => {
-      const backend = new GitHubBackend('/repo');
-      mockGhExec.mockResolvedValue('');
+      const backend = await createBackend();
+      const openMod = await import('open');
 
       await backend.openItem('5');
-      expect(mockGhExec).toHaveBeenCalledWith(
-        ['issue', 'view', '5', '--web'],
-        '/repo',
+      expect(openMod.default).toHaveBeenCalledWith(
+        'https://github.com/owner/repo/issues/5',
       );
     });
   });
 
   describe('getChildren', () => {
     it('returns items whose parent matches the given id', async () => {
-      const backend = new GitHubBackend('/repo');
-      mockGhGraphQL.mockResolvedValue(
+      const backend = await createBackend();
+      mockGraphql.mockResolvedValue(
         makeListResponse([
           makeGhIssue({ number: 1, parent: null }),
           makeGhIssue({ number: 2, parent: { number: 1 } }),
@@ -734,8 +832,8 @@ describe('GitHubBackend', () => {
 
   describe('getDependents', () => {
     it('returns empty array (dependsOn not supported)', async () => {
-      const backend = new GitHubBackend('/repo');
-      mockGhGraphQL.mockResolvedValue(
+      const backend = await createBackend();
+      mockGraphql.mockResolvedValue(
         makeListResponse([
           makeGhIssue({ number: 1 }),
           makeGhIssue({ number: 2 }),
@@ -749,21 +847,21 @@ describe('GitHubBackend', () => {
 
   describe('getAssignees', () => {
     it('returns collaborator logins', async () => {
-      const backend = new GitHubBackend('/repo');
-      mockGh
-        .mockResolvedValueOnce({ nameWithOwner: 'owner/repo' })
-        .mockResolvedValueOnce([
-          { login: 'alice' },
-          { login: 'bob' },
-          { login: 'charlie' },
-        ]);
+      const backend = await createBackend();
+      mockPaginateResults.push([
+        { login: 'alice' },
+        { login: 'bob' },
+        { login: 'charlie' },
+      ]);
       expect(await backend.getAssignees()).toEqual(['alice', 'bob', 'charlie']);
     });
 
     it('returns empty array on error', async () => {
-      const backend = new GitHubBackend('/repo');
-      mockGh.mockResolvedValueOnce({ nameWithOwner: 'owner/repo' });
-      mockGh.mockRejectedValueOnce(new Error('API error'));
+      const backend = await createBackend();
+      // eslint-disable-next-line @typescript-eslint/require-await, require-yield
+      mockPaginate.mockImplementationOnce(async function* () {
+        throw new Error('API error');
+      });
       expect(await backend.getAssignees()).toEqual([]);
     });
   });
