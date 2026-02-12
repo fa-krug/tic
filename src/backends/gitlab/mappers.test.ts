@@ -1,26 +1,86 @@
 import { describe, it, expect } from 'vitest';
-import {
-  mapIssueToWorkItem,
-  mapEpicToWorkItem,
-  mapNoteToComment,
-} from './mappers.js';
+import type { GlWorkItem, GlNote } from './mappers.js';
+import { mapWorkItemToWorkItem, mapNoteToComment } from './mappers.js';
 
-describe('mapIssueToWorkItem', () => {
-  it('maps a full GitLab issue to a WorkItem', () => {
-    const glIssue = {
-      iid: 42,
+function makeWorkItem(overrides: Partial<GlWorkItem> = {}): GlWorkItem {
+  return {
+    id: 'gid://gitlab/WorkItem/42',
+    iid: '42',
+    title: 'Test item',
+    state: 'OPEN',
+    workItemType: { name: 'Issue' },
+    widgets: [],
+    createdAt: '2026-01-15T10:00:00Z',
+    updatedAt: '2026-01-20T14:30:00Z',
+    ...overrides,
+  };
+}
+
+describe('mapWorkItemToWorkItem', () => {
+  it('maps an issue with all widgets populated', () => {
+    const glWorkItem = makeWorkItem({
+      iid: '42',
       title: 'Fix login bug',
-      description: 'The login form breaks on mobile.',
-      state: 'opened',
-      assignees: [{ username: 'alice' }, { username: 'bob' }],
-      labels: ['bug', 'urgent'],
-      milestone: { title: 'v1.0' },
-      epic: { iid: 5 },
-      created_at: '2026-01-15T10:00:00Z',
-      updated_at: '2026-01-20T14:30:00Z',
-    };
+      widgets: [
+        {
+          __typename: 'WorkItemWidgetDescription',
+          description: 'The login form breaks on mobile.',
+        },
+        {
+          __typename: 'WorkItemWidgetAssignees',
+          assignees: {
+            nodes: [{ username: 'alice' }, { username: 'bob' }],
+          },
+        },
+        {
+          __typename: 'WorkItemWidgetLabels',
+          labels: { nodes: [{ title: 'bug' }, { title: 'urgent' }] },
+        },
+        {
+          __typename: 'WorkItemWidgetMilestone',
+          milestone: { title: 'v1.0' },
+        },
+        {
+          __typename: 'WorkItemWidgetHierarchy',
+          parent: {
+            id: 'gid://gitlab/WorkItem/5',
+            iid: '5',
+            workItemType: { name: 'Epic' },
+          },
+        },
+        {
+          __typename: 'WorkItemWidgetNotes',
+          discussions: {
+            nodes: [
+              {
+                notes: {
+                  nodes: [
+                    {
+                      author: { username: 'carol' },
+                      createdAt: '2026-01-16T09:00:00Z',
+                      body: 'Looks good!',
+                    },
+                  ],
+                },
+              },
+              {
+                notes: {
+                  nodes: [
+                    {
+                      author: { username: 'dave' },
+                      createdAt: '2026-01-17T11:00:00Z',
+                      body: 'Needs more tests.',
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      ],
+    });
 
-    const item = mapIssueToWorkItem(glIssue);
+    const item = mapWorkItemToWorkItem(glWorkItem);
 
     expect(item.id).toBe('issue-42');
     expect(item.title).toBe('Fix login bug');
@@ -35,149 +95,121 @@ describe('mapIssueToWorkItem', () => {
     expect(item.updated).toBe('2026-01-20T14:30:00Z');
     expect(item.parent).toBe('epic-5');
     expect(item.dependsOn).toEqual([]);
-    expect(item.comments).toEqual([]);
+    expect(item.comments).toHaveLength(2);
+    expect(item.comments[0]).toEqual({
+      author: 'carol',
+      date: '2026-01-16T09:00:00Z',
+      body: 'Looks good!',
+    });
+    expect(item.comments[1]).toEqual({
+      author: 'dave',
+      date: '2026-01-17T11:00:00Z',
+      body: 'Needs more tests.',
+    });
   });
 
-  it('handles null description', () => {
-    const glIssue = {
-      iid: 1,
-      title: 'Empty',
-      description: null,
-      state: 'closed',
-      assignees: [],
-      labels: [],
-      milestone: null,
-      epic: null,
-      created_at: '2026-01-01T00:00:00Z',
-      updated_at: '2026-01-01T00:00:00Z',
-    };
-
-    const item = mapIssueToWorkItem(glIssue);
-
-    expect(item.description).toBe('');
-    expect(item.status).toBe('closed');
-    expect(item.assignee).toBe('');
-    expect(item.iteration).toBe('');
-    expect(item.parent).toBeNull();
-  });
-
-  it('maps opened state to open', () => {
-    const glIssue = {
-      iid: 3,
-      title: 'Open issue',
-      description: '',
-      state: 'opened',
-      assignees: [],
-      labels: [],
-      milestone: null,
-      epic: null,
-      created_at: '2026-01-01T00:00:00Z',
-      updated_at: '2026-01-01T00:00:00Z',
-    };
-
-    expect(mapIssueToWorkItem(glIssue).status).toBe('open');
-  });
-
-  it('maps closed state to closed', () => {
-    const glIssue = {
-      iid: 4,
-      title: 'Closed issue',
-      description: '',
-      state: 'closed',
-      assignees: [],
-      labels: [],
-      milestone: null,
-      epic: null,
-      created_at: '2026-01-01T00:00:00Z',
-      updated_at: '2026-01-01T00:00:00Z',
-    };
-
-    expect(mapIssueToWorkItem(glIssue).status).toBe('closed');
-  });
-
-  it('sets parent from epic iid', () => {
-    const glIssue = {
-      iid: 10,
-      title: 'With epic',
-      description: '',
-      state: 'opened',
-      assignees: [],
-      labels: [],
-      milestone: null,
-      epic: { iid: 7 },
-      created_at: '2026-01-01T00:00:00Z',
-      updated_at: '2026-01-01T00:00:00Z',
-    };
-
-    expect(mapIssueToWorkItem(glIssue).parent).toBe('epic-7');
-  });
-});
-
-describe('mapEpicToWorkItem', () => {
-  it('maps a full GitLab epic to a WorkItem', () => {
-    const glEpic = {
-      iid: 5,
+  it('maps an epic work item', () => {
+    const glWorkItem = makeWorkItem({
+      id: 'gid://gitlab/WorkItem/99',
+      iid: '99',
       title: 'Big feature',
-      description: 'Epic description here.',
-      state: 'opened',
-      labels: ['feature', 'priority'],
-      created_at: '2026-01-10T00:00:00Z',
-      updated_at: '2026-01-18T00:00:00Z',
-    };
+      workItemType: { name: 'Epic' },
+      widgets: [
+        {
+          __typename: 'WorkItemWidgetDescription',
+          description: 'Epic description here.',
+        },
+        {
+          __typename: 'WorkItemWidgetLabels',
+          labels: { nodes: [{ title: 'feature' }, { title: 'priority' }] },
+        },
+      ],
+    });
 
-    const item = mapEpicToWorkItem(glEpic);
+    const item = mapWorkItemToWorkItem(glWorkItem);
 
-    expect(item.id).toBe('epic-5');
+    expect(item.id).toBe('epic-99');
     expect(item.title).toBe('Big feature');
     expect(item.description).toBe('Epic description here.');
-    expect(item.status).toBe('open');
     expect(item.type).toBe('epic');
-    expect(item.assignee).toBe('');
     expect(item.labels).toEqual(['feature', 'priority']);
+    expect(item.assignee).toBe('');
     expect(item.iteration).toBe('');
-    expect(item.priority).toBe('medium');
     expect(item.parent).toBeNull();
-    expect(item.dependsOn).toEqual([]);
     expect(item.comments).toEqual([]);
   });
 
-  it('handles null description', () => {
-    const glEpic = {
-      iid: 1,
-      title: 'Empty epic',
-      description: null,
-      state: 'closed',
-      labels: [],
-      created_at: '2026-01-01T00:00:00Z',
-      updated_at: '2026-01-01T00:00:00Z',
-    };
-
-    const item = mapEpicToWorkItem(glEpic);
-
-    expect(item.description).toBe('');
-    expect(item.status).toBe('closed');
+  it('maps CLOSED state to closed', () => {
+    const glWorkItem = makeWorkItem({ state: 'CLOSED' });
+    expect(mapWorkItemToWorkItem(glWorkItem).status).toBe('closed');
   });
 
-  it('maps opened state to open', () => {
-    const glEpic = {
-      iid: 2,
-      title: 'Open epic',
-      description: '',
-      state: 'opened',
-      labels: [],
-      created_at: '2026-01-01T00:00:00Z',
-      updated_at: '2026-01-01T00:00:00Z',
-    };
+  it('maps OPEN state to open', () => {
+    const glWorkItem = makeWorkItem({ state: 'OPEN' });
+    expect(mapWorkItemToWorkItem(glWorkItem).status).toBe('open');
+  });
 
-    expect(mapEpicToWorkItem(glEpic).status).toBe('open');
+  it('handles missing widgets gracefully (empty widgets array)', () => {
+    const glWorkItem = makeWorkItem({ widgets: [] });
+
+    const item = mapWorkItemToWorkItem(glWorkItem);
+
+    expect(item.description).toBe('');
+    expect(item.assignee).toBe('');
+    expect(item.labels).toEqual([]);
+    expect(item.iteration).toBe('');
+    expect(item.parent).toBeNull();
+    expect(item.comments).toEqual([]);
+  });
+
+  it('handles unknown widget types gracefully', () => {
+    const glWorkItem = makeWorkItem({
+      widgets: [{ __typename: 'WorkItemWidgetSomethingNew' }],
+    });
+
+    const item = mapWorkItemToWorkItem(glWorkItem);
+
+    expect(item.description).toBe('');
+    expect(item.assignee).toBe('');
+    expect(item.labels).toEqual([]);
+  });
+
+  it('handles null milestone', () => {
+    const glWorkItem = makeWorkItem({
+      widgets: [{ __typename: 'WorkItemWidgetMilestone', milestone: null }],
+    });
+    expect(mapWorkItemToWorkItem(glWorkItem).iteration).toBe('');
+  });
+
+  it('handles null parent in hierarchy widget', () => {
+    const glWorkItem = makeWorkItem({
+      widgets: [{ __typename: 'WorkItemWidgetHierarchy', parent: null }],
+    });
+    expect(mapWorkItemToWorkItem(glWorkItem).parent).toBeNull();
+  });
+
+  it('derives parent type from parent workItemType', () => {
+    const glWorkItem = makeWorkItem({
+      widgets: [
+        {
+          __typename: 'WorkItemWidgetHierarchy',
+          parent: {
+            id: 'gid://gitlab/WorkItem/10',
+            iid: '10',
+            workItemType: { name: 'Task' },
+          },
+        },
+      ],
+    });
+    expect(mapWorkItemToWorkItem(glWorkItem).parent).toBe('task-10');
   });
 });
 
 describe('mapNoteToComment', () => {
   it('maps a GitLab note to a tic Comment', () => {
-    const glNote = {
+    const glNote: GlNote = {
       author: { username: 'alice' },
-      created_at: '2026-01-15T10:00:00Z',
+      createdAt: '2026-01-15T10:00:00Z',
       body: 'Looks good!',
     };
 

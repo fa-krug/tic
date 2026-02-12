@@ -1,82 +1,126 @@
 import type { WorkItem, Comment } from '../../types.js';
 
-export interface GlIssue {
-  iid: number;
+// --- GitLab Work Items GraphQL API types ---
+
+export interface GlWorkItem {
+  id: string; // 'gid://gitlab/WorkItem/123'
+  iid: string;
   title: string;
-  description: string | null;
-  state: string;
-  assignees: { username: string }[];
-  labels: string[];
-  milestone: { title: string } | null;
-  epic: { iid: number } | null;
-  created_at: string;
-  updated_at: string;
+  state: string; // 'OPEN' | 'CLOSED'
+  workItemType: { name: string };
+  widgets: GlWidget[];
+  createdAt: string;
+  updatedAt: string;
 }
 
-export interface GlEpic {
-  iid: number;
-  title: string;
-  description: string | null;
-  state: string;
-  labels: string[];
-  created_at: string;
-  updated_at: string;
-}
+export type GlWidget =
+  | {
+      __typename: 'WorkItemWidgetDescription';
+      description: string;
+    }
+  | {
+      __typename: 'WorkItemWidgetAssignees';
+      assignees: { nodes: Array<{ username: string }> };
+    }
+  | {
+      __typename: 'WorkItemWidgetLabels';
+      labels: { nodes: Array<{ title: string }> };
+    }
+  | {
+      __typename: 'WorkItemWidgetMilestone';
+      milestone: { title: string } | null;
+    }
+  | {
+      __typename: 'WorkItemWidgetHierarchy';
+      parent: {
+        id: string;
+        iid: string;
+        workItemType: { name: string };
+      } | null;
+    }
+  | {
+      __typename: 'WorkItemWidgetNotes';
+      discussions: {
+        nodes: Array<{ notes: { nodes: GlNote[] } }>;
+      };
+    }
+  | { __typename: string }; // catch-all for unknown widgets
 
 export interface GlNote {
   author: { username: string };
-  created_at: string;
+  createdAt: string;
   body: string;
 }
 
-export interface GlIteration {
-  title: string;
-  start_date: string;
-  due_date: string;
+// --- Helper ---
+
+type WidgetByType<T extends GlWidget['__typename']> = Extract<
+  GlWidget,
+  { __typename: T }
+>;
+
+function findWidget<T extends GlWidget['__typename']>(
+  widgets: GlWidget[],
+  typename: T,
+): WidgetByType<T> | undefined {
+  return widgets.find((w) => w.__typename === typename) as
+    | WidgetByType<T>
+    | undefined;
 }
 
-export function mapIssueToWorkItem(issue: GlIssue): WorkItem {
-  return {
-    id: `issue-${issue.iid}`,
-    title: issue.title,
-    description: issue.description ?? '',
-    status: issue.state === 'opened' ? 'open' : 'closed',
-    type: 'issue',
-    assignee: issue.assignees[0]?.username ?? '',
-    labels: issue.labels,
-    iteration: issue.milestone?.title ?? '',
-    priority: 'medium',
-    created: issue.created_at,
-    updated: issue.updated_at,
-    parent: issue.epic ? `epic-${issue.epic.iid}` : null,
-    dependsOn: [],
-    comments: [],
-  };
-}
+// --- Mappers ---
 
-export function mapEpicToWorkItem(epic: GlEpic): WorkItem {
+export function mapWorkItemToWorkItem(workItem: GlWorkItem): WorkItem {
+  const type = workItem.workItemType.name.toLowerCase();
+
+  const descWidget = findWidget(workItem.widgets, 'WorkItemWidgetDescription');
+  const assigneesWidget = findWidget(
+    workItem.widgets,
+    'WorkItemWidgetAssignees',
+  );
+  const labelsWidget = findWidget(workItem.widgets, 'WorkItemWidgetLabels');
+  const milestoneWidget = findWidget(
+    workItem.widgets,
+    'WorkItemWidgetMilestone',
+  );
+  const hierarchyWidget = findWidget(
+    workItem.widgets,
+    'WorkItemWidgetHierarchy',
+  );
+  const notesWidget = findWidget(workItem.widgets, 'WorkItemWidgetNotes');
+
+  const parent = hierarchyWidget?.parent
+    ? `${hierarchyWidget.parent.workItemType.name.toLowerCase()}-${hierarchyWidget.parent.iid}`
+    : null;
+
+  const comments: Comment[] = notesWidget
+    ? notesWidget.discussions.nodes.flatMap((d) =>
+        d.notes.nodes.map(mapNoteToComment),
+      )
+    : [];
+
   return {
-    id: `epic-${epic.iid}`,
-    title: epic.title,
-    description: epic.description ?? '',
-    status: epic.state === 'opened' ? 'open' : 'closed',
-    type: 'epic',
-    assignee: '',
-    labels: epic.labels,
-    iteration: '',
+    id: `${type}-${workItem.iid}`,
+    title: workItem.title,
+    description: descWidget?.description ?? '',
+    status: workItem.state === 'CLOSED' ? 'closed' : 'open',
+    type,
+    assignee: assigneesWidget?.assignees.nodes[0]?.username ?? '',
+    labels: labelsWidget?.labels.nodes.map((l) => l.title) ?? [],
+    iteration: milestoneWidget?.milestone?.title ?? '',
     priority: 'medium',
-    created: epic.created_at,
-    updated: epic.updated_at,
-    parent: null,
+    created: workItem.createdAt,
+    updated: workItem.updatedAt,
+    parent,
     dependsOn: [],
-    comments: [],
+    comments,
   };
 }
 
 export function mapNoteToComment(note: GlNote): Comment {
   return {
     author: note.author.username,
-    date: note.created_at,
+    date: note.createdAt,
     body: note.body,
   };
 }
