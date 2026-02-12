@@ -72,7 +72,7 @@ export async function createRemoteBackend(
     }
     case 'azure': {
       const { AzureDevOpsBackend } = await import('./ado/index.js');
-      return new AzureDevOpsBackend(root);
+      return AzureDevOpsBackend.create(root, options);
     }
     case 'jira': {
       const { JiraBackend } = await import('./jira/index.js');
