@@ -1,6 +1,6 @@
 {
   "name": "@sascha384/tic",
-  "version": "4.0.0",
+  "version": "4.1.0",
   "description": "Terminal UI for issue tracking",
   "type": "module",
   "bin": {
