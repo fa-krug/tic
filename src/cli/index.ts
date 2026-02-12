@@ -530,12 +530,13 @@ export function createProgram(): Command {
   auth
     .command('login')
     .description('Authenticate with a backend provider')
-    .argument('<provider>', 'Provider (github)')
-    .action(async (provider: string) => {
+    .argument('<provider>', 'Provider (github, azure)')
+    .option('--pat', 'Authenticate with a Personal Access Token')
+    .action(async (provider: string, options: { pat?: boolean }) => {
       const parentOpts = program.opts<GlobalOpts>();
       try {
         const { runAuthLogin } = await import('./commands/auth.js');
-        await runAuthLogin(provider);
+        await runAuthLogin(provider, { pat: options.pat });
         if (!parentOpts.quiet) {
           console.log(`Authenticated with ${provider}`);
         }
@@ -568,7 +569,7 @@ export function createProgram(): Command {
   auth
     .command('logout')
     .description('Remove stored credentials for a provider')
-    .argument('<provider>', 'Provider (github)')
+    .argument('<provider>', 'Provider (github, azure)')
     .action(async (provider: string) => {
       const parentOpts = program.opts<GlobalOpts>();
       try {
