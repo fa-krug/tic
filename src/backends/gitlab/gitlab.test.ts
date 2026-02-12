@@ -11,14 +11,12 @@ vi.mock('./glab.js', () => ({
 
 // Mock the remote detection
 vi.mock('./remote.js', () => ({
-  parseGitLabRemote: vi
-    .fn()
-    .mockReturnValue({
-      host: 'gitlab.com',
-      group: 'mygroup',
-      project: 'myproject',
-      fullPath: 'mygroup/myproject',
-    }),
+  parseGitLabRemote: vi.fn().mockReturnValue({
+    host: 'gitlab.com',
+    group: 'mygroup',
+    project: 'myproject',
+    fullPath: 'mygroup/myproject',
+  }),
 }));
 
 // Mock node:child_process for the direct execFile import in index.ts (used by openItem for epics)

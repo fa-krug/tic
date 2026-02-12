@@ -143,7 +143,8 @@ describe('GitLabApiClient', () => {
       }
     }`;
 
-    const extractConnection = (data: ProjectResponse) => data.project.workItems;
+    const extractConnection = (data: unknown) =>
+      (data as ProjectResponse).project.workItems;
 
     it('paginates through multiple pages using cursor', async () => {
       const page1Response: ProjectResponse = {
@@ -282,7 +283,8 @@ describe('GitLabApiClient', () => {
 
       fetchMock.mockResolvedValue(mockResponse(200, { data: response }));
 
-      const differentExtract = (data: IssuesResponse) => data.group.issues;
+      const differentExtract = (data: unknown) =>
+        (data as IssuesResponse).group.issues;
 
       const allNodes: WorkItemNode[] = [];
       for await (const page of client.paginate<WorkItemNode>(

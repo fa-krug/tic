@@ -1,6 +1,6 @@
 import { AuthError, BaseApiClient } from '../shared/api-client.js';
 
-interface Connection<T> {
+export interface Connection<T> {
   nodes: T[];
   pageInfo: {
     hasNextPage: boolean;
