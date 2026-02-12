@@ -7,6 +7,7 @@ import type { GlWorkItem } from './mappers.js';
 vi.mock('../../auth/gitlab.js', () => ({
   getGitLabToken: vi.fn(),
   getGitLabPat: vi.fn(),
+  authenticateGitLab: vi.fn(),
 }));
 
 // Mock the remote detection
@@ -169,13 +170,16 @@ describe('GitLabBackend', () => {
       ).rejects.toThrow('GitLab authentication required');
     });
 
-    it('throws AuthError without skipAuth when no token', async () => {
+    it('triggers auth flow when no token is stored', async () => {
       mockGetToken.mockReturnValue(null);
       mockGetPat.mockReturnValue(null);
+      const { authenticateGitLab } = await import('../../auth/gitlab.js');
+      vi.mocked(authenticateGitLab).mockResolvedValueOnce('new-token');
+      mockGraphql.mockResolvedValueOnce(workItemTypesResponse);
 
-      await expect(GitLabBackend.create('/repo')).rejects.toThrow(
-        'GitLab authentication required',
-      );
+      const backend = await GitLabBackend.create('/repo');
+      expect(backend).toBeInstanceOf(GitLabBackend);
+      expect(authenticateGitLab).toHaveBeenCalled();
     });
   });
 

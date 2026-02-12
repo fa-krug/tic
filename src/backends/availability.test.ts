@@ -39,8 +39,8 @@ describe('BACKEND_CLI', () => {
     expect(BACKEND_CLI.github).toBe('gh');
   });
 
-  it('maps gitlab to glab', () => {
-    expect(BACKEND_CLI.gitlab).toBe('glab');
+  it('maps gitlab to null (no CLI needed)', () => {
+    expect(BACKEND_CLI.gitlab).toBeNull();
   });
 
   it('maps azure to az', () => {
@@ -93,22 +93,10 @@ describe('checkBackendAvailability', () => {
     expect(result).toBe(false);
   });
 
-  it('returns true when glab CLI is available', async () => {
-    simulateSuccess();
+  it('returns true for gitlab (no CLI required)', async () => {
     const result = await checkBackendAvailability('gitlab');
     expect(result).toBe(true);
-    expect(mockExecFile).toHaveBeenCalledWith(
-      'glab',
-      ['--version'],
-      { timeout: 5000 },
-      expect.any(Function),
-    );
-  });
-
-  it('returns false when glab CLI is not available', async () => {
-    simulateFailure();
-    const result = await checkBackendAvailability('gitlab');
-    expect(result).toBe(false);
+    expect(mockExecFile).not.toHaveBeenCalled();
   });
 
   it('returns true when az CLI is available', async () => {
@@ -146,8 +134,8 @@ describe('checkAllBackendAvailability', () => {
       azure: true,
       jira: true,
     });
-    // Only CLI backends should trigger execFile (github, gitlab, azure)
-    expect(mockExecFile).toHaveBeenCalledTimes(3);
+    // Only CLI backends should trigger execFile (github, azure)
+    expect(mockExecFile).toHaveBeenCalledTimes(2);
   });
 
   it('reports unavailable backends correctly', async () => {
@@ -157,7 +145,7 @@ describe('checkAllBackendAvailability', () => {
       none: true,
       filesystem: true,
       github: false,
-      gitlab: false,
+      gitlab: true,
       azure: false,
       jira: true,
     });

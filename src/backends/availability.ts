@@ -8,7 +8,7 @@ export const BACKEND_CLI: Record<BackendType, string | null> = {
   none: null,
   filesystem: null,
   github: 'gh',
-  gitlab: 'glab',
+  gitlab: null,
   azure: 'az',
   jira: null,
 };

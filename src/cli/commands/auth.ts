@@ -10,9 +10,16 @@ import {
   ADO_ACCOUNT,
   ADO_PAT_ACCOUNT,
 } from '../../auth/ado.js';
+import {
+  authenticateGitLab,
+  clearGitLabTokens,
+  setGitLabPat,
+  GITLAB_ACCOUNT,
+  GITLAB_PAT_ACCOUNT,
+} from '../../auth/gitlab.js';
 import { getToken } from '../../auth/keychain.js';
 
-const VALID_PROVIDERS = ['github', 'azure'] as const;
+const VALID_PROVIDERS = ['github', 'azure', 'gitlab'] as const;
 type Provider = (typeof VALID_PROVIDERS)[number];
 
 function assertProvider(provider: string): asserts provider is Provider {
@@ -25,7 +32,7 @@ function assertProvider(provider: string): asserts provider is Provider {
 
 /**
  * Authenticate with a backend provider using the device code flow.
- * Supports: github, azure
+ * Supports: github, azure, gitlab
  */
 export async function runAuthLogin(
   provider: string,
@@ -52,6 +59,17 @@ export async function runAuthLogin(
           console.log(`Open ${verificationUri} and enter code: ${userCode}`);
         },
       });
+    case 'gitlab':
+      if (options?.pat) {
+        const pat = await readLine('Enter your GitLab PAT: ');
+        setGitLabPat(pat);
+        return pat;
+      }
+      return authenticateGitLab({
+        onCode(userCode, verificationUri) {
+          console.log(`Open ${verificationUri} and enter code: ${userCode}`);
+        },
+      });
   }
 }
 
@@ -65,6 +83,8 @@ export function runAuthStatus(): {
 }[] {
   const adoToken = getToken(ADO_ACCOUNT);
   const adoPat = getToken(ADO_PAT_ACCOUNT);
+  const gitlabToken = getToken(GITLAB_ACCOUNT);
+  const gitlabPat = getToken(GITLAB_PAT_ACCOUNT);
   return [
     {
       provider: 'github',
@@ -74,6 +94,11 @@ export function runAuthStatus(): {
       provider: 'azure',
       authenticated: adoToken !== null || adoPat !== null,
       method: adoToken ? 'oauth' : adoPat ? 'pat' : undefined,
+    },
+    {
+      provider: 'gitlab',
+      authenticated: gitlabToken !== null || gitlabPat !== null,
+      method: gitlabToken ? 'oauth' : gitlabPat ? 'pat' : undefined,
     },
   ];
 }
@@ -90,6 +115,9 @@ export function runAuthLogout(provider: string): void {
       break;
     case 'azure':
       clearAdoTokens();
+      break;
+    case 'gitlab':
+      clearGitLabTokens();
       break;
   }
 }

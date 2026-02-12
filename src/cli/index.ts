@@ -530,7 +530,7 @@ export function createProgram(): Command {
   auth
     .command('login')
     .description('Authenticate with a backend provider')
-    .argument('<provider>', 'Provider (github, azure)')
+    .argument('<provider>', 'Provider (github, gitlab, azure)')
     .option('--pat', 'Authenticate with a Personal Access Token')
     .action(async (provider: string, options: { pat?: boolean }) => {
       const parentOpts = program.opts<GlobalOpts>();
@@ -569,7 +569,7 @@ export function createProgram(): Command {
   auth
     .command('logout')
     .description('Remove stored credentials for a provider')
-    .argument('<provider>', 'Provider (github, azure)')
+    .argument('<provider>', 'Provider (github, gitlab, azure)')
     .action(async (provider: string) => {
       const parentOpts = program.opts<GlobalOpts>();
       try {
