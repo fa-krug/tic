@@ -282,13 +282,21 @@ export function StatusScreen() {
         <Box marginTop={1} flexDirection="column">
           <Text bold>Sync:</Text>
           <Box marginLeft={2}>
-            {authDismissed ? (
+            {authDismissed &&
+            ['github', 'azure', 'gitlab'].includes(backendType) ? (
               <Text dimColor>
                 Not available — not authenticated. Run{' '}
-                <Text bold>tic auth login github</Text> to authenticate.
+                <Text bold>
+                  tic auth login {backendType === 'azure' ? 'ado' : backendType}
+                </Text>{' '}
+                to authenticate.
               </Text>
             ) : (
-              <Text dimColor>Not available (local-only mode)</Text>
+              <Text dimColor>
+                {authDismissed
+                  ? 'Not available — not authenticated.'
+                  : 'Not available (local-only mode)'}
+              </Text>
             )}
           </Box>
         </Box>

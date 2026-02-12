@@ -40,7 +40,7 @@ export interface AuthPromptInfo {
 }
 
 export interface AuthFlowState {
-  state: 'waiting' | 'code-ready' | 'success' | 'error';
+  state: 'waiting' | 'code-ready' | 'entering-pat' | 'success' | 'error';
   userCode?: string;
   verificationUri?: string;
   error?: string;
@@ -78,6 +78,8 @@ export interface BackendDataStoreState {
   setSyncStatus(status: SyncStatus): void;
   dismissAuthPrompt(): void;
   startAuthFlow(): Promise<void>;
+  startPatFlow(): void;
+  submitAdoPat(pat: string): Promise<void>;
   destroy(): void;
 }
 
@@ -268,6 +270,59 @@ export const backendDataStore = createStore<BackendDataStoreState>(
 
     dismissAuthPrompt() {
       set({ authPrompt: null, authFlow: null, authDismissed: true });
+    },
+
+    startPatFlow() {
+      set({ authFlow: { state: 'entering-pat' } });
+    },
+
+    async submitAdoPat(pat: string) {
+      if (!currentCwd) return;
+      const { setAdoPat } = await import('../auth/ado.js');
+      setAdoPat(pat);
+
+      set({ authFlow: { state: 'waiting' } });
+
+      try {
+        const generation = initGeneration;
+        const { createRemoteBackend } = await import('../backends/factory.js');
+        const remote = await createRemoteBackend(currentCwd, 'azure');
+
+        if (generation !== initGeneration || !remote || !currentBackend) {
+          return;
+        }
+
+        const { SyncManager: SM } = await import('../sync/SyncManager.js');
+        const { SyncQueue } = await import('../storage/syncQueue.js');
+        type StorageType = import('../storage/index.js').Storage;
+        const primary = currentBackend as StorageType;
+        const queue = new SyncQueue(primary.getDatabase());
+        const syncManager = new SM(primary, remote, queue);
+
+        syncManager.onStatusChange((status: SyncStatus) => {
+          if (generation !== initGeneration) return;
+          get().setSyncStatus(status);
+          if (status.state === 'idle') {
+            void get().refresh();
+          }
+        });
+
+        set({
+          syncManager,
+          queue,
+          authPrompt: null,
+          authFlow: null,
+        });
+
+        syncManager.sync().catch(() => {});
+      } catch (err: unknown) {
+        set({
+          authFlow: {
+            state: 'error',
+            error: err instanceof Error ? err.message : String(err),
+          },
+        });
+      }
     },
 
     async startAuthFlow() {

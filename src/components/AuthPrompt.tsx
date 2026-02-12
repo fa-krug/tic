@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
+import TextInput from 'ink-text-input';
 import Spinner from 'ink-spinner';
 import {
   backendDataStore,
@@ -9,24 +11,64 @@ import { BACKEND_LABELS } from './Header.js';
 export function AuthPrompt() {
   const authPrompt = useBackendDataStore((s) => s.authPrompt);
   const authFlow = useBackendDataStore((s) => s.authFlow);
+  const [pat, setPat] = useState('');
 
   const isPolling =
-    authFlow?.state === 'waiting' || authFlow?.state === 'code-ready';
+    authFlow?.state === 'waiting' ||
+    authFlow?.state === 'code-ready' ||
+    authFlow?.state === 'entering-pat';
 
-  useInput((_input, key) => {
-    if (key.return && !isPolling) {
-      void backendDataStore.getState().startAuthFlow();
-      return;
-    }
-    if (key.escape) {
-      backendDataStore.getState().dismissAuthPrompt();
-    }
-  });
+  useInput(
+    (_input, key) => {
+      if (key.return && !isPolling) {
+        void backendDataStore.getState().startAuthFlow();
+        return;
+      }
+      if (key.escape) {
+        backendDataStore.getState().dismissAuthPrompt();
+      }
+      if (_input === 'p' && authPrompt?.backendType === 'azure' && !isPolling) {
+        backendDataStore.getState().startPatFlow();
+      }
+    },
+    { isActive: authFlow?.state !== 'entering-pat' },
+  );
 
   if (!authPrompt) return null;
 
   const backendLabel =
     BACKEND_LABELS[authPrompt.backendType] ?? authPrompt.backendType;
+
+  // PAT input
+  if (authFlow?.state === 'entering-pat') {
+    return (
+      <Box
+        borderStyle="round"
+        borderColor="yellow"
+        flexDirection="column"
+        paddingX={2}
+        paddingY={1}
+      >
+        <Text bold color="yellow">
+          Enter Azure DevOps PAT
+        </Text>
+        <Box marginTop={1}>
+          <Text>PAT: </Text>
+          <TextInput
+            value={pat}
+            onChange={setPat}
+            mask="*"
+            onSubmit={(val) => {
+              void backendDataStore.getState().submitAdoPat(val);
+            }}
+          />
+        </Box>
+        <Box marginTop={1}>
+          <Text dimColor>enter submit esc cancel</Text>
+        </Box>
+      </Box>
+    );
+  }
 
   // Code ready — show device code
   if (authFlow?.state === 'code-ready') {
@@ -133,7 +175,11 @@ export function AuthPrompt() {
         <Text>{authPrompt.message}</Text>
       </Box>
       <Box marginTop={1}>
-        <Text dimColor>enter authenticate esc skip (local-only mode)</Text>
+        <Text dimColor>
+          enter authenticate
+          {authPrompt.backendType === 'azure' && '  p use PAT'} esc skip
+          (local-only mode)
+        </Text>
       </Box>
     </Box>
   );

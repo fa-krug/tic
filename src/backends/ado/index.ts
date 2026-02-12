@@ -71,7 +71,7 @@ export class AzureDevOpsBackend extends BaseBackend {
     if (!auth) {
       if (options?.skipAuth) {
         throw new AuthError(
-          'Azure DevOps authentication required. Run "tic auth login azure" to authenticate.',
+          'Azure DevOps authentication required. Run "tic auth login ado" to authenticate.',
         );
       }
       const accessToken = await authenticateAdo({

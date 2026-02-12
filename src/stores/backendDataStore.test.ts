@@ -225,4 +225,9 @@ describe('backendDataStore', () => {
     expect(backendDataStore.getState().loading).toBe(false);
     expect(backendDataStore.getState().syncManager).toBeNull();
   });
+
+  it('handles startPatFlow', () => {
+    backendDataStore.getState().startPatFlow();
+    expect(backendDataStore.getState().authFlow?.state).toBe('entering-pat');
+  });
 });

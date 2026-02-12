@@ -188,8 +188,8 @@ tic iteration set sprint-2           # Set current iteration
 tic config get backend               # Get config value
 tic config set backend github        # Set config value
 tic auth login github                # Authenticate with GitHub (OAuth device flow)
-tic auth login azure                 # Authenticate with Azure DevOps (Entra ID)
-tic auth login azure --pat           # Authenticate with a Personal Access Token
+tic auth login ado                   # Authenticate with Azure DevOps (Entra ID)
+tic auth login ado --pat             # Authenticate with a Personal Access Token
 tic auth status                      # Show authentication status
 tic auth logout github               # Remove stored credentials
 ```
@@ -203,7 +203,7 @@ Add `--json` to any command for machine-readable output, or `--quiet` to suppres
 | Local only (SQLite) | — | Default fallback |
 | GitHub Issues | `tic auth login github` (OAuth) or existing `gh` token | `github.com` in git remote |
 | GitLab Issues | [`glab`](https://gitlab.com/gitlab-org/cli) CLI | `gitlab.com` in git remote |
-| Azure DevOps Work Items | `tic auth login azure` (Entra ID) or `--pat` | `dev.azure.com` or `visualstudio.com` in git remote |
+| Azure DevOps Work Items | `tic auth login ado` (Entra ID) or `--pat` | `dev.azure.com` or `visualstudio.com` in git remote |
 | Jira | REST API (configured in settings) | Configured via settings |
 
 Each backend supports a different set of capabilities (types, statuses, iterations, relationships, etc.). The TUI and CLI automatically adapt to show only what the active backend supports.
@@ -225,8 +225,8 @@ Falls back to an existing `gh` CLI token if available.
 **Azure DevOps:**
 
 ```bash
-tic auth login azure        # Entra ID device code flow (recommended)
-tic auth login azure --pat  # Personal Access Token
+tic auth login ado        # Entra ID device code flow (recommended)
+tic auth login ado --pat  # Personal Access Token
 ```
 
 **Managing credentials:**

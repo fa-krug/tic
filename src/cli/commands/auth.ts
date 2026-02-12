@@ -19,20 +19,20 @@ import {
 } from '../../auth/gitlab.js';
 import { getToken } from '../../auth/keychain.js';
 
-const VALID_PROVIDERS = ['github', 'azure', 'gitlab'] as const;
+const VALID_PROVIDERS = ['github', 'azure', 'ado', 'gitlab'] as const;
 type Provider = (typeof VALID_PROVIDERS)[number];
 
 function assertProvider(provider: string): asserts provider is Provider {
   if (!VALID_PROVIDERS.includes(provider as Provider)) {
     throw new Error(
-      `Unknown provider "${provider}". Valid providers: ${VALID_PROVIDERS.join(', ')}`,
+      `Unknown provider "${provider}". Valid providers: github, azure, ado, gitlab`,
     );
   }
 }
 
 /**
  * Authenticate with a backend provider using the device code flow.
- * Supports: github, azure, gitlab
+ * Supports: github, azure, ado, gitlab
  */
 export async function runAuthLogin(
   provider: string,
@@ -47,6 +47,7 @@ export async function runAuthLogin(
           console.log(`Open ${verificationUri} and enter code: ${userCode}`);
         },
       });
+    case 'ado':
     case 'azure':
       if (options?.pat) {
         // Read PAT from stdin or prompt
@@ -113,6 +114,7 @@ export function runAuthLogout(provider: string): void {
     case 'github':
       clearGitHubToken();
       break;
+    case 'ado':
     case 'azure':
       clearAdoTokens();
       break;
