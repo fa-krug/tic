@@ -17,7 +17,7 @@ describe('navigationStore', () => {
     });
 
     it('resets UI overlays', () => {
-      uiStore.getState().openOverlay({ type: 'search' });
+      uiStore.getState().openOverlay({ type: 'command-bar' });
       navigationStore.getState().navigate('settings');
       expect(uiStore.getState().activeOverlay).toBeNull();
     });

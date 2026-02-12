@@ -12,8 +12,8 @@ describe('uiStore', () => {
   });
 
   it('opens an overlay', () => {
-    uiStore.getState().openOverlay({ type: 'search' });
-    expect(uiStore.getState().activeOverlay).toEqual({ type: 'search' });
+    uiStore.getState().openOverlay({ type: 'command-bar' });
+    expect(uiStore.getState().activeOverlay).toEqual({ type: 'command-bar' });
   });
 
   it('opens an overlay with targetIds', () => {
@@ -37,7 +37,7 @@ describe('uiStore', () => {
   });
 
   it('closes overlay', () => {
-    uiStore.getState().openOverlay({ type: 'search' });
+    uiStore.getState().openOverlay({ type: 'command-bar' });
     uiStore.getState().closeOverlay();
     expect(uiStore.getState().activeOverlay).toBeNull();
   });
@@ -54,7 +54,7 @@ describe('uiStore', () => {
   });
 
   it('reset clears everything', () => {
-    uiStore.getState().openOverlay({ type: 'search' });
+    uiStore.getState().openOverlay({ type: 'command-bar' });
     uiStore.getState().setWarning('test');
     uiStore.getState().reset();
     expect(uiStore.getState().activeOverlay).toBeNull();
@@ -69,7 +69,7 @@ describe('uiStore', () => {
   });
 
   it('getOverlayTargetIds returns empty array when overlay has no targetIds', () => {
-    uiStore.getState().openOverlay({ type: 'search' });
+    uiStore.getState().openOverlay({ type: 'command-bar' });
     expect(getOverlayTargetIds()).toEqual([]);
   });
 

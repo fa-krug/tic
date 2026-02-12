@@ -10,6 +10,7 @@ export interface OverlayItem {
   hint?: string;
   category?: string;
   selected?: boolean;
+  kind?: 'command' | 'issue';
 }
 
 export interface OverlayItemGroup {
@@ -202,9 +203,11 @@ export function OverlayPanel({
       {visibleGroups.map((group) => (
         <Box key={group.category || '__default'} flexDirection="column">
           {group.category !== '' && (
-            <Text dimColor bold>
-              {group.category}
-            </Text>
+            <Box marginTop={1}>
+              <Text dimColor bold>
+                {group.category}
+              </Text>
+            </Box>
           )}
           {group.items.map((item) => {
             const idx = selectableIdx++;

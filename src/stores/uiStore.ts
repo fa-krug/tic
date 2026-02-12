@@ -3,8 +3,7 @@ import { useStore } from 'zustand';
 
 export type ActiveOverlay =
   // WorkItemList overlays
-  | { type: 'search' }
-  | { type: 'command-palette' }
+  | { type: 'command-bar' }
   | { type: 'bulk-menu' }
   | { type: 'delete-confirm'; targetIds: string[] }
   | { type: 'template-picker' }

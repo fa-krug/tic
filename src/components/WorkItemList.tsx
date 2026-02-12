@@ -364,7 +364,7 @@ export function WorkItemList() {
   }, [cursor]);
 
   useEffect(() => {
-    if (activeOverlay?.type !== 'search' || !backend) return;
+    if (activeOverlay?.type !== 'command-bar' || !backend) return;
     let cancelled = false;
     void backend.listWorkItems().then((items) => {
       if (!cancelled) setAllSearchItems(items);
@@ -439,13 +439,8 @@ export function WorkItemList() {
   // Block 3: Main input handler — only active when no overlay is open
   useInput(
     (input, key) => {
-      if (input === '/') {
-        openOverlay({ type: 'search' });
-        return;
-      }
-
-      if (input === ':') {
-        openOverlay({ type: 'command-palette' });
+      if (input === '/' || input === ':') {
+        openOverlay({ type: 'command-bar' });
         return;
       }
 
@@ -975,7 +970,7 @@ export function WorkItemList() {
       }
       items.push({
         id: '__new__',
-        label: 'New view...',
+        label: 'New view',
         value: '__new__',
         category: 'Actions',
       });
@@ -1138,6 +1133,9 @@ export function WorkItemList() {
         break;
     }
   };
+  // TODO: paletteItems and handleCommandSelect will be used by the unified command-bar (next task)
+  void paletteItems;
+  void handleCommandSelect;
 
   const handleBulkAction = (action: BulkAction) => {
     const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
@@ -1257,7 +1255,7 @@ export function WorkItemList() {
             <Text dimColor>↑↓ scroll space/esc close</Text>
             {positionText && <Text dimColor> {positionText}</Text>}
           </Box>
-        ) : activeOverlay?.type === 'search' ? (
+        ) : activeOverlay?.type === 'command-bar' ? (
           (() => {
             const searchItems: OverlayItem[] = allSearchItems.map((item) => ({
               id: item.id,
@@ -1289,14 +1287,14 @@ export function WorkItemList() {
             const bulkItems: OverlayItem[] = [];
             bulkItems.push({
               id: 'status',
-              label: 'Set status...',
+              label: 'Set status',
               value: 'status',
               hint: 's',
             });
             if (capabilities.iterations) {
               bulkItems.push({
                 id: 'iteration',
-                label: 'Set iteration...',
+                label: 'Set iteration',
                 value: 'iteration',
                 hint: 'i',
               });
@@ -1304,7 +1302,7 @@ export function WorkItemList() {
             if (capabilities.fields.parent) {
               bulkItems.push({
                 id: 'parent',
-                label: 'Set parent...',
+                label: 'Set parent',
                 value: 'parent',
                 hint: 'p',
               });
@@ -1312,7 +1310,7 @@ export function WorkItemList() {
             if (capabilities.customTypes) {
               bulkItems.push({
                 id: 'type',
-                label: 'Set type...',
+                label: 'Set type',
                 value: 'type',
                 hint: 't',
               });
@@ -1320,7 +1318,7 @@ export function WorkItemList() {
             if (capabilities.fields.priority) {
               bulkItems.push({
                 id: 'priority',
-                label: 'Set priority...',
+                label: 'Set priority',
                 value: 'priority',
                 hint: 'P',
               });
@@ -1328,7 +1326,7 @@ export function WorkItemList() {
             if (capabilities.fields.assignee) {
               bulkItems.push({
                 id: 'assignee',
-                label: 'Set assignee...',
+                label: 'Set assignee',
                 value: 'assignee',
                 hint: 'a',
               });
@@ -1336,7 +1334,7 @@ export function WorkItemList() {
             if (capabilities.fields.labels) {
               bulkItems.push({
                 id: 'labels',
-                label: 'Set labels...',
+                label: 'Set labels',
                 value: 'labels',
                 hint: 'l',
               });
@@ -1360,17 +1358,6 @@ export function WorkItemList() {
               />
             );
           })()
-        ) : activeOverlay?.type === 'command-palette' ? (
-          <OverlayPanel
-            title="Commands"
-            items={paletteItems}
-            placeholder="Type a command..."
-            onSelect={(item) => {
-              const cmd = paletteCommands.find((c) => c.id === item.value);
-              if (cmd) handleCommandSelect(cmd);
-            }}
-            onCancel={() => closeOverlay()}
-          />
         ) : activeOverlay?.type === 'status-picker' ? (
           <OverlayPanel
             title="Set Status"
