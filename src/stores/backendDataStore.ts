@@ -193,7 +193,9 @@ export const backendDataStore = createStore<BackendDataStoreState>(
                 }
               },
             );
-            syncManager.sync().catch(() => {});
+            syncManager.sync().catch(() => {
+              // Errors are recorded in syncStatus by SyncManager
+            });
           }
 
           return get().refresh();
@@ -328,7 +330,9 @@ export const backendDataStore = createStore<BackendDataStoreState>(
           authFlow: null,
         });
 
-        syncManager.sync().catch(() => {});
+        syncManager.sync().catch(() => {
+          // Errors are recorded in syncStatus by SyncManager
+        });
       } catch (err: unknown) {
         set({
           authFlow: {
@@ -392,7 +396,9 @@ export const backendDataStore = createStore<BackendDataStoreState>(
           authFlow: null,
         });
 
-        syncManager.sync().catch(() => {});
+        syncManager.sync().catch(() => {
+          // Errors are recorded in syncStatus by SyncManager
+        });
       } catch (err: unknown) {
         set({
           authFlow: {
@@ -483,7 +489,9 @@ export const backendDataStore = createStore<BackendDataStoreState>(
           authFlow: null,
         });
 
-        syncManager.sync().catch(() => {});
+        syncManager.sync().catch(() => {
+          // Errors are recorded in syncStatus by SyncManager
+        });
       } catch (err: unknown) {
         set({
           authFlow: {
