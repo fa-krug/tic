@@ -39,8 +39,12 @@ export class SyncManager {
     return { ...this.status };
   }
 
-  onStatusChange(cb: StatusListener): void {
+  onStatusChange(cb: StatusListener): () => void {
     this.listeners.push(cb);
+    return () => {
+      const idx = this.listeners.indexOf(cb);
+      if (idx >= 0) this.listeners.splice(idx, 1);
+    };
   }
 
   private updateStatus(partial: Partial<SyncStatus>): void {

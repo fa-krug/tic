@@ -660,6 +660,25 @@ describe('SyncManager status callbacks', () => {
     expect(states[states.length - 1]).toBe('idle');
   });
 
+  it('returns unsubscribe function from onStatusChange', async () => {
+    const remote = createMockRemote([]);
+    const manager = new SyncManager(local, remote, queueStore);
+    const states: string[] = [];
+
+    const unsubscribe = manager.onStatusChange((status) => {
+      states.push(status.state);
+    });
+
+    await manager.sync();
+    expect(states.length).toBeGreaterThan(0);
+
+    const countBefore = states.length;
+    unsubscribe();
+
+    await manager.sync();
+    expect(states.length).toBe(countBefore);
+  });
+
   it('reports error state when push fails', async () => {
     const remote = createMockRemote([]);
     // eslint-disable-next-line @typescript-eslint/require-await
