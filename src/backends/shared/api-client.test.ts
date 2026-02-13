@@ -58,13 +58,16 @@ describe('BaseApiClient', () => {
 
       const result = await client.testFetch<typeof data>('GET', '/items');
 
-      expect(fetchMock).toHaveBeenCalledWith('https://api.example.com/items', {
-        method: 'GET',
-        headers: {
-          Authorization: 'Bearer test-token',
-          Accept: 'application/json',
-        },
-      });
+      expect(fetchMock).toHaveBeenCalledWith(
+        'https://api.example.com/items',
+        expect.objectContaining({
+          method: 'GET',
+          headers: {
+            Authorization: 'Bearer test-token',
+            Accept: 'application/json',
+          },
+        }),
+      );
       expect(result).toEqual(data);
     });
 
@@ -75,15 +78,18 @@ describe('BaseApiClient', () => {
 
       await client.testFetch('POST', '/items', body);
 
-      expect(fetchMock).toHaveBeenCalledWith('https://api.example.com/items', {
-        method: 'POST',
-        headers: {
-          Authorization: 'Bearer test-token',
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-      });
+      expect(fetchMock).toHaveBeenCalledWith(
+        'https://api.example.com/items',
+        expect.objectContaining({
+          method: 'POST',
+          headers: {
+            Authorization: 'Bearer test-token',
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body),
+        }),
+      );
     });
 
     it('throws AuthError on 401', async () => {
@@ -122,6 +128,27 @@ describe('BaseApiClient', () => {
       await expect(client.testFetch('GET', '/items')).rejects.toThrow(
         'HTTP 500:',
       );
+    });
+
+    it('throws "Request timed out" when fetch is aborted', async () => {
+      fetchMock.mockImplementation(() => {
+        throw new DOMException('The operation was aborted', 'AbortError');
+      });
+
+      await expect(client.testFetch('GET', '/items')).rejects.toThrow(
+        'Request timed out',
+      );
+    });
+
+    it('passes AbortSignal to fetch', async () => {
+      const data = { id: 1 };
+      fetchMock.mockResolvedValue(mockResponse(200, data));
+
+      await client.testFetch('GET', '/items');
+
+      const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(init.signal).toBeInstanceOf(AbortSignal);
+      expect(init.signal?.aborted).toBe(false);
     });
   });
 

@@ -15,6 +15,8 @@ export class RateLimitError extends Error {
   }
 }
 
+export const DEFAULT_TIMEOUT_MS = 15_000;
+
 export abstract class BaseApiClient {
   protected token: string;
   protected baseUrl: string;
@@ -43,7 +45,21 @@ export abstract class BaseApiClient {
       init.body = JSON.stringify(body);
     }
 
-    const response = await globalThis.fetch(url, init);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+    init.signal = controller.signal;
+
+    let response: Response;
+    try {
+      response = await globalThis.fetch(url, init);
+    } catch (error: unknown) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new Error('Request timed out');
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
 
     this.checkRateLimit(response.headers);
 
