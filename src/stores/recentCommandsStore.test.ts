@@ -153,4 +153,32 @@ describe('recentCommandsStore', () => {
     expect(recentCommandsStore.getState().recentIds).toEqual([]);
     expect(recentCommandsStore.getState().root).toBeNull();
   });
+
+  it('recovers from write errors and continues writing', async () => {
+    const { rm } = await import('node:fs/promises');
+    await recentCommandsStore.getState().init(root);
+
+    // Make the target file a directory so writeFile fails with EISDIR
+    const filePath = join(root, '.tic', 'recent-commands.json');
+    await rm(filePath, { force: true });
+    await mkdir(filePath, { recursive: true });
+
+    // First addRecent will fail because the path is a directory
+    recentCommandsStore.getState().addRecent('create');
+
+    // Wait for the failed write to settle
+    await new Promise((r) => setTimeout(r, 100));
+
+    // Fix the path: remove the directory so the next write succeeds
+    await rm(filePath, { recursive: true });
+
+    // Second addRecent should succeed because .catch(() => {}) prevents chain breakage
+    recentCommandsStore.getState().addRecent('edit');
+
+    // Wait for async write
+    await new Promise((r) => setTimeout(r, 200));
+
+    const data = await readFile(filePath, 'utf-8');
+    expect(JSON.parse(data)).toEqual(['edit', 'create']);
+  });
 });

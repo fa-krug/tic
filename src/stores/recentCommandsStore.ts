@@ -46,11 +46,13 @@ export const recentCommandsStore = createStore<RecentCommandsStoreState>(
 
       if (root) {
         const filePath = join(root, '.tic', FILENAME);
-        writeChain = writeChain.then(() =>
-          mkdir(join(root, '.tic'), { recursive: true }).then(() =>
-            writeFile(filePath, JSON.stringify(updated) + '\n'),
-          ),
-        );
+        writeChain = writeChain
+          .then(() =>
+            mkdir(join(root, '.tic'), { recursive: true }).then(() =>
+              writeFile(filePath, JSON.stringify(updated) + '\n'),
+            ),
+          )
+          .catch(() => {});
       }
     },
 

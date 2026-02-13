@@ -13,6 +13,7 @@ export type AdoAuth =
 
 export class AdoApiClient extends BaseApiClient {
   private auth: AdoAuth;
+  private refreshPromise: Promise<string | null> | null = null;
 
   constructor(auth: AdoAuth, org: string) {
     const token = auth.type === 'bearer' ? auth.token : auth.pat;
@@ -76,7 +77,12 @@ export class AdoApiClient extends BaseApiClient {
     if (response.status === 401 && this.auth.type === 'bearer') {
       const refreshToken = getAdoRefreshToken();
       if (refreshToken) {
-        const newToken = await refreshAdoToken(refreshToken);
+        if (!this.refreshPromise) {
+          this.refreshPromise = refreshAdoToken(refreshToken).finally(() => {
+            this.refreshPromise = null;
+          });
+        }
+        const newToken = await this.refreshPromise;
         if (newToken) {
           this.auth = { type: 'bearer', token: newToken };
           this.token = newToken;

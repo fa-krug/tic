@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AdoApiClient } from './api.js';
 import { AuthError } from '../shared/api-client.js';
+import { getAdoRefreshToken, refreshAdoToken } from '../../auth/ado.js';
+
+vi.mock('../../auth/ado.js', () => ({
+  getAdoRefreshToken: vi.fn(),
+  refreshAdoToken: vi.fn(),
+}));
 
 function mockResponse(
   status: number,
@@ -215,6 +221,32 @@ describe('AdoApiClient', () => {
         ids: number[];
       };
       expect(thirdBody.ids).toHaveLength(50);
+    });
+  });
+
+  describe('token refresh mutex', () => {
+    it('calls refreshAdoToken only once for concurrent 401 responses', async () => {
+      const getRefresh = vi.mocked(getAdoRefreshToken);
+      const refresh = vi.mocked(refreshAdoToken);
+
+      getRefresh.mockReturnValue('refresh-token-123');
+      refresh.mockResolvedValue('new-access-token');
+
+      // First two calls (one per concurrent request) return 401, retries succeed
+      fetchMock
+        .mockResolvedValueOnce(mockResponse(401, 'Unauthorized'))
+        .mockResolvedValueOnce(mockResponse(401, 'Unauthorized'))
+        .mockResolvedValue(mockResponse(200, { id: 1 }));
+
+      const [result1, result2] = await Promise.all([
+        client.rest<{ id: number }>('GET', '/_apis/wit/workitems/1'),
+        client.rest<{ id: number }>('GET', '/_apis/wit/workitems/2'),
+      ]);
+
+      expect(result1).toEqual({ id: 1 });
+      expect(result2).toEqual({ id: 1 });
+      expect(refresh).toHaveBeenCalledTimes(1);
+      expect(refresh).toHaveBeenCalledWith('refresh-token-123');
     });
   });
 

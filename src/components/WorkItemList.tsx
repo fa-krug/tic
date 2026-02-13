@@ -229,18 +229,24 @@ export function WorkItemList() {
   }, [warning, clearWarning]);
 
   useEffect(() => {
-    if (capabilities.templates && backend) {
-      void backend
-        .listTemplates()
-        .then(setTemplates)
-        .catch((err: unknown) => {
-          uiStore
-            .getState()
-            .setToast(
-              err instanceof Error ? err.message : 'Failed to load templates',
-            );
-        });
-    }
+    if (!capabilities.templates || !backend) return;
+    let cancelled = false;
+    void backend
+      .listTemplates()
+      .then((t) => {
+        if (!cancelled) setTemplates(t);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        uiStore
+          .getState()
+          .setToast(
+            err instanceof Error ? err.message : 'Failed to load templates',
+          );
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [backend, capabilities.templates]);
 
   // Load default view on startup

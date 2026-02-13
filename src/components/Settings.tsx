@@ -93,8 +93,10 @@ export function Settings() {
   );
 
   useEffect(() => {
+    let cancelled = false;
     void checkAllBackendAvailability()
       .then((results) => {
+        if (cancelled) return;
         setAvailability(
           Object.fromEntries(
             Object.entries(results).map(([b, ok]) => [
@@ -105,33 +107,47 @@ export function Settings() {
         );
       })
       .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
-    if (capabilities.templates && backend) {
-      void backend
-        .listTemplates()
-        .then(setTemplates)
-        .catch((err: unknown) => {
-          uiStore
-            .getState()
-            .setToast(
-              err instanceof Error ? err.message : 'Failed to load templates',
-            );
-        });
-    }
+    if (!capabilities.templates || !backend) return;
+    let cancelled = false;
+    void backend
+      .listTemplates()
+      .then((t) => {
+        if (!cancelled) setTemplates(t);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        uiStore
+          .getState()
+          .setToast(
+            err instanceof Error ? err.message : 'Failed to load templates',
+          );
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [backend, capabilities.templates]);
 
   useEffect(() => {
+    let cancelled = false;
     setUpdateChecking(true);
     void checkForUpdate()
       .then((info) => {
+        if (cancelled) return;
         setUpdateInfo(info);
         setUpdateChecking(false);
       })
       .catch(() => {
-        setUpdateChecking(false);
+        if (!cancelled) setUpdateChecking(false);
       });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Initialize cursor and jira fields when config loads
