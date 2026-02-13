@@ -5,7 +5,56 @@ import {
   mapPriorityToTic,
   mapPriorityToJira,
   extractDependsOn,
+  adfToText,
 } from './mappers.js';
+
+describe('adfToText', () => {
+  it('converts ADF doc with paragraph and text nodes', () => {
+    const adf = {
+      type: 'doc',
+      version: 1,
+      content: [
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Hello world' }],
+        },
+      ],
+    };
+    expect(adfToText(adf)).toBe('Hello world');
+  });
+
+  it('returns empty string for null', () => {
+    expect(adfToText(null)).toBe('');
+  });
+
+  it('returns empty string for undefined', () => {
+    expect(adfToText(undefined)).toBe('');
+  });
+
+  it('returns string as-is if input is string', () => {
+    expect(adfToText('plain text')).toBe('plain text');
+  });
+
+  it('handles nested content', () => {
+    const adf = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'First ' },
+            { type: 'text', text: 'Second' },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Third' }],
+        },
+      ],
+    };
+    expect(adfToText(adf)).toBe('First SecondThird');
+  });
+});
 
 describe('mapPriorityToTic', () => {
   it('maps Highest to critical', () => {
@@ -70,7 +119,18 @@ describe('mapIssueToWorkItem', () => {
       key: 'TEAM-42',
       fields: {
         summary: 'Fix login bug',
-        description: 'The login form breaks on mobile.',
+        description: {
+          type: 'doc',
+          version: 1,
+          content: [
+            {
+              type: 'paragraph',
+              content: [
+                { type: 'text', text: 'The login form breaks on mobile.' },
+              ],
+            },
+          ],
+        },
         status: { name: 'In Progress' },
         issuetype: { name: 'Bug' },
         priority: { name: 'High' },
@@ -152,7 +212,16 @@ describe('mapCommentToComment', () => {
         emailAddress: 'alice@example.com',
       },
       created: '2026-01-15T10:00:00.000+0000',
-      body: 'Looks good!',
+      body: {
+        type: 'doc',
+        version: 1,
+        content: [
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: 'Looks good!' }],
+          },
+        ],
+      },
     };
 
     const comment = mapCommentToComment(jiraComment);

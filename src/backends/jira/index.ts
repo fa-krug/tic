@@ -7,9 +7,11 @@ import type {
   Comment,
   Template,
 } from '../../types.js';
-import { acli, acliExec, acliExecSync } from './acli.js';
+import { JiraApiClient } from './api.js';
 import { readJiraConfig } from './config.js';
 import type { JiraConfig } from './config.js';
+import { AuthError } from '../shared/api-client.js';
+import { getJiraCredentials } from '../../auth/jira.js';
 import {
   mapIssueToWorkItem,
   mapPriorityToJira,
@@ -24,15 +26,19 @@ function titleCase(s: string): string {
     .join(' ');
 }
 
+function normalizeSite(site: string): string {
+  return site.replace(/^https?:\/\//, '');
+}
+
 export class JiraBackend extends BaseBackend {
-  private cwd: string;
+  private api: JiraApiClient;
   private config: JiraConfig;
 
   private cachedSprints: JiraSprint[] | null = null;
 
-  private constructor(cwd: string, config: JiraConfig) {
+  private constructor(api: JiraApiClient, config: JiraConfig) {
     super(60_000);
-    this.cwd = cwd;
+    this.api = api;
     this.config = config;
   }
 
@@ -40,10 +46,23 @@ export class JiraBackend extends BaseBackend {
     this.cachedSprints = null;
   }
 
-  static async create(cwd: string): Promise<JiraBackend> {
-    acliExecSync(['jira', 'auth', 'status'], cwd);
-    const config = await readJiraConfig(cwd);
-    return new JiraBackend(cwd, config);
+  static async create(
+    root: string,
+    options?: { skipAuth?: boolean },
+  ): Promise<JiraBackend> {
+    const config = await readJiraConfig(root);
+    const site = normalizeSite(config.site);
+    const credentials = getJiraCredentials(site);
+    if (!credentials) {
+      throw new AuthError(
+        'No Jira credentials found. Run "tic auth login --backend jira" to authenticate.',
+      );
+    }
+    const api = new JiraApiClient(credentials.email, credentials.token, site);
+    if (!options?.skipAuth) {
+      await api.rest('GET', '/api/3/myself');
+    }
+    return new JiraBackend(api, config);
   }
 
   getCapabilities(): BackendCapabilities {
@@ -76,33 +95,33 @@ export class JiraBackend extends BaseBackend {
   }
 
   async getStatuses(): Promise<string[]> {
-    const statuses = await acli<{ name: string }[]>(
-      [
-        'jira',
-        'project',
-        'statuses',
-        '--project',
-        this.config.project,
-        '--json',
-      ],
-      this.cwd,
+    const response = await this.api.rest<{ statuses: { name: string }[] }[]>(
+      'GET',
+      `/api/3/project/${this.config.project}/statuses`,
     );
-    return statuses.map((s) => s.name.toLowerCase());
+    const allStatuses: string[] = [];
+    for (const group of response) {
+      for (const s of group.statuses) {
+        const name = s.name.toLowerCase();
+        if (!allStatuses.includes(name)) allStatuses.push(name);
+      }
+    }
+    return allStatuses;
   }
 
   async getWorkItemTypes(): Promise<string[]> {
-    const project = await acli<{ issueTypes: { name: string }[] }>(
-      ['jira', 'project', 'view', '--project', this.config.project, '--json'],
-      this.cwd,
+    const project = await this.api.rest<{ issueTypes: { name: string }[] }>(
+      'GET',
+      `/api/3/project/${this.config.project}`,
     );
     return project.issueTypes.map((t) => t.name.toLowerCase());
   }
 
   async getAssignees(): Promise<string[]> {
     try {
-      const users = await acli<{ emailAddress: string }[]>(
-        ['jira', 'user', 'search', '--project', this.config.project, '--json'],
-        this.cwd,
+      const users = await this.api.rest<{ emailAddress: string }[]>(
+        'GET',
+        `/api/3/user/assignable/search?project=${this.config.project}`,
       );
       return users.map((u) => u.emailAddress);
     } catch {
@@ -122,20 +141,11 @@ export class JiraBackend extends BaseBackend {
 
   async getCurrentIteration(): Promise<string> {
     if (!this.config.boardId) return '';
-    const sprints = await acli<JiraSprint[]>(
-      [
-        'jira',
-        'board',
-        'list-sprints',
-        '--id',
-        String(this.config.boardId),
-        '--state',
-        'active',
-        '--json',
-      ],
-      this.cwd,
+    const response = await this.api.rest<{ values: JiraSprint[] }>(
+      'GET',
+      `/agile/1.0/board/${this.config.boardId}/sprint?state=active`,
     );
-    return sprints.length > 0 ? sprints[0]!.name : '';
+    return response.values.length > 0 ? response.values[0]!.name : '';
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -150,37 +160,23 @@ export class JiraBackend extends BaseBackend {
       const sprint = sprints.find((s) => s.name === iteration);
       if (!sprint) return [];
 
-      const issues = await acli<JiraIssue[]>(
-        [
-          'jira',
-          'workitem',
-          'search',
-          '--jql',
-          `project = ${this.config.project} AND sprint = ${sprint.id}`,
-          '--fields',
-          '*all',
-          '--paginate',
-          '--json',
-        ],
-        this.cwd,
-      );
+      const jql = `project = ${this.config.project} AND sprint = ${sprint.id}`;
+      const issues: JiraIssue[] = [];
+      for await (const page of this.api.paginate<JiraIssue>(
+        `/api/3/search?jql=${encodeURIComponent(jql)}&fields=*all`,
+      )) {
+        issues.push(...page);
+      }
       return issues.map(mapIssueToWorkItem);
     }
 
-    const issues = await acli<JiraIssue[]>(
-      [
-        'jira',
-        'workitem',
-        'search',
-        '--jql',
-        `project = ${this.config.project}`,
-        '--fields',
-        '*all',
-        '--paginate',
-        '--json',
-      ],
-      this.cwd,
-    );
+    const jql = `project = ${this.config.project}`;
+    const issues: JiraIssue[] = [];
+    for await (const page of this.api.paginate<JiraIssue>(
+      `/api/3/search?jql=${encodeURIComponent(jql)}&fields=*all`,
+    )) {
+      issues.push(...page);
+    }
     let items = issues.map(mapIssueToWorkItem);
     if (iteration) {
       items = items.filter((i) => i.iteration === iteration);
@@ -189,19 +185,19 @@ export class JiraBackend extends BaseBackend {
   }
 
   async getWorkItem(id: string): Promise<WorkItem> {
-    const issue = await acli<JiraIssue>(
-      ['jira', 'workitem', 'view', '--key', id, '--fields', '*all', '--json'],
-      this.cwd,
+    const issue = await this.api.rest<JiraIssue>(
+      'GET',
+      `/api/3/issue/${id}?fields=*all`,
     );
     const item = mapIssueToWorkItem(issue);
 
     // Fetch comments separately
     try {
-      const comments = await acli<JiraComment[]>(
-        ['jira', 'workitem', 'comment', 'list', '--key', id, '--json'],
-        this.cwd,
+      const response = await this.api.rest<{ comments: JiraComment[] }>(
+        'GET',
+        `/api/3/issue/${id}/comment`,
       );
-      item.comments = comments.map(mapCommentToComment);
+      item.comments = response.comments.map(mapCommentToComment);
     } catch {
       // Comments may fail — leave empty
     }
@@ -212,64 +208,59 @@ export class JiraBackend extends BaseBackend {
   async createWorkItem(data: NewWorkItem): Promise<WorkItem> {
     this.validateFields(data);
 
-    const args = [
-      'jira',
-      'workitem',
-      'create',
-      '--project',
-      this.config.project,
-      '--type',
-      titleCase(data.type),
-      '--summary',
-      data.title,
-    ];
+    const fields: Record<string, unknown> = {
+      project: { key: this.config.project },
+      issuetype: { name: titleCase(data.type) },
+      summary: data.title,
+    };
 
     if (data.description) {
-      args.push('--description', data.description);
+      fields['description'] = {
+        type: 'doc',
+        version: 1,
+        content: [
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: data.description }],
+          },
+        ],
+      };
     }
     if (data.priority && data.priority !== 'medium') {
-      args.push('--priority', mapPriorityToJira(data.priority));
+      fields['priority'] = { name: mapPriorityToJira(data.priority) };
     }
     if (data.assignee) {
-      args.push('--assignee', data.assignee);
+      fields['assignee'] = { id: data.assignee };
     }
     if (data.labels.length > 0) {
-      args.push('--labels', data.labels.join(','));
+      fields['labels'] = data.labels;
     }
     if (data.parent) {
-      args.push('--parent', data.parent);
+      fields['parent'] = { key: data.parent };
     }
 
-    args.push('--json');
-    const result = await acli<{ key: string }>(args, this.cwd);
+    const result = await this.api.rest<{ key: string }>(
+      'POST',
+      '/api/3/issue',
+      {
+        fields,
+      },
+    );
     const key = result.key;
 
     // Create dependency links
     if (data.dependsOn.length > 0) {
       try {
         for (const dep of data.dependsOn) {
-          await acliExec(
-            [
-              'jira',
-              'workitem',
-              'link',
-              'create',
-              '--out',
-              dep,
-              '--in',
-              key,
-              '--type',
-              'Blocks',
-            ],
-            this.cwd,
-          );
+          await this.api.rest('POST', '/api/3/issueLink', {
+            type: { name: 'Blocks' },
+            inwardIssue: { key },
+            outwardIssue: { key: dep },
+          });
         }
       } catch (err) {
         try {
-          await acliExec(
-            ['jira', 'workitem', 'delete', '--key', key, '--yes'],
-            this.cwd,
-          );
+          await this.api.rest('DELETE', `/api/3/issue/${key}`);
         } catch {
           // Best-effort cleanup
         }
@@ -289,67 +280,56 @@ export class JiraBackend extends BaseBackend {
 
     // Handle status transition separately
     if (data.status !== undefined) {
-      await acliExec(
-        [
-          'jira',
-          'workitem',
-          'transition',
-          '--key',
-          id,
-          '--status',
-          titleCase(data.status),
-          '--yes',
-        ],
-        this.cwd,
-      );
-    }
+      const transitions = await this.api.rest<{
+        transitions: { id: string; name: string }[];
+      }>('GET', `/api/3/issue/${id}/transitions`);
 
-    // Handle assignee separately
-    if (data.assignee !== undefined) {
-      if (data.assignee) {
-        await acliExec(
-          [
-            'jira',
-            'workitem',
-            'assign',
-            '--key',
-            id,
-            '--assignee',
-            data.assignee,
-          ],
-          this.cwd,
-        );
-      } else {
-        await acliExec(
-          ['jira', 'workitem', 'assign', '--key', id, '--remove-assignee'],
-          this.cwd,
-        );
+      const transition = transitions.transitions.find(
+        (t) => t.name.toLowerCase() === data.status!.toLowerCase(),
+      );
+      if (transition) {
+        await this.api.rest('POST', `/api/3/issue/${id}/transitions`, {
+          transition: { id: transition.id },
+        });
       }
     }
 
-    // Handle edit fields (title, description, labels, type)
-    const editArgs = ['jira', 'workitem', 'edit', '--key', id];
+    // Handle edit fields (title, description, labels, type, assignee)
+    const fields: Record<string, unknown> = {};
     let hasEdits = false;
 
     if (data.title !== undefined) {
-      editArgs.push('--summary', data.title);
+      fields['summary'] = data.title;
       hasEdits = true;
     }
     if (data.description !== undefined) {
-      editArgs.push('--description', data.description);
+      fields['description'] = {
+        type: 'doc',
+        version: 1,
+        content: [
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: data.description }],
+          },
+        ],
+      };
       hasEdits = true;
     }
     if (data.labels !== undefined) {
-      editArgs.push('--labels', data.labels.join(','));
+      fields['labels'] = data.labels;
       hasEdits = true;
     }
     if (data.type !== undefined) {
-      editArgs.push('--type', titleCase(data.type));
+      fields['issuetype'] = { name: titleCase(data.type) };
+      hasEdits = true;
+    }
+    if (data.assignee !== undefined) {
+      fields['assignee'] = data.assignee ? { id: data.assignee } : null;
       hasEdits = true;
     }
 
     if (hasEdits) {
-      await acliExec(editArgs, this.cwd);
+      await this.api.rest('PUT', `/api/3/issue/${id}`, { fields });
     }
 
     this.invalidateCache();
@@ -357,27 +337,23 @@ export class JiraBackend extends BaseBackend {
   }
 
   async deleteWorkItem(id: string): Promise<void> {
-    await acliExec(
-      ['jira', 'workitem', 'delete', '--key', id, '--yes'],
-      this.cwd,
-    );
+    await this.api.rest('DELETE', `/api/3/issue/${id}`);
     this.invalidateCache();
   }
 
   async addComment(workItemId: string, comment: NewComment): Promise<Comment> {
-    await acliExec(
-      [
-        'jira',
-        'workitem',
-        'comment',
-        'create',
-        '--key',
-        workItemId,
-        '--body',
-        comment.body,
-      ],
-      this.cwd,
-    );
+    await this.api.rest('POST', `/api/3/issue/${workItemId}/comment`, {
+      body: {
+        type: 'doc',
+        version: 1,
+        content: [
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: comment.body }],
+          },
+        ],
+      },
+    });
     return {
       author: comment.author,
       date: new Date().toISOString(),
@@ -386,38 +362,24 @@ export class JiraBackend extends BaseBackend {
   }
 
   override async getChildren(id: string): Promise<WorkItem[]> {
-    const issues = await acli<JiraIssue[]>(
-      [
-        'jira',
-        'workitem',
-        'search',
-        '--jql',
-        `parent = ${id}`,
-        '--fields',
-        '*all',
-        '--paginate',
-        '--json',
-      ],
-      this.cwd,
-    );
+    const jql = `parent = ${id}`;
+    const issues: JiraIssue[] = [];
+    for await (const page of this.api.paginate<JiraIssue>(
+      `/api/3/search?jql=${encodeURIComponent(jql)}&fields=*all`,
+    )) {
+      issues.push(...page);
+    }
     return issues.map(mapIssueToWorkItem);
   }
 
   override async getDependents(id: string): Promise<WorkItem[]> {
-    const issues = await acli<JiraIssue[]>(
-      [
-        'jira',
-        'workitem',
-        'search',
-        '--jql',
-        `issue in linkedIssues("${id}","is blocked by")`,
-        '--fields',
-        '*all',
-        '--paginate',
-        '--json',
-      ],
-      this.cwd,
-    );
+    const jql = `issue in linkedIssues("${id}","is blocked by")`;
+    const issues: JiraIssue[] = [];
+    for await (const page of this.api.paginate<JiraIssue>(
+      `/api/3/search?jql=${encodeURIComponent(jql)}&fields=*all`,
+    )) {
+      issues.push(...page);
+    }
     return issues.map(mapIssueToWorkItem);
   }
 
@@ -426,7 +388,8 @@ export class JiraBackend extends BaseBackend {
   }
 
   async openItem(id: string): Promise<void> {
-    await acliExec(['jira', 'workitem', 'view', id, '--web'], this.cwd);
+    const { default: open } = await import('open');
+    await open(this.getItemUrl(id));
   }
 
   /* eslint-disable @typescript-eslint/require-await, @typescript-eslint/no-unused-vars */
@@ -452,18 +415,11 @@ export class JiraBackend extends BaseBackend {
 
   private async fetchSprints(): Promise<JiraSprint[]> {
     if (this.cachedSprints) return this.cachedSprints;
-    this.cachedSprints = await acli<JiraSprint[]>(
-      [
-        'jira',
-        'board',
-        'list-sprints',
-        '--id',
-        String(this.config.boardId),
-        '--paginate',
-        '--json',
-      ],
-      this.cwd,
+    const response = await this.api.rest<{ values: JiraSprint[] }>(
+      'GET',
+      `/agile/1.0/board/${this.config.boardId}/sprint`,
     );
+    this.cachedSprints = response.values;
     return this.cachedSprints;
   }
 }
