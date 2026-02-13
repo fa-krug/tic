@@ -48,13 +48,14 @@ describe('AdoApiClient', () => {
 
       expect(fetchMock).toHaveBeenCalledWith(
         'https://dev.azure.com/contoso/MyProject/_apis/wit/workitems/1?api-version=7.1',
-        {
+        expect.objectContaining({
           method: 'GET',
           headers: {
             Authorization: 'Bearer ado-token-123',
             Accept: 'application/json',
           },
-        },
+          signal: expect.any(AbortSignal) as unknown,
+        }),
       );
       expect(result).toEqual(data);
     });

@@ -41,14 +41,18 @@ describe('GitLabApiClient', () => {
 
       await client.graphql(query);
 
-      expect(fetchMock).toHaveBeenCalledWith('https://gitlab.com/api/graphql', {
-        method: 'POST',
-        headers: {
-          Authorization: 'Bearer glpat-test-token',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ query, variables: undefined }),
-      });
+      expect(fetchMock).toHaveBeenCalledWith(
+        'https://gitlab.com/api/graphql',
+        expect.objectContaining({
+          method: 'POST',
+          headers: {
+            Authorization: 'Bearer glpat-test-token',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ query, variables: undefined }),
+          signal: expect.any(AbortSignal) as unknown,
+        }),
+      );
     });
 
     it('passes variables in the request body', async () => {

@@ -2,6 +2,7 @@ import {
   AuthError,
   RateLimitError,
   BaseApiClient,
+  DEFAULT_TIMEOUT_MS,
 } from '../shared/api-client.js';
 
 const GITHUB_API_VERSION = '2022-11-28';
@@ -31,7 +32,23 @@ export class GitHubApiClient extends BaseApiClient {
       init.body = JSON.stringify(body);
     }
 
-    const response = await globalThis.fetch(url, init);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+
+    let response: Response;
+    try {
+      response = await globalThis.fetch(url, {
+        ...init,
+        signal: controller.signal,
+      });
+    } catch (error: unknown) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new Error('Request timed out');
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
 
     this.checkRateLimit(response.headers);
 
@@ -79,11 +96,25 @@ export class GitHubApiClient extends BaseApiClient {
       'GraphQL-Features': 'sub_issues',
     };
 
-    const response = await globalThis.fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ query, variables }),
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+
+    let response: Response;
+    try {
+      response = await globalThis.fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ query, variables }),
+        signal: controller.signal,
+      });
+    } catch (error: unknown) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new Error('Request timed out');
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
 
     this.checkRateLimit(response.headers);
 
@@ -127,10 +158,24 @@ export class GitHubApiClient extends BaseApiClient {
         'X-GitHub-Api-Version': GITHUB_API_VERSION,
       };
 
-      const response = await globalThis.fetch(url, {
-        method: 'GET',
-        headers,
-      });
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+
+      let response: Response;
+      try {
+        response = await globalThis.fetch(url, {
+          method: 'GET',
+          headers,
+          signal: controller.signal,
+        });
+      } catch (error: unknown) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          throw new Error('Request timed out');
+        }
+        throw error;
+      } finally {
+        clearTimeout(timeout);
+      }
 
       this.checkRateLimit(response.headers);
 

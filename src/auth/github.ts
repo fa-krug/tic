@@ -1,4 +1,5 @@
 import { getToken, setToken, deleteToken } from './keychain.js';
+import { DEFAULT_TIMEOUT_MS } from '../backends/shared/api-client.js';
 
 export const GITHUB_ACCOUNT = 'github.com';
 export const DEFAULT_CLIENT_ID = 'Ov23lizRXsY0iSURg1he';
@@ -71,17 +72,34 @@ export async function authenticateGitHub(
   const clientId = options?.clientId ?? DEFAULT_CLIENT_ID;
 
   // Step 1: Request device code
-  const codeResponse = await fetch('https://github.com/login/device/code', {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      client_id: clientId,
-      scope: 'repo',
-    }),
-  });
+  const codeController = new AbortController();
+  const codeTimeout = setTimeout(
+    () => codeController.abort(),
+    DEFAULT_TIMEOUT_MS,
+  );
+
+  let codeResponse: Response;
+  try {
+    codeResponse = await fetch('https://github.com/login/device/code', {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        client_id: clientId,
+        scope: 'repo',
+      }),
+      signal: codeController.signal,
+    });
+  } catch (error: unknown) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error('Request timed out');
+    }
+    throw error;
+  } finally {
+    clearTimeout(codeTimeout);
+  }
 
   if (!codeResponse.ok) {
     throw new Error(
@@ -100,21 +118,38 @@ export async function authenticateGitHub(
   while (true) {
     await sleep(interval);
 
-    const tokenResponse = await fetch(
-      'https://github.com/login/oauth/access_token',
-      {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          client_id: clientId,
-          device_code: deviceCode.device_code,
-          grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
-        }),
-      },
+    const tokenController = new AbortController();
+    const tokenTimeout = setTimeout(
+      () => tokenController.abort(),
+      DEFAULT_TIMEOUT_MS,
     );
+
+    let tokenResponse: Response;
+    try {
+      tokenResponse = await fetch(
+        'https://github.com/login/oauth/access_token',
+        {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            client_id: clientId,
+            device_code: deviceCode.device_code,
+            grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+          }),
+          signal: tokenController.signal,
+        },
+      );
+    } catch (error: unknown) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new Error('Request timed out');
+      }
+      throw error;
+    } finally {
+      clearTimeout(tokenTimeout);
+    }
 
     if (!tokenResponse.ok) {
       throw new Error(

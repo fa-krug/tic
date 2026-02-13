@@ -1,4 +1,8 @@
-import { BaseApiClient, AuthError } from '../shared/api-client.js';
+import {
+  BaseApiClient,
+  AuthError,
+  DEFAULT_TIMEOUT_MS,
+} from '../shared/api-client.js';
 import { getAdoRefreshToken, refreshAdoToken } from '../../auth/ado.js';
 
 const ADO_API_VERSION = '7.1';
@@ -48,7 +52,23 @@ export class AdoApiClient extends BaseApiClient {
       init.body = JSON.stringify(body);
     }
 
-    let response = await globalThis.fetch(url, init);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+
+    let response: Response;
+    try {
+      response = await globalThis.fetch(url, {
+        ...init,
+        signal: controller.signal,
+      });
+    } catch (error: unknown) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new Error('Request timed out');
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
 
     this.checkRateLimit(response.headers);
 
@@ -61,11 +81,28 @@ export class AdoApiClient extends BaseApiClient {
           this.auth = { type: 'bearer', token: newToken };
           this.token = newToken;
           headers['Authorization'] = `Bearer ${newToken}`;
-          response = await globalThis.fetch(url, {
-            method,
-            headers,
-            body: init.body,
-          });
+
+          const retryController = new AbortController();
+          const retryTimeout = setTimeout(
+            () => retryController.abort(),
+            DEFAULT_TIMEOUT_MS,
+          );
+
+          try {
+            response = await globalThis.fetch(url, {
+              method,
+              headers,
+              body: init.body,
+              signal: retryController.signal,
+            });
+          } catch (error: unknown) {
+            if (error instanceof DOMException && error.name === 'AbortError') {
+              throw new Error('Request timed out');
+            }
+            throw error;
+          } finally {
+            clearTimeout(retryTimeout);
+          }
         }
       }
     }
@@ -121,10 +158,24 @@ export class AdoApiClient extends BaseApiClient {
         Accept: 'application/json',
       };
 
-      const response: Response = await globalThis.fetch(url, {
-        method: 'GET',
-        headers,
-      });
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+
+      let response: Response;
+      try {
+        response = await globalThis.fetch(url, {
+          method: 'GET',
+          headers,
+          signal: controller.signal,
+        });
+      } catch (error: unknown) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          throw new Error('Request timed out');
+        }
+        throw error;
+      } finally {
+        clearTimeout(timeout);
+      }
 
       this.checkRateLimit(response.headers);
 

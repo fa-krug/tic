@@ -45,14 +45,15 @@ describe('GitHubApiClient', () => {
 
       expect(fetchMock).toHaveBeenCalledWith(
         'https://api.github.com/repos/owner/repo/issues',
-        {
+        expect.objectContaining({
           method: 'GET',
           headers: {
             Authorization: 'Bearer gh-token-123',
             Accept: 'application/json',
             'X-GitHub-Api-Version': '2022-11-28',
           },
-        },
+          signal: expect.any(AbortSignal) as unknown,
+        }),
       );
       expect(result).toEqual(data);
     });
@@ -66,7 +67,7 @@ describe('GitHubApiClient', () => {
 
       expect(fetchMock).toHaveBeenCalledWith(
         'https://api.github.com/repos/owner/repo/issues',
-        {
+        expect.objectContaining({
           method: 'POST',
           headers: {
             Authorization: 'Bearer gh-token-123',
@@ -75,7 +76,8 @@ describe('GitHubApiClient', () => {
             'X-GitHub-Api-Version': '2022-11-28',
           },
           body: JSON.stringify(body),
-        },
+          signal: expect.any(AbortSignal) as unknown,
+        }),
       );
     });
 
@@ -96,16 +98,20 @@ describe('GitHubApiClient', () => {
 
       await client.graphql(query);
 
-      expect(fetchMock).toHaveBeenCalledWith('https://api.github.com/graphql', {
-        method: 'POST',
-        headers: {
-          Authorization: 'Bearer gh-token-123',
-          'Content-Type': 'application/json',
-          'X-GitHub-Api-Version': '2022-11-28',
-          'GraphQL-Features': 'sub_issues',
-        },
-        body: JSON.stringify({ query, variables: undefined }),
-      });
+      expect(fetchMock).toHaveBeenCalledWith(
+        'https://api.github.com/graphql',
+        expect.objectContaining({
+          method: 'POST',
+          headers: {
+            Authorization: 'Bearer gh-token-123',
+            'Content-Type': 'application/json',
+            'X-GitHub-Api-Version': '2022-11-28',
+            'GraphQL-Features': 'sub_issues',
+          },
+          body: JSON.stringify({ query, variables: undefined }),
+          signal: expect.any(AbortSignal) as unknown,
+        }),
+      );
     });
 
     it('passes variables in body', async () => {
@@ -245,20 +251,22 @@ describe('GitHubApiClient', () => {
       expect(fetchMock).toHaveBeenNthCalledWith(
         1,
         'https://api.github.com/repos/owner/repo/issues',
-        {
+        expect.objectContaining({
           method: 'GET',
           headers: expectedHeaders,
-        },
+          signal: expect.any(AbortSignal) as unknown,
+        }),
       );
 
       // Second request (paginated)
       expect(fetchMock).toHaveBeenNthCalledWith(
         2,
         'https://api.github.com/repos/owner/repo/issues?page=2',
-        {
+        expect.objectContaining({
           method: 'GET',
           headers: expectedHeaders,
-        },
+          signal: expect.any(AbortSignal) as unknown,
+        }),
       );
     });
   });

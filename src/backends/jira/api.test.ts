@@ -51,13 +51,14 @@ describe('JiraApiClient', () => {
 
       expect(fetchMock).toHaveBeenCalledWith(
         'https://mysite.atlassian.net/rest/api/3/issue/PROJ-1',
-        {
+        expect.objectContaining({
           method: 'GET',
           headers: {
             Authorization: expectedAuth,
             Accept: 'application/json',
           },
-        },
+          signal: expect.any(AbortSignal) as unknown,
+        }),
       );
       expect(result).toEqual(data);
     });
@@ -75,7 +76,7 @@ describe('JiraApiClient', () => {
 
       expect(fetchMock).toHaveBeenCalledWith(
         'https://mysite.atlassian.net/rest/api/3/issue',
-        {
+        expect.objectContaining({
           method: 'POST',
           headers: {
             Authorization: expectedAuth,
@@ -83,7 +84,8 @@ describe('JiraApiClient', () => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(body),
-        },
+          signal: expect.any(AbortSignal) as unknown,
+        }),
       );
     });
 

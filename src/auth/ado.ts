@@ -1,4 +1,5 @@
 import { getToken, setToken, deleteToken } from './keychain.js';
+import { DEFAULT_TIMEOUT_MS } from '../backends/shared/api-client.js';
 
 export const ADO_ACCOUNT = 'dev.azure.com';
 export const ADO_REFRESH_ACCOUNT = 'dev.azure.com:refresh';
@@ -85,16 +86,30 @@ export async function refreshAdoToken(
   refreshToken: string,
 ): Promise<string | null> {
   try {
-    const response = await fetch(`${AUTHORITY}/oauth2/v2.0/token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: urlEncode({
-        client_id: AZURE_CLI_CLIENT_ID,
-        grant_type: 'refresh_token',
-        refresh_token: refreshToken,
-        scope: ADO_SCOPE,
-      }),
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+
+    let response: Response;
+    try {
+      response = await fetch(`${AUTHORITY}/oauth2/v2.0/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: urlEncode({
+          client_id: AZURE_CLI_CLIENT_ID,
+          grant_type: 'refresh_token',
+          refresh_token: refreshToken,
+          scope: ADO_SCOPE,
+        }),
+        signal: controller.signal,
+      });
+    } catch (error: unknown) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new Error('Request timed out');
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
 
     if (!response.ok) return null;
 
@@ -128,14 +143,31 @@ export async function authenticateAdo(
   options?: AuthenticateAdoOptions,
 ): Promise<string> {
   // Step 1: Request device code
-  const codeResponse = await fetch(`${AUTHORITY}/oauth2/v2.0/devicecode`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: urlEncode({
-      client_id: AZURE_CLI_CLIENT_ID,
-      scope: ADO_SCOPE,
-    }),
-  });
+  const codeController = new AbortController();
+  const codeTimeout = setTimeout(
+    () => codeController.abort(),
+    DEFAULT_TIMEOUT_MS,
+  );
+
+  let codeResponse: Response;
+  try {
+    codeResponse = await fetch(`${AUTHORITY}/oauth2/v2.0/devicecode`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: urlEncode({
+        client_id: AZURE_CLI_CLIENT_ID,
+        scope: ADO_SCOPE,
+      }),
+      signal: codeController.signal,
+    });
+  } catch (error: unknown) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error('Request timed out');
+    }
+    throw error;
+  } finally {
+    clearTimeout(codeTimeout);
+  }
 
   if (!codeResponse.ok) {
     throw new Error(
@@ -154,15 +186,32 @@ export async function authenticateAdo(
   while (true) {
     await sleep(interval);
 
-    const tokenResponse = await fetch(`${AUTHORITY}/oauth2/v2.0/token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: urlEncode({
-        client_id: AZURE_CLI_CLIENT_ID,
-        grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
-        device_code: deviceCode.device_code,
-      }),
-    });
+    const tokenController = new AbortController();
+    const tokenTimeout = setTimeout(
+      () => tokenController.abort(),
+      DEFAULT_TIMEOUT_MS,
+    );
+
+    let tokenResponse: Response;
+    try {
+      tokenResponse = await fetch(`${AUTHORITY}/oauth2/v2.0/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: urlEncode({
+          client_id: AZURE_CLI_CLIENT_ID,
+          grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+          device_code: deviceCode.device_code,
+        }),
+        signal: tokenController.signal,
+      });
+    } catch (error: unknown) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new Error('Request timed out');
+      }
+      throw error;
+    } finally {
+      clearTimeout(tokenTimeout);
+    }
 
     // Entra ID returns 400 for pending/slow_down/declined/expired errors
     if (!tokenResponse.ok) {

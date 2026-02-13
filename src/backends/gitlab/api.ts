@@ -1,4 +1,8 @@
-import { AuthError, BaseApiClient } from '../shared/api-client.js';
+import {
+  AuthError,
+  BaseApiClient,
+  DEFAULT_TIMEOUT_MS,
+} from '../shared/api-client.js';
 
 export interface Connection<T> {
   nodes: T[];
@@ -31,11 +35,25 @@ export class GitLabApiClient extends BaseApiClient {
       'Content-Type': 'application/json',
     };
 
-    const response = await globalThis.fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ query, variables }),
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+
+    let response: Response;
+    try {
+      response = await globalThis.fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ query, variables }),
+        signal: controller.signal,
+      });
+    } catch (error: unknown) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new Error('Request timed out');
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
 
     this.checkRateLimit(response.headers);
 

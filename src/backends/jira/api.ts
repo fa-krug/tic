@@ -1,4 +1,8 @@
-import { AuthError, BaseApiClient } from '../shared/api-client.js';
+import {
+  AuthError,
+  BaseApiClient,
+  DEFAULT_TIMEOUT_MS,
+} from '../shared/api-client.js';
 
 interface JiraSearchResponse<T> {
   startAt: number;
@@ -43,7 +47,23 @@ export class JiraApiClient extends BaseApiClient {
       init.body = JSON.stringify(body);
     }
 
-    const response = await globalThis.fetch(url, init);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+
+    let response: Response;
+    try {
+      response = await globalThis.fetch(url, {
+        ...init,
+        signal: controller.signal,
+      });
+    } catch (error: unknown) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new Error('Request timed out');
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
 
     if (response.status === 401) {
       throw new AuthError();

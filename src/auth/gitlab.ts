@@ -1,4 +1,5 @@
 import { getToken, setToken, deleteToken } from './keychain.js';
+import { DEFAULT_TIMEOUT_MS } from '../backends/shared/api-client.js';
 
 export const GITLAB_ACCOUNT = 'gitlab.com';
 export const GITLAB_PAT_ACCOUNT = 'gitlab.com:pat';
@@ -89,9 +90,15 @@ export async function authenticateGitLab(
   const clientId = options?.clientId ?? DEFAULT_GITLAB_CLIENT_ID;
 
   // Step 1: Request device code
-  const codeResponse = await fetch(
-    'https://gitlab.com/oauth/authorize_device',
-    {
+  const codeController = new AbortController();
+  const codeTimeout = setTimeout(
+    () => codeController.abort(),
+    DEFAULT_TIMEOUT_MS,
+  );
+
+  let codeResponse: Response;
+  try {
+    codeResponse = await fetch('https://gitlab.com/oauth/authorize_device', {
       method: 'POST',
       headers: {
         Accept: 'application/json',
@@ -101,8 +108,16 @@ export async function authenticateGitLab(
         client_id: clientId,
         scope: 'api',
       }),
-    },
-  );
+      signal: codeController.signal,
+    });
+  } catch (error: unknown) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error('Request timed out');
+    }
+    throw error;
+  } finally {
+    clearTimeout(codeTimeout);
+  }
 
   if (!codeResponse.ok) {
     throw new Error(
@@ -121,18 +136,35 @@ export async function authenticateGitLab(
   while (true) {
     await sleep(interval);
 
-    const tokenResponse = await fetch('https://gitlab.com/oauth/token', {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        client_id: clientId,
-        device_code: deviceCode.device_code,
-        grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
-      }),
-    });
+    const tokenController = new AbortController();
+    const tokenTimeout = setTimeout(
+      () => tokenController.abort(),
+      DEFAULT_TIMEOUT_MS,
+    );
+
+    let tokenResponse: Response;
+    try {
+      tokenResponse = await fetch('https://gitlab.com/oauth/token', {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          client_id: clientId,
+          device_code: deviceCode.device_code,
+          grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+        }),
+        signal: tokenController.signal,
+      });
+    } catch (error: unknown) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new Error('Request timed out');
+      }
+      throw error;
+    } finally {
+      clearTimeout(tokenTimeout);
+    }
 
     if (!tokenResponse.ok) {
       throw new Error(
