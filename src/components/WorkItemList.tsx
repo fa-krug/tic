@@ -10,6 +10,7 @@ import { isGitRepo } from '../git.js';
 import { beginImplementation } from '../implement.js';
 import { configStore, useConfigStore } from '../stores/configStore.js';
 import { uiStore, useUIStore, getOverlayTargetIds } from '../stores/uiStore.js';
+import { getMarkedDistribution } from './getMarkedDistribution.js';
 import { TableLayout } from './TableLayout.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { useScrollViewport } from '../hooks/useScrollViewport.js';
@@ -439,6 +440,17 @@ export function WorkItemList() {
     chromeLines,
     linesPerItem: 1,
   });
+
+  const markedDistribution = useMemo(
+    () =>
+      getMarkedDistribution(
+        markedIds,
+        treeItems.map((t) => t.item),
+        viewport.start,
+        viewport.end,
+      ),
+    [markedIds, treeItems, viewport.start, viewport.end],
+  );
 
   // Block 1.5: Description scroll handler — active when full description is shown
   useInput(
@@ -1271,7 +1283,11 @@ export function WorkItemList() {
             dimColor
           >{` (${filterCount > 0 ? `${items.length}/${unfilteredCount}` : items.length} item${unfilteredCount === 1 ? '' : 's'})`}</Text>
           {markedCount > 0 && (
-            <Text color="magenta">{` ● ${markedCount} marked`}</Text>
+            <Text color="magenta">
+              {` ● ${markedCount}`}
+              {markedDistribution.above > 0 && ` ↑${markedDistribution.above}`}
+              {markedDistribution.below > 0 && ` ↓${markedDistribution.below}`}
+            </Text>
           )}
           {filterCount > 0 && (
             <Text color="yellow">
