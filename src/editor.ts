@@ -16,7 +16,6 @@ export function openInEditor(content: string): string {
 
     const result = spawnSync(editor, [tmpFile], {
       stdio: 'inherit',
-      shell: true,
     });
 
     if (result.status !== 0) {
