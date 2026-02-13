@@ -94,6 +94,7 @@ export interface BackendDataStoreState {
 let currentBackend: Backend | null = null;
 let currentCwd: string | null = null;
 let initGeneration = 0;
+let currentSyncUnsubscribe: (() => void) | null = null;
 
 async function createBackendAndSync(cwd: string): Promise<{
   backend: Backend;
@@ -182,13 +183,16 @@ export const backendDataStore = createStore<BackendDataStoreState>(
           set({ backend, syncManager, queue, authPrompt: authError });
 
           if (syncManager) {
-            syncManager.onStatusChange((status: SyncStatus) => {
-              if (generation !== initGeneration) return;
-              get().setSyncStatus(status);
-              if (status.state === 'idle') {
-                void get().refresh();
-              }
-            });
+            currentSyncUnsubscribe?.();
+            currentSyncUnsubscribe = syncManager.onStatusChange(
+              (status: SyncStatus) => {
+                if (generation !== initGeneration) return;
+                get().setSyncStatus(status);
+                if (status.state === 'idle') {
+                  void get().refresh();
+                }
+              },
+            );
             syncManager.sync().catch(() => {});
           }
 
@@ -306,13 +310,16 @@ export const backendDataStore = createStore<BackendDataStoreState>(
         const queue = new SyncQueue(primary.getDatabase());
         const syncManager = new SM(primary, remote, queue);
 
-        syncManager.onStatusChange((status: SyncStatus) => {
-          if (generation !== initGeneration) return;
-          get().setSyncStatus(status);
-          if (status.state === 'idle') {
-            void get().refresh();
-          }
-        });
+        currentSyncUnsubscribe?.();
+        currentSyncUnsubscribe = syncManager.onStatusChange(
+          (status: SyncStatus) => {
+            if (generation !== initGeneration) return;
+            get().setSyncStatus(status);
+            if (status.state === 'idle') {
+              void get().refresh();
+            }
+          },
+        );
 
         set({
           syncManager,
@@ -367,13 +374,16 @@ export const backendDataStore = createStore<BackendDataStoreState>(
         const queue = new SyncQueue(primary.getDatabase());
         const syncManager = new SM(primary, remote, queue);
 
-        syncManager.onStatusChange((status: SyncStatus) => {
-          if (generation !== initGeneration) return;
-          get().setSyncStatus(status);
-          if (status.state === 'idle') {
-            void get().refresh();
-          }
-        });
+        currentSyncUnsubscribe?.();
+        currentSyncUnsubscribe = syncManager.onStatusChange(
+          (status: SyncStatus) => {
+            if (generation !== initGeneration) return;
+            get().setSyncStatus(status);
+            if (status.state === 'idle') {
+              void get().refresh();
+            }
+          },
+        );
 
         set({
           syncManager,
@@ -455,13 +465,16 @@ export const backendDataStore = createStore<BackendDataStoreState>(
         const queue = new SyncQueue(primary.getDatabase());
         const syncManager = new SM(primary, remote, queue);
 
-        syncManager.onStatusChange((status: SyncStatus) => {
-          if (generation !== initGeneration) return;
-          get().setSyncStatus(status);
-          if (status.state === 'idle') {
-            void get().refresh();
-          }
-        });
+        currentSyncUnsubscribe?.();
+        currentSyncUnsubscribe = syncManager.onStatusChange(
+          (status: SyncStatus) => {
+            if (generation !== initGeneration) return;
+            get().setSyncStatus(status);
+            if (status.state === 'idle') {
+              void get().refresh();
+            }
+          },
+        );
 
         set({
           syncManager,
@@ -483,6 +496,8 @@ export const backendDataStore = createStore<BackendDataStoreState>(
 
     destroy() {
       ++initGeneration;
+      currentSyncUnsubscribe?.();
+      currentSyncUnsubscribe = null;
       // Null out store DB references before closing the connection
       undoStore.getState().destroy();
       configStore.getState().setDatabase(null);
