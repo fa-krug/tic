@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { render } from 'ink';
 import { App } from './app.js';
+import { ErrorBoundary } from './components/ErrorBoundary.js';
 import { configStore } from './stores/configStore.js';
 import { backendDataStore } from './stores/backendDataStore.js';
 import { undoStore } from './stores/undoStore.js';
@@ -34,7 +35,11 @@ if (process.argv.length > 2) {
   await recentCommandsStore.getState().init(cwd);
 
   console.clear();
-  const app = render(<App />);
+  const app = render(
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>,
+  );
   await app.waitUntilExit();
 
   // Clean up undo stack — permanently delete any remaining soft-deleted items
