@@ -574,24 +574,25 @@ export class Storage extends BaseBackend implements SoftDeleteBackend {
     this.validateFields(data);
     const now = new Date().toISOString();
 
-    // Get and increment nextId
-    const config = this.db
-      .select()
-      .from(schema.projectConfig)
-      .where(eq(schema.projectConfig.id, 1))
-      .get();
-    const nextId = config?.nextId ?? 1;
-    const id = this.tempIds ? `local-${nextId}` : String(nextId);
+    // Allocate ID atomically inside transaction to prevent race conditions
+    const { id } = this.db.transaction((tx) => {
+      const config = tx
+        .select()
+        .from(schema.projectConfig)
+        .where(eq(schema.projectConfig.id, 1))
+        .get();
+      const nid = config?.nextId ?? 1;
+      tx.update(schema.projectConfig)
+        .set({ nextId: nid + 1 })
+        .where(eq(schema.projectConfig.id, 1))
+        .run();
+      return { id: this.tempIds ? `local-${nid}` : String(nid), nextId: nid };
+    });
 
     // Validate relationships before inserting
     this.validateRelationships(id, data.parent, data.dependsOn);
 
     this.db.transaction((tx) => {
-      tx.update(schema.projectConfig)
-        .set({ nextId: nextId + 1 })
-        .where(eq(schema.projectConfig.id, 1))
-        .run();
-
       // Ensure iteration exists
       if (data.iteration) {
         tx.insert(schema.iterations)
