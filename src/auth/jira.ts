@@ -11,7 +11,10 @@ export function getJiraCredentials(site: string): JiraCredentials | null {
   const stored = getToken(`${JIRA_ACCOUNT_PREFIX}${site}`);
   if (!stored) return null;
 
-  const idx = stored.indexOf(':');
+  let idx = stored.indexOf('\0');
+  if (idx < 0) {
+    idx = stored.indexOf(':');
+  }
   if (idx < 0) return null;
 
   return {
@@ -25,7 +28,7 @@ export function setJiraCredentials(
   email: string,
   token: string,
 ): void {
-  setToken(`${JIRA_ACCOUNT_PREFIX}${site}`, `${email}:${token}`);
+  setToken(`${JIRA_ACCOUNT_PREFIX}${site}`, `${email}\0${token}`);
 }
 
 export function removeJiraCredentials(site: string): void {

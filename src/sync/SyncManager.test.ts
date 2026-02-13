@@ -494,6 +494,91 @@ describe('SyncManager strips unsupported fields', () => {
       }),
     );
   });
+
+  it('notifies via toast and sync log when fields are stripped on create', async () => {
+    const { uiStore } = await import('../stores/uiStore.js');
+    const setToastSpy = vi.spyOn(uiStore.getState(), 'setToast');
+
+    const base = createMockRemote();
+    const originalCaps = base.getCapabilities();
+    base.getCapabilities = () => ({
+      ...originalCaps,
+      fields: {
+        ...originalCaps.fields,
+        priority: false,
+        labels: false,
+      },
+    });
+
+    const manager = new SyncManager(local, base, queueStore);
+
+    const item = await local.createWorkItem({
+      title: 'Stripped Item',
+      type: 'task',
+      status: 'backlog',
+      priority: 'high',
+      assignee: '',
+      labels: ['bug'],
+      iteration: 'default',
+      description: '',
+      parent: null,
+      dependsOn: [],
+    });
+
+    queueStore.append({
+      action: 'create',
+      itemId: item.id,
+      timestamp: new Date().toISOString(),
+    });
+
+    await manager.pushPending();
+
+    expect(setToastSpy).toHaveBeenCalledWith(
+      'Sync: priority, labels stripped (unsupported by remote)',
+    );
+
+    const log = manager.getStatus().syncLog;
+    const strippedEntry = log.find((e) =>
+      e.message?.includes('stripped fields'),
+    );
+    expect(strippedEntry).toBeDefined();
+    expect(strippedEntry!.message).toContain('priority');
+    expect(strippedEntry!.message).toContain('labels');
+
+    setToastSpy.mockRestore();
+  });
+
+  it('does not notify when no fields are actually stripped', async () => {
+    const { uiStore } = await import('../stores/uiStore.js');
+    const setToastSpy = vi.spyOn(uiStore.getState(), 'setToast');
+
+    const remote = createMockRemote(); // all fields supported
+    const manager = new SyncManager(local, remote, queueStore);
+
+    const item = await local.createWorkItem({
+      title: 'Normal Item',
+      type: 'task',
+      status: 'backlog',
+      priority: 'medium',
+      assignee: '',
+      labels: [],
+      iteration: 'default',
+      description: '',
+      parent: null,
+      dependsOn: [],
+    });
+
+    queueStore.append({
+      action: 'create',
+      itemId: item.id,
+      timestamp: new Date().toISOString(),
+    });
+
+    await manager.pushPending();
+
+    expect(setToastSpy).not.toHaveBeenCalled();
+    setToastSpy.mockRestore();
+  });
 });
 
 describe('SyncManager pull phase (via sync)', () => {

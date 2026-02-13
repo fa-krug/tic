@@ -24,8 +24,8 @@ describe('Jira auth', () => {
   });
 
   describe('getJiraCredentials', () => {
-    it('returns email and token when stored', () => {
-      mockGetToken.mockReturnValue('user@corp.com:ABCdef123');
+    it('returns email and token from null byte separator', () => {
+      mockGetToken.mockReturnValue('user@corp.com\0ABCdef123');
       const creds = getJiraCredentials('mycompany.atlassian.net');
       expect(mockGetToken).toHaveBeenCalledWith('jira:mycompany.atlassian.net');
       expect(creds).toEqual({ email: 'user@corp.com', token: 'ABCdef123' });
@@ -36,15 +36,21 @@ describe('Jira auth', () => {
       expect(getJiraCredentials('mycompany.atlassian.net')).toBeNull();
     });
 
-    it('handles tokens containing colons', () => {
-      mockGetToken.mockReturnValue('user@corp.com:ABC:def:123');
+    it('falls back to colon separator for legacy credentials', () => {
+      mockGetToken.mockReturnValue('user@corp.com:ABCdef123');
+      const creds = getJiraCredentials('mycompany.atlassian.net');
+      expect(creds).toEqual({ email: 'user@corp.com', token: 'ABCdef123' });
+    });
+
+    it('handles tokens containing colons with null byte separator', () => {
+      mockGetToken.mockReturnValue('user@corp.com\0ABC:def:123');
       const creds = getJiraCredentials('mycompany.atlassian.net');
       expect(creds).toEqual({ email: 'user@corp.com', token: 'ABC:def:123' });
     });
   });
 
   describe('setJiraCredentials', () => {
-    it('stores email:token in keychain', () => {
+    it('stores email and token with null byte separator', () => {
       setJiraCredentials(
         'mycompany.atlassian.net',
         'user@corp.com',
@@ -52,7 +58,7 @@ describe('Jira auth', () => {
       );
       expect(mockSetToken).toHaveBeenCalledWith(
         'jira:mycompany.atlassian.net',
-        'user@corp.com:token123',
+        'user@corp.com\0token123',
       );
     });
   });

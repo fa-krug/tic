@@ -150,32 +150,41 @@ export class SyncManager {
   }
 
   /** Strip fields the remote backend doesn't support to avoid UnsupportedOperationError. */
-  private stripUnsupportedFields(data: NewWorkItem): NewWorkItem {
+  private stripUnsupportedFields(data: NewWorkItem): {
+    data: NewWorkItem;
+    strippedFields: string[];
+  } {
     const caps = this.remote.getCapabilities();
     const result = { ...data };
-    if (!caps.fields.priority) {
+    const strippedFields: string[] = [];
+    if (!caps.fields.priority && data.priority !== 'medium') {
       result.priority = 'medium';
+      strippedFields.push('priority');
     }
-    if (!caps.fields.assignee) {
+    if (!caps.fields.assignee && data.assignee) {
       result.assignee = '';
+      strippedFields.push('assignee');
     }
-    if (!caps.fields.labels) {
+    if (!caps.fields.labels && data.labels.length > 0) {
       result.labels = [];
+      strippedFields.push('labels');
     }
-    if (!caps.fields.parent) {
+    if (!caps.fields.parent && data.parent) {
       result.parent = null;
+      strippedFields.push('parent');
     }
-    if (!caps.fields.dependsOn) {
+    if (!caps.fields.dependsOn && data.dependsOn.length > 0) {
       result.dependsOn = [];
+      strippedFields.push('dependsOn');
     }
-    return result;
+    return { data: result, strippedFields };
   }
 
   private async pushEntry(entry: QueueEntry): Promise<string> {
     switch (entry.action) {
       case 'create': {
         const localItem = await this.primary.getWorkItem(entry.itemId);
-        const remoteItem = await this.remote.createWorkItem(
+        const { data: strippedCreate, strippedFields: strippedCreateFields } =
           this.stripUnsupportedFields({
             title: localItem.title,
             type: localItem.type,
@@ -187,8 +196,24 @@ export class SyncManager {
             description: localItem.description,
             parent: localItem.parent,
             dependsOn: localItem.dependsOn,
-          }),
-        );
+          });
+        if (strippedCreateFields.length > 0) {
+          const { uiStore } = await import('../stores/uiStore.js');
+          uiStore
+            .getState()
+            .setToast(
+              `Sync: ${strippedCreateFields.join(', ')} stripped (unsupported by remote)`,
+            );
+          this.appendLog({
+            phase: 'push',
+            action: 'create',
+            itemId: entry.itemId,
+            result: 'success',
+            message: `stripped fields: ${strippedCreateFields.join(', ')}`,
+            timestamp: new Date().toISOString(),
+          });
+        }
+        const remoteItem = await this.remote.createWorkItem(strippedCreate);
         if (remoteItem.id !== entry.itemId) {
           await this.renameLocalItem(entry.itemId, remoteItem.id);
           await this.queue.renameItem(entry.itemId, remoteItem.id);
@@ -198,8 +223,7 @@ export class SyncManager {
       }
       case 'update': {
         const localItem = await this.primary.getWorkItem(entry.itemId);
-        await this.remote.updateWorkItem(
-          entry.itemId,
+        const { data: strippedUpdate, strippedFields: strippedUpdateFields } =
           this.stripUnsupportedFields({
             title: localItem.title,
             type: localItem.type,
@@ -211,8 +235,24 @@ export class SyncManager {
             description: localItem.description,
             parent: localItem.parent,
             dependsOn: localItem.dependsOn,
-          }),
-        );
+          });
+        if (strippedUpdateFields.length > 0) {
+          const { uiStore } = await import('../stores/uiStore.js');
+          uiStore
+            .getState()
+            .setToast(
+              `Sync: ${strippedUpdateFields.join(', ')} stripped (unsupported by remote)`,
+            );
+          this.appendLog({
+            phase: 'push',
+            action: 'update',
+            itemId: entry.itemId,
+            result: 'success',
+            message: `stripped fields: ${strippedUpdateFields.join(', ')}`,
+            timestamp: new Date().toISOString(),
+          });
+        }
+        await this.remote.updateWorkItem(entry.itemId, strippedUpdate);
         return entry.itemId;
       }
       case 'delete': {
