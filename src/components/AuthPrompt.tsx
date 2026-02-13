@@ -12,11 +12,15 @@ export function AuthPrompt() {
   const authPrompt = useBackendDataStore((s) => s.authPrompt);
   const authFlow = useBackendDataStore((s) => s.authFlow);
   const [pat, setPat] = useState('');
+  const [jiraEmail, setJiraEmail] = useState('');
+  const [jiraEmailInput, setJiraEmailInput] = useState('');
+  const [jiraToken, setJiraToken] = useState('');
 
   const isPolling =
     authFlow?.state === 'waiting' ||
     authFlow?.state === 'code-ready' ||
-    authFlow?.state === 'entering-pat';
+    authFlow?.state === 'entering-pat' ||
+    authFlow?.state === 'entering-jira-credentials';
 
   useInput(
     (_input, key) => {
@@ -31,7 +35,11 @@ export function AuthPrompt() {
         backendDataStore.getState().startPatFlow();
       }
     },
-    { isActive: authFlow?.state !== 'entering-pat' },
+    {
+      isActive:
+        authFlow?.state !== 'entering-pat' &&
+        authFlow?.state !== 'entering-jira-credentials',
+    },
   );
 
   if (!authPrompt) return null;
@@ -60,6 +68,81 @@ export function AuthPrompt() {
             mask="*"
             onSubmit={(val) => {
               void backendDataStore.getState().submitAdoPat(val);
+            }}
+          />
+        </Box>
+        <Box marginTop={1}>
+          <Text dimColor>enter submit esc cancel</Text>
+        </Box>
+      </Box>
+    );
+  }
+
+  // Jira credentials input (two-step: email then token)
+  if (authFlow?.state === 'entering-jira-credentials') {
+    if (!jiraEmail) {
+      // Step 1: Email
+      return (
+        <Box
+          borderStyle="round"
+          borderColor="yellow"
+          flexDirection="column"
+          paddingX={2}
+          paddingY={1}
+        >
+          <Text bold color="yellow">
+            Jira Authentication
+          </Text>
+          <Text dimColor>
+            Generate a token at
+            https://id.atlassian.com/manage-profile/security/api-tokens
+          </Text>
+          <Box marginTop={1}>
+            <Text>Email: </Text>
+            <TextInput
+              value={jiraEmailInput}
+              onChange={setJiraEmailInput}
+              onSubmit={(val) => {
+                if (val) setJiraEmail(val);
+              }}
+            />
+          </Box>
+          <Box marginTop={1}>
+            <Text dimColor>enter next esc cancel</Text>
+          </Box>
+        </Box>
+      );
+    }
+
+    // Step 2: Token
+    return (
+      <Box
+        borderStyle="round"
+        borderColor="yellow"
+        flexDirection="column"
+        paddingX={2}
+        paddingY={1}
+      >
+        <Text bold color="yellow">
+          Jira Authentication
+        </Text>
+        <Box marginTop={1}>
+          <Text>
+            Email: <Text bold>{jiraEmail}</Text>
+          </Text>
+        </Box>
+        <Box marginTop={1}>
+          <Text>Token: </Text>
+          <TextInput
+            value={jiraToken}
+            onChange={setJiraToken}
+            mask="*"
+            onSubmit={(val) => {
+              if (jiraEmail && val) {
+                void backendDataStore
+                  .getState()
+                  .submitJiraCredentials(jiraEmail, val);
+              }
             }}
           />
         </Box>

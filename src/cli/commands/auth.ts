@@ -17,15 +17,22 @@ import {
   GITLAB_ACCOUNT,
   GITLAB_PAT_ACCOUNT,
 } from '../../auth/gitlab.js';
+import {
+  getJiraCredentials,
+  setJiraCredentials,
+  removeJiraCredentials,
+} from '../../auth/jira.js';
 import { getToken } from '../../auth/keychain.js';
+import { JiraApiClient } from '../../backends/jira/api.js';
+import { configStore } from '../../stores/configStore.js';
 
-const VALID_PROVIDERS = ['github', 'azure', 'ado', 'gitlab'] as const;
+const VALID_PROVIDERS = ['github', 'azure', 'ado', 'gitlab', 'jira'] as const;
 type Provider = (typeof VALID_PROVIDERS)[number];
 
 function assertProvider(provider: string): asserts provider is Provider {
   if (!VALID_PROVIDERS.includes(provider as Provider)) {
     throw new Error(
-      `Unknown provider "${provider}". Valid providers: github, azure, ado, gitlab`,
+      `Unknown provider "${provider}". Valid providers: github, azure, ado, gitlab, jira`,
     );
   }
 }
@@ -71,6 +78,15 @@ export async function runAuthLogin(
           console.log(`Open ${verificationUri} and enter code: ${userCode}`);
         },
       });
+    case 'jira': {
+      const site = await readLine('Jira site (e.g. mycompany.atlassian.net): ');
+      const email = await readLine('Email: ');
+      const token = await readLine('API token: ');
+      const api = new JiraApiClient(email, token, site);
+      await api.rest('GET', '/api/3/myself');
+      setJiraCredentials(site, email, token);
+      return token;
+    }
   }
 }
 
@@ -101,6 +117,17 @@ export function runAuthStatus(): {
       authenticated: gitlabToken !== null || gitlabPat !== null,
       method: gitlabToken ? 'oauth' : gitlabPat ? 'pat' : undefined,
     },
+    (() => {
+      const jiraSite = configStore
+        .getState()
+        .config.jira?.site?.replace(/^https?:\/\//, '');
+      const jiraCreds = jiraSite ? getJiraCredentials(jiraSite) : null;
+      return {
+        provider: 'jira',
+        authenticated: jiraCreds !== null,
+        method: jiraCreds ? 'api-token' : undefined,
+      };
+    })(),
   ];
 }
 
@@ -121,6 +148,15 @@ export function runAuthLogout(provider: string): void {
     case 'gitlab':
       clearGitLabTokens();
       break;
+    case 'jira': {
+      const jiraSite = configStore
+        .getState()
+        .config.jira?.site?.replace(/^https?:\/\//, '');
+      if (jiraSite) {
+        removeJiraCredentials(jiraSite);
+      }
+      break;
+    }
   }
 }
 
