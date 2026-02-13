@@ -40,7 +40,13 @@ export interface AuthPromptInfo {
 }
 
 export interface AuthFlowState {
-  state: 'waiting' | 'code-ready' | 'entering-pat' | 'success' | 'error';
+  state:
+    | 'waiting'
+    | 'code-ready'
+    | 'entering-pat'
+    | 'entering-jira-credentials'
+    | 'success'
+    | 'error';
   userCode?: string;
   verificationUri?: string;
   error?: string;
@@ -80,6 +86,7 @@ export interface BackendDataStoreState {
   startAuthFlow(): Promise<void>;
   startPatFlow(): void;
   submitAdoPat(pat: string): Promise<void>;
+  submitJiraCredentials(email: string, token: string): Promise<void>;
   destroy(): void;
 }
 
@@ -325,6 +332,67 @@ export const backendDataStore = createStore<BackendDataStoreState>(
       }
     },
 
+    async submitJiraCredentials(email: string, token: string) {
+      if (!currentCwd) return;
+
+      set({ authFlow: { state: 'waiting' } });
+
+      try {
+        const generation = initGeneration;
+        const config = configStore.getState().config;
+        const site = config.jira?.site?.replace(/^https?:\/\//, '');
+        if (!site) throw new Error('Jira site not configured');
+
+        // Validate credentials
+        const { JiraApiClient } = await import('../backends/jira/api.js');
+        const api = new JiraApiClient(email, token, site);
+        await api.rest('GET', '/api/3/myself');
+
+        // Store credentials
+        const { setJiraCredentials } = await import('../auth/jira.js');
+        setJiraCredentials(site, email, token);
+
+        // Create remote backend
+        const { createRemoteBackend } = await import('../backends/factory.js');
+        const remote = await createRemoteBackend(currentCwd, 'jira');
+
+        if (generation !== initGeneration || !remote || !currentBackend) {
+          return;
+        }
+
+        const { SyncManager: SM } = await import('../sync/SyncManager.js');
+        const { SyncQueue } = await import('../storage/syncQueue.js');
+        type StorageType = import('../storage/index.js').Storage;
+        const primary = currentBackend as StorageType;
+        const queue = new SyncQueue(primary.getDatabase());
+        const syncManager = new SM(primary, remote, queue);
+
+        syncManager.onStatusChange((status: SyncStatus) => {
+          if (generation !== initGeneration) return;
+          get().setSyncStatus(status);
+          if (status.state === 'idle') {
+            void get().refresh();
+          }
+        });
+
+        set({
+          syncManager,
+          queue,
+          authPrompt: null,
+          authFlow: null,
+        });
+
+        syncManager.sync().catch(() => {});
+      } catch (err: unknown) {
+        set({
+          authFlow: {
+            state: 'error',
+            error: err instanceof Error ? err.message : String(err),
+          },
+        });
+      }
+    },
+
     async startAuthFlow() {
       const { authPrompt } = get();
       if (!authPrompt || !currentCwd) return;
@@ -357,6 +425,10 @@ export const backendDataStore = createStore<BackendDataStoreState>(
             const { authenticateAdo } = await import('../auth/ado.js');
             await authenticateAdo({ onCode });
             break;
+          }
+          case 'jira': {
+            set({ authFlow: { state: 'entering-jira-credentials' } });
+            return;
           }
           default:
             throw new Error(

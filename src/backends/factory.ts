@@ -76,7 +76,7 @@ export async function createRemoteBackend(
     }
     case 'jira': {
       const { JiraBackend } = await import('./jira/index.js');
-      return JiraBackend.create(root);
+      return JiraBackend.create(root, options);
     }
     default:
       return null;
