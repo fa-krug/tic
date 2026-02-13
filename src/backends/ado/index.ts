@@ -152,7 +152,9 @@ export class AzureDevOpsBackend extends BaseBackend {
         'GET',
         `/_apis/projects/${encodeURIComponent(this.project)}/teams/${encodeURIComponent(this.project + ' Team')}/members`,
       );
-      return result.value.map((m) => m.identity.displayName);
+      return result.value
+        .map((m) => m.identity?.displayName)
+        .filter((name): name is string => !!name);
     } catch {
       return [];
     }

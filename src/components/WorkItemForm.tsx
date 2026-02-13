@@ -24,6 +24,7 @@ import { slugifyTemplateName } from '../backends/local/templates.js';
 import { Breadcrumbs } from './Breadcrumbs.js';
 import { uiStore } from '../stores/uiStore.js';
 import { undoStore } from '../stores/undoStore.js';
+import { useFormValidation } from '../hooks/useFormValidation.js';
 
 type FieldName =
   | 'title'
@@ -252,6 +253,17 @@ export function WorkItemForm() {
     }
     return required;
   }, [selectedWorkItemId, capabilities.customTypes]);
+
+  const requiredFieldsList = useMemo(
+    () => capabilities.requiredFields ?? [...requiredFields],
+    [capabilities.requiredFields, requiredFields],
+  );
+
+  const {
+    errors: validationErrors,
+    validate,
+    clearError,
+  } = useFormValidation(allItems, selectedWorkItemId, requiredFieldsList);
 
   const [comments, setComments] = useState<Comment[]>([]);
 
@@ -766,6 +778,18 @@ export function WorkItemForm() {
 
         // S: save and go back
         if (_input === 's') {
+          // Run full validation before save
+          const fieldValues: Record<string, string> = { type, status };
+          const hasErr = validate(
+            'all',
+            { title, parentId, dependsOn },
+            fieldValues,
+          );
+          if (hasErr) {
+            uiStore.getState().setToast('Fix validation errors before saving');
+            return;
+          }
+
           setSaving(true);
           void (async () => {
             await save();
@@ -788,10 +812,18 @@ export function WorkItemForm() {
         }
 
         if (key.upArrow) {
+          const leavingField = fields[focusedField];
+          if (leavingField === 'title') {
+            validate('title', { title, parentId, dependsOn });
+          }
           setFocusedField((f) => Math.max(0, f - 1));
         }
 
         if (key.downArrow) {
+          const leavingField = fields[focusedField];
+          if (leavingField === 'title') {
+            validate('title', { title, parentId, dependsOn });
+          }
           setFocusedField((f) => Math.min(fields.length - 1, f + 1));
         }
 
@@ -1085,13 +1117,20 @@ export function WorkItemForm() {
       }
 
       return (
-        <Box key={field}>
-          <Text color={focused ? 'cyan' : undefined}>{cursor} </Text>
-          <Text bold={focused} color={focused ? 'cyan' : undefined}>
-            {label}:{dirtyIndicator}
-            {isRequired && <Text dimColor> *</Text>}{' '}
-          </Text>
-          <Text>{currentValue}</Text>
+        <Box key={field} flexDirection="column">
+          <Box>
+            <Text color={focused ? 'cyan' : undefined}>{cursor} </Text>
+            <Text bold={focused} color={focused ? 'cyan' : undefined}>
+              {label}:{dirtyIndicator}
+              {isRequired && <Text dimColor> *</Text>}{' '}
+            </Text>
+            <Text>{currentValue}</Text>
+          </Box>
+          {validationErrors[field] && (
+            <Box marginLeft={4}>
+              <Text color="red">{validationErrors[field]}</Text>
+            </Box>
+          )}
         </Box>
       );
     }
@@ -1155,27 +1194,41 @@ export function WorkItemForm() {
                 onChange={setParentId}
                 onSubmit={() => {
                   setEditing(false);
+                  validate('parentId', { title, parentId, dependsOn });
                 }}
                 onCancel={() => {
                   setParentId(preEditValue);
                   setEditing(false);
+                  clearError('parentId');
                 }}
                 suggestions={parentSuggestions}
                 focus={true}
               />
             </Box>
+            {validationErrors['parentId'] && (
+              <Box marginLeft={4}>
+                <Text color="red">{validationErrors['parentId']}</Text>
+              </Box>
+            )}
           </Box>
         );
       }
 
       return (
-        <Box key={field}>
-          <Text color={focused ? 'cyan' : undefined}>{cursor} </Text>
-          <Text bold={focused} color={focused ? 'cyan' : undefined}>
-            {label}:{dirtyIndicator}
-            {isRequired && <Text dimColor> *</Text>}{' '}
-          </Text>
-          <Text>{parentId || <Text dimColor>(empty)</Text>}</Text>
+        <Box key={field} flexDirection="column">
+          <Box>
+            <Text color={focused ? 'cyan' : undefined}>{cursor} </Text>
+            <Text bold={focused} color={focused ? 'cyan' : undefined}>
+              {label}:{dirtyIndicator}
+              {isRequired && <Text dimColor> *</Text>}{' '}
+            </Text>
+            <Text>{parentId || <Text dimColor>(empty)</Text>}</Text>
+          </Box>
+          {validationErrors['parentId'] && (
+            <Box marginLeft={4}>
+              <Text color="red">{validationErrors['parentId']}</Text>
+            </Box>
+          )}
         </Box>
       );
     }
@@ -1222,27 +1275,41 @@ export function WorkItemForm() {
                 onChange={setDependsOn}
                 onSubmit={() => {
                   setEditing(false);
+                  validate('dependsOn', { title, parentId, dependsOn });
                 }}
                 onCancel={() => {
                   setDependsOn(preEditValue);
                   setEditing(false);
+                  clearError('dependsOn');
                 }}
                 suggestions={parentSuggestions}
                 focus={true}
               />
             </Box>
+            {validationErrors['dependsOn'] && (
+              <Box marginLeft={4}>
+                <Text color="red">{validationErrors['dependsOn']}</Text>
+              </Box>
+            )}
           </Box>
         );
       }
 
       return (
-        <Box key={field}>
-          <Text color={focused ? 'cyan' : undefined}>{cursor} </Text>
-          <Text bold={focused} color={focused ? 'cyan' : undefined}>
-            {label}:{dirtyIndicator}
-            {isRequired && <Text dimColor> *</Text>}{' '}
-          </Text>
-          <Text>{dependsOn || <Text dimColor>(empty)</Text>}</Text>
+        <Box key={field} flexDirection="column">
+          <Box>
+            <Text color={focused ? 'cyan' : undefined}>{cursor} </Text>
+            <Text bold={focused} color={focused ? 'cyan' : undefined}>
+              {label}:{dirtyIndicator}
+              {isRequired && <Text dimColor> *</Text>}{' '}
+            </Text>
+            <Text>{dependsOn || <Text dimColor>(empty)</Text>}</Text>
+          </Box>
+          {validationErrors['dependsOn'] && (
+            <Box marginLeft={4}>
+              <Text color="red">{validationErrors['dependsOn']}</Text>
+            </Box>
+          )}
         </Box>
       );
     }
@@ -1296,32 +1363,47 @@ export function WorkItemForm() {
 
     if (isEditing) {
       return (
-        <Box key={field}>
-          <Text color="cyan">{cursor} </Text>
-          <Text bold color="cyan">
-            {label}:{dirtyIndicator}
-            {isRequired && <Text dimColor> *</Text>}{' '}
-          </Text>
-          <TextInput
-            value={textValue}
-            onChange={textSetter}
-            focus={true}
-            onSubmit={() => {
-              setEditing(false);
-            }}
-          />
+        <Box key={field} flexDirection="column">
+          <Box>
+            <Text color="cyan">{cursor} </Text>
+            <Text bold color="cyan">
+              {label}:{dirtyIndicator}
+              {isRequired && <Text dimColor> *</Text>}{' '}
+            </Text>
+            <TextInput
+              value={textValue}
+              onChange={textSetter}
+              focus={true}
+              onSubmit={() => {
+                setEditing(false);
+                validate('title', { title, parentId, dependsOn });
+              }}
+            />
+          </Box>
+          {validationErrors['title'] && (
+            <Box marginLeft={4}>
+              <Text color="red">{validationErrors['title']}</Text>
+            </Box>
+          )}
         </Box>
       );
     }
 
     return (
-      <Box key={field}>
-        <Text color={focused ? 'cyan' : undefined}>{cursor} </Text>
-        <Text bold={focused} color={focused ? 'cyan' : undefined}>
-          {label}:{dirtyIndicator}
-          {isRequired && <Text dimColor> *</Text>}{' '}
-        </Text>
-        <Text>{textValue || <Text dimColor>(empty)</Text>}</Text>
+      <Box key={field} flexDirection="column">
+        <Box>
+          <Text color={focused ? 'cyan' : undefined}>{cursor} </Text>
+          <Text bold={focused} color={focused ? 'cyan' : undefined}>
+            {label}:{dirtyIndicator}
+            {isRequired && <Text dimColor> *</Text>}{' '}
+          </Text>
+          <Text>{textValue || <Text dimColor>(empty)</Text>}</Text>
+        </Box>
+        {validationErrors['title'] && (
+          <Box marginLeft={4}>
+            <Text color="red">{validationErrors['title']}</Text>
+          </Box>
+        )}
       </Box>
     );
   }

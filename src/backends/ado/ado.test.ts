@@ -678,6 +678,22 @@ describe('AzureDevOpsBackend', () => {
       ]);
     });
 
+    it('filters out entries with null/undefined identity', async () => {
+      const backend = await makeBackend();
+      mockApi.rest.mockResolvedValueOnce({
+        value: [
+          { identity: { displayName: 'Alice Smith' } },
+          { identity: null },
+          { identity: undefined },
+          { identity: { displayName: 'Bob Jones' } },
+        ],
+      });
+      expect(await backend.getAssignees()).toEqual([
+        'Alice Smith',
+        'Bob Jones',
+      ]);
+    });
+
     it('returns empty array on error', async () => {
       const backend = await makeBackend();
       mockApi.rest.mockRejectedValueOnce(new Error('API error'));

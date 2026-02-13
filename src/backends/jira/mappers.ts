@@ -93,12 +93,11 @@ export function mapPriorityToJira(priority: string): string {
 
 export function extractDependsOn(links: JiraIssueLink[] | undefined): string[] {
   if (!links) return [];
-  return links
-    .filter(
-      (link) =>
-        link.type.inward === 'is blocked by' && link.inwardIssue != null,
-    )
-    .map((link) => link.inwardIssue!.key);
+  return links.flatMap((link) =>
+    link.type.inward === 'is blocked by' && link.inwardIssue != null
+      ? [link.inwardIssue.key]
+      : [],
+  );
 }
 
 export function mapIssueToWorkItem(issue: JiraIssue): WorkItem {

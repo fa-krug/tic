@@ -15,7 +15,7 @@ export interface GhIssue {
 }
 
 export interface GhComment {
-  author: { login: string };
+  author: { login: string } | null;
   createdAt: string;
   body: string;
 }
@@ -29,7 +29,7 @@ export interface GhMilestone {
 
 export function mapCommentToComment(ghComment: GhComment): Comment {
   return {
-    author: ghComment.author.login,
+    author: ghComment.author?.login ?? 'unknown',
     date: ghComment.createdAt,
     body: ghComment.body,
   };

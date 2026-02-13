@@ -93,6 +93,20 @@ describe('extractDependsOn', () => {
     expect(extractDependsOn(links)).toEqual(['TEAM-5']);
   });
 
+  it('skips links with null/undefined inwardIssue', () => {
+    const links = [
+      {
+        type: { name: 'Blocks', inward: 'is blocked by', outward: 'blocks' },
+        inwardIssue: undefined,
+      },
+      {
+        type: { name: 'Blocks', inward: 'is blocked by', outward: 'blocks' },
+        inwardIssue: { key: 'TEAM-7' },
+      },
+    ];
+    expect(extractDependsOn(links)).toEqual(['TEAM-7']);
+  });
+
   it('returns empty array for no links', () => {
     expect(extractDependsOn(undefined)).toEqual([]);
     expect(extractDependsOn([])).toEqual([]);

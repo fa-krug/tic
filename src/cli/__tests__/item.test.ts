@@ -1,8 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { Storage } from '../../storage/index.js';
+import type { Backend } from '../../backends/types.js';
 import {
   runItemList,
   runItemShow,
@@ -196,6 +197,41 @@ describe('item commands', () => {
       await expect(
         runItemUpdate(backend, '1', { priority: 'urgent' }),
       ).rejects.toThrow('Invalid priority');
+    });
+  });
+
+  describe('runItemCreate with empty types/statuses', () => {
+    it('falls back to defaults when backend returns empty arrays', async () => {
+      const createFn = vi.fn().mockResolvedValue({
+        id: '1',
+        title: 'Test',
+        type: 'task',
+        status: 'open',
+        priority: 'medium',
+        assignee: '',
+        labels: [],
+        iteration: '',
+        created: '',
+        updated: '',
+        parent: null,
+        dependsOn: [],
+        comments: [],
+        description: '',
+      });
+      const mockBackend = {
+        getStatuses: vi.fn().mockResolvedValue([]),
+        getWorkItemTypes: vi.fn().mockResolvedValue([]),
+        getCurrentIteration: vi.fn().mockResolvedValue(''),
+        cachedCreateWorkItem: createFn,
+      } as unknown as Backend;
+
+      await runItemCreate(mockBackend, 'Test', {});
+      const createArg = createFn.mock.calls[0]![0] as {
+        type: string;
+        status: string;
+      };
+      expect(createArg.type).toBe('task');
+      expect(createArg.status).toBe('open');
     });
   });
 

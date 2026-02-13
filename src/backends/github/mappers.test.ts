@@ -103,4 +103,44 @@ describe('mapCommentToComment', () => {
     expect(comment.date).toBe('2026-01-15T10:00:00Z');
     expect(comment.body).toBe('Looks good!');
   });
+
+  it('handles null author (deleted user)', () => {
+    const ghComment = {
+      author: null,
+      createdAt: '2026-01-16T09:00:00Z',
+      body: 'Ghost comment',
+    };
+    const comment = mapCommentToComment(ghComment);
+    expect(comment.author).toBe('unknown');
+  });
+});
+
+describe('mapIssueToWorkItem with null comment author', () => {
+  it('maps comments with null author to unknown', () => {
+    const ghIssue = {
+      number: 10,
+      title: 'Test',
+      body: 'Body',
+      state: 'OPEN',
+      assignees: { nodes: [] },
+      labels: { nodes: [] },
+      milestone: null,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+      comments: {
+        nodes: [
+          {
+            author: null,
+            createdAt: '2026-01-02T00:00:00Z',
+            body: 'Deleted user comment',
+          },
+        ],
+      },
+      parent: null,
+    };
+
+    const item = mapIssueToWorkItem(ghIssue);
+    expect(item.comments).toHaveLength(1);
+    expect(item.comments[0]!.author).toBe('unknown');
+  });
 });

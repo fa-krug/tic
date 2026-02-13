@@ -68,8 +68,8 @@ export async function runItemCreate(
 
   return backend.cachedCreateWorkItem({
     title,
-    type: opts.type ?? (types.includes('task') ? 'task' : types[0]!),
-    status: opts.status ?? statuses[0]!,
+    type: opts.type ?? (types.includes('task') ? 'task' : (types[0] ?? 'task')),
+    status: opts.status ?? statuses[0] ?? 'open',
     priority: (opts.priority as WorkItem['priority']) ?? 'medium',
     assignee: opts.assignee ?? '',
     labels: opts.labels ? opts.labels.split(',').map((l) => l.trim()) : [],
