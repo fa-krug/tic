@@ -1,10 +1,31 @@
 import type { WorkItem, Comment } from '../../types.js';
 
+// ADF → plain text (minimal conversion for display)
+export interface AdfNode {
+  type: string;
+  text?: string;
+  content?: AdfNode[];
+}
+
+export function adfToText(adf: AdfNode | string | null | undefined): string {
+  if (!adf) return '';
+  if (typeof adf === 'string') return adf;
+
+  const parts: string[] = [];
+  if (adf.text) parts.push(adf.text);
+  if (adf.content) {
+    for (const child of adf.content) {
+      parts.push(adfToText(child));
+    }
+  }
+  return parts.join('');
+}
+
 export interface JiraIssue {
   key: string;
   fields: {
     summary: string;
-    description: string | null;
+    description: unknown;
     status: { name: string };
     issuetype: { name: string };
     priority: { name: string } | null;
@@ -27,7 +48,7 @@ export interface JiraIssueLink {
 export interface JiraComment {
   author: { displayName: string; emailAddress: string };
   created: string;
-  body: string;
+  body: unknown;
 }
 
 export interface JiraSprint {
@@ -84,7 +105,7 @@ export function mapIssueToWorkItem(issue: JiraIssue): WorkItem {
   return {
     id: issue.key,
     title: issue.fields.summary,
-    description: issue.fields.description ?? '',
+    description: adfToText(issue.fields.description as AdfNode | string | null),
     status: issue.fields.status.name.toLowerCase(),
     type: issue.fields.issuetype.name.toLowerCase(),
     priority: mapPriorityToTic(issue.fields.priority?.name),
@@ -103,6 +124,6 @@ export function mapCommentToComment(comment: JiraComment): Comment {
   return {
     author: comment.author.emailAddress,
     date: comment.created,
-    body: comment.body,
+    body: adfToText(comment.body as AdfNode | string | null),
   };
 }

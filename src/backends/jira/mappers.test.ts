@@ -5,7 +5,42 @@ import {
   mapPriorityToTic,
   mapPriorityToJira,
   extractDependsOn,
+  adfToText,
 } from './mappers.js';
+
+describe('adfToText', () => {
+  it('converts ADF document with nested paragraphs to plain text', () => {
+    const adf = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'Hello ' },
+            { type: 'text', text: 'world' },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Second paragraph' }],
+        },
+      ],
+    };
+    expect(adfToText(adf)).toBe('Hello worldSecond paragraph');
+  });
+
+  it('returns empty string for null', () => {
+    expect(adfToText(null)).toBe('');
+  });
+
+  it('returns empty string for undefined', () => {
+    expect(adfToText(undefined)).toBe('');
+  });
+
+  it('passes through plain strings', () => {
+    expect(adfToText('plain text')).toBe('plain text');
+  });
+});
 
 describe('mapPriorityToTic', () => {
   it('maps Highest to critical', () => {
@@ -70,7 +105,17 @@ describe('mapIssueToWorkItem', () => {
       key: 'TEAM-42',
       fields: {
         summary: 'Fix login bug',
-        description: 'The login form breaks on mobile.',
+        description: {
+          type: 'doc',
+          content: [
+            {
+              type: 'paragraph',
+              content: [
+                { type: 'text', text: 'The login form breaks on mobile.' },
+              ],
+            },
+          ],
+        },
         status: { name: 'In Progress' },
         issuetype: { name: 'Bug' },
         priority: { name: 'High' },
@@ -152,7 +197,15 @@ describe('mapCommentToComment', () => {
         emailAddress: 'alice@example.com',
       },
       created: '2026-01-15T10:00:00.000+0000',
-      body: 'Looks good!',
+      body: {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: 'Looks good!' }],
+          },
+        ],
+      },
     };
 
     const comment = mapCommentToComment(jiraComment);
