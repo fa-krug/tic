@@ -102,7 +102,9 @@ export function StatusScreen() {
     }
 
     if (input === 'r' && syncManager && syncStatus?.state !== 'syncing') {
-      void syncManager.sync();
+      void syncManager.sync().catch(() => {
+        // Errors recorded in syncStatus by SyncManager
+      });
       return;
     }
 

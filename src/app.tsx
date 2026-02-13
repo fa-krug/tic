@@ -51,11 +51,13 @@ export function App() {
   // Update check on mount
   useEffect(() => {
     if (autoUpdate !== false) {
-      void import('./update-checker.js').then(({ checkForUpdate }) =>
-        checkForUpdate().then((info) => {
-          if (info) navigationStore.getState().setUpdateInfo(info);
-        }),
-      );
+      void import('./update-checker.js')
+        .then(({ checkForUpdate }) =>
+          checkForUpdate().then((info) => {
+            if (info) navigationStore.getState().setUpdateInfo(info);
+          }),
+        )
+        .catch(() => {});
     }
   }, [autoUpdate]);
 

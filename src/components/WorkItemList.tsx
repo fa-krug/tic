@@ -209,7 +209,10 @@ export function WorkItemList() {
   // Marked count for header display
   const markedCount = markedIds.size;
   const refreshData = useCallback(() => {
-    void backendDataStore.getState().refresh();
+    void backendDataStore
+      .getState()
+      .refresh()
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -226,7 +229,16 @@ export function WorkItemList() {
 
   useEffect(() => {
     if (capabilities.templates && backend) {
-      void backend.listTemplates().then(setTemplates);
+      void backend
+        .listTemplates()
+        .then(setTemplates)
+        .catch((err: unknown) => {
+          uiStore
+            .getState()
+            .setToast(
+              err instanceof Error ? err.message : 'Failed to load templates',
+            );
+        });
     }
   }, [backend, capabilities.templates]);
 
@@ -254,7 +266,11 @@ export function WorkItemList() {
         itemId,
         timestamp: new Date().toISOString(),
       });
-      syncManager?.pushPending().catch(() => {});
+      syncManager?.pushPending().catch((err: unknown) => {
+        uiStore
+          .getState()
+          .setToast(err instanceof Error ? err.message : 'Sync failed');
+      });
     }
   };
 
@@ -367,9 +383,18 @@ export function WorkItemList() {
   useEffect(() => {
     if (activeOverlay?.type !== 'command-bar' || !backend) return;
     let cancelled = false;
-    void backend.listWorkItems().then((items) => {
-      if (!cancelled) setAllSearchItems(items);
-    });
+    void backend
+      .listWorkItems()
+      .then((items) => {
+        if (!cancelled) setAllSearchItems(items);
+      })
+      .catch((err: unknown) => {
+        uiStore
+          .getState()
+          .setToast(
+            err instanceof Error ? err.message : 'Failed to load items',
+          );
+      });
     return () => {
       cancelled = true;
     };
@@ -605,15 +630,22 @@ export function WorkItemList() {
             refreshData();
             setToast(`Undid ${entry.label}`);
           }
-        })();
+        })().catch((err: unknown) => {
+          uiStore
+            .getState()
+            .setToast(err instanceof Error ? err.message : 'Undo failed');
+        });
       }
 
       if (input === 'o' && treeItems.length > 0 && backend) {
         void (async () => {
           const itemId = treeItems[cursor]!.item.id;
           await backend.openItem(itemId);
-          void backendDataStore.getState().reloadItem(itemId);
-        })();
+          void backendDataStore
+            .getState()
+            .reloadItem(itemId)
+            .catch(() => {});
+        })().catch(() => {});
       }
 
       if (input === 'b' && gitAvailable && treeItems.length > 0) {
@@ -643,7 +675,10 @@ export function WorkItemList() {
             e instanceof Error ? e.message : 'Failed to start implementation',
           );
         }
-        void backendDataStore.getState().reloadItem(item.id);
+        void backendDataStore
+          .getState()
+          .reloadItem(item.id)
+          .catch(() => {});
       }
 
       if (input === 'S') {
@@ -677,7 +712,8 @@ export function WorkItemList() {
       if (input === 'v') {
         void configStore
           .getState()
-          .update({ showDetailPanel: !showDetailPanel });
+          .update({ showDetailPanel: !showDetailPanel })
+          .catch(() => {});
       }
 
       if (input === ' ' && showDetailPanel && hasDescription) {
@@ -701,9 +737,14 @@ export function WorkItemList() {
       }
 
       if (input === 'r' && syncManager) {
-        void syncManager.sync().then(() => {
-          refreshData();
-        });
+        void syncManager
+          .sync()
+          .then(() => {
+            refreshData();
+          })
+          .catch(() => {
+            // Errors recorded in syncStatus by SyncManager
+          });
       }
 
       if (input === 'm' && treeItems.length > 0) {
@@ -1034,8 +1075,11 @@ export function WorkItemList() {
           void (async () => {
             const itemId = treeItems[cursor]!.item.id;
             await backend.openItem(itemId);
-            void backendDataStore.getState().reloadItem(itemId);
-          })();
+            void backendDataStore
+              .getState()
+              .reloadItem(itemId)
+              .catch(() => {});
+          })().catch(() => {});
         }
         break;
       case 'branch':
@@ -1065,12 +1109,20 @@ export function WorkItemList() {
               e instanceof Error ? e.message : 'Failed to start implementation',
             );
           }
-          void backendDataStore.getState().reloadItem(item.id);
+          void backendDataStore
+            .getState()
+            .reloadItem(item.id)
+            .catch(() => {});
         }
         break;
       case 'sync':
         if (syncManager) {
-          void syncManager.sync().then(() => refreshData());
+          void syncManager
+            .sync()
+            .then(() => refreshData())
+            .catch(() => {
+              // Errors recorded in syncStatus by SyncManager
+            });
         }
         break;
       case 'iterations':
@@ -1403,7 +1455,13 @@ export function WorkItemList() {
                     ? 'Status updated — press u to undo'
                     : `${targetIds.length} items updated — press u to undo`,
                 );
-              })();
+              })().catch((err: unknown) => {
+                uiStore
+                  .getState()
+                  .setToast(
+                    err instanceof Error ? err.message : 'Update failed',
+                  );
+              });
             }}
             onCancel={() => closeOverlay()}
           />
@@ -1435,7 +1493,13 @@ export function WorkItemList() {
                     ? 'Type updated — press u to undo'
                     : `${targetIds.length} items updated — press u to undo`,
                 );
-              })();
+              })().catch((err: unknown) => {
+                uiStore
+                  .getState()
+                  .setToast(
+                    err instanceof Error ? err.message : 'Update failed',
+                  );
+              });
             }}
             onCancel={() => closeOverlay()}
           />
@@ -1471,7 +1535,13 @@ export function WorkItemList() {
                     ? 'Priority updated — press u to undo'
                     : `${targetIds.length} items updated — press u to undo`,
                 );
-              })();
+              })().catch((err: unknown) => {
+                uiStore
+                  .getState()
+                  .setToast(
+                    err instanceof Error ? err.message : 'Update failed',
+                  );
+              });
             }}
             onCancel={() => closeOverlay()}
           />
@@ -1538,7 +1608,7 @@ export function WorkItemList() {
                     ? 'Parent updated — press u to undo'
                     : `${targetIds.length} items updated — press u to undo`,
                 );
-              })();
+              })().catch(() => {});
             }}
             onSubmitFreeform={(text) => {
               const targetIds = getOverlayTargetIds();
@@ -1572,7 +1642,7 @@ export function WorkItemList() {
                     ? 'Parent updated — press u to undo'
                     : `${targetIds.length} items updated — press u to undo`,
                 );
-              })();
+              })().catch(() => {});
             }}
             onCancel={() => closeOverlay()}
             placeholder="Type parent ID or title..."
@@ -1603,7 +1673,13 @@ export function WorkItemList() {
                     ? 'Assignee updated — press u to undo'
                     : `${targetIds.length} items updated — press u to undo`,
                 );
-              })();
+              })().catch((err: unknown) => {
+                uiStore
+                  .getState()
+                  .setToast(
+                    err instanceof Error ? err.message : 'Update failed',
+                  );
+              });
             }}
             onSubmitFreeform={(text) => {
               const targetIds = getOverlayTargetIds();
@@ -1625,7 +1701,13 @@ export function WorkItemList() {
                     ? 'Assignee updated — press u to undo'
                     : `${targetIds.length} items updated — press u to undo`,
                 );
-              })();
+              })().catch((err: unknown) => {
+                uiStore
+                  .getState()
+                  .setToast(
+                    err instanceof Error ? err.message : 'Update failed',
+                  );
+              });
             }}
             onCancel={() => closeOverlay()}
             placeholder="Type assignee name..."
@@ -1660,7 +1742,13 @@ export function WorkItemList() {
                     ? 'Labels updated — press u to undo'
                     : `${targetIds.length} items updated — press u to undo`,
                 );
-              })();
+              })().catch((err: unknown) => {
+                uiStore
+                  .getState()
+                  .setToast(
+                    err instanceof Error ? err.message : 'Update failed',
+                  );
+              });
             }}
             onSubmitFreeform={(text) => {
               const targetIds = getOverlayTargetIds();
@@ -1684,7 +1772,13 @@ export function WorkItemList() {
                     ? 'Labels updated — press u to undo'
                     : `${targetIds.length} items updated — press u to undo`,
                 );
-              })();
+              })().catch((err: unknown) => {
+                uiStore
+                  .getState()
+                  .setToast(
+                    err instanceof Error ? err.message : 'Update failed',
+                  );
+              });
             }}
             onCancel={() => closeOverlay()}
             placeholder="Type to filter labels..."
@@ -1775,9 +1869,12 @@ export function WorkItemList() {
                 const existing = savedViews.filter(
                   (v) => v.name !== lastViewName,
                 );
-                void configStore.getState().update({
-                  views: [...existing, newView],
-                });
+                void configStore
+                  .getState()
+                  .update({
+                    views: [...existing, newView],
+                  })
+                  .catch(() => {});
                 filterStore.setState({
                   activeViewName: lastViewName,
                 });
@@ -1806,10 +1903,16 @@ export function WorkItemList() {
                 item.value === '__no-filters__' ||
                 item.value === defaultView
               ) {
-                void configStore.getState().update({ defaultView: undefined });
+                void configStore
+                  .getState()
+                  .update({ defaultView: undefined })
+                  .catch(() => {});
                 setToast('Default view cleared');
               } else {
-                void configStore.getState().update({ defaultView: item.value });
+                void configStore
+                  .getState()
+                  .update({ defaultView: item.value })
+                  .catch(() => {});
                 setToast(`View "${item.value}" set as default`);
               }
             }}
@@ -1833,9 +1936,12 @@ export function WorkItemList() {
                 ...(sortStack.length > 0 ? { sort: [...sortStack] } : {}),
               };
               const existing = savedViews.filter((v) => v.name !== name.trim());
-              void configStore.getState().update({
-                views: [...existing, newView],
-              });
+              void configStore
+                .getState()
+                .update({
+                  views: [...existing, newView],
+                })
+                .catch(() => {});
               filterStore.setState({ activeViewName: name.trim() });
               closeOverlay();
               setToast(`View "${name.trim()}" saved`);
@@ -1850,12 +1956,15 @@ export function WorkItemList() {
             items={viewPickerItems.filter((i) => i.id !== '__no-filters__')}
             onSelect={(item) => {
               const remaining = savedViews.filter((v) => v.name !== item.value);
-              void configStore.getState().update({
-                views: remaining,
-                ...(defaultView === item.value
-                  ? { defaultView: undefined }
-                  : {}),
-              });
+              void configStore
+                .getState()
+                .update({
+                  views: remaining,
+                  ...(defaultView === item.value
+                    ? { defaultView: undefined }
+                    : {}),
+                })
+                .catch(() => {});
               if (activeViewName === item.value) {
                 filterStore.setState({ activeViewName: null });
               }
@@ -1918,7 +2027,13 @@ export function WorkItemList() {
                       ? `Item #${targetIds[0]} deleted${softDelete ? ' — press u to undo' : ''}`
                       : `${targetIds.length} items deleted${softDelete ? ' — press u to undo' : ''}`,
                   );
-                })();
+                })().catch((err: unknown) => {
+                  uiStore
+                    .getState()
+                    .setToast(
+                      err instanceof Error ? err.message : 'Delete failed',
+                    );
+                });
               } else {
                 closeOverlay();
               }

@@ -93,30 +93,45 @@ export function Settings() {
   );
 
   useEffect(() => {
-    void checkAllBackendAvailability().then((results) => {
-      setAvailability(
-        Object.fromEntries(
-          Object.entries(results).map(([b, ok]) => [
-            b,
-            ok ? 'available' : 'unavailable',
-          ]),
-        ) as Record<BackendType, AvailabilityStatus>,
-      );
-    });
+    void checkAllBackendAvailability()
+      .then((results) => {
+        setAvailability(
+          Object.fromEntries(
+            Object.entries(results).map(([b, ok]) => [
+              b,
+              ok ? 'available' : 'unavailable',
+            ]),
+          ) as Record<BackendType, AvailabilityStatus>,
+        );
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
     if (capabilities.templates && backend) {
-      void backend.listTemplates().then(setTemplates);
+      void backend
+        .listTemplates()
+        .then(setTemplates)
+        .catch((err: unknown) => {
+          uiStore
+            .getState()
+            .setToast(
+              err instanceof Error ? err.message : 'Failed to load templates',
+            );
+        });
     }
   }, [backend, capabilities.templates]);
 
   useEffect(() => {
     setUpdateChecking(true);
-    void checkForUpdate().then((info) => {
-      setUpdateInfo(info);
-      setUpdateChecking(false);
-    });
+    void checkForUpdate()
+      .then((info) => {
+        setUpdateInfo(info);
+        setUpdateChecking(false);
+      })
+      .catch(() => {
+        setUpdateChecking(false);
+      });
   }, []);
 
   // Initialize cursor and jira fields when config loads
@@ -200,15 +215,18 @@ export function Settings() {
   function saveJiraConfig() {
     if (!configLoaded) return;
     const boardIdNum = parseInt(jiraBoardId.trim(), 10);
-    void configStore.getState().update({
-      jira: {
-        site: jiraSite.trim(),
-        project: jiraProject.trim(),
-        ...(jiraBoardId.trim() && !isNaN(boardIdNum)
-          ? { boardId: boardIdNum }
-          : {}),
-      },
-    });
+    void configStore
+      .getState()
+      .update({
+        jira: {
+          site: jiraSite.trim(),
+          project: jiraProject.trim(),
+          ...(jiraBoardId.trim() && !isNaN(boardIdNum)
+            ? { boardId: boardIdNum }
+            : {}),
+        },
+      })
+      .catch(() => {});
   }
 
   // Navigation mode input handler
@@ -261,7 +279,10 @@ export function Settings() {
           if (item.backend === 'jira' && !config.jira) {
             updates.jira = { site: jiraSite, project: jiraProject };
           }
-          void configStore.getState().update(updates);
+          void configStore
+            .getState()
+            .update(updates)
+            .catch(() => {});
           // Auto-advance cursor to first jira field
           if (item.backend === 'jira') {
             const jiraIdx = VALID_BACKENDS.indexOf('jira');
@@ -280,17 +301,22 @@ export function Settings() {
           openOverlay({ type: 'default-iteration-picker' });
         } else if (item.kind === 'update-check') {
           setUpdateChecking(true);
-          void checkForUpdate().then((info) => {
-            setUpdateInfo(info);
-            setUpdateChecking(false);
-          });
+          void checkForUpdate()
+            .then((info) => {
+              setUpdateInfo(info);
+              setUpdateChecking(false);
+            })
+            .catch(() => {
+              setUpdateChecking(false);
+            });
         } else if (item.kind === 'update-now') {
           requestUpdate();
           exit();
         } else if (item.kind === 'update-toggle') {
           void configStore
             .getState()
-            .update({ autoUpdate: !(config.autoUpdate !== false) });
+            .update({ autoUpdate: !(config.autoUpdate !== false) })
+            .catch(() => {});
         } else if (item.kind === 'branch-command') {
           try {
             const current =
@@ -298,14 +324,16 @@ export function Settings() {
             const edited = openInEditor(current);
             void configStore
               .getState()
-              .update({ branchCommand: edited.trim() });
+              .update({ branchCommand: edited.trim() })
+              .catch(() => {});
           } catch {
             // Editor failed, ignore
           }
         } else if (item.kind === 'branch-clipboard-toggle') {
           void configStore
             .getState()
-            .update({ copyToClipboard: !(config?.copyToClipboard !== false) });
+            .update({ copyToClipboard: !(config?.copyToClipboard !== false) })
+            .catch(() => {});
         }
       }
 
@@ -619,7 +647,10 @@ export function Settings() {
           title="Default Type"
           items={config.types.map((t) => ({ id: t, label: t, value: t }))}
           onSelect={(item) => {
-            void configStore.getState().update({ defaultType: item.value });
+            void configStore
+              .getState()
+              .update({ defaultType: item.value })
+              .catch(() => {});
             closeOverlay();
           }}
           onCancel={() => closeOverlay()}
@@ -634,7 +665,8 @@ export function Settings() {
           onSelect={(item) => {
             void configStore
               .getState()
-              .update({ current_iteration: item.value });
+              .update({ current_iteration: item.value })
+              .catch(() => {});
             closeOverlay();
           }}
           onCancel={() => closeOverlay()}
@@ -653,18 +685,35 @@ export function Settings() {
             if (item.value === 'yes') {
               const slug = activeOverlay.templateSlug;
               if (backend) {
-                void backend.deleteTemplate(slug).then(async () => {
-                  setTemplates((prev) => prev.filter((t) => t.slug !== slug));
-                  if (queue) {
-                    await queue.append({
-                      action: 'template-delete',
-                      itemId: slug,
-                      timestamp: new Date().toISOString(),
-                      templateSlug: slug,
-                    });
-                    syncManager?.pushPending().catch(() => {});
-                  }
-                });
+                void backend
+                  .deleteTemplate(slug)
+                  .then(async () => {
+                    setTemplates((prev) => prev.filter((t) => t.slug !== slug));
+                    if (queue) {
+                      await queue.append({
+                        action: 'template-delete',
+                        itemId: slug,
+                        timestamp: new Date().toISOString(),
+                        templateSlug: slug,
+                      });
+                      syncManager?.pushPending().catch((err: unknown) => {
+                        uiStore
+                          .getState()
+                          .setToast(
+                            err instanceof Error ? err.message : 'Sync failed',
+                          );
+                      });
+                    }
+                  })
+                  .catch((err: unknown) => {
+                    uiStore
+                      .getState()
+                      .setToast(
+                        err instanceof Error
+                          ? err.message
+                          : 'Failed to delete template',
+                      );
+                  });
               }
             }
             closeOverlay();

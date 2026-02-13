@@ -123,7 +123,11 @@ export function WorkItemForm() {
         ...(extra?.commentData ? { commentData: extra.commentData } : {}),
         ...(extra?.templateSlug ? { templateSlug: extra.templateSlug } : {}),
       });
-      syncManager?.pushPending().catch(() => {});
+      syncManager?.pushPending().catch((err: unknown) => {
+        uiStore
+          .getState()
+          .setToast(err instanceof Error ? err.message : 'Sync failed');
+      });
     }
   };
 
@@ -184,7 +188,7 @@ export function WorkItemForm() {
       } finally {
         if (!cancelled) setItemLoading(false);
       }
-    })();
+    })().catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -398,37 +402,46 @@ export function WorkItemForm() {
   useEffect(() => {
     if (formMode !== 'template' || !editingTemplateSlug || !backend) return;
     let cancelled = false;
-    void backend.getTemplate(editingTemplateSlug).then((t) => {
-      if (cancelled) return;
+    void backend
+      .getTemplate(editingTemplateSlug)
+      .then((t) => {
+        if (cancelled) return;
 
-      const newFields: FormFields = {
-        title: t.name,
-        type: t.type ?? type,
-        status: t.status ?? status,
-        iteration: t.iteration ?? iteration,
-        priority: t.priority ?? priority,
-        assignee: t.assignee ?? assignee,
-        labels: t.labels != null ? t.labels.join(', ') : labels,
-        description: t.description ?? description,
-        parentId: t.parent != null ? String(t.parent) : parentId,
-        dependsOn: t.dependsOn != null ? t.dependsOn.join(', ') : dependsOn,
-        newComment: '',
-      };
-
-      // Update both fields and initialSnapshot in the store
-      formStackStore.setState((state) => {
-        if (state.stack.length === 0) return state;
-        const updated = [...state.stack];
-        const current = updated[updated.length - 1]!;
-        updated[updated.length - 1] = {
-          ...current,
-          itemTitle: t.name,
-          fields: newFields,
-          initialSnapshot: { ...newFields },
+        const newFields: FormFields = {
+          title: t.name,
+          type: t.type ?? type,
+          status: t.status ?? status,
+          iteration: t.iteration ?? iteration,
+          priority: t.priority ?? priority,
+          assignee: t.assignee ?? assignee,
+          labels: t.labels != null ? t.labels.join(', ') : labels,
+          description: t.description ?? description,
+          parentId: t.parent != null ? String(t.parent) : parentId,
+          dependsOn: t.dependsOn != null ? t.dependsOn.join(', ') : dependsOn,
+          newComment: '',
         };
-        return { stack: updated };
+
+        // Update both fields and initialSnapshot in the store
+        formStackStore.setState((state) => {
+          if (state.stack.length === 0) return state;
+          const updated = [...state.stack];
+          const current = updated[updated.length - 1]!;
+          updated[updated.length - 1] = {
+            ...current,
+            itemTitle: t.name,
+            fields: newFields,
+            initialSnapshot: { ...newFields },
+          };
+          return { stack: updated };
+        });
+      })
+      .catch((err: unknown) => {
+        uiStore
+          .getState()
+          .setToast(
+            err instanceof Error ? err.message : 'Failed to load template',
+          );
       });
-    });
     return () => {
       cancelled = true;
     };
@@ -653,7 +666,11 @@ export function WorkItemForm() {
               const prev = popWorkItem();
               if (prev === null) navigate('list');
             }
-          })();
+          })().catch((err: unknown) => {
+            uiStore
+              .getState()
+              .setToast(err instanceof Error ? err.message : 'Save failed');
+          });
           setShowDirtyPrompt(false);
           return;
         }
@@ -761,7 +778,12 @@ export function WorkItemForm() {
               const prev = popWorkItem();
               if (prev === null) navigate('list');
             }
-          })();
+          })().catch((err: unknown) => {
+            setSaving(false);
+            uiStore
+              .getState()
+              .setToast(err instanceof Error ? err.message : 'Save failed');
+          });
           return;
         }
 

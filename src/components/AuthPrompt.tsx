@@ -25,7 +25,10 @@ export function AuthPrompt() {
   useInput(
     (_input, key) => {
       if (key.return && !isPolling) {
-        void backendDataStore.getState().startAuthFlow();
+        void backendDataStore
+          .getState()
+          .startAuthFlow()
+          .catch(() => {});
         return;
       }
       if (key.escape) {
@@ -67,7 +70,10 @@ export function AuthPrompt() {
             onChange={setPat}
             mask="*"
             onSubmit={(val) => {
-              void backendDataStore.getState().submitAdoPat(val);
+              void backendDataStore
+                .getState()
+                .submitAdoPat(val)
+                .catch(() => {});
             }}
           />
         </Box>
@@ -141,7 +147,8 @@ export function AuthPrompt() {
               if (jiraEmail && val) {
                 void backendDataStore
                   .getState()
-                  .submitJiraCredentials(jiraEmail, val);
+                  .submitJiraCredentials(jiraEmail, val)
+                  .catch(() => {});
               }
             }}
           />
