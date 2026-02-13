@@ -210,6 +210,7 @@ export class GitHubBackend extends BaseBackend {
         dependsOn: false,
         description: false,
       },
+      requiredFields: ['title'],
     };
   }
 

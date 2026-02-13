@@ -125,6 +125,7 @@ export class AzureDevOpsBackend extends BaseBackend {
         dependsOn: false,
         description: false,
       },
+      requiredFields: ['title', 'type'],
     };
   }
 

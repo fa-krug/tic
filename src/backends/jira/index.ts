@@ -101,6 +101,7 @@ export class JiraBackend extends BaseBackend {
         dependsOn: false,
         description: false,
       },
+      requiredFields: ['title', 'type'],
     };
   }
 

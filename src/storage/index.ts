@@ -198,6 +198,7 @@ export class Storage extends BaseBackend implements SoftDeleteBackend {
         dependsOn: true,
         description: true,
       },
+      requiredFields: ['title'],
     };
   }
 
