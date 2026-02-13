@@ -112,8 +112,7 @@ export class AdoApiClient extends BaseApiClient {
     }
 
     if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`HTTP ${response.status}: ${text}`);
+      throw new Error(`HTTP ${response.status}: Request failed`);
     }
 
     return (await response.json()) as T;
@@ -184,8 +183,7 @@ export class AdoApiClient extends BaseApiClient {
       }
 
       if (!response.ok) {
-        const text = await response.text();
-        throw new Error(`HTTP ${response.status}: ${text}`);
+        throw new Error(`HTTP ${response.status}: Request failed`);
       }
 
       const json = (await response.json()) as { value: T[]; count?: number };

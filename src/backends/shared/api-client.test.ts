@@ -126,7 +126,7 @@ describe('BaseApiClient', () => {
       fetchMock.mockResolvedValue(mockResponse(500, 'Internal Server Error'));
 
       await expect(client.testFetch('GET', '/items')).rejects.toThrow(
-        'HTTP 500:',
+        'HTTP 500: Request failed',
       );
     });
 
@@ -158,7 +158,7 @@ describe('BaseApiClient', () => {
       const fn = () => {
         callCount++;
         if (callCount === 1) {
-          return Promise.reject(new Error('HTTP 500: Internal Server Error'));
+          return Promise.reject(new Error('HTTP 500: Request failed'));
         }
         return Promise.resolve('success');
       };
@@ -170,11 +170,11 @@ describe('BaseApiClient', () => {
 
     it('throws after retry fails on 5xx', async () => {
       const fn = () => {
-        return Promise.reject(new Error('HTTP 502: Bad Gateway'));
+        return Promise.reject(new Error('HTTP 502: Request failed'));
       };
 
       await expect(client.testRetry(fn)).rejects.toThrow(
-        'HTTP 502: Bad Gateway',
+        'HTTP 502: Request failed',
       );
     });
 

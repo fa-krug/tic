@@ -70,10 +70,9 @@ export class JiraApiClient extends BaseApiClient {
     }
 
     if (!response.ok) {
-      const text = await response.text();
-
       // Try to parse Jira error format for readable messages
       try {
+        const text = await response.text();
         const errorBody = JSON.parse(text) as JiraErrorResponse;
         const messages: string[] = [];
         if (errorBody.errorMessages?.length) {
@@ -93,7 +92,7 @@ export class JiraApiClient extends BaseApiClient {
         }
       }
 
-      throw new Error(`HTTP ${response.status}: ${text}`);
+      throw new Error(`HTTP ${response.status}: Request failed`);
     }
 
     return (await response.json()) as T;

@@ -62,8 +62,7 @@ export class GitLabApiClient extends BaseApiClient {
     }
 
     if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`HTTP ${response.status}: ${text}`);
+      throw new Error(`HTTP ${response.status}: Request failed`);
     }
 
     const json = (await response.json()) as {

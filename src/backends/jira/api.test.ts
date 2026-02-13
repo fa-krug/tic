@@ -120,7 +120,7 @@ describe('JiraApiClient', () => {
         .mockResolvedValueOnce(mockResponse(500, 'Internal Server Error'));
 
       await expect(client.rest('GET', '/api/3/issue/PROJ-1')).rejects.toThrow(
-        'HTTP 500: Internal Server Error',
+        'HTTP 500: Request failed',
       );
     });
 
