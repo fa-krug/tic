@@ -32,6 +32,7 @@ export interface BackendCapabilities {
     dependsOn: boolean;
     description: boolean;
   };
+  requiredFields?: string[];
 }
 
 export class UnsupportedOperationError extends Error {
