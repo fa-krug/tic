@@ -22,8 +22,8 @@ import {
   setJiraCredentials,
   removeJiraCredentials,
 } from '../../auth/jira.js';
-import { JiraApiClient } from '../../backends/jira/api.js';
 import { getToken } from '../../auth/keychain.js';
+import { JiraApiClient } from '../../backends/jira/api.js';
 import { configStore } from '../../stores/configStore.js';
 
 const VALID_PROVIDERS = ['github', 'azure', 'ado', 'gitlab', 'jira'] as const;

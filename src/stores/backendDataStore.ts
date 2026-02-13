@@ -428,7 +428,7 @@ export const backendDataStore = createStore<BackendDataStoreState>(
           }
           case 'jira': {
             set({ authFlow: { state: 'entering-jira-credentials' } });
-            return;
+            return; // Wait for form submission
           }
           default:
             throw new Error(

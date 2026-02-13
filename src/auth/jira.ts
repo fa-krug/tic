@@ -7,10 +7,6 @@ export interface JiraCredentials {
   token: string;
 }
 
-/**
- * Retrieve stored Jira credentials from the system keychain.
- * Returns null if no credentials are found for the given site.
- */
 export function getJiraCredentials(site: string): JiraCredentials | null {
   const stored = getToken(`${JIRA_ACCOUNT_PREFIX}${site}`);
   if (!stored) return null;
@@ -24,9 +20,6 @@ export function getJiraCredentials(site: string): JiraCredentials | null {
   };
 }
 
-/**
- * Store Jira credentials in the system keychain.
- */
 export function setJiraCredentials(
   site: string,
   email: string,
@@ -35,9 +28,6 @@ export function setJiraCredentials(
   setToken(`${JIRA_ACCOUNT_PREFIX}${site}`, `${email}:${token}`);
 }
 
-/**
- * Remove Jira credentials from the system keychain.
- */
 export function removeJiraCredentials(site: string): void {
   deleteToken(`${JIRA_ACCOUNT_PREFIX}${site}`);
 }

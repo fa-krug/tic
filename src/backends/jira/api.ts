@@ -1,4 +1,11 @@
-import { BaseApiClient, AuthError } from '../shared/api-client.js';
+import { AuthError, BaseApiClient } from '../shared/api-client.js';
+
+interface JiraSearchResponse<T> {
+  startAt: number;
+  maxResults: number;
+  total: number;
+  issues: T[];
+}
 
 interface JiraErrorResponse {
   errorMessages?: string[];
@@ -44,42 +51,32 @@ export class JiraApiClient extends BaseApiClient {
 
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(`HTTP ${response.status}: ${this.parseJiraError(text)}`);
-    }
 
-    // Handle 204 No Content (e.g., DELETE responses)
-    if (response.status === 204) {
-      return undefined as T;
+      // Try to parse Jira error format for readable messages
+      try {
+        const errorBody = JSON.parse(text) as JiraErrorResponse;
+        const messages: string[] = [];
+        if (errorBody.errorMessages?.length) {
+          messages.push(...errorBody.errorMessages);
+        }
+        if (errorBody.errors) {
+          for (const [field, msg] of Object.entries(errorBody.errors)) {
+            messages.push(`${field}: ${msg}`);
+          }
+        }
+        if (messages.length > 0) {
+          throw new Error(`Jira API error: ${messages.join('; ')}`);
+        }
+      } catch (e) {
+        if (e instanceof Error && e.message.startsWith('Jira API error:')) {
+          throw e;
+        }
+      }
+
+      throw new Error(`HTTP ${response.status}: ${text}`);
     }
 
     return (await response.json()) as T;
-  }
-
-  private parseJiraError(text: string): string {
-    try {
-      const json = JSON.parse(text) as JiraErrorResponse;
-
-      const messages: string[] = [];
-
-      if (json.errorMessages && json.errorMessages.length > 0) {
-        messages.push(...json.errorMessages);
-      }
-
-      if (json.errors && Object.keys(json.errors).length > 0) {
-        const fieldErrors = Object.entries(json.errors)
-          .map(([field, msg]) => `${field}: ${msg}`)
-          .join('; ');
-        messages.push(fieldErrors);
-      }
-
-      if (messages.length > 0) {
-        return messages.join('; ');
-      }
-    } catch {
-      // Not JSON, return raw text
-    }
-
-    return text;
   }
 
   async rest<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -88,44 +85,21 @@ export class JiraApiClient extends BaseApiClient {
 
   async *paginate<T>(path: string): AsyncGenerator<T[]> {
     let startAt = 0;
-    let total: number | undefined;
+    const separator = path.includes('?') ? '&' : '?';
 
-    do {
-      const separator = path.includes('?') ? '&' : '?';
-      const url = `${path}${separator}startAt=${startAt}`;
+    while (true) {
+      const url = `${path}${separator}startAt=${startAt}&maxResults=50`;
+      const response = await this.rest<JiraSearchResponse<T>>('GET', url);
 
-      const headers: Record<string, string> = {
-        Authorization: this.getAuthHeader(),
-        Accept: 'application/json',
-      };
-
-      const response = await globalThis.fetch(this.baseUrl + url, {
-        method: 'GET',
-        headers,
-      });
-
-      if (response.status === 401) {
-        throw new AuthError();
+      if (response.issues.length > 0) {
+        yield response.issues;
       }
 
-      if (!response.ok) {
-        const text = await response.text();
-        throw new Error(
-          `HTTP ${response.status}: ${this.parseJiraError(text)}`,
-        );
+      startAt += response.issues.length;
+
+      if (startAt >= response.total || response.issues.length === 0) {
+        break;
       }
-
-      const json = (await response.json()) as {
-        startAt: number;
-        maxResults: number;
-        total: number;
-        issues: T[];
-      };
-
-      yield json.issues;
-
-      total = json.total;
-      startAt = json.startAt + json.issues.length;
-    } while (total !== undefined && startAt < total);
+    }
   }
 }

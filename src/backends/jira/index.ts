@@ -10,8 +10,8 @@ import type {
 import { JiraApiClient } from './api.js';
 import { readJiraConfig } from './config.js';
 import type { JiraConfig } from './config.js';
-import { AuthError } from '../shared/api-client.js';
 import { getJiraCredentials } from '../../auth/jira.js';
+import { AuthError } from '../shared/api-client.js';
 import {
   mapIssueToWorkItem,
   mapPriorityToJira,
@@ -31,15 +31,15 @@ function normalizeSite(site: string): string {
 }
 
 export class JiraBackend extends BaseBackend {
-  private api: JiraApiClient;
   private config: JiraConfig;
+  private api: JiraApiClient;
 
   private cachedSprints: JiraSprint[] | null = null;
 
-  private constructor(api: JiraApiClient, config: JiraConfig) {
+  private constructor(config: JiraConfig, api: JiraApiClient) {
     super(60_000);
-    this.api = api;
     this.config = config;
+    this.api = api;
   }
 
   protected override onCacheInvalidate(): void {
@@ -52,17 +52,19 @@ export class JiraBackend extends BaseBackend {
   ): Promise<JiraBackend> {
     const config = await readJiraConfig(root);
     const site = normalizeSite(config.site);
-    const credentials = getJiraCredentials(site);
-    if (!credentials) {
+    const creds = getJiraCredentials(site);
+    if (!creds) {
       throw new AuthError(
-        'No Jira credentials found. Run "tic auth login --backend jira" to authenticate.',
+        `No Jira credentials found for ${site}. Run "tic auth login --backend jira" first.`,
       );
     }
-    const api = new JiraApiClient(credentials.email, credentials.token, site);
+    const api = new JiraApiClient(creds.email, creds.token, site);
+
     if (!options?.skipAuth) {
       await api.rest('GET', '/api/3/myself');
     }
-    return new JiraBackend(api, config);
+
+    return new JiraBackend(config, api);
   }
 
   getCapabilities(): BackendCapabilities {
@@ -95,18 +97,22 @@ export class JiraBackend extends BaseBackend {
   }
 
   async getStatuses(): Promise<string[]> {
-    const response = await this.api.rest<{ statuses: { name: string }[] }[]>(
+    const groups = await this.api.rest<{ statuses: { name: string }[] }[]>(
       'GET',
       `/api/3/project/${this.config.project}/statuses`,
     );
-    const allStatuses: string[] = [];
-    for (const group of response) {
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const group of groups) {
       for (const s of group.statuses) {
-        const name = s.name.toLowerCase();
-        if (!allStatuses.includes(name)) allStatuses.push(name);
+        const lower = s.name.toLowerCase();
+        if (!seen.has(lower)) {
+          seen.add(lower);
+          result.push(lower);
+        }
       }
     }
-    return allStatuses;
+    return result;
   }
 
   async getWorkItemTypes(): Promise<string[]> {
@@ -160,23 +166,15 @@ export class JiraBackend extends BaseBackend {
       const sprint = sprints.find((s) => s.name === iteration);
       if (!sprint) return [];
 
-      const jql = `project = ${this.config.project} AND sprint = ${sprint.id}`;
-      const issues: JiraIssue[] = [];
-      for await (const page of this.api.paginate<JiraIssue>(
-        `/api/3/search?jql=${encodeURIComponent(jql)}&fields=*all`,
-      )) {
-        issues.push(...page);
-      }
+      const issues = await this.collectPages<JiraIssue>(
+        `/api/3/search?jql=${encodeURIComponent(`project = ${this.config.project} AND sprint = ${sprint.id}`)}&fields=*all`,
+      );
       return issues.map(mapIssueToWorkItem);
     }
 
-    const jql = `project = ${this.config.project}`;
-    const issues: JiraIssue[] = [];
-    for await (const page of this.api.paginate<JiraIssue>(
-      `/api/3/search?jql=${encodeURIComponent(jql)}&fields=*all`,
-    )) {
-      issues.push(...page);
-    }
+    const issues = await this.collectPages<JiraIssue>(
+      `/api/3/search?jql=${encodeURIComponent(`project = ${this.config.project}`)}&fields=*all`,
+    );
     let items = issues.map(mapIssueToWorkItem);
     if (iteration) {
       items = items.filter((i) => i.iteration === iteration);
@@ -278,19 +276,24 @@ export class JiraBackend extends BaseBackend {
   async updateWorkItem(id: string, data: Partial<WorkItem>): Promise<WorkItem> {
     this.validateFields(data);
 
-    // Handle status transition separately
+    // Handle status transition separately — must look up transition ID
     if (data.status !== undefined) {
-      const transitions = await this.api.rest<{
+      const transitionsResponse = await this.api.rest<{
         transitions: { id: string; name: string }[];
       }>('GET', `/api/3/issue/${id}/transitions`);
 
-      const transition = transitions.transitions.find(
-        (t) => t.name.toLowerCase() === data.status!.toLowerCase(),
+      const target = titleCase(data.status);
+      const transition = transitionsResponse.transitions.find(
+        (t) => t.name === target,
       );
       if (transition) {
         await this.api.rest('POST', `/api/3/issue/${id}/transitions`, {
           transition: { id: transition.id },
         });
+      } else {
+        throw new Error(
+          `No transition found to status "${target}". Available: ${transitionsResponse.transitions.map((t) => t.name).join(', ')}`,
+        );
       }
     }
 
@@ -303,16 +306,18 @@ export class JiraBackend extends BaseBackend {
       hasEdits = true;
     }
     if (data.description !== undefined) {
-      fields['description'] = {
-        type: 'doc',
-        version: 1,
-        content: [
-          {
-            type: 'paragraph',
-            content: [{ type: 'text', text: data.description }],
-          },
-        ],
-      };
+      fields['description'] = data.description
+        ? {
+            type: 'doc',
+            version: 1,
+            content: [
+              {
+                type: 'paragraph',
+                content: [{ type: 'text', text: data.description }],
+              },
+            ],
+          }
+        : null;
       hasEdits = true;
     }
     if (data.labels !== undefined) {
@@ -325,6 +330,10 @@ export class JiraBackend extends BaseBackend {
     }
     if (data.assignee !== undefined) {
       fields['assignee'] = data.assignee ? { id: data.assignee } : null;
+      hasEdits = true;
+    }
+    if (data.priority !== undefined) {
+      fields['priority'] = { name: mapPriorityToJira(data.priority) };
       hasEdits = true;
     }
 
@@ -362,24 +371,16 @@ export class JiraBackend extends BaseBackend {
   }
 
   override async getChildren(id: string): Promise<WorkItem[]> {
-    const jql = `parent = ${id}`;
-    const issues: JiraIssue[] = [];
-    for await (const page of this.api.paginate<JiraIssue>(
-      `/api/3/search?jql=${encodeURIComponent(jql)}&fields=*all`,
-    )) {
-      issues.push(...page);
-    }
+    const issues = await this.collectPages<JiraIssue>(
+      `/api/3/search?jql=${encodeURIComponent(`parent = ${id}`)}&fields=*all`,
+    );
     return issues.map(mapIssueToWorkItem);
   }
 
   override async getDependents(id: string): Promise<WorkItem[]> {
-    const jql = `issue in linkedIssues("${id}","is blocked by")`;
-    const issues: JiraIssue[] = [];
-    for await (const page of this.api.paginate<JiraIssue>(
-      `/api/3/search?jql=${encodeURIComponent(jql)}&fields=*all`,
-    )) {
-      issues.push(...page);
-    }
+    const issues = await this.collectPages<JiraIssue>(
+      `/api/3/search?jql=${encodeURIComponent(`issue in linkedIssues("${id}","is blocked by")`)}&fields=*all`,
+    );
     return issues.map(mapIssueToWorkItem);
   }
 
@@ -388,8 +389,8 @@ export class JiraBackend extends BaseBackend {
   }
 
   async openItem(id: string): Promise<void> {
-    const { default: open } = await import('open');
-    await open(this.getItemUrl(id));
+    const openModule = await import('open');
+    await openModule.default(this.getItemUrl(id));
   }
 
   /* eslint-disable @typescript-eslint/require-await, @typescript-eslint/no-unused-vars */
@@ -421,5 +422,13 @@ export class JiraBackend extends BaseBackend {
     );
     this.cachedSprints = response.values;
     return this.cachedSprints;
+  }
+
+  private async collectPages<T>(path: string): Promise<T[]> {
+    const all: T[] = [];
+    for await (const page of this.api.paginate<T>(path)) {
+      all.push(...page);
+    }
+    return all;
   }
 }

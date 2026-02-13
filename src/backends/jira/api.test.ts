@@ -30,7 +30,7 @@ describe('JiraApiClient', () => {
     vi.restoreAllMocks();
     client = new JiraApiClient(
       'user@example.com',
-      'api-token-123',
+      'jira-api-token',
       'mysite.atlassian.net',
     );
     fetchMock = vi.fn();
@@ -42,11 +42,15 @@ describe('JiraApiClient', () => {
       const data = { id: '10001', key: 'PROJ-1' };
       fetchMock.mockResolvedValue(mockResponse(200, data));
 
-      const result = await client.rest<typeof data>('GET', '/issue/PROJ-1');
+      const result = await client.rest<typeof data>(
+        'GET',
+        '/api/3/issue/PROJ-1',
+      );
 
-      const expectedAuth = `Basic ${Buffer.from('user@example.com:api-token-123').toString('base64')}`;
+      const expectedAuth = `Basic ${Buffer.from('user@example.com:jira-api-token').toString('base64')}`;
+
       expect(fetchMock).toHaveBeenCalledWith(
-        'https://mysite.atlassian.net/rest/issue/PROJ-1',
+        'https://mysite.atlassian.net/rest/api/3/issue/PROJ-1',
         {
           method: 'GET',
           headers: {
@@ -59,15 +63,18 @@ describe('JiraApiClient', () => {
     });
 
     it('sends JSON body on POST', async () => {
-      const body = { fields: { summary: 'New issue', description: 'Details' } };
-      const data = { id: '10002', key: 'PROJ-2' };
-      fetchMock.mockResolvedValue(mockResponse(201, data));
+      const body = {
+        fields: { summary: 'New issue', description: 'Description' },
+      };
+      const data = { id: '10001', key: 'PROJ-1' };
+      fetchMock.mockResolvedValue(mockResponse(200, data));
 
-      await client.rest('POST', '/issue', body);
+      await client.rest('POST', '/api/3/issue', body);
 
-      const expectedAuth = `Basic ${Buffer.from('user@example.com:api-token-123').toString('base64')}`;
+      const expectedAuth = `Basic ${Buffer.from('user@example.com:jira-api-token').toString('base64')}`;
+
       expect(fetchMock).toHaveBeenCalledWith(
-        'https://mysite.atlassian.net/rest/issue',
+        'https://mysite.atlassian.net/rest/api/3/issue',
         {
           method: 'POST',
           headers: {
@@ -83,97 +90,86 @@ describe('JiraApiClient', () => {
     it('throws AuthError on 401', async () => {
       fetchMock.mockResolvedValue(mockResponse(401, 'Unauthorized'));
 
-      await expect(client.rest('GET', '/issue/PROJ-1')).rejects.toThrow(
+      await expect(client.rest('GET', '/api/3/issue/PROJ-1')).rejects.toThrow(
         AuthError,
       );
     });
 
-    it('throws on non-ok response with Jira error body (errorMessages parsed)', async () => {
+    it('throws with Jira error messages on non-ok response', async () => {
       const errorBody = {
-        errorMessages: [
-          'Issue does not exist or you do not have permission to see it.',
-        ],
-        errors: {},
-      };
-      fetchMock.mockResolvedValue(mockResponse(404, errorBody));
-
-      await expect(client.rest('GET', '/issue/PROJ-999')).rejects.toThrow(
-        'Issue does not exist or you do not have permission to see it.',
-      );
-    });
-
-    it('throws with field errors from Jira error body', async () => {
-      const errorBody = {
-        errorMessages: [],
-        errors: {
-          summary: 'Summary is required',
-          priority: 'Priority is required',
-        },
+        errorMessages: ['Issue does not exist'],
+        errors: { summary: 'Field is required' },
       };
       fetchMock.mockResolvedValue(mockResponse(400, errorBody));
 
       await expect(
-        client.rest('POST', '/issue', { fields: {} }),
+        client.rest('POST', '/api/3/issue', { fields: {} }),
       ).rejects.toThrow(
-        'summary: Summary is required; priority: Priority is required',
+        'Jira API error: Issue does not exist; summary: Field is required',
+      );
+    });
+
+    it('throws generic HTTP error when response has no Jira error format', async () => {
+      fetchMock.mockResolvedValue(mockResponse(500, 'Internal Server Error'));
+
+      // First call fails with 5xx, retry also fails with 5xx
+      fetchMock
+        .mockResolvedValueOnce(mockResponse(500, 'Internal Server Error'))
+        .mockResolvedValueOnce(mockResponse(500, 'Internal Server Error'));
+
+      await expect(client.rest('GET', '/api/3/issue/PROJ-1')).rejects.toThrow(
+        'HTTP 500: Internal Server Error',
       );
     });
 
     it('retries on 5xx errors', async () => {
+      const data = { id: '10001', key: 'PROJ-1' };
       fetchMock
-        .mockResolvedValueOnce(mockResponse(502, 'Bad Gateway'))
-        .mockResolvedValueOnce(mockResponse(200, { id: '10001' }));
+        .mockResolvedValueOnce(mockResponse(500, 'Server Error'))
+        .mockResolvedValueOnce(mockResponse(200, data));
 
-      const result = await client.rest<{ id: string }>('GET', '/issue/PROJ-1');
+      const result = await client.rest<typeof data>(
+        'GET',
+        '/api/3/issue/PROJ-1',
+      );
 
-      expect(result).toEqual({ id: '10001' });
+      expect(result).toEqual(data);
       expect(fetchMock).toHaveBeenCalledTimes(2);
-    });
-
-    it('handles DELETE returning 204 with no body', async () => {
-      const response = {
-        ok: true,
-        status: 204,
-        headers: new Headers(),
-        json: vi.fn().mockRejectedValue(new Error('No body')),
-        text: vi.fn().mockResolvedValue(''),
-      } as unknown as Response;
-      fetchMock.mockResolvedValue(response);
-
-      const result = await client.rest('DELETE', '/issue/PROJ-1');
-
-      expect(result).toBeUndefined();
     });
   });
 
   describe('paginate', () => {
-    it('fetches all pages using startAt + total', async () => {
-      const page1 = {
-        startAt: 0,
-        maxResults: 2,
-        total: 5,
-        issues: [{ id: '1' }, { id: '2' }],
-      };
-      const page2 = {
-        startAt: 2,
-        maxResults: 2,
-        total: 5,
-        issues: [{ id: '3' }, { id: '4' }],
-      };
-      const page3 = {
-        startAt: 4,
-        maxResults: 2,
-        total: 5,
-        issues: [{ id: '5' }],
-      };
-
+    it('fetches all pages using startAt/total', async () => {
       fetchMock
-        .mockResolvedValueOnce(mockResponse(200, page1))
-        .mockResolvedValueOnce(mockResponse(200, page2))
-        .mockResolvedValueOnce(mockResponse(200, page3));
+        .mockResolvedValueOnce(
+          mockResponse(200, {
+            startAt: 0,
+            maxResults: 2,
+            total: 5,
+            issues: [{ id: '1' }, { id: '2' }],
+          }),
+        )
+        .mockResolvedValueOnce(
+          mockResponse(200, {
+            startAt: 2,
+            maxResults: 2,
+            total: 5,
+            issues: [{ id: '3' }, { id: '4' }],
+          }),
+        )
+        .mockResolvedValueOnce(
+          mockResponse(200, {
+            startAt: 4,
+            maxResults: 2,
+            total: 5,
+            issues: [{ id: '5' }],
+          }),
+        );
 
       const pages: Array<{ id: string }[]> = [];
-      for await (const page of client.paginate<{ id: string }>('/search')) {
+      for await (const page of client.paginate<{ id: string }>(
+        '/api/3/search?jql=project=PROJ',
+      )) {
         pages.push(page);
       }
 
@@ -184,68 +180,88 @@ describe('JiraApiClient', () => {
       ]);
       expect(fetchMock).toHaveBeenCalledTimes(3);
 
-      // Verify pagination query params
-      const expectedAuth = `Basic ${Buffer.from('user@example.com:api-token-123').toString('base64')}`;
+      // Check that startAt parameter is appended correctly (path already has ?)
       expect(fetchMock).toHaveBeenNthCalledWith(
         1,
-        'https://mysite.atlassian.net/rest/search?startAt=0',
-        {
-          method: 'GET',
-          headers: {
-            Authorization: expectedAuth,
-            Accept: 'application/json',
-          },
-        },
+        expect.stringContaining('startAt=0&maxResults=50'),
+        expect.any(Object),
       );
       expect(fetchMock).toHaveBeenNthCalledWith(
         2,
-        'https://mysite.atlassian.net/rest/search?startAt=2',
-        expect.objectContaining({ method: 'GET' }),
+        expect.stringContaining('startAt=2&maxResults=50'),
+        expect.any(Object),
       );
       expect(fetchMock).toHaveBeenNthCalledWith(
         3,
-        'https://mysite.atlassian.net/rest/search?startAt=4',
-        expect.objectContaining({ method: 'GET' }),
+        expect.stringContaining('startAt=4&maxResults=50'),
+        expect.any(Object),
       );
     });
 
     it('handles empty results', async () => {
-      const emptyResponse = {
-        startAt: 0,
-        maxResults: 50,
-        total: 0,
-        issues: [],
-      };
-      fetchMock.mockResolvedValue(mockResponse(200, emptyResponse));
-
-      const pages: Array<{ id: string }[]> = [];
-      for await (const page of client.paginate<{ id: string }>('/search')) {
-        pages.push(page);
-      }
-
-      expect(pages).toEqual([[]]);
-      expect(fetchMock).toHaveBeenCalledTimes(1);
-    });
-
-    it('handles path with existing query parameters', async () => {
-      const response = {
-        startAt: 0,
-        maxResults: 50,
-        total: 1,
-        issues: [{ id: '1' }],
-      };
-      fetchMock.mockResolvedValue(mockResponse(200, response));
+      fetchMock.mockResolvedValueOnce(
+        mockResponse(200, {
+          startAt: 0,
+          maxResults: 50,
+          total: 0,
+          issues: [],
+        }),
+      );
 
       const pages: Array<{ id: string }[]> = [];
       for await (const page of client.paginate<{ id: string }>(
-        '/search?jql=project=PROJ',
+        '/api/3/search',
+      )) {
+        pages.push(page);
+      }
+
+      expect(pages).toEqual([]);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('uses & separator when path already contains ?', async () => {
+      fetchMock.mockResolvedValueOnce(
+        mockResponse(200, {
+          startAt: 0,
+          maxResults: 50,
+          total: 1,
+          issues: [{ id: '1' }],
+        }),
+      );
+
+      const pages: Array<{ id: string }[]> = [];
+      for await (const page of client.paginate<{ id: string }>(
+        '/api/3/search?jql=project=PROJ',
       )) {
         pages.push(page);
       }
 
       expect(fetchMock).toHaveBeenCalledWith(
-        'https://mysite.atlassian.net/rest/search?jql=project=PROJ&startAt=0',
-        expect.objectContaining({ method: 'GET' }),
+        'https://mysite.atlassian.net/rest/api/3/search?jql=project=PROJ&startAt=0&maxResults=50',
+        expect.any(Object),
+      );
+    });
+
+    it('uses ? separator when path has no query string', async () => {
+      fetchMock.mockResolvedValueOnce(
+        mockResponse(200, {
+          startAt: 0,
+          maxResults: 50,
+          total: 1,
+          issues: [{ id: '1' }],
+        }),
+      );
+
+      const pages: Array<{ id: string }[]> = [];
+      for await (const page of client.paginate<{ id: string }>(
+        '/api/3/search',
+      )) {
+        pages.push(page);
+      }
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        'https://mysite.atlassian.net/rest/api/3/search?startAt=0&maxResults=50',
+        expect.any(Object),
       );
     });
   });

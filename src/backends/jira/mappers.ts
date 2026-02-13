@@ -1,5 +1,6 @@
 import type { WorkItem, Comment } from '../../types.js';
 
+// ADF → plain text (minimal conversion for display)
 export interface AdfNode {
   type: string;
   text?: string;
@@ -9,6 +10,7 @@ export interface AdfNode {
 export function adfToText(adf: AdfNode | string | null | undefined): string {
   if (!adf) return '';
   if (typeof adf === 'string') return adf;
+
   const parts: string[] = [];
   if (adf.text) parts.push(adf.text);
   if (adf.content) {
@@ -103,7 +105,7 @@ export function mapIssueToWorkItem(issue: JiraIssue): WorkItem {
   return {
     id: issue.key,
     title: issue.fields.summary,
-    description: adfToText(issue.fields.description as AdfNode),
+    description: adfToText(issue.fields.description as AdfNode | string | null),
     status: issue.fields.status.name.toLowerCase(),
     type: issue.fields.issuetype.name.toLowerCase(),
     priority: mapPriorityToTic(issue.fields.priority?.name),
@@ -122,6 +124,6 @@ export function mapCommentToComment(comment: JiraComment): Comment {
   return {
     author: comment.author.emailAddress,
     date: comment.created,
-    body: adfToText(comment.body as AdfNode),
+    body: adfToText(comment.body as AdfNode | string | null),
   };
 }

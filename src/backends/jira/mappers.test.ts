@@ -9,18 +9,24 @@ import {
 } from './mappers.js';
 
 describe('adfToText', () => {
-  it('converts ADF doc with paragraph and text nodes', () => {
+  it('converts ADF document with nested paragraphs to plain text', () => {
     const adf = {
       type: 'doc',
-      version: 1,
       content: [
         {
           type: 'paragraph',
-          content: [{ type: 'text', text: 'Hello world' }],
+          content: [
+            { type: 'text', text: 'Hello ' },
+            { type: 'text', text: 'world' },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Second paragraph' }],
         },
       ],
     };
-    expect(adfToText(adf)).toBe('Hello world');
+    expect(adfToText(adf)).toBe('Hello worldSecond paragraph');
   });
 
   it('returns empty string for null', () => {
@@ -31,28 +37,8 @@ describe('adfToText', () => {
     expect(adfToText(undefined)).toBe('');
   });
 
-  it('returns string as-is if input is string', () => {
+  it('passes through plain strings', () => {
     expect(adfToText('plain text')).toBe('plain text');
-  });
-
-  it('handles nested content', () => {
-    const adf = {
-      type: 'doc',
-      content: [
-        {
-          type: 'paragraph',
-          content: [
-            { type: 'text', text: 'First ' },
-            { type: 'text', text: 'Second' },
-          ],
-        },
-        {
-          type: 'paragraph',
-          content: [{ type: 'text', text: 'Third' }],
-        },
-      ],
-    };
-    expect(adfToText(adf)).toBe('First SecondThird');
   });
 });
 
@@ -121,7 +107,6 @@ describe('mapIssueToWorkItem', () => {
         summary: 'Fix login bug',
         description: {
           type: 'doc',
-          version: 1,
           content: [
             {
               type: 'paragraph',
@@ -214,7 +199,6 @@ describe('mapCommentToComment', () => {
       created: '2026-01-15T10:00:00.000+0000',
       body: {
         type: 'doc',
-        version: 1,
         content: [
           {
             type: 'paragraph',
