@@ -270,6 +270,42 @@ describe('ado auth', () => {
       expect(fetchMock).toHaveBeenCalledTimes(3);
     });
 
+    it('throws when device code expires due to polling timeout', async () => {
+      const shortExpiryDevice = {
+        ...mockDeviceCodeResponse,
+        expires_in: 2,
+        interval: 1,
+      };
+      const fetchMock = vi.fn();
+      // Device code request
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        json: () => Promise.resolve(shortExpiryDevice),
+      });
+      // All polls return authorization_pending (Entra ID uses HTTP 400)
+      fetchMock.mockResolvedValue({
+        ok: false,
+        status: 400,
+        statusText: 'Bad Request',
+        json: () => Promise.resolve({ error: 'authorization_pending' }),
+      });
+      vi.stubGlobal('fetch', fetchMock);
+
+      const promise = authenticateAdo();
+      const rejection = expect(promise).rejects.toThrow(
+        'Device code has expired. Please restart the authentication flow.',
+      );
+
+      // Advance past the 2s deadline
+      await vi.advanceTimersByTimeAsync(1000); // first poll
+      await vi.advanceTimersByTimeAsync(1000); // second poll
+      await vi.advanceTimersByTimeAsync(1000); // past deadline
+
+      await rejection;
+    });
+
     it('throws when device code request fails', async () => {
       mockFetchResponses({ ok: false, status: 500, json: {} });
 

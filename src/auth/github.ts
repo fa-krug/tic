@@ -114,8 +114,9 @@ export async function authenticateGitHub(
 
   // Step 3: Poll for access token
   let interval = deviceCode.interval * 1000; // Convert to ms
+  const deadline = Date.now() + deviceCode.expires_in * 1000;
 
-  while (true) {
+  while (Date.now() < deadline) {
     await sleep(interval);
 
     const tokenController = new AbortController();
@@ -185,4 +186,8 @@ export async function authenticateGitHub(
     setToken(GITHUB_ACCOUNT, data.access_token);
     return data.access_token;
   }
+
+  throw new Error(
+    'Device code has expired. Please restart the authentication flow.',
+  );
 }

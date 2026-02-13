@@ -30,6 +30,14 @@ function normalizeSite(site: string): string {
   return site.replace(/^https?:\/\//, '');
 }
 
+/**
+ * Escape a value for safe interpolation into a JQL query string.
+ * Wraps in single quotes and doubles any embedded single quotes.
+ */
+export function escapeJqlValue(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
 export class JiraBackend extends BaseBackend {
   private config: JiraConfig;
   private api: JiraApiClient;
@@ -167,13 +175,13 @@ export class JiraBackend extends BaseBackend {
       if (!sprint) return [];
 
       const issues = await this.collectPages<JiraIssue>(
-        `/api/3/search?jql=${encodeURIComponent(`project = ${this.config.project} AND sprint = ${sprint.id}`)}&fields=*all`,
+        `/api/3/search?jql=${encodeURIComponent(`project = ${escapeJqlValue(this.config.project)} AND sprint = ${sprint.id}`)}&fields=*all`,
       );
       return issues.map(mapIssueToWorkItem);
     }
 
     const issues = await this.collectPages<JiraIssue>(
-      `/api/3/search?jql=${encodeURIComponent(`project = ${this.config.project}`)}&fields=*all`,
+      `/api/3/search?jql=${encodeURIComponent(`project = ${escapeJqlValue(this.config.project)}`)}&fields=*all`,
     );
     let items = issues.map(mapIssueToWorkItem);
     if (iteration) {

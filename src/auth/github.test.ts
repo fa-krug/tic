@@ -293,6 +293,42 @@ describe('github auth', () => {
       await rejection;
     });
 
+    it('throws when device code expires due to polling timeout', async () => {
+      const shortExpiryDevice = {
+        ...mockDeviceCodeResponse,
+        expires_in: 2,
+        interval: 1,
+      };
+      const fetchMock = vi.fn();
+      // Device code request
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        json: () => Promise.resolve(shortExpiryDevice),
+      });
+      // All polls return authorization_pending
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        json: () => Promise.resolve({ error: 'authorization_pending' }),
+      });
+      vi.stubGlobal('fetch', fetchMock);
+
+      const promise = authenticateGitHub();
+      const rejection = expect(promise).rejects.toThrow(
+        'Device code has expired. Please restart the authentication flow.',
+      );
+
+      // Advance past the 2s deadline
+      await vi.advanceTimersByTimeAsync(1000); // first poll
+      await vi.advanceTimersByTimeAsync(1000); // second poll
+      await vi.advanceTimersByTimeAsync(1000); // past deadline
+
+      await rejection;
+    });
+
     it('handles unknown error types', async () => {
       mockFetchResponses(
         { json: mockDeviceCodeResponse },

@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { JiraBackend } from './index.js';
+import { JiraBackend, escapeJqlValue } from './index.js';
 
 vi.mock('./api.js', () => ({
   JiraApiClient: vi.fn(),
@@ -642,6 +642,64 @@ describe('JiraBackend', () => {
       const backend = await JiraBackend.create('/repo');
       mockApi.rest.mockRejectedValue(new Error('API error'));
       expect(await backend.getAssignees()).toEqual([]);
+    });
+  });
+
+  describe('escapeJqlValue', () => {
+    it('wraps a simple value in single quotes', () => {
+      expect(escapeJqlValue('TEAM')).toBe("'TEAM'");
+    });
+
+    it('doubles embedded single quotes', () => {
+      expect(escapeJqlValue("My Project' OR 1=1 --")).toBe(
+        "'My Project'' OR 1=1 --'",
+      );
+    });
+
+    it('handles multiple embedded quotes', () => {
+      expect(escapeJqlValue("it's a 'test'")).toBe("'it''s a ''test'''");
+    });
+  });
+
+  describe('JQL injection prevention', () => {
+    it('escapes project names with JQL special characters in listWorkItems', async () => {
+      mockReadJiraConfig.mockResolvedValue({
+        site: 'https://mycompany.atlassian.net',
+        project: "My Project' OR 1=1 --",
+        boardId: 6,
+      });
+      const backend = await JiraBackend.create('/repo');
+      mockApi.paginate.mockImplementation(mockPaginate([]));
+
+      await backend.listWorkItems();
+
+      expect(mockApi.paginate).toHaveBeenCalledWith(
+        expect.stringContaining(
+          encodeURIComponent("project = 'My Project'' OR 1=1 --'"),
+        ),
+      );
+    });
+
+    it('escapes project names in sprint-filtered listWorkItems', async () => {
+      mockReadJiraConfig.mockResolvedValue({
+        site: 'https://mycompany.atlassian.net',
+        project: "My Project' OR 1=1 --",
+        boardId: 6,
+      });
+      const backend = await JiraBackend.create('/repo');
+      // fetchSprints
+      mockApi.rest.mockResolvedValueOnce({
+        values: [{ id: 42, name: 'Sprint 5', state: 'active' }],
+      });
+      mockApi.paginate.mockImplementation(mockPaginate([]));
+
+      await backend.listWorkItems('Sprint 5');
+
+      expect(mockApi.paginate).toHaveBeenCalledWith(
+        expect.stringContaining(
+          encodeURIComponent("project = 'My Project'' OR 1=1 --'"),
+        ),
+      );
     });
   });
 

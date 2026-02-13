@@ -182,8 +182,9 @@ export async function authenticateAdo(
 
   // Step 3: Poll for access token
   let interval = deviceCode.interval * 1000;
+  const deadline = Date.now() + deviceCode.expires_in * 1000;
 
-  while (true) {
+  while (Date.now() < deadline) {
     await sleep(interval);
 
     const tokenController = new AbortController();
@@ -244,4 +245,8 @@ export async function authenticateAdo(
     }
     return data.access_token;
   }
+
+  throw new Error(
+    'Device code has expired. Please restart the authentication flow.',
+  );
 }
