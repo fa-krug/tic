@@ -4,6 +4,7 @@ import type { BackendCapabilities } from '../backends/types.js';
 import type { TreeItem } from './buildTree.js';
 import type { SortEntry } from '../stores/listViewStore.js';
 import { useThemeStore } from '../stores/themeStore.js';
+import { ColorPill } from './ColorPill.js';
 
 interface ColumnWidths {
   id: number;
@@ -41,8 +42,8 @@ const gap = 2;
 const MARKER_WIDTH = 2;
 const TITLE_MIN_WIDTH = 30;
 
-const FIXED_STATUS = 10;
-const FIXED_PRIORITY = 10;
+const FIXED_STATUS = 12;
+const FIXED_PRIORITY = 12;
 const FIXED_ASSIGNEE = 20;
 const FIXED_LABELS = 20;
 
@@ -184,15 +185,10 @@ const TableRow = memo(
         </Box>
         {columns.showStatus && (
           <Box width={columns.status} marginRight={gap} overflowX="hidden">
-            <Text
-              color={selected ? accent : undefined}
-              bold={selected}
-              dimColor={dimmed}
-              wrap="truncate"
-            >
-              {capabilities.fields.dependsOn && hasUnresolvedDeps ? '⧗ ' : ''}
-              {item.status}
-            </Text>
+            {capabilities.fields.dependsOn && hasUnresolvedDeps && (
+              <Text dimColor={dimmed}>⧗ </Text>
+            )}
+            <ColorPill field="status" value={item.status} />
           </Box>
         )}
         {columns.showAssignee && (
@@ -213,26 +209,48 @@ const TableRow = memo(
             marginRight={columns.showPriority ? gap : 0}
             overflowX="hidden"
           >
-            <Text
-              color={selected ? accent : undefined}
-              bold={selected}
-              dimColor={dimmed}
-              wrap="truncate"
-            >
-              {item.labels.join(', ')}
-            </Text>
+            {(() => {
+              const maxWidth = columns.labels;
+              const rendered: string[] = [];
+              let usedWidth = 0;
+              for (const label of item.labels) {
+                // Each pill takes label.length + 2 (padding), plus 1 gap between pills
+                const pillWidth = label.length + 2;
+                const needed = usedWidth === 0 ? pillWidth : pillWidth + 1;
+                if (usedWidth + needed > maxWidth) {
+                  const remaining = item.labels.length - rendered.length;
+                  if (remaining > 0) {
+                    return (
+                      <Box gap={1}>
+                        {rendered.map((l) => (
+                          <ColorPill key={l} field="label" value={l} />
+                        ))}
+                        <Text dimColor>+{remaining}</Text>
+                      </Box>
+                    );
+                  }
+                  break;
+                }
+                rendered.push(label);
+                usedWidth += needed;
+              }
+              return (
+                <Box gap={1}>
+                  {rendered.map((l) => (
+                    <ColorPill key={l} field="label" value={l} />
+                  ))}
+                </Box>
+              );
+            })()}
           </Box>
         )}
         {columns.showPriority && (
           <Box width={columns.priority} overflowX="hidden">
-            <Text
-              color={selected ? accent : undefined}
-              bold={selected}
-              dimColor={dimmed}
-              wrap="truncate"
-            >
-              {item.priority}
-            </Text>
+            {item.priority ? (
+              <ColorPill field="priority" value={item.priority} />
+            ) : (
+              <Text> </Text>
+            )}
           </Box>
         )}
       </Box>
