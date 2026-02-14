@@ -53,3 +53,28 @@ export interface Template {
   dependsOn?: string[];
   description?: string;
 }
+
+export type PullRequestStatus = 'open' | 'merged' | 'closed' | 'draft';
+
+export interface PullRequest {
+  id: string;
+  number: number;
+  title: string;
+  description: string;
+  status: PullRequestStatus;
+  sourceBranch: string;
+  targetBranch: string;
+  author: string;
+  linkedItems: string[];
+  created: string;
+  updated: string;
+  url: string;
+}
+
+export interface NewPullRequest {
+  title: string;
+  description?: string;
+  sourceBranch: string;
+  targetBranch?: string;
+  linkedItems?: string[];
+}
