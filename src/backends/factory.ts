@@ -1,10 +1,7 @@
 import { execSync } from 'node:child_process';
 import type { Backend } from './types.js';
 import type { SyncQueueAdapter } from '../sync/types.js';
-import { Storage } from '../storage/index.js';
-import { SyncQueue } from '../storage/syncQueue.js';
-import { configStore } from '../stores/configStore.js';
-import { SyncManager } from '../sync/SyncManager.js';
+import type { SyncManager } from '../sync/SyncManager.js';
 
 export const VALID_BACKENDS = [
   'none',
@@ -42,6 +39,8 @@ export function detectBackend(root: string): BackendType {
 }
 
 export async function createBackend(root: string): Promise<Backend> {
+  const { Storage } = await import('../storage/index.js');
+  const { configStore } = await import('../stores/configStore.js');
   const primary = Storage.create(root);
   configStore.getState().setDatabase(primary.getDatabase());
   if (!configStore.getState().loaded) {
@@ -93,6 +92,8 @@ export async function createBackendWithSync(
   root: string,
   options?: RemoteBackendOptions,
 ): Promise<BackendSetup> {
+  const { Storage } = await import('../storage/index.js');
+  const { configStore } = await import('../stores/configStore.js');
   const primary = Storage.create(root);
   configStore.getState().setDatabase(primary.getDatabase());
 
@@ -110,8 +111,10 @@ export async function createBackendWithSync(
   let syncManager: SyncManager | null = null;
   let queue: SyncQueueAdapter | null = null;
   if (remote) {
+    const { SyncQueue } = await import('../storage/syncQueue.js');
+    const { SyncManager: SM } = await import('../sync/SyncManager.js');
     queue = new SyncQueue(primary.getDatabase());
-    syncManager = new SyncManager(primary, remote, queue);
+    syncManager = new SM(primary, remote, queue);
   }
 
   return { backend: primary, syncManager, queue };
