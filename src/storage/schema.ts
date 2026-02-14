@@ -281,3 +281,43 @@ export const colorMappings = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.fieldType, t.value] })],
 );
+
+// 23. Pull Requests
+export const pullRequests = sqliteTable(
+  'pull_requests',
+  {
+    id: text('id').primaryKey(),
+    number: integer('number').notNull(),
+    title: text('title').notNull(),
+    description: text('description').notNull().default(''),
+    status: text('status').notNull(),
+    sourceBranch: text('source_branch').notNull(),
+    targetBranch: text('target_branch').notNull(),
+    author: text('author').notNull().default(''),
+    url: text('url').notNull().default(''),
+    remoteId: text('remote_id'),
+    created: text('created').notNull(),
+    updated: text('updated').notNull(),
+  },
+  (t) => [
+    index('idx_pr_status').on(t.status),
+    index('idx_pr_remote').on(t.remoteId),
+  ],
+);
+
+// 24. PR-Item Links (junction for bidirectional linking)
+export const prItemLinks = sqliteTable(
+  'pr_item_links',
+  {
+    prId: text('pr_id')
+      .notNull()
+      .references(() => pullRequests.id, { onDelete: 'cascade' }),
+    itemId: text('item_id')
+      .notNull()
+      .references(() => workItems.id, { onDelete: 'cascade' }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.prId, t.itemId] }),
+    index('idx_pr_link_item').on(t.itemId),
+  ],
+);
