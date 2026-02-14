@@ -15,6 +15,13 @@
       "when": 1771049640584,
       "tag": "0001_brainy_norrin_radd",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1771065102957,
+      "tag": "0002_yellow_vin_gonzales",
+      "breakpoints": true
     }
   ]
 }

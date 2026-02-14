@@ -30,6 +30,9 @@ export const workItems = sqliteTable(
     index('idx_priority').on(t.priority),
     index('idx_iteration').on(t.iteration),
     index('idx_parent').on(t.parent),
+    index('idx_deleted_iteration').on(t.deletedAt, t.iteration),
+    index('idx_deleted_status').on(t.deletedAt, t.status),
+    index('idx_deleted_assignee').on(t.deletedAt, t.assignee),
   ],
 );
 
