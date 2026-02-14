@@ -1267,4 +1267,23 @@ describe('Storage', () => {
       expect(url).toContain('.tic/items/42.md');
     });
   });
+
+  // ─── comment loading optimization ──────────────────────────────
+
+  describe('comment loading', () => {
+    it('listWorkItems omits comments by default', async () => {
+      const item = await backend.createWorkItem(makeNewItem());
+      await backend.addComment(item.id, { body: 'hello', author: 'me' });
+      const items = await backend.listWorkItems();
+      expect(items[0]!.comments).toEqual([]);
+    });
+
+    it('getWorkItem includes comments', async () => {
+      const item = await backend.createWorkItem(makeNewItem());
+      await backend.addComment(item.id, { body: 'hello', author: 'me' });
+      const fetched = await backend.getWorkItem(item.id);
+      expect(fetched.comments).toHaveLength(1);
+      expect(fetched.comments[0]!.body).toBe('hello');
+    });
+  });
 });

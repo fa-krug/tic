@@ -406,7 +406,10 @@ export class Storage extends BaseBackend implements SoftDeleteBackend {
   /**
    * Helper: given a set of work item rows, fetch their labels/deps/comments and assemble.
    */
-  private assembleWorkItems(itemRows: WorkItemRow[]): WorkItem[] {
+  private assembleWorkItems(
+    itemRows: WorkItemRow[],
+    options?: { includeComments?: boolean },
+  ): WorkItem[] {
     const itemIds = itemRows.map((r) => r.id);
 
     const labelRows = this.db
@@ -421,11 +424,13 @@ export class Storage extends BaseBackend implements SoftDeleteBackend {
       .where(inArray(schema.workItemDeps.workItemId, itemIds))
       .all();
 
-    const commentRows = this.db
-      .select()
-      .from(schema.comments)
-      .where(inArray(schema.comments.workItemId, itemIds))
-      .all();
+    const commentRows = options?.includeComments
+      ? this.db
+          .select()
+          .from(schema.comments)
+          .where(inArray(schema.comments.workItemId, itemIds))
+          .all()
+      : [];
 
     const labelsByItem = new Map<string, WorkItemLabelRow[]>();
     for (const l of labelRows) {
