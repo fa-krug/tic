@@ -1,21 +1,7 @@
 import { Box, Text } from 'ink';
 import type { WorkItem } from '../types.js';
 import { useThemeStore } from '../stores/themeStore.js';
-
-function priorityIcon(priority: string): string {
-  switch (priority) {
-    case 'critical':
-      return '▲▲';
-    case 'high':
-      return '▲';
-    case 'medium':
-      return '●';
-    case 'low':
-      return '▽';
-    default:
-      return '';
-  }
-}
+import { ColorPill } from './ColorPill.js';
 
 export function truncateDescription(
   description: string,
@@ -40,28 +26,7 @@ export function DetailPanel({
   descriptionScrollOffset?: number;
   maxDescriptionHeight?: number;
 }) {
-  const { error, warning, info, border, mutedDim } = useThemeStore(
-    (s) => s.colors,
-  );
-
-  function priorityColor(priority: string): string | undefined {
-    switch (priority) {
-      case 'critical':
-        return error;
-      case 'high':
-        return warning;
-      case 'medium':
-        return info;
-      default:
-        return undefined;
-    }
-  }
-
-  const metaParts: string[] = [`#${item.id}`, item.status];
-  if (item.assignee) {
-    metaParts.push(`@${item.assignee}`);
-  }
-  const metaLine = metaParts.join('  ·  ');
+  const { border, mutedDim } = useThemeStore((s) => s.colors);
 
   const hasBottom = item.priority || item.labels.length > 0;
   const hasDescription = item.description.trim().length > 0;
@@ -89,22 +54,20 @@ export function DetailPanel({
       <Text bold wrap="truncate">
         {item.title}
       </Text>
-      <Box>
-        <Text dimColor={mutedDim}>{metaLine}</Text>
+      <Box gap={1}>
+        <Text dimColor={mutedDim}>#{item.id}</Text>
+        <ColorPill field="status" value={item.status} />
+        <ColorPill field="type" value={item.type} />
+        {item.assignee && <Text dimColor={mutedDim}>@{item.assignee}</Text>}
       </Box>
       {hasBottom && (
-        <Box>
+        <Box gap={1}>
           {item.priority && (
-            <Text color={priorityColor(item.priority)}>
-              {priorityIcon(item.priority)} {item.priority}
-            </Text>
+            <ColorPill field="priority" value={item.priority} />
           )}
-          {item.priority && item.labels.length > 0 && (
-            <Text dimColor={mutedDim}>{'  '}</Text>
-          )}
-          {item.labels.length > 0 && (
-            <Text dimColor={mutedDim}>{item.labels.join(', ')}</Text>
-          )}
+          {item.labels.map((label) => (
+            <ColorPill key={label} field="label" value={label} />
+          ))}
         </Box>
       )}
       {hasDescription && !showFullDescription && (
