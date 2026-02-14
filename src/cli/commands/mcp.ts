@@ -29,6 +29,17 @@ import type {
   ItemUpdateOptions,
 } from './item.js';
 import { runIterationSet } from './iteration.js';
+import {
+  runPrList,
+  runPrShow,
+  runPrCreate,
+  runPrMerge,
+  runPrClose,
+  runPrLink,
+  runPrUnlink,
+} from './pr.js';
+import type { PrCreateOptions } from './pr.js';
+import { isPrBackend } from '../../backends/types.js';
 
 export interface ToolResult {
   [key: string]: unknown;
@@ -410,6 +421,118 @@ export async function handleGetItemTree(
   }
 }
 
+export async function handleListPrs(
+  backend: Backend,
+  args: { status?: string },
+): Promise<ToolResult> {
+  try {
+    const prs = await runPrList(backend, { status: args.status });
+    return success(prs);
+  } catch (err) {
+    return error(err instanceof Error ? err.message : String(err));
+  }
+}
+
+export async function handleShowPr(
+  backend: Backend,
+  args: { id: string },
+): Promise<ToolResult> {
+  try {
+    const pr = await runPrShow(backend, args.id);
+    return success(pr);
+  } catch (err) {
+    return error(err instanceof Error ? err.message : String(err));
+  }
+}
+
+export async function handleCreatePr(
+  backend: Backend,
+  args: {
+    title: string;
+    sourceBranch: string;
+    targetBranch?: string;
+    linkedItems?: string;
+  },
+): Promise<ToolResult> {
+  try {
+    const opts: PrCreateOptions = {
+      title: args.title,
+      source: args.sourceBranch,
+      target: args.targetBranch,
+      link: args.linkedItems,
+    };
+    const pr = await runPrCreate(backend, opts);
+    return success(pr);
+  } catch (err) {
+    return error(err instanceof Error ? err.message : String(err));
+  }
+}
+
+export async function handleMergePr(
+  backend: Backend,
+  args: { id: string },
+): Promise<ToolResult> {
+  try {
+    const pr = await runPrMerge(backend, args.id);
+    return success(pr);
+  } catch (err) {
+    return error(err instanceof Error ? err.message : String(err));
+  }
+}
+
+export async function handleClosePr(
+  backend: Backend,
+  args: { id: string },
+): Promise<ToolResult> {
+  try {
+    const pr = await runPrClose(backend, args.id);
+    return success(pr);
+  } catch (err) {
+    return error(err instanceof Error ? err.message : String(err));
+  }
+}
+
+export async function handleLinkPr(
+  backend: Backend,
+  args: { prId: string; itemId: string },
+): Promise<ToolResult> {
+  try {
+    await runPrLink(backend, args.prId, args.itemId);
+    return success({ linked: { prId: args.prId, itemId: args.itemId } });
+  } catch (err) {
+    return error(err instanceof Error ? err.message : String(err));
+  }
+}
+
+export async function handleUnlinkPr(
+  backend: Backend,
+  args: { prId: string; itemId: string },
+): Promise<ToolResult> {
+  try {
+    await runPrUnlink(backend, args.prId, args.itemId);
+    return success({ unlinked: { prId: args.prId, itemId: args.itemId } });
+  } catch (err) {
+    return error(err instanceof Error ? err.message : String(err));
+  }
+}
+
+export async function handleGetLinkedPrs(
+  backend: Backend,
+  args: { itemId: string },
+): Promise<ToolResult> {
+  try {
+    if (!isPrBackend(backend)) {
+      return error(
+        'Pull request operations require a PR-capable backend (e.g., GitHub)',
+      );
+    }
+    const prs = await backend.getLinkedPullRequests(args.itemId);
+    return success(prs);
+  } catch (err) {
+    return error(err instanceof Error ? err.message : String(err));
+  }
+}
+
 export interface SyncState {
   syncManager: SyncManager | null;
   queue: SyncQueueAdapter | null;
@@ -681,6 +804,108 @@ export function registerTools(
       async (args) => {
         if (syncState?.syncManager) await syncState.syncManager.sync();
         return handleGetItemTree(backend, args);
+      },
+    );
+  }
+
+  // PR tools — available if backend supports PRs
+  if (isPrBackend(backend)) {
+    server.tool(
+      'tic-list_prs',
+      'List pull requests with optional status filter',
+      {
+        status: z
+          .string()
+          .optional()
+          .describe('Filter by status (open, merged, closed, draft)'),
+      },
+      async (args) => {
+        return handleListPrs(backend, args);
+      },
+    );
+
+    server.tool(
+      'tic-show_pr',
+      'Show pull request details',
+      {
+        id: z.string().describe('Pull request ID'),
+      },
+      async (args) => {
+        return handleShowPr(backend, args);
+      },
+    );
+
+    server.tool(
+      'tic-create_pr',
+      'Create a pull request (requires remote backend)',
+      {
+        title: z.string().describe('PR title'),
+        sourceBranch: z.string().describe('Source branch'),
+        targetBranch: z.string().optional().describe('Target branch'),
+        linkedItems: z
+          .string()
+          .optional()
+          .describe('Comma-separated work item IDs to link'),
+      },
+      async (args) => {
+        return handleCreatePr(backend, args);
+      },
+    );
+
+    server.tool(
+      'tic-merge_pr',
+      'Merge a pull request',
+      {
+        id: z.string().describe('Pull request ID'),
+      },
+      async (args) => {
+        return handleMergePr(backend, args);
+      },
+    );
+
+    server.tool(
+      'tic-close_pr',
+      'Close a pull request',
+      {
+        id: z.string().describe('Pull request ID'),
+      },
+      async (args) => {
+        return handleClosePr(backend, args);
+      },
+    );
+
+    server.tool(
+      'tic-link_pr',
+      'Link a pull request to a work item',
+      {
+        prId: z.string().describe('Pull request ID'),
+        itemId: z.string().describe('Work item ID'),
+      },
+      async (args) => {
+        return handleLinkPr(backend, args);
+      },
+    );
+
+    server.tool(
+      'tic-unlink_pr',
+      'Unlink a pull request from a work item',
+      {
+        prId: z.string().describe('Pull request ID'),
+        itemId: z.string().describe('Work item ID'),
+      },
+      async (args) => {
+        return handleUnlinkPr(backend, args);
+      },
+    );
+
+    server.tool(
+      'tic-get_linked_prs',
+      'Get pull requests linked to a work item',
+      {
+        itemId: z.string().describe('Work item ID'),
+      },
+      async (args) => {
+        return handleGetLinkedPrs(backend, args);
       },
     );
   }
