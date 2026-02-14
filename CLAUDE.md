@@ -72,7 +72,7 @@ Or add `.mcp.json` to the project root:
 Key modules in `src/storage/`:
 
 - `index.ts` — `Storage` class. Implements `Backend` + `SoftDeleteBackend`. All data lives in `.tic/tic.db` (SQLite with WAL mode). Manages work items, comments, templates, config, iterations, and auto-incrementing IDs.
-- `schema.ts` — Drizzle ORM table definitions (work items, labels, dependencies, comments, templates, config, undo log, sync queue).
+- `schema.ts` — Drizzle ORM table definitions (work items, labels, dependencies, comments, templates, config, undo log, sync queue, color mappings).
 - `db.ts` — database creation, migration, and WAL setup via `createDatabase(root)`. Migrations live in `drizzle/` at the project root.
 - `config.ts` — `Config` type, `defaultConfig`, and SQLite read/write functions. Project config stored in the `project_config` table (statuses, types, iterations, branch settings, views). Also provides `readBackendTypeSync()` for CLI startup.
 - `syncQueue.ts` — `SyncQueue` class. Queues create/update/delete actions for `SyncManager` to push to remote backends and `FilesBackend`.
@@ -81,14 +81,15 @@ Key modules in `src/storage/`:
 
 ### Components
 
-- `WorkItemList` — collapsible tree-indented table with keyboard navigation. Supports bulk operations via mark/unmark (`m`/`M`), inline property pickers via OverlayPanel (`s` status, `P` priority, `a` assignee, `l` labels, `t` type), search (`/`), command palette (`:`), branch/worktree creation (`b`), bulk actions menu (`B`), detail panel toggle (`v`), and undo (`u`). Shows `⧗` indicator for items with dependencies. Responsive column hiding based on terminal width.
-- `WorkItemForm` — multi-field form for create/edit with dropdowns, autocomplete inputs, multi-autocomplete (labels), and external `$EDITOR` for descriptions. Navigable relationship links allow drilling into related items with a back-stack. Also serves as the template editor via `formMode`.
-- `OverlayPanel` — unified overlay component for search, bulk actions, and all property pickers. Supports single-select, multi-select, and freeform input modes with fuzzy filtering and category grouping.
-- `DetailPanel` — inline preview panel showing selected item metadata and description with scroll support.
+- `WorkItemList` — collapsible tree-indented table with keyboard navigation. Supports bulk operations via mark/unmark (`m`/`M`), inline property pickers via OverlayPanel (`s` status, `P` priority, `a` assignee, `l` labels, `t` type), search (`/`), command palette (`:`), branch/worktree creation (`b`), bulk actions menu (`B`), detail panel toggle (`v`), and undo (`u`). Shows `⧗` indicator for items with dependencies. Responsive column hiding based on terminal width. Status, priority, and labels render as colored pills via `ColorPill`.
+- `WorkItemForm` — multi-field form for create/edit with dropdowns, autocomplete inputs, multi-autocomplete (labels), and external `$EDITOR` for descriptions. Navigable relationship links allow drilling into related items with a back-stack. Also serves as the template editor via `formMode`. Display values for status, priority, type, and labels render as colored pills.
+- `OverlayPanel` — unified overlay component for search, bulk actions, and all property pickers. Supports single-select, multi-select, and freeform input modes with fuzzy filtering and category grouping. Accepts optional `fieldType` prop to show `ColorPill` previews alongside picker items.
+- `ColorPill` — reusable component rendering colored background pills for field values (status, priority, type, label). Resolves color via `themeStore.resolveFieldColor()`. Falls back to plain text when no color matches.
+- `DetailPanel` — inline preview panel showing selected item metadata and description with scroll support. Status, priority, type, and labels render as colored pills.
 - `AuthPrompt` — full-screen authentication flow UI. Displays device code, verification URI, and spinner during OAuth flows. Integrated into `App` via lazy loading. States: waiting, code-ready, success, error.
 - `Breadcrumbs` — breadcrumb navigation for form drill-down stack.
 - `IterationPicker` — select from configured iterations
-- `Settings` — backend selector and Jira configuration
+- `Settings` — backend selector, Jira configuration, theme picker, and Colors section for customizing field color pills (status, priority, type, label colors with 16-color terminal palette picker)
 - `StatusScreen` — sync status and error details
 - `HelpScreen` — context-sensitive keyboard shortcut reference (press `?` from any screen)
 - `AutocompleteInput` / `MultiAutocompleteInput` — fuzzy autocomplete inputs for single and comma-separated multi-value fields
@@ -98,7 +99,8 @@ Key modules in `src/storage/`:
 
 Zustand vanilla stores in `src/stores/`:
 
-- `backendDataStore` — single source of truth for backend data (items, statuses, types, assignees, labels, capabilities, sync status). Also manages auth state (`authPrompt`, `authFlow`, `authDismissed`) for in-TUI authentication flows. Initialized with `init(cwd)` which creates backends asynchronously (Storage + optional remote + SyncManager). Components subscribe via `useBackendDataStore(selector)`. Has `initGeneration` counter to prevent stale async init from overwriting store after destroy.
+- `themeStore` — UI theme colors and field color resolution. Holds `themeName`, semantic `colors` (accent, muted, error, etc.), `colorOverrides` (user-defined field colors from `color_mappings` table), and `resolveFieldColor(field, value)` which checks: user override → keyword defaults → label hash → null. Exports `FieldType`, `FieldColor`, `autoFg()`. Initialized via `initThemeFromConfig()` after configStore loads; color overrides loaded during `backendDataStore.init()`.
+- `backendDataStore` — single source of truth for backend data (items, statuses, types, assignees, labels, capabilities, sync status). Also manages auth state (`authPrompt`, `authFlow`, `authDismissed`) for in-TUI authentication flows. Initialized with `init(cwd)` which creates backends asynchronously (Storage + optional remote + SyncManager). Components subscribe via `useBackendDataStore(selector)`. Has `initGeneration` counter to prevent stale async init from overwriting store after destroy. Exposes `setColorMapping()`, `deleteColorMapping()`, `deleteColorMappingsByField()`, `reloadColorOverrides()` for Settings color picker.
 - `configStore` — single source of truth for project config. Reads/writes exclusively via SQLite (the `project_config` table). `init(root)` reads config from DB, `startWatching()` is a no-op (DB is the source of truth). Store must be `destroy()`'d on exit.
 - `undoStore` — undo action stack (max depth 5). Delete uses soft-delete (`deleted_at` column in SQLite), create/update use whole-item snapshots. `u` keybinding in WorkItemList pops and reverses.
 - `formStackStore` — form navigation stack and field state for drill-down into related items.
