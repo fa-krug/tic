@@ -79,6 +79,8 @@ const defaultDefaults: FieldDefaults = {
       color: { bg: 'gray', fg: 'white' },
     },
     { patterns: ['blocked'], color: { bg: 'red', fg: 'white' } },
+    { patterns: ['merged'], color: { bg: 'magenta', fg: 'white' } },
+    { patterns: ['draft'], color: { bg: 'gray', fg: 'white' } },
   ],
   priority: [
     { patterns: ['critical'], color: { bg: 'red', fg: 'white' } },
@@ -109,6 +111,8 @@ const highContrastDefaults: FieldDefaults = {
       color: { bg: 'grayBright', fg: 'white' },
     },
     { patterns: ['blocked'], color: { bg: 'redBright', fg: 'white' } },
+    { patterns: ['merged'], color: { bg: 'magentaBright', fg: 'white' } },
+    { patterns: ['draft'], color: { bg: 'grayBright', fg: 'white' } },
   ],
   priority: [
     { patterns: ['critical'], color: { bg: 'redBright', fg: 'white' } },
