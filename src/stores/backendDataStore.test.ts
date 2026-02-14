@@ -226,6 +226,43 @@ describe('backendDataStore', () => {
     expect(backendDataStore.getState().syncManager).toBeNull();
   });
 
+  it('derives assignees and labels from loaded items', async () => {
+    // Pre-create items with assignees and labels
+    const storage = Storage.create(tmpDir);
+    await storage.createWorkItem({
+      title: 'A',
+      type: 'task',
+      status: 'todo',
+      iteration: 'default',
+      priority: 'medium',
+      assignee: 'alice',
+      labels: ['bug'],
+      description: '',
+      parent: null,
+      dependsOn: [],
+    });
+    await storage.createWorkItem({
+      title: 'B',
+      type: 'task',
+      status: 'todo',
+      iteration: 'default',
+      priority: 'medium',
+      assignee: 'bob',
+      labels: ['bug', 'ui'],
+      description: '',
+      parent: null,
+      dependsOn: [],
+    });
+    storage.destroy();
+
+    backendDataStore.getState().init(tmpDir);
+    await waitForLoad();
+
+    const state = backendDataStore.getState();
+    expect(state.assignees).toEqual(['alice', 'bob']);
+    expect(state.labels).toEqual(['bug', 'ui']);
+  });
+
   it('handles startPatFlow', () => {
     backendDataStore.getState().startPatFlow();
     expect(backendDataStore.getState().authFlow?.state).toBe('entering-pat');
