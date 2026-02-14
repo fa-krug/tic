@@ -153,6 +153,16 @@ export class Storage extends BaseBackend implements SoftDeleteBackend {
       const raw = fs.readFileSync(yamlPath, 'utf-8');
       const config = yaml.parse(raw) as Config;
 
+      // Recalculate nextId from actual max item ID to prevent collisions
+      // (the YAML next_id may be stale if items were synced from a remote)
+      const maxRow = this.db.raw
+        .prepare('SELECT MAX(CAST(id AS INTEGER)) AS maxId FROM work_items')
+        .get() as { maxId: number | null } | undefined;
+      const maxId = maxRow?.maxId ?? 0;
+      if (maxId >= config.next_id) {
+        config.next_id = maxId + 1;
+      }
+
       this.db.transaction((tx) => {
         insertConfigTx(tx, config);
       });

@@ -1,4 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { createDatabase, type TicDatabase } from './db.js';
 import { Storage } from './index.js';
 import { isSoftDeleteBackend } from '../backends/types.js';
@@ -1284,6 +1287,67 @@ describe('Storage', () => {
       const fetched = await backend.getWorkItem(item.id);
       expect(fetched.comments).toHaveLength(1);
       expect(fetched.comments[0]!.body).toBe('hello');
+    });
+  });
+
+  // ─── YAML migration: nextId recalculation ───────────────────────
+
+  describe('migrateFromYaml nextId', () => {
+    let tmpDir: string;
+
+    beforeEach(() => {
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-migrate-test-'));
+    });
+
+    afterEach(() => {
+      fs.rmSync(tmpDir, { recursive: true });
+    });
+
+    it('recalculates nextId from existing items when YAML next_id is stale', async () => {
+      // 1. Create initial Storage to get a DB with some items
+      const initial = Storage.create(tmpDir);
+      await initial.createWorkItem(makeNewItem({ title: 'Item 1' }));
+      await initial.createWorkItem(makeNewItem({ title: 'Item 2' }));
+      await initial.createWorkItem(makeNewItem({ title: 'Item 3' }));
+      // Items have IDs 1, 2, 3 — nextId is now 4
+      initial.destroy();
+
+      // 2. Write a config.yml with a stale next_id (1) to simulate the bug
+      const yamlContent = [
+        'backend: none',
+        'types:',
+        '  - issue',
+        '  - task',
+        'statuses:',
+        '  - open',
+        '  - closed',
+        'current_iteration: default',
+        'iterations:',
+        '  - default',
+        'next_id: 1',
+        'branchMode: worktree',
+        'autoUpdate: true',
+      ].join('\n');
+      fs.writeFileSync(path.join(tmpDir, '.tic', 'config.yml'), yamlContent);
+
+      // 3. Force the DB to think it's a fresh seed so migration triggers
+      //    (migrateFromYaml only runs when backend === 'drizzle')
+      const tempDb = createDatabase(tmpDir);
+      tempDb.raw.exec(
+        "UPDATE project_config SET backend = 'drizzle' WHERE id = 1",
+      );
+      tempDb.close();
+
+      // 4. Re-open Storage — this triggers migrateFromYaml
+      const reopened = Storage.create(tmpDir);
+
+      // 5. Create a new item — should NOT collide with existing IDs
+      const newItem = await reopened.createWorkItem(
+        makeNewItem({ title: 'Item 4' }),
+      );
+      expect(Number(newItem.id)).toBeGreaterThanOrEqual(4);
+
+      reopened.destroy();
     });
   });
 });
