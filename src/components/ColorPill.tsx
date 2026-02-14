@@ -9,7 +9,9 @@ export function ColorPill({
   field: FieldType;
   value: string;
 }) {
-  const resolved = useThemeStore((s) => s.resolveFieldColor(field, value));
+  const resolved = useThemeStore((s) =>
+    value ? s.resolveFieldColor(field, value) : null,
+  );
   if (!resolved) return <Text>{value}</Text>;
   return (
     <Box>

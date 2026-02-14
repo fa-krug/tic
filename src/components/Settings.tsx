@@ -3,6 +3,7 @@ import { Box, Text, useInput, useApp } from 'ink';
 import TextInput from 'ink-text-input';
 import { useNavigationStore } from '../stores/navigationStore.js';
 import {
+  backendDataStore,
   useBackendDataStore,
   defaultCapabilities,
 } from '../stores/backendDataStore.js';
@@ -880,31 +881,10 @@ export function Settings() {
               fieldType={ft}
               onSelect={(item) => {
                 if (item.value === '__reset_all__') {
-                  const storage = backend as unknown as {
-                    deleteColorMappingsByField?: (
-                      fieldType: string,
-                    ) => Promise<void>;
-                    getColorMappings?: () => Promise<
-                      {
-                        fieldType: string;
-                        value: string;
-                        bg: string;
-                        fg: string;
-                      }[]
-                    >;
-                  };
-                  if (
-                    storage?.deleteColorMappingsByField &&
-                    storage?.getColorMappings
-                  ) {
-                    void storage
-                      .deleteColorMappingsByField(ft)
-                      .then(() => storage.getColorMappings!())
-                      .then((mappings) => {
-                        themeStore.getState().loadColorOverrides(mappings);
-                      })
-                      .catch(() => {});
-                  }
+                  void backendDataStore
+                    .getState()
+                    .deleteColorMappingsByField(ft)
+                    .catch(() => {});
                   closeOverlay();
                 } else {
                   openOverlay({
@@ -960,53 +940,13 @@ export function Settings() {
               items={items}
               fieldType={ft}
               onSelect={(item) => {
-                const storage = backend as unknown as {
-                  setColorMapping?: (
-                    fieldType: string,
-                    value: string,
-                    bg: string,
-                    fg: string,
-                  ) => Promise<void>;
-                  deleteColorMapping?: (
-                    fieldType: string,
-                    value: string,
-                  ) => Promise<void>;
-                  getColorMappings?: () => Promise<
-                    {
-                      fieldType: string;
-                      value: string;
-                      bg: string;
-                      fg: string;
-                    }[]
-                  >;
-                };
-                if (!storage?.getColorMappings) {
-                  closeOverlay();
-                  return;
-                }
-
+                const store = backendDataStore.getState();
                 if (item.value === '__reset__') {
-                  if (storage.deleteColorMapping) {
-                    void storage
-                      .deleteColorMapping(ft, val)
-                      .then(() => storage.getColorMappings!())
-                      .then((mappings) => {
-                        themeStore.getState().loadColorOverrides(mappings);
-                      })
-                      .catch(() => {});
-                  }
+                  void store.deleteColorMapping(ft, val).catch(() => {});
                 } else {
                   const bg = item.value;
                   const fg = autoFg(bg);
-                  if (storage.setColorMapping) {
-                    void storage
-                      .setColorMapping(ft, val, bg, fg)
-                      .then(() => storage.getColorMappings!())
-                      .then((mappings) => {
-                        themeStore.getState().loadColorOverrides(mappings);
-                      })
-                      .catch(() => {});
-                  }
+                  void store.setColorMapping(ft, val, bg, fg).catch(() => {});
                 }
                 closeOverlay();
               }}

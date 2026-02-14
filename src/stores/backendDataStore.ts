@@ -89,6 +89,17 @@ export interface BackendDataStoreState {
   submitAdoPat(pat: string): Promise<void>;
   submitJiraCredentials(email: string, token: string): Promise<void>;
   destroy(): void;
+
+  // Color mapping operations (delegate to Storage)
+  setColorMapping(
+    fieldType: string,
+    value: string,
+    bg: string,
+    fg: string,
+  ): Promise<void>;
+  deleteColorMapping(fieldType: string, value: string): Promise<void>;
+  deleteColorMappingsByField(fieldType: string): Promise<void>;
+  reloadColorOverrides(): Promise<void>;
 }
 
 // Module-level references (not reactive state)
@@ -516,6 +527,58 @@ export const backendDataStore = createStore<BackendDataStoreState>(
             error: err instanceof Error ? err.message : String(err),
           },
         });
+      }
+    },
+
+    async setColorMapping(
+      fieldType: string,
+      value: string,
+      bg: string,
+      fg: string,
+    ) {
+      const b = currentBackend as {
+        setColorMapping?: (
+          ft: string,
+          v: string,
+          b: string,
+          f: string,
+        ) => Promise<void>;
+      } | null;
+      if (b?.setColorMapping) {
+        await b.setColorMapping(fieldType, value, bg, fg);
+        await get().reloadColorOverrides();
+      }
+    },
+
+    async deleteColorMapping(fieldType: string, value: string) {
+      const b = currentBackend as {
+        deleteColorMapping?: (ft: string, v: string) => Promise<void>;
+      } | null;
+      if (b?.deleteColorMapping) {
+        await b.deleteColorMapping(fieldType, value);
+        await get().reloadColorOverrides();
+      }
+    },
+
+    async deleteColorMappingsByField(fieldType: string) {
+      const b = currentBackend as {
+        deleteColorMappingsByField?: (ft: string) => Promise<void>;
+      } | null;
+      if (b?.deleteColorMappingsByField) {
+        await b.deleteColorMappingsByField(fieldType);
+        await get().reloadColorOverrides();
+      }
+    },
+
+    async reloadColorOverrides() {
+      const b = currentBackend as {
+        getColorMappings?: () => Promise<
+          { fieldType: string; value: string; bg: string; fg: string }[]
+        >;
+      } | null;
+      if (b?.getColorMappings) {
+        const mappings = await b.getColorMappings();
+        themeStore.getState().loadColorOverrides(mappings);
       }
     },
 

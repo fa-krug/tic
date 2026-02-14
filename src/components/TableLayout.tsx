@@ -42,7 +42,7 @@ const gap = 2;
 const MARKER_WIDTH = 2;
 const TITLE_MIN_WIDTH = 30;
 
-const FIXED_STATUS = 12;
+const FIXED_STATUS = 14;
 const FIXED_PRIORITY = 12;
 const FIXED_ASSIGNEE = 20;
 const FIXED_LABELS = 20;
