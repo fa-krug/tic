@@ -4,20 +4,23 @@ module.enableCompileCache?.();
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { render } from 'ink';
-import { App } from './app.js';
-import { ErrorBoundary } from './components/ErrorBoundary.js';
-import { configStore } from './stores/configStore.js';
-import { backendDataStore } from './stores/backendDataStore.js';
-import { undoStore } from './stores/undoStore.js';
-import { recentCommandsStore } from './stores/recentCommandsStore.js';
-import { isSoftDeleteBackend } from './backends/types.js';
-import { initThemeFromConfig } from './stores/themeStore.js';
 
 if (process.argv.length > 2) {
   const { runCli } = await import('./cli/index.js');
   await runCli(process.argv);
 } else {
+  // Lazy-load Ink/React only for TUI mode
+  const { render } = await import('ink');
+  const { App } = await import('./app.js');
+  const { ErrorBoundary } = await import('./components/ErrorBoundary.js');
+  const { configStore } = await import('./stores/configStore.js');
+  const { backendDataStore } = await import('./stores/backendDataStore.js');
+  const { undoStore } = await import('./stores/undoStore.js');
+  const { recentCommandsStore } =
+    await import('./stores/recentCommandsStore.js');
+  const { isSoftDeleteBackend } = await import('./backends/types.js');
+  const { initThemeFromConfig } = await import('./stores/themeStore.js');
+
   const cwd = process.cwd();
 
   // Auto-init on first run: detect backend from git remotes
@@ -62,8 +65,7 @@ if (process.argv.length > 2) {
   backendDataStore.getState().destroy();
   configStore.getState().destroy();
 
-  // If an update was requested from Settings, run it now while we still
-  // have foreground terminal control (Ink has already unmounted).
+  // If an update was requested from Settings, run it now
   const { isUpdateRequested, runUpdate } = await import('./updater.js');
   if (isUpdateRequested()) {
     runUpdate([]);
