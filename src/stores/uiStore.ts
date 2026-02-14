@@ -23,7 +23,9 @@ export type ActiveOverlay =
   | { type: 'default-iteration-picker' }
   | { type: 'delete-template-confirm'; templateSlug: string }
   | { type: 'settings-edit' }
-  | { type: 'theme-picker' };
+  | { type: 'theme-picker' }
+  | { type: 'color-value-picker'; fieldType: string }
+  | { type: 'color-palette-picker'; fieldType: string; value: string };
 
 export interface UIStoreState {
   activeOverlay: ActiveOverlay | null;

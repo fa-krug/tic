@@ -82,7 +82,7 @@ Case-insensitive **contains** matching — `"In Progress"` matches a rule for `"
 
 ### High-contrast theme
 
-Same patterns but brighter variants (`greenBright`, `blueBright`, etc.), always white fg.
+Same patterns but brighter variants (`greenBright`, `blueBright`, etc.). Fg is auto-calculated for readability: `black` for light backgrounds (`yellowBright`, `cyanBright`, `greenBright`), `white` for dark ones.
 
 ### Label hashing
 
@@ -90,7 +90,7 @@ Same patterns but brighter variants (`greenBright`, `blueBright`, etc.), always 
 palette[hash(name.toLowerCase()) % palette.length]
 ```
 
-10-color palette: `blue, green, magenta, cyan, yellow, red, blueBright, greenBright, magentaBright, cyanBright`. All with white fg. Deterministic — same label always gets the same color.
+10-color palette: `blue, green, magenta, cyan, yellow, red, blueBright, greenBright, magentaBright, cyanBright`. Fg is auto-calculated per background for readability. Deterministic — same label always gets the same color.
 
 ## ColorPill Component
 

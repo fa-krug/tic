@@ -22,10 +22,12 @@ import { useShallow } from 'zustand/shallow';
 import { openInEditor } from '../editor.js';
 import { slugifyTemplateName } from '../backends/local/templates.js';
 import { Breadcrumbs } from './Breadcrumbs.js';
+import { ColorPill } from './ColorPill.js';
 import { uiStore } from '../stores/uiStore.js';
 import { undoStore } from '../stores/undoStore.js';
 import { useFormValidation } from '../hooks/useFormValidation.js';
 import { useThemeStore } from '../stores/themeStore.js';
+import type { FieldType } from '../stores/themeStore.js';
 
 type FieldName =
   | 'title'
@@ -1129,7 +1131,13 @@ export function WorkItemForm() {
               {label}:{dirtyIndicator}
               {isRequired && <Text dimColor={mutedDim}> *</Text>}{' '}
             </Text>
-            <Text>{currentValue}</Text>
+            {(['status', 'priority', 'type'] as FieldType[]).includes(
+              field as FieldType,
+            ) ? (
+              <ColorPill field={field as FieldType} value={currentValue} />
+            ) : (
+              <Text>{currentValue}</Text>
+            )}
           </Box>
           {validationErrors[field] && (
             <Box marginLeft={4}>
@@ -1351,6 +1359,11 @@ export function WorkItemForm() {
         );
       }
 
+      const labelItems = labels
+        .split(',')
+        .map((l) => l.trim())
+        .filter((l) => l.length > 0);
+
       return (
         <Box key={field}>
           <Text color={focused ? accent : undefined}>{cursor} </Text>
@@ -1358,7 +1371,15 @@ export function WorkItemForm() {
             {label}:{dirtyIndicator}
             {isRequired && <Text dimColor={mutedDim}> *</Text>}{' '}
           </Text>
-          <Text>{labels || <Text dimColor={mutedDim}>(empty)</Text>}</Text>
+          {labelItems.length > 0 ? (
+            <Box gap={1}>
+              {labelItems.map((l) => (
+                <ColorPill key={l} field="label" value={l} />
+              ))}
+            </Box>
+          ) : (
+            <Text dimColor={mutedDim}>(empty)</Text>
+          )}
         </Box>
       );
     }

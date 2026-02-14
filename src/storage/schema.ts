@@ -269,3 +269,15 @@ export const fileSyncState = sqliteTable('file_sync_state', {
   hash: text('hash').notNull(),
   syncedAt: text('synced_at').notNull(),
 });
+
+// 22. Color Mappings (user overrides for field colors)
+export const colorMappings = sqliteTable(
+  'color_mappings',
+  {
+    fieldType: text('field_type').notNull(),
+    value: text('value').notNull(),
+    bg: text('bg').notNull(),
+    fg: text('fg').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.fieldType, t.value] })],
+);

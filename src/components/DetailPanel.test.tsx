@@ -59,7 +59,8 @@ describe('DetailPanel', () => {
     expect(frame).toContain('in-progress');
     expect(frame).toContain('@alice');
     expect(frame).toContain('high');
-    expect(frame).toContain('bug, frontend');
+    expect(frame).toContain('bug');
+    expect(frame).toContain('frontend');
   });
 
   it('omits assignee when empty', () => {
@@ -90,22 +91,20 @@ describe('DetailPanel', () => {
     expect(frame).not.toContain('frontend');
   });
 
-  it('shows priority icon for critical', () => {
+  it('shows priority pill for critical', () => {
     const { lastFrame } = render(
       <DetailPanel
         item={makeItem({ priority: 'critical' })}
         terminalWidth={80}
       />,
     );
-    expect(lastFrame()).toContain('▲▲');
     expect(lastFrame()).toContain('critical');
   });
 
-  it('shows priority icon for low', () => {
+  it('shows priority pill for low', () => {
     const { lastFrame } = render(
       <DetailPanel item={makeItem({ priority: 'low' })} terminalWidth={80} />,
     );
-    expect(lastFrame()).toContain('▽');
     expect(lastFrame()).toContain('low');
   });
 });
