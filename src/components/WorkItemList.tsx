@@ -1466,6 +1466,7 @@ export function WorkItemList() {
         ) : activeOverlay?.type === 'status-picker' ? (
           <OverlayPanel
             title="Set Status"
+            fieldType="status"
             items={statuses.map((s) => ({ id: s, label: s, value: s }))}
             onSelect={(item) => {
               const targetIds = getOverlayTargetIds();
@@ -1500,6 +1501,7 @@ export function WorkItemList() {
         ) : activeOverlay?.type === 'type-picker' ? (
           <OverlayPanel
             title="Set Type"
+            fieldType="type"
             items={types.map((t) => ({
               id: t,
               label: t.charAt(0).toUpperCase() + t.slice(1),
@@ -1538,6 +1540,7 @@ export function WorkItemList() {
         ) : activeOverlay?.type === 'priority-picker' ? (
           <OverlayPanel
             title="Set Priority"
+            fieldType="priority"
             items={[
               { id: 'critical', label: 'Critical', value: 'critical' },
               { id: 'high', label: 'High', value: 'high' },
@@ -1747,6 +1750,7 @@ export function WorkItemList() {
         ) : activeOverlay?.type === 'labels-input' ? (
           <OverlayPanel
             title={`Set Labels (${activeOverlay.targetIds.length} item${activeOverlay.targetIds.length > 1 ? 's' : ''})`}
+            fieldType="label"
             items={labelSuggestions.map((l) => ({
               id: l,
               label: l,

@@ -3,6 +3,8 @@ import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import { useScrollViewport } from '../hooks/useScrollViewport.js';
 import { useThemeStore } from '../stores/themeStore.js';
+import type { FieldType } from '../stores/themeStore.js';
+import { ColorPill } from './ColorPill.js';
 
 export interface OverlayItem {
   id: string;
@@ -35,6 +37,7 @@ export interface OverlayPanelProps {
   footer?: string;
   externalFilter?: boolean;
   onQueryChange?: (query: string) => void;
+  fieldType?: FieldType;
 }
 
 export function filterItems(
@@ -80,6 +83,7 @@ export function OverlayPanel({
   footer,
   externalFilter = false,
   onQueryChange,
+  fieldType,
 }: OverlayPanelProps) {
   const [query, setQuery] = useState(initialQuery);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -239,12 +243,18 @@ export function OverlayPanel({
                       : '  '}
                 </Text>
                 <Box flexGrow={1}>
-                  <Text
-                    color={isSelected ? accent : undefined}
-                    bold={isSelected}
-                  >
-                    {item.label}
-                  </Text>
+                  {fieldType ? (
+                    <Box>
+                      <ColorPill field={fieldType} value={item.value} />
+                    </Box>
+                  ) : (
+                    <Text
+                      color={isSelected ? accent : undefined}
+                      bold={isSelected}
+                    >
+                      {item.label}
+                    </Text>
+                  )}
                 </Box>
                 {item.hint && <Text dimColor={mutedDim}> {item.hint}</Text>}
               </Box>
