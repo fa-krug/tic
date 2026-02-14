@@ -237,23 +237,25 @@ export class Storage extends BaseBackend implements SoftDeleteBackend {
   // eslint-disable-next-line @typescript-eslint/require-await
   async getAssignees(): Promise<string[]> {
     const rows = this.db
-      .select({ assignee: schema.workItems.assignee })
+      .selectDistinct({ assignee: schema.workItems.assignee })
       .from(schema.workItems)
-      .where(isNull(schema.workItems.deletedAt))
+      .where(
+        and(
+          isNull(schema.workItems.deletedAt),
+          isNotNull(schema.workItems.assignee),
+        ),
+      )
       .all();
-    // Filter out empty assignees in JS (they don't represent real assignees)
-    const assignees = new Set<string>();
-    for (const r of rows) {
-      if (r.assignee) assignees.add(r.assignee);
-    }
-    return [...assignees].sort();
+    return rows
+      .map((r) => r.assignee)
+      .filter(Boolean)
+      .sort();
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
   async getLabels(): Promise<string[]> {
-    // Get labels only for non-deleted items
     const rows = this.db
-      .select({ label: schema.workItemLabels.label })
+      .selectDistinct({ label: schema.workItemLabels.label })
       .from(schema.workItemLabels)
       .innerJoin(
         schema.workItems,
@@ -261,11 +263,7 @@ export class Storage extends BaseBackend implements SoftDeleteBackend {
       )
       .where(isNull(schema.workItems.deletedAt))
       .all();
-    const labels = new Set<string>();
-    for (const r of rows) {
-      labels.add(r.label);
-    }
-    return [...labels].sort();
+    return rows.map((r) => r.label).sort();
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
