@@ -2,6 +2,7 @@ import { Box, Text } from 'ink';
 import Spinner from 'ink-spinner';
 import { useConfigStore } from '../stores/configStore.js';
 import { useBackendDataStore } from '../stores/backendDataStore.js';
+import { useThemeStore } from '../stores/themeStore.js';
 import os from 'node:os';
 import { VERSION } from '../version.js';
 
@@ -74,6 +75,7 @@ function getStatusDisplay(
 }
 
 export function Header() {
+  const { accent, error, warning, mutedDim } = useThemeStore((s) => s.colors);
   const backendType = useConfigStore((s) => s.config.backend ?? 'none');
   const loading = useBackendDataStore((s) => s.loading);
   const initError = useBackendDataStore((s) => s.error);
@@ -93,7 +95,7 @@ export function Header() {
     <Box marginTop={1} marginBottom={1}>
       <Box flexDirection="column" marginRight={3}>
         {ART_LINES.map((line, i) => (
-          <Text key={i} color="cyan">
+          <Text key={i} color={accent}>
             {line}
           </Text>
         ))}
@@ -101,21 +103,21 @@ export function Header() {
       <Box flexDirection="column" justifyContent="center">
         <Text>
           <Text bold>tic</Text>
-          <Text dimColor> v{VERSION}</Text>
+          <Text dimColor={mutedDim}> v{VERSION}</Text>
           {showSpinner && (
-            <Text color="yellow">
+            <Text color={warning}>
               {' '}
               <Spinner type="dots" />
             </Text>
           )}
           {statusText && (
-            <Text color={isError ? 'red' : undefined} dimColor={!isError}>
+            <Text color={isError ? error : undefined} dimColor={!isError}>
               {' '}
               {statusText}
             </Text>
           )}
         </Text>
-        <Text dimColor>
+        <Text dimColor={mutedDim}>
           {backendLabel} · {projectPath}
         </Text>
       </Box>

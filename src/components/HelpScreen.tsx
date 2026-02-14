@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
+import { useThemeStore } from '../stores/themeStore.js';
 import { useNavigationStore, type Screen } from '../stores/navigationStore.js';
 import { useBackendDataStore } from '../stores/backendDataStore.js';
 import { isGitRepo } from '../git.js';
@@ -243,6 +244,7 @@ export function flattenGroups(groups: ShortcutGroup[]): LineEntry[] {
 }
 
 export function HelpScreen({ sourceScreen }: { sourceScreen: Screen }) {
+  const { accent, mutedDim } = useThemeStore((s) => s.colors);
   const backend = useBackendDataStore((s) => s.backend);
   const syncManager = useBackendDataStore((s) => s.syncManager);
   const navigateBackFromHelp = useNavigationStore(
@@ -316,7 +318,7 @@ export function HelpScreen({ sourceScreen }: { sourceScreen: Screen }) {
   return (
     <Box flexDirection="column">
       <Box marginBottom={1}>
-        <Text bold color="cyan">
+        <Text bold color={accent}>
           Keyboard Shortcuts — {title}
         </Text>
       </Box>
@@ -335,7 +337,7 @@ export function HelpScreen({ sourceScreen }: { sourceScreen: Screen }) {
         return (
           <Box key={idx} marginLeft={2}>
             <Box width={12}>
-              <Text color="cyan">{line.key}</Text>
+              <Text color={accent}>{line.key}</Text>
             </Box>
             <Text>{line.description}</Text>
           </Box>
@@ -343,7 +345,7 @@ export function HelpScreen({ sourceScreen }: { sourceScreen: Screen }) {
       })}
 
       <Box marginTop={1}>
-        <Text dimColor>
+        <Text dimColor={mutedDim}>
           {needsScroll
             ? `↑↓ scroll (${scrollOffset + 1}-${Math.min(scrollOffset + maxVisible, lines.length)} of ${lines.length})  esc: back`
             : 'esc: back'}

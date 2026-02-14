@@ -34,6 +34,7 @@ export interface Config {
     sort?: Array<{ column: string; direction: string }>;
   }>;
   defaultView?: string;
+  theme?: string;
 }
 
 export const defaultConfig: Config = {
@@ -150,6 +151,10 @@ export function readConfig(db: TicDatabase): Config {
     config.defaultView = pc.defaultView;
   }
 
+  if (pc?.theme && pc.theme !== 'default') {
+    config.theme = pc.theme;
+  }
+
   // Jira — only include if site is non-empty
   if (jc && jc.site !== '') {
     const jira: Config['jira'] = {
@@ -240,6 +245,7 @@ export function insertConfigTx(tx: TicTransaction, config: Config): void {
       defaultType: config.defaultType ?? '',
       showDetailPanel: config.showDetailPanel ?? false,
       defaultView: config.defaultView ?? '',
+      theme: config.theme ?? 'default',
     })
     .onConflictDoUpdate({
       target: schema.projectConfig.id,
@@ -254,6 +260,7 @@ export function insertConfigTx(tx: TicTransaction, config: Config): void {
         defaultType: config.defaultType ?? '',
         showDetailPanel: config.showDetailPanel ?? false,
         defaultView: config.defaultView ?? '',
+        theme: config.theme ?? 'default',
       },
     })
     .run();

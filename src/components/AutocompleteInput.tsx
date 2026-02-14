@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
+import { useThemeStore } from '../stores/themeStore.js';
 
 const MAX_VISIBLE = 5;
 
@@ -34,6 +35,7 @@ export function AutocompleteInput({
   suggestions,
   focus,
 }: AutocompleteInputProps) {
+  const { mutedDim } = useThemeStore((s) => s.colors);
   const [highlightIndex, setHighlightIndex] = useState(-1);
 
   const { visible, totalCount } = filterSuggestions(value, suggestions);
@@ -94,7 +96,7 @@ export function AutocompleteInput({
       )}
       {totalCount > MAX_VISIBLE && (
         <Box marginLeft={2}>
-          <Text dimColor>+{totalCount - MAX_VISIBLE} more</Text>
+          <Text dimColor={mutedDim}>+{totalCount - MAX_VISIBLE} more</Text>
         </Box>
       )}
     </Box>

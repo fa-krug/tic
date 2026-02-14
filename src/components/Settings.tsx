@@ -20,6 +20,7 @@ import { OverlayPanel } from './OverlayPanel.js';
 import { openInEditor } from '../editor.js';
 import { defaultConfig } from '../storage/config.js';
 import { useTerminalWidth } from '../hooks/useTerminalWidth.js';
+import { themeStore, useThemeStore, themes } from '../stores/themeStore.js';
 
 type NavItem =
   | { kind: 'backend'; backend: string }
@@ -33,7 +34,8 @@ type NavItem =
   | { kind: 'update-check' }
   | { kind: 'update-toggle' }
   | { kind: 'branch-command' }
-  | { kind: 'branch-clipboard-toggle' };
+  | { kind: 'branch-clipboard-toggle' }
+  | { kind: 'theme' };
 
 const JIRA_FIELDS = ['site', 'project', 'boardId'] as const;
 
@@ -57,6 +59,8 @@ export function Settings() {
   );
   const selectWorkItem = useNavigationStore((s) => s.selectWorkItem);
   const terminalWidth = useTerminalWidth();
+  const themeName = useThemeStore((s) => s.themeName);
+  const { accent, success, mutedDim } = useThemeStore((s) => s.colors);
 
   const queue = useBackendDataStore((s) => s.queue);
 
@@ -195,6 +199,7 @@ export function Settings() {
     items.push({ kind: 'default-iteration' });
     items.push({ kind: 'branch-command' });
     items.push({ kind: 'branch-clipboard-toggle' });
+    items.push({ kind: 'theme' });
     if (capabilities.templates) {
       items.push({ kind: 'template-header' });
       for (const t of templates) {
@@ -350,6 +355,8 @@ export function Settings() {
             .getState()
             .update({ copyToClipboard: !(config?.copyToClipboard !== false) })
             .catch(() => {});
+        } else if (item.kind === 'theme') {
+          openOverlay({ type: 'theme-picker' });
         }
       }
 
@@ -392,7 +399,7 @@ export function Settings() {
   return (
     <Box flexDirection="column">
       <Box marginBottom={1}>
-        <Text bold color="cyan">
+        <Text bold color={accent}>
           Settings
         </Text>
       </Box>
@@ -407,11 +414,11 @@ export function Settings() {
           const status = availability[b];
           return (
             <Box key={b}>
-              <Text color={focused ? 'cyan' : undefined}>
+              <Text color={focused ? accent : undefined}>
                 {focused ? '>' : ' '}{' '}
               </Text>
               <Text
-                color={focused ? 'cyan' : undefined}
+                color={focused ? accent : undefined}
                 bold={focused}
                 dimColor={status !== 'available'}
               >
@@ -434,7 +441,8 @@ export function Settings() {
           item.kind === 'updates-header' ||
           item.kind === 'update-now' ||
           item.kind === 'update-check' ||
-          item.kind === 'update-toggle'
+          item.kind === 'update-toggle' ||
+          item.kind === 'theme'
         ) {
           return null; // rendered separately below
         }
@@ -464,12 +472,12 @@ export function Settings() {
 
         return (
           <Box key={`jira-${field}`} marginLeft={4}>
-            <Text color={focused ? 'cyan' : undefined}>
+            <Text color={focused ? accent : undefined}>
               {focused ? '>' : ' '}{' '}
             </Text>
             {isEditing ? (
               <Box>
-                <Text bold color="cyan">
+                <Text bold color={accent}>
                   {label}:{' '}
                 </Text>
                 <TextInput
@@ -483,10 +491,12 @@ export function Settings() {
                 />
               </Box>
             ) : (
-              <Text bold={focused} color={focused ? 'cyan' : undefined}>
+              <Text bold={focused} color={focused ? accent : undefined}>
                 {label}:{' '}
                 {value || (
-                  <Text dimColor>{required ? '(required)' : '(optional)'}</Text>
+                  <Text dimColor={mutedDim}>
+                    {required ? '(required)' : '(optional)'}
+                  </Text>
                 )}
               </Text>
             )}
@@ -508,10 +518,10 @@ export function Settings() {
               : config.current_iteration;
           return (
             <Box key={item.kind} marginLeft={2}>
-              <Text color={focused ? 'cyan' : undefined}>
+              <Text color={focused ? accent : undefined}>
                 {focused ? '>' : ' '}{' '}
               </Text>
-              <Text bold={focused} color={focused ? 'cyan' : undefined}>
+              <Text bold={focused} color={focused ? accent : undefined}>
                 {label}: {value}
               </Text>
             </Box>
@@ -540,13 +550,15 @@ export function Settings() {
                 : rawCmd;
             return (
               <Box key="branch-command" marginLeft={2}>
-                <Text color={focused ? 'cyan' : undefined}>
+                <Text color={focused ? accent : undefined}>
                   {focused ? '>' : ' '}{' '}
                 </Text>
-                <Text bold={focused} color={focused ? 'cyan' : undefined}>
+                <Text bold={focused} color={focused ? accent : undefined}>
                   Branch command: {truncCmd || '(none)'}
                 </Text>
-                {focused && <Text dimColor> [enter opens $EDITOR]</Text>}
+                {focused && (
+                  <Text dimColor={mutedDim}> [enter opens $EDITOR]</Text>
+                )}
               </Box>
             );
           }
@@ -554,10 +566,10 @@ export function Settings() {
           if (item.kind === 'branch-clipboard-toggle') {
             return (
               <Box key="branch-clipboard-toggle" marginLeft={2}>
-                <Text color={focused ? 'cyan' : undefined}>
+                <Text color={focused ? accent : undefined}>
                   {focused ? '>' : ' '}{' '}
                 </Text>
-                <Text bold={focused} color={focused ? 'cyan' : undefined}>
+                <Text bold={focused} color={focused ? accent : undefined}>
                   Copy to clipboard:{' '}
                   {config?.copyToClipboard !== false ? 'on' : 'off'}
                 </Text>
@@ -569,6 +581,24 @@ export function Settings() {
         })}
       </Box>
 
+      <Box marginTop={1} flexDirection="column">
+        <Text bold>Display:</Text>
+        {navItems.map((item, idx) => {
+          if (item.kind !== 'theme') return null;
+          const focused = idx === cursor;
+          return (
+            <Box key="theme" marginLeft={2}>
+              <Text color={focused ? accent : undefined}>
+                {focused ? '>' : ' '}{' '}
+              </Text>
+              <Text bold={focused} color={focused ? accent : undefined}>
+                Theme: {themeName}
+              </Text>
+            </Box>
+          );
+        })}
+      </Box>
+
       {capabilities.templates && (
         <Box marginTop={1} flexDirection="column">
           <Text bold>Templates:</Text>
@@ -577,10 +607,10 @@ export function Settings() {
             const focused = idx === cursor;
             return (
               <Box key={`tmpl-${item.slug}`} marginLeft={2}>
-                <Text color={focused ? 'cyan' : undefined}>
+                <Text color={focused ? accent : undefined}>
                   {focused ? '>' : ' '}{' '}
                 </Text>
-                <Text bold={focused} color={focused ? 'cyan' : undefined}>
+                <Text bold={focused} color={focused ? accent : undefined}>
                   {item.name}
                 </Text>
               </Box>
@@ -588,7 +618,9 @@ export function Settings() {
           })}
           {templates.length === 0 && (
             <Box marginLeft={2}>
-              <Text dimColor>(no templates — press c to create)</Text>
+              <Text dimColor={mutedDim}>
+                (no templates — press c to create)
+              </Text>
             </Box>
           )}
         </Box>
@@ -597,10 +629,10 @@ export function Settings() {
       <Box marginTop={1} flexDirection="column">
         <Text bold>Updates:</Text>
         <Box marginLeft={2}>
-          <Text dimColor>Current: v{VERSION}</Text>
+          <Text dimColor={mutedDim}>Current: v{VERSION}</Text>
         </Box>
         <Box marginLeft={2}>
-          <Text dimColor>
+          <Text dimColor={mutedDim}>
             Latest:{' '}
             {updateChecking
               ? 'checking...'
@@ -617,10 +649,10 @@ export function Settings() {
           if (item.kind === 'update-now') {
             return (
               <Box key="update-now" marginLeft={2}>
-                <Text color={focused ? 'cyan' : undefined}>
+                <Text color={focused ? accent : undefined}>
                   {focused ? '>' : ' '}{' '}
                 </Text>
-                <Text bold={focused} color={focused ? 'cyan' : 'green'}>
+                <Text bold={focused} color={focused ? accent : success}>
                   Update to v{updateInfo?.latest}
                 </Text>
               </Box>
@@ -630,10 +662,10 @@ export function Settings() {
           if (item.kind === 'update-check') {
             return (
               <Box key="update-check" marginLeft={2}>
-                <Text color={focused ? 'cyan' : undefined}>
+                <Text color={focused ? accent : undefined}>
                   {focused ? '>' : ' '}{' '}
                 </Text>
-                <Text bold={focused} color={focused ? 'cyan' : undefined}>
+                <Text bold={focused} color={focused ? accent : undefined}>
                   {updateChecking ? 'Checking...' : 'Check for updates'}
                 </Text>
               </Box>
@@ -643,10 +675,10 @@ export function Settings() {
           if (item.kind === 'update-toggle') {
             return (
               <Box key="update-toggle" marginLeft={2}>
-                <Text color={focused ? 'cyan' : undefined}>
+                <Text color={focused ? accent : undefined}>
                   {focused ? '>' : ' '}{' '}
                 </Text>
-                <Text bold={focused} color={focused ? 'cyan' : undefined}>
+                <Text bold={focused} color={focused ? accent : undefined}>
                   Auto-check on launch:{' '}
                   {config?.autoUpdate !== false ? 'on' : 'off'}
                 </Text>
@@ -738,8 +770,24 @@ export function Settings() {
         />
       )}
 
+      {activeOverlay?.type === 'theme-picker' && (
+        <OverlayPanel
+          title="Theme"
+          items={Object.keys(themes).map((t) => ({
+            id: t,
+            label: t,
+            value: t,
+          }))}
+          onSelect={(item) => {
+            themeStore.getState().setTheme(item.value);
+            closeOverlay();
+          }}
+          onCancel={() => closeOverlay()}
+        />
+      )}
+
       <Box marginTop={1}>
-        <Text dimColor>
+        <Text dimColor={mutedDim}>
           {capabilities.templates
             ? '↑↓ navigate  enter select  c create template  d delete template  esc back  ? help'
             : '↑↓ navigate  enter select  esc back  ? help'}

@@ -25,6 +25,7 @@ import { Breadcrumbs } from './Breadcrumbs.js';
 import { uiStore } from '../stores/uiStore.js';
 import { undoStore } from '../stores/undoStore.js';
 import { useFormValidation } from '../hooks/useFormValidation.js';
+import { useThemeStore } from '../stores/themeStore.js';
 
 type FieldName =
   | 'title'
@@ -46,6 +47,10 @@ const SELECT_FIELDS: FieldName[] = ['type', 'status', 'iteration', 'priority'];
 const PRIORITIES = ['low', 'medium', 'high', 'critical'];
 
 export function WorkItemForm() {
+  const { accent, success, error, warning, mutedDim } = useThemeStore(
+    (s) => s.colors,
+  );
+
   // Backend data store - grouped selector with shallow comparison
   const {
     backend,
@@ -1039,21 +1044,21 @@ export function WorkItemForm() {
     };
     const formKey = (fieldKeyMap[field] ?? field) as keyof FormFields;
     const dirty = storeIsFieldDirty(formKey);
-    const dirtyIndicator = dirty ? <Text color="yellow"> ●</Text> : null;
+    const dirtyIndicator = dirty ? <Text color={warning}> ●</Text> : null;
 
     if (field === 'comments') {
       return (
         <Box key={field} flexDirection="column">
           <Box>
-            <Text color={focused ? 'cyan' : undefined}>{cursor} </Text>
-            <Text bold={focused} color={focused ? 'cyan' : undefined}>
+            <Text color={focused ? accent : undefined}>{cursor} </Text>
+            <Text bold={focused} color={focused ? accent : undefined}>
               {label}:{dirtyIndicator}
-              {isRequired && <Text dimColor> *</Text>}
+              {isRequired && <Text dimColor={mutedDim}> *</Text>}
             </Text>
           </Box>
           {comments.map((c, ci) => (
             <Box key={ci} marginLeft={4}>
-              <Text dimColor>
+              <Text dimColor={mutedDim}>
                 [{c.date}] {c.author}: {c.body}
               </Text>
             </Box>
@@ -1061,7 +1066,7 @@ export function WorkItemForm() {
           <Box marginLeft={4}>
             {isEditing ? (
               <Box>
-                <Text color="green">New: </Text>
+                <Text color={success}>New: </Text>
                 <TextInput
                   value={newComment}
                   onChange={setNewComment}
@@ -1072,7 +1077,7 @@ export function WorkItemForm() {
                 />
               </Box>
             ) : (
-              <Text dimColor>
+              <Text dimColor={mutedDim}>
                 {newComment
                   ? `New: ${newComment}`
                   : '(press Enter to add comment)'}
@@ -1097,10 +1102,10 @@ export function WorkItemForm() {
         return (
           <Box key={field} flexDirection="column">
             <Box>
-              <Text color="cyan">{cursor} </Text>
-              <Text bold color="cyan">
+              <Text color={accent}>{cursor} </Text>
+              <Text bold color={accent}>
                 {label}:{dirtyIndicator}
-                {isRequired && <Text dimColor> *</Text>}{' '}
+                {isRequired && <Text dimColor={mutedDim}> *</Text>}{' '}
               </Text>
             </Box>
             <Box marginLeft={4}>
@@ -1119,16 +1124,16 @@ export function WorkItemForm() {
       return (
         <Box key={field} flexDirection="column">
           <Box>
-            <Text color={focused ? 'cyan' : undefined}>{cursor} </Text>
-            <Text bold={focused} color={focused ? 'cyan' : undefined}>
+            <Text color={focused ? accent : undefined}>{cursor} </Text>
+            <Text bold={focused} color={focused ? accent : undefined}>
               {label}:{dirtyIndicator}
-              {isRequired && <Text dimColor> *</Text>}{' '}
+              {isRequired && <Text dimColor={mutedDim}> *</Text>}{' '}
             </Text>
             <Text>{currentValue}</Text>
           </Box>
           {validationErrors[field] && (
             <Box marginLeft={4}>
-              <Text color="red">{validationErrors[field]}</Text>
+              <Text color={error}>{validationErrors[field]}</Text>
             </Box>
           )}
         </Box>
@@ -1140,10 +1145,10 @@ export function WorkItemForm() {
         return (
           <Box key={field} flexDirection="column">
             <Box>
-              <Text color="cyan">{cursor} </Text>
-              <Text bold color="cyan">
+              <Text color={accent}>{cursor} </Text>
+              <Text bold color={accent}>
                 {label}:{dirtyIndicator}
-                {isRequired && <Text dimColor> *</Text>}{' '}
+                {isRequired && <Text dimColor={mutedDim}> *</Text>}{' '}
               </Text>
             </Box>
             <Box marginLeft={4}>
@@ -1167,12 +1172,12 @@ export function WorkItemForm() {
 
       return (
         <Box key={field}>
-          <Text color={focused ? 'cyan' : undefined}>{cursor} </Text>
-          <Text bold={focused} color={focused ? 'cyan' : undefined}>
+          <Text color={focused ? accent : undefined}>{cursor} </Text>
+          <Text bold={focused} color={focused ? accent : undefined}>
             {label}:{dirtyIndicator}
-            {isRequired && <Text dimColor> *</Text>}{' '}
+            {isRequired && <Text dimColor={mutedDim}> *</Text>}{' '}
           </Text>
-          <Text>{assignee || <Text dimColor>(empty)</Text>}</Text>
+          <Text>{assignee || <Text dimColor={mutedDim}>(empty)</Text>}</Text>
         </Box>
       );
     }
@@ -1182,10 +1187,10 @@ export function WorkItemForm() {
         return (
           <Box key={field} flexDirection="column">
             <Box>
-              <Text color="cyan">{cursor} </Text>
-              <Text bold color="cyan">
+              <Text color={accent}>{cursor} </Text>
+              <Text bold color={accent}>
                 {label}:{dirtyIndicator}
-                {isRequired && <Text dimColor> *</Text>}{' '}
+                {isRequired && <Text dimColor={mutedDim}> *</Text>}{' '}
               </Text>
             </Box>
             <Box marginLeft={4}>
@@ -1207,7 +1212,7 @@ export function WorkItemForm() {
             </Box>
             {validationErrors['parentId'] && (
               <Box marginLeft={4}>
-                <Text color="red">{validationErrors['parentId']}</Text>
+                <Text color={error}>{validationErrors['parentId']}</Text>
               </Box>
             )}
           </Box>
@@ -1217,16 +1222,16 @@ export function WorkItemForm() {
       return (
         <Box key={field} flexDirection="column">
           <Box>
-            <Text color={focused ? 'cyan' : undefined}>{cursor} </Text>
-            <Text bold={focused} color={focused ? 'cyan' : undefined}>
+            <Text color={focused ? accent : undefined}>{cursor} </Text>
+            <Text bold={focused} color={focused ? accent : undefined}>
               {label}:{dirtyIndicator}
-              {isRequired && <Text dimColor> *</Text>}{' '}
+              {isRequired && <Text dimColor={mutedDim}> *</Text>}{' '}
             </Text>
-            <Text>{parentId || <Text dimColor>(empty)</Text>}</Text>
+            <Text>{parentId || <Text dimColor={mutedDim}>(empty)</Text>}</Text>
           </Box>
           {validationErrors['parentId'] && (
             <Box marginLeft={4}>
-              <Text color="red">{validationErrors['parentId']}</Text>
+              <Text color={error}>{validationErrors['parentId']}</Text>
             </Box>
           )}
         </Box>
@@ -1244,14 +1249,16 @@ export function WorkItemForm() {
       return (
         <Box key={field} flexDirection="column">
           <Box>
-            <Text color={focused ? 'cyan' : undefined}>{cursor} </Text>
-            <Text bold={focused} color={focused ? 'cyan' : undefined}>
+            <Text color={focused ? accent : undefined}>{cursor} </Text>
+            <Text bold={focused} color={focused ? accent : undefined}>
               {label}:{dirtyIndicator}
-              {isRequired && <Text dimColor> *</Text>}{' '}
+              {isRequired && <Text dimColor={mutedDim}> *</Text>}{' '}
             </Text>
             <Text wrap="truncate">
-              {preview || <Text dimColor>(empty)</Text>}
-              {focused && <Text dimColor> [enter opens $EDITOR]</Text>}
+              {preview || <Text dimColor={mutedDim}>(empty)</Text>}
+              {focused && (
+                <Text dimColor={mutedDim}> [enter opens $EDITOR]</Text>
+              )}
             </Text>
           </Box>
         </Box>
@@ -1263,10 +1270,10 @@ export function WorkItemForm() {
         return (
           <Box key={field} flexDirection="column">
             <Box>
-              <Text color="cyan">{cursor} </Text>
-              <Text bold color="cyan">
+              <Text color={accent}>{cursor} </Text>
+              <Text bold color={accent}>
                 {label}:{dirtyIndicator}
-                {isRequired && <Text dimColor> *</Text>}{' '}
+                {isRequired && <Text dimColor={mutedDim}> *</Text>}{' '}
               </Text>
             </Box>
             <Box marginLeft={4}>
@@ -1288,7 +1295,7 @@ export function WorkItemForm() {
             </Box>
             {validationErrors['dependsOn'] && (
               <Box marginLeft={4}>
-                <Text color="red">{validationErrors['dependsOn']}</Text>
+                <Text color={error}>{validationErrors['dependsOn']}</Text>
               </Box>
             )}
           </Box>
@@ -1298,16 +1305,16 @@ export function WorkItemForm() {
       return (
         <Box key={field} flexDirection="column">
           <Box>
-            <Text color={focused ? 'cyan' : undefined}>{cursor} </Text>
-            <Text bold={focused} color={focused ? 'cyan' : undefined}>
+            <Text color={focused ? accent : undefined}>{cursor} </Text>
+            <Text bold={focused} color={focused ? accent : undefined}>
               {label}:{dirtyIndicator}
-              {isRequired && <Text dimColor> *</Text>}{' '}
+              {isRequired && <Text dimColor={mutedDim}> *</Text>}{' '}
             </Text>
-            <Text>{dependsOn || <Text dimColor>(empty)</Text>}</Text>
+            <Text>{dependsOn || <Text dimColor={mutedDim}>(empty)</Text>}</Text>
           </Box>
           {validationErrors['dependsOn'] && (
             <Box marginLeft={4}>
-              <Text color="red">{validationErrors['dependsOn']}</Text>
+              <Text color={error}>{validationErrors['dependsOn']}</Text>
             </Box>
           )}
         </Box>
@@ -1319,10 +1326,10 @@ export function WorkItemForm() {
         return (
           <Box key={field} flexDirection="column">
             <Box>
-              <Text color="cyan">{cursor} </Text>
-              <Text bold color="cyan">
+              <Text color={accent}>{cursor} </Text>
+              <Text bold color={accent}>
                 {label}:{dirtyIndicator}
-                {isRequired && <Text dimColor> *</Text>}{' '}
+                {isRequired && <Text dimColor={mutedDim}> *</Text>}{' '}
               </Text>
             </Box>
             <Box marginLeft={4}>
@@ -1346,12 +1353,12 @@ export function WorkItemForm() {
 
       return (
         <Box key={field}>
-          <Text color={focused ? 'cyan' : undefined}>{cursor} </Text>
-          <Text bold={focused} color={focused ? 'cyan' : undefined}>
+          <Text color={focused ? accent : undefined}>{cursor} </Text>
+          <Text bold={focused} color={focused ? accent : undefined}>
             {label}:{dirtyIndicator}
-            {isRequired && <Text dimColor> *</Text>}{' '}
+            {isRequired && <Text dimColor={mutedDim}> *</Text>}{' '}
           </Text>
-          <Text>{labels || <Text dimColor>(empty)</Text>}</Text>
+          <Text>{labels || <Text dimColor={mutedDim}>(empty)</Text>}</Text>
         </Box>
       );
     }
@@ -1365,10 +1372,10 @@ export function WorkItemForm() {
       return (
         <Box key={field} flexDirection="column">
           <Box>
-            <Text color="cyan">{cursor} </Text>
-            <Text bold color="cyan">
+            <Text color={accent}>{cursor} </Text>
+            <Text bold color={accent}>
               {label}:{dirtyIndicator}
-              {isRequired && <Text dimColor> *</Text>}{' '}
+              {isRequired && <Text dimColor={mutedDim}> *</Text>}{' '}
             </Text>
             <TextInput
               value={textValue}
@@ -1382,7 +1389,7 @@ export function WorkItemForm() {
           </Box>
           {validationErrors['title'] && (
             <Box marginLeft={4}>
-              <Text color="red">{validationErrors['title']}</Text>
+              <Text color={error}>{validationErrors['title']}</Text>
             </Box>
           )}
         </Box>
@@ -1392,16 +1399,16 @@ export function WorkItemForm() {
     return (
       <Box key={field} flexDirection="column">
         <Box>
-          <Text color={focused ? 'cyan' : undefined}>{cursor} </Text>
-          <Text bold={focused} color={focused ? 'cyan' : undefined}>
+          <Text color={focused ? accent : undefined}>{cursor} </Text>
+          <Text bold={focused} color={focused ? accent : undefined}>
             {label}:{dirtyIndicator}
-            {isRequired && <Text dimColor> *</Text>}{' '}
+            {isRequired && <Text dimColor={mutedDim}> *</Text>}{' '}
           </Text>
-          <Text>{textValue || <Text dimColor>(empty)</Text>}</Text>
+          <Text>{textValue || <Text dimColor={mutedDim}>(empty)</Text>}</Text>
         </Box>
         {validationErrors['title'] && (
           <Box marginLeft={4}>
-            <Text color="red">{validationErrors['title']}</Text>
+            <Text color={error}>{validationErrors['title']}</Text>
           </Box>
         )}
       </Box>
@@ -1431,8 +1438,8 @@ export function WorkItemForm() {
 
     return (
       <Box key={field}>
-        <Text color={focused ? 'cyan' : undefined}>{cursor} </Text>
-        <Text bold={focused} color={focused ? 'cyan' : undefined}>
+        <Text color={focused ? accent : undefined}>{cursor} </Text>
+        <Text bold={focused} color={focused ? accent : undefined}>
           #{item.id} ({item.title})
         </Text>
       </Box>
@@ -1478,7 +1485,7 @@ export function WorkItemForm() {
         <Box marginBottom={1}>
           <Text bold>Loading item...</Text>
         </Box>
-        <Text dimColor>esc back ? help</Text>
+        <Text dimColor={mutedDim}>esc back ? help</Text>
       </Box>
     );
   }
@@ -1500,7 +1507,7 @@ export function WorkItemForm() {
   return (
     <Box flexDirection="column">
       <Box marginBottom={1}>
-        <Text bold color="cyan">
+        <Text bold color={accent}>
           {mode}
           {typeLabel ? ` ${typeLabel}` : ''}
           {formMode !== 'template' && selectedWorkItemId !== null
@@ -1527,7 +1534,7 @@ export function WorkItemForm() {
         capabilities.relationships &&
         fields.some((f, i) => f.startsWith('rel-') && isFieldVisible(i)) && (
           <Box flexDirection="column" marginTop={1}>
-            <Text bold dimColor>
+            <Text bold dimColor={mutedDim}>
               Relationships:
             </Text>
 
@@ -1537,7 +1544,7 @@ export function WorkItemForm() {
               ) && (
                 <Box flexDirection="column">
                   <Box marginLeft={2}>
-                    <Text dimColor>Parent:</Text>
+                    <Text dimColor={mutedDim}>Parent:</Text>
                   </Box>
                   {fields.map((field, index) =>
                     field === 'rel-parent' && isFieldVisible(index) ? (
@@ -1554,7 +1561,7 @@ export function WorkItemForm() {
             ) && (
               <Box flexDirection="column">
                 <Box marginLeft={2}>
-                  <Text dimColor>Children:</Text>
+                  <Text dimColor={mutedDim}>Children:</Text>
                 </Box>
                 {fields.map((field, index) =>
                   field.startsWith('rel-child-') && isFieldVisible(index) ? (
@@ -1571,7 +1578,7 @@ export function WorkItemForm() {
             ) && (
               <Box flexDirection="column">
                 <Box marginLeft={2}>
-                  <Text dimColor>Depended on by:</Text>
+                  <Text dimColor={mutedDim}>Depended on by:</Text>
                 </Box>
                 {fields.map((field, index) =>
                   field.startsWith('rel-dependent-') &&
@@ -1592,15 +1599,15 @@ export function WorkItemForm() {
             {selectedWorkItemId !== null || title.trim() ? (
               <Text>
                 Unsaved changes:{' '}
-                <Text color="green" bold>
+                <Text color={success} bold>
                   (s)
                 </Text>
                 <Text>ave </Text>
-                <Text color="red" bold>
+                <Text color={error} bold>
                   (d)
                 </Text>
                 <Text>iscard </Text>
-                <Text color="yellow" bold>
+                <Text color={warning} bold>
                   (esc)
                 </Text>
                 <Text> stay</Text>
@@ -1608,11 +1615,11 @@ export function WorkItemForm() {
             ) : (
               <Text>
                 Discard new item?{' '}
-                <Text color="red" bold>
+                <Text color={error} bold>
                   (d)
                 </Text>
                 <Text>iscard </Text>
-                <Text color="yellow" bold>
+                <Text color={warning} bold>
                   (esc)
                 </Text>
                 <Text> stay</Text>
@@ -1620,7 +1627,7 @@ export function WorkItemForm() {
             )}
           </Text>
         ) : (
-          <Text dimColor>
+          <Text dimColor={mutedDim}>
             {editing
               ? 'enter confirm  esc revert  ? help'
               : isDirty

@@ -136,6 +136,7 @@ export const projectConfig = sqliteTable('project_config', {
     .notNull()
     .default(false),
   defaultView: text('default_view').notNull().default(''),
+  theme: text('theme').notNull().default('default'),
 });
 
 // 9. Statuses

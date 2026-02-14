@@ -37,6 +37,7 @@ import {
 } from '../stores/recentCommandsStore.js';
 import { isSoftDeleteBackend } from '../backends/types.js';
 import { filterStore, useFilterStore } from '../stores/filterStore.js';
+import { useThemeStore } from '../stores/themeStore.js';
 import {
   applyFilters,
   countActiveFilters,
@@ -92,6 +93,15 @@ export function buildHelpText(availableWidth: number): string {
 }
 
 export function WorkItemList() {
+  const {
+    accent,
+    success,
+    error: errorColor,
+    warning: warningColor,
+    marked,
+    mutedDim,
+  } = useThemeStore((s) => s.colors);
+
   // Backend data store - split by change frequency for minimal re-renders
 
   // Rarely changes (individual selectors)
@@ -1282,21 +1292,21 @@ export function WorkItemList() {
     <Box flexDirection="column">
       <Box marginBottom={1}>
         <Text wrap="truncate">
-          <Text bold color="cyan">
+          <Text bold color={accent}>
             {typeLabel} — {iteration}
           </Text>
           <Text
-            dimColor
+            dimColor={mutedDim}
           >{` (${filterCount > 0 ? `${items.length}/${unfilteredCount}` : items.length} item${unfilteredCount === 1 ? '' : 's'})`}</Text>
           {markedCount > 0 && (
-            <Text color="magenta">
+            <Text color={marked}>
               {` ● ${markedCount}`}
               {markedDistribution.above > 0 && ` ↑${markedDistribution.above}`}
               {markedDistribution.below > 0 && ` ↓${markedDistribution.below}`}
             </Text>
           )}
           {filterCount > 0 && (
-            <Text color="yellow">
+            <Text color={warningColor}>
               {` [${filterCount} filter${filterCount === 1 ? '' : 's'}${activeViewName ? `: ${activeViewName}` : ''}]`}
             </Text>
           )}
@@ -1315,16 +1325,16 @@ export function WorkItemList() {
 
       {treeItems.length === 0 && !loading && initError && (
         <Box marginTop={1} flexDirection="column">
-          <Text color="red">Failed to connect to backend:</Text>
+          <Text color={errorColor}>Failed to connect to backend:</Text>
           <Box marginLeft={2}>
-            <Text color="red">{initError}</Text>
+            <Text color={errorColor}>{initError}</Text>
           </Box>
-          <Text dimColor>Press , for settings or q to quit.</Text>
+          <Text dimColor={mutedDim}>Press , for settings or q to quit.</Text>
         </Box>
       )}
       {treeItems.length === 0 && !loading && !initError && (
         <Box marginTop={1}>
-          <Text dimColor>
+          <Text dimColor={mutedDim}>
             No {activeType ?? 'item'}s in this iteration. Press c to create, /
             to search all.
           </Text>
@@ -1332,7 +1342,7 @@ export function WorkItemList() {
       )}
       {loading && treeItems.length === 0 && (
         <Box marginTop={1}>
-          <Text dimColor>Loading...</Text>
+          <Text dimColor={mutedDim}>Loading...</Text>
         </Box>
       )}
 
@@ -1351,8 +1361,8 @@ export function WorkItemList() {
       <Box marginTop={1}>
         {showFullDescription ? (
           <Box>
-            <Text dimColor>↑↓ scroll space/esc close</Text>
-            {positionText && <Text dimColor> {positionText}</Text>}
+            <Text dimColor={mutedDim}>↑↓ scroll space/esc close</Text>
+            {positionText && <Text dimColor={mutedDim}> {positionText}</Text>}
           </Box>
         ) : activeOverlay?.type === 'command-bar' ? (
           <OverlayPanel
@@ -2064,28 +2074,28 @@ export function WorkItemList() {
           />
         ) : toast ? (
           <Box>
-            <Text color="green">{toast.message}</Text>
-            {positionText && <Text dimColor> {positionText}</Text>}
+            <Text color={success}>{toast.message}</Text>
+            {positionText && <Text dimColor={mutedDim}> {positionText}</Text>}
           </Box>
         ) : (
           <Box>
-            <Text dimColor>
+            <Text dimColor={mutedDim}>
               {buildHelpText(
                 terminalWidth - (positionText ? positionText.length + 2 : 0),
               )}
             </Text>
-            {positionText && <Text dimColor> {positionText}</Text>}
+            {positionText && <Text dimColor={mutedDim}> {positionText}</Text>}
           </Box>
         )}
       </Box>
       {warning && (
         <Box>
-          <Text color="yellow">⚠ {warning}</Text>
+          <Text color={warningColor}>⚠ {warning}</Text>
         </Box>
       )}
       {updateInfo?.updateAvailable && activeOverlay === null && (
         <Box>
-          <Text color="yellow">
+          <Text color={warningColor}>
             Update available: {updateInfo.current} → {updateInfo.latest} Press ,
             to update in Settings
           </Text>

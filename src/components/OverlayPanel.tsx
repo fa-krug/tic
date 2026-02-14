@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import { useScrollViewport } from '../hooks/useScrollViewport.js';
+import { useThemeStore } from '../stores/themeStore.js';
 
 export interface OverlayItem {
   id: string;
@@ -176,6 +177,8 @@ export function OverlayPanel({
     if (onQueryChange) onQueryChange(value);
   };
 
+  const { accent, mutedDim } = useThemeStore((s) => s.colors);
+
   const defaultFooter = multiSelect
     ? 'space toggle  enter confirm  esc cancel'
     : '↑↓ navigate  enter select  esc cancel';
@@ -191,11 +194,11 @@ export function OverlayPanel({
     <Box
       flexDirection="column"
       borderStyle="round"
-      borderColor="cyan"
+      borderColor={accent}
       paddingX={1}
     >
       <Box marginBottom={1}>
-        <Text bold color="cyan">
+        <Text bold color={accent}>
           {title}{' '}
         </Text>
         <TextInput
@@ -206,13 +209,15 @@ export function OverlayPanel({
         />
       </Box>
 
-      {flatItems.length === 0 && <Text dimColor>{emptyMessage}</Text>}
+      {flatItems.length === 0 && (
+        <Text dimColor={mutedDim}>{emptyMessage}</Text>
+      )}
 
       {visibleGroups.map((group) => (
         <Box key={group.category || '__default'} flexDirection="column">
           {group.category !== '' && (
             <Box marginTop={1}>
-              <Text dimColor bold>
+              <Text dimColor={mutedDim} bold>
                 {group.category}
               </Text>
             </Box>
@@ -224,7 +229,7 @@ export function OverlayPanel({
 
             return (
               <Box key={item.id}>
-                <Text color={isSelected ? 'cyan' : undefined} bold={isSelected}>
+                <Text color={isSelected ? accent : undefined} bold={isSelected}>
                   {multiSelect
                     ? isToggled
                       ? '☑ '
@@ -235,13 +240,13 @@ export function OverlayPanel({
                 </Text>
                 <Box flexGrow={1}>
                   <Text
-                    color={isSelected ? 'cyan' : undefined}
+                    color={isSelected ? accent : undefined}
                     bold={isSelected}
                   >
                     {item.label}
                   </Text>
                 </Box>
-                {item.hint && <Text dimColor> {item.hint}</Text>}
+                {item.hint && <Text dimColor={mutedDim}> {item.hint}</Text>}
               </Box>
             );
           })}
@@ -249,7 +254,7 @@ export function OverlayPanel({
       ))}
 
       <Box marginTop={1}>
-        <Text dimColor>{footer ?? defaultFooter}</Text>
+        <Text dimColor={mutedDim}>{footer ?? defaultFooter}</Text>
       </Box>
     </Box>
   );

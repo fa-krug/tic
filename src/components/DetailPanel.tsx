@@ -1,20 +1,6 @@
 import { Box, Text } from 'ink';
 import type { WorkItem } from '../types.js';
-
-function priorityColor(
-  priority: string,
-): 'red' | 'yellow' | 'cyan' | undefined {
-  switch (priority) {
-    case 'critical':
-      return 'red';
-    case 'high':
-      return 'yellow';
-    case 'medium':
-      return 'cyan';
-    default:
-      return undefined;
-  }
-}
+import { useThemeStore } from '../stores/themeStore.js';
 
 function priorityIcon(priority: string): string {
   switch (priority) {
@@ -54,6 +40,23 @@ export function DetailPanel({
   descriptionScrollOffset?: number;
   maxDescriptionHeight?: number;
 }) {
+  const { error, warning, info, border, mutedDim } = useThemeStore(
+    (s) => s.colors,
+  );
+
+  function priorityColor(priority: string): string | undefined {
+    switch (priority) {
+      case 'critical':
+        return error;
+      case 'high':
+        return warning;
+      case 'medium':
+        return info;
+      default:
+        return undefined;
+    }
+  }
+
   const metaParts: string[] = [`#${item.id}`, item.status];
   if (item.assignee) {
     metaParts.push(`@${item.assignee}`);
@@ -78,7 +81,7 @@ export function DetailPanel({
     <Box
       flexDirection="column"
       borderStyle="round"
-      borderColor="gray"
+      borderColor={border}
       paddingLeft={1}
       paddingRight={1}
       width={terminalWidth}
@@ -87,7 +90,7 @@ export function DetailPanel({
         {item.title}
       </Text>
       <Box>
-        <Text dimColor>{metaLine}</Text>
+        <Text dimColor={mutedDim}>{metaLine}</Text>
       </Box>
       {hasBottom && (
         <Box>
@@ -97,16 +100,16 @@ export function DetailPanel({
             </Text>
           )}
           {item.priority && item.labels.length > 0 && (
-            <Text dimColor>{'  '}</Text>
+            <Text dimColor={mutedDim}>{'  '}</Text>
           )}
           {item.labels.length > 0 && (
-            <Text dimColor>{item.labels.join(', ')}</Text>
+            <Text dimColor={mutedDim}>{item.labels.join(', ')}</Text>
           )}
         </Box>
       )}
       {hasDescription && !showFullDescription && (
         <Box>
-          <Text dimColor wrap="truncate">
+          <Text dimColor={mutedDim} wrap="truncate">
             {truncateDescription(item.description, contentWidth)}
           </Text>
         </Box>
@@ -114,14 +117,14 @@ export function DetailPanel({
       {showFullDescription && hasDescription && (
         <>
           <Box>
-            <Text dimColor>
+            <Text dimColor={mutedDim}>
               {'─── description '}
               {'─'.repeat(Math.max(0, contentWidth - 17))}
             </Text>
           </Box>
           {visibleLines.map((line, idx) => (
             <Box key={idx}>
-              <Text dimColor>{line || ' '}</Text>
+              <Text dimColor={mutedDim}>{line || ' '}</Text>
             </Box>
           ))}
         </>

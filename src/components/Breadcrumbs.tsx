@@ -1,4 +1,5 @@
 import { Box, Text } from 'ink';
+import { useThemeStore } from '../stores/themeStore.js';
 import { useFormStackStore } from '../stores/formStackStore.js';
 
 interface BreadcrumbsProps {
@@ -6,6 +7,7 @@ interface BreadcrumbsProps {
 }
 
 export function Breadcrumbs({ maxTitleLength = 30 }: BreadcrumbsProps) {
+  const { mutedDim } = useThemeStore((s) => s.colors);
   const stack = useFormStackStore((s) => s.stack);
 
   if (stack.length <= 1) {
@@ -24,7 +26,7 @@ export function Breadcrumbs({ maxTitleLength = 30 }: BreadcrumbsProps) {
           key={draft.itemId ?? `new-${index}`}
           dimColor={index < stack.length - 1}
         >
-          {index > 0 && <Text dimColor> › </Text>}
+          {index > 0 && <Text dimColor={mutedDim}> › </Text>}
           {truncate(draft.itemTitle)}
         </Text>
       ))}

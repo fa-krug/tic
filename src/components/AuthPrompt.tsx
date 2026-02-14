@@ -6,9 +6,16 @@ import {
   backendDataStore,
   useBackendDataStore,
 } from '../stores/backendDataStore.js';
+import { useThemeStore } from '../stores/themeStore.js';
 import { BACKEND_LABELS } from './Header.js';
 
 export function AuthPrompt() {
+  const {
+    accent,
+    error: errorColor,
+    warning: warningColor,
+    mutedDim,
+  } = useThemeStore((s) => s.colors);
   const authPrompt = useBackendDataStore((s) => s.authPrompt);
   const authFlow = useBackendDataStore((s) => s.authFlow);
   const [pat, setPat] = useState('');
@@ -60,7 +67,7 @@ export function AuthPrompt() {
         paddingX={2}
         paddingY={1}
       >
-        <Text bold color="yellow">
+        <Text bold color={warningColor}>
           Enter Azure DevOps PAT
         </Text>
         <Box marginTop={1}>
@@ -78,7 +85,7 @@ export function AuthPrompt() {
           />
         </Box>
         <Box marginTop={1}>
-          <Text dimColor>enter submit esc cancel</Text>
+          <Text dimColor={mutedDim}>enter submit esc cancel</Text>
         </Box>
       </Box>
     );
@@ -96,10 +103,10 @@ export function AuthPrompt() {
           paddingX={2}
           paddingY={1}
         >
-          <Text bold color="yellow">
+          <Text bold color={warningColor}>
             Jira Authentication
           </Text>
-          <Text dimColor>
+          <Text dimColor={mutedDim}>
             Generate a token at
             https://id.atlassian.com/manage-profile/security/api-tokens
           </Text>
@@ -114,7 +121,7 @@ export function AuthPrompt() {
             />
           </Box>
           <Box marginTop={1}>
-            <Text dimColor>enter next esc cancel</Text>
+            <Text dimColor={mutedDim}>enter next esc cancel</Text>
           </Box>
         </Box>
       );
@@ -129,7 +136,7 @@ export function AuthPrompt() {
         paddingX={2}
         paddingY={1}
       >
-        <Text bold color="yellow">
+        <Text bold color={warningColor}>
           Jira Authentication
         </Text>
         <Box marginTop={1}>
@@ -154,7 +161,7 @@ export function AuthPrompt() {
           />
         </Box>
         <Box marginTop={1}>
-          <Text dimColor>enter submit esc cancel</Text>
+          <Text dimColor={mutedDim}>enter submit esc cancel</Text>
         </Box>
       </Box>
     );
@@ -170,13 +177,13 @@ export function AuthPrompt() {
         paddingX={2}
         paddingY={1}
       >
-        <Text bold color="yellow">
+        <Text bold color={warningColor}>
           {backendLabel} Authentication
         </Text>
         <Box marginTop={1} flexDirection="column">
           <Text>
             Visit:{' '}
-            <Text bold color="cyan">
+            <Text bold color={accent}>
               {authFlow.verificationUri}
             </Text>
           </Text>
@@ -188,13 +195,13 @@ export function AuthPrompt() {
           </Text>
         </Box>
         <Box marginTop={1}>
-          <Text color="yellow">
+          <Text color={warningColor}>
             <Spinner type="dots" />
           </Text>
-          <Text dimColor> Waiting for authorization...</Text>
+          <Text dimColor={mutedDim}> Waiting for authorization...</Text>
         </Box>
         <Box marginTop={1}>
-          <Text dimColor>esc skip</Text>
+          <Text dimColor={mutedDim}>esc skip</Text>
         </Box>
       </Box>
     );
@@ -210,14 +217,14 @@ export function AuthPrompt() {
         paddingX={2}
         paddingY={1}
       >
-        <Text bold color="red">
+        <Text bold color={errorColor}>
           Authentication Failed
         </Text>
         <Box marginTop={1}>
-          <Text color="red">{authFlow.error}</Text>
+          <Text color={errorColor}>{authFlow.error}</Text>
         </Box>
         <Box marginTop={1}>
-          <Text dimColor>enter retry esc skip</Text>
+          <Text dimColor={mutedDim}>enter retry esc skip</Text>
         </Box>
       </Box>
     );
@@ -233,17 +240,17 @@ export function AuthPrompt() {
         paddingX={2}
         paddingY={1}
       >
-        <Text bold color="yellow">
+        <Text bold color={warningColor}>
           {backendLabel} Authentication Required
         </Text>
         <Box marginTop={1}>
-          <Text color="yellow">
+          <Text color={warningColor}>
             <Spinner type="dots" />
           </Text>
-          <Text dimColor> Connecting...</Text>
+          <Text dimColor={mutedDim}> Connecting...</Text>
         </Box>
         <Box marginTop={1}>
-          <Text dimColor>esc skip</Text>
+          <Text dimColor={mutedDim}>esc skip</Text>
         </Box>
       </Box>
     );
@@ -258,14 +265,14 @@ export function AuthPrompt() {
       paddingX={2}
       paddingY={1}
     >
-      <Text bold color="yellow">
+      <Text bold color={warningColor}>
         {backendLabel} Authentication Required
       </Text>
       <Box marginTop={1}>
         <Text>{authPrompt.message}</Text>
       </Box>
       <Box marginTop={1}>
-        <Text dimColor>
+        <Text dimColor={mutedDim}>
           enter authenticate
           {authPrompt.backendType === 'azure' && '  p use PAT'} esc skip
           (local-only mode)

@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
+import { useThemeStore } from '../stores/themeStore.js';
 import { useNavigationStore } from '../stores/navigationStore.js';
 import type { BackendCapabilities } from '../backends/types.js';
 import { useScrollViewport } from '../hooks/useScrollViewport.js';
@@ -14,14 +15,27 @@ function CapabilityLine({
   label: string;
   enabled: boolean;
 }) {
+  const { success, mutedDim } = useThemeStore((s) => s.colors);
   return (
     <Text>
-      {enabled ? <Text color="green">✓</Text> : <Text dimColor>✗</Text>} {label}
+      {enabled ? (
+        <Text color={success}>✓</Text>
+      ) : (
+        <Text dimColor={mutedDim}>✗</Text>
+      )}{' '}
+      {label}
     </Text>
   );
 }
 
 export function StatusScreen() {
+  const {
+    accent,
+    success,
+    error: errorColor,
+    warning: warningColor,
+    mutedDim,
+  } = useThemeStore((s) => s.colors);
   const backend = useBackendDataStore((s) => s.backend);
   const syncManager = useBackendDataStore((s) => s.syncManager);
   const navigate = useNavigationStore((s) => s.navigate);
@@ -137,7 +151,7 @@ export function StatusScreen() {
   return (
     <Box flexDirection="column">
       <Box marginBottom={1}>
-        <Text bold color="cyan">
+        <Text bold color={accent}>
           Status
         </Text>
       </Box>
@@ -149,11 +163,11 @@ export function StatusScreen() {
 
       {initError && (
         <Box marginBottom={1} flexDirection="column">
-          <Text bold color="red">
+          <Text bold color={errorColor}>
             Connection Error:
           </Text>
           <Box marginLeft={2}>
-            <Text color="red">{initError}</Text>
+            <Text color={errorColor}>{initError}</Text>
           </Box>
         </Box>
       )}
@@ -197,11 +211,11 @@ export function StatusScreen() {
             <Text>
               State:{' '}
               {syncStatus.state === 'syncing' ? (
-                <Text color="yellow">syncing</Text>
+                <Text color={warningColor}>syncing</Text>
               ) : syncStatus.state === 'error' ? (
-                <Text color="red">error</Text>
+                <Text color={errorColor}>error</Text>
               ) : (
-                <Text color="green">idle</Text>
+                <Text color={success}>idle</Text>
               )}
             </Text>
             <Text>Pending: {syncStatus.pendingCount}</Text>
@@ -218,7 +232,9 @@ export function StatusScreen() {
               <Text bold>Sync Log:</Text>
               {visibleLogEntries.map((entry, idx) => (
                 <Box key={logScrollOffset + idx} marginLeft={2}>
-                  <Text color={entry.result === 'success' ? 'green' : 'red'}>
+                  <Text
+                    color={entry.result === 'success' ? success : errorColor}
+                  >
                     {entry.result === 'success' ? '✓' : '✗'}
                   </Text>
                   <Text>
@@ -230,14 +246,14 @@ export function StatusScreen() {
                       ? ` — ${entry.message}`
                       : ''}
                   </Text>
-                  <Text dimColor>
+                  <Text dimColor={mutedDim}>
                     {' '}
                     {new Date(entry.timestamp).toLocaleTimeString()}
                   </Text>
                 </Box>
               ))}
               {syncLog.length > logViewport.maxVisible && (
-                <Text dimColor>
+                <Text dimColor={mutedDim}>
                   {' '}
                   ↑↓ scroll ({logScrollOffset + 1}-
                   {Math.min(
@@ -252,7 +268,7 @@ export function StatusScreen() {
 
           {errors.length > 0 && (
             <Box marginTop={1} flexDirection="column">
-              <Text bold color="red">
+              <Text bold color={errorColor}>
                 Errors ({errors.length}):
               </Text>
               {visibleErrors.map((err, idx) => (
@@ -261,14 +277,14 @@ export function StatusScreen() {
                   marginLeft={2}
                   flexDirection="column"
                 >
-                  <Text color="red">
+                  <Text color={errorColor}>
                     [{err.entry.action}] #{err.entry.itemId}: {err.message}
                   </Text>
-                  <Text dimColor> {err.timestamp}</Text>
+                  <Text dimColor={mutedDim}> {err.timestamp}</Text>
                 </Box>
               ))}
               {errors.length > viewport.maxVisible && (
-                <Text dimColor>
+                <Text dimColor={mutedDim}>
                   {' '}
                   ↑↓ scroll ({scrollOffset + 1}-
                   {Math.min(scrollOffset + viewport.maxVisible, errors.length)}{' '}
@@ -286,7 +302,7 @@ export function StatusScreen() {
           <Box marginLeft={2}>
             {authDismissed &&
             ['github', 'azure', 'gitlab'].includes(backendType) ? (
-              <Text dimColor>
+              <Text dimColor={mutedDim}>
                 Not available — not authenticated. Run{' '}
                 <Text bold>
                   tic auth login {backendType === 'azure' ? 'ado' : backendType}
@@ -294,7 +310,7 @@ export function StatusScreen() {
                 to authenticate.
               </Text>
             ) : (
-              <Text dimColor>
+              <Text dimColor={mutedDim}>
                 {authDismissed
                   ? 'Not available — not authenticated.'
                   : 'Not available (local-only mode)'}
@@ -305,7 +321,7 @@ export function StatusScreen() {
       )}
 
       <Box marginTop={1}>
-        <Text dimColor>
+        <Text dimColor={mutedDim}>
           {syncManager &&
           (errors.length > 0 || (syncStatus?.pendingCount ?? 0) > 0)
             ? '↑↓ scroll  r retry  esc back  ? help'

@@ -3,6 +3,7 @@ import { Box, Text } from 'ink';
 import type { BackendCapabilities } from '../backends/types.js';
 import type { TreeItem } from './buildTree.js';
 import type { SortEntry } from '../stores/listViewStore.js';
+import { useThemeStore } from '../stores/themeStore.js';
 
 interface ColumnWidths {
   id: number;
@@ -149,18 +150,19 @@ const TableRow = memo(
     capabilities,
     columns,
   }: TableRowProps) {
+    const { accent, accentBg } = useThemeStore((s) => s.colors);
     const { item, prefix, isCrossType } = treeItem;
     const hasUnresolvedDeps = item.dependsOn.length > 0;
     const typeLabel = isCrossType ? ` (${item.type})` : '';
     const dimmed = isCrossType && !selected;
     return (
-      <Box {...(marked && !selected ? { backgroundColor: 'cyan' } : {})}>
+      <Box {...(marked && !selected ? { backgroundColor: accentBg } : {})}>
         <Box width={2}>
-          <Text color="cyan">{selected ? '>' : ' '}</Text>
+          <Text color={accent}>{selected ? '>' : ' '}</Text>
         </Box>
         <Box width={columns.id} overflowX="hidden">
           <Text
-            color={selected ? 'cyan' : undefined}
+            color={selected ? accent : undefined}
             bold={selected}
             dimColor={dimmed}
           >
@@ -169,7 +171,7 @@ const TableRow = memo(
         </Box>
         <Box width={columns.title} marginRight={gap} overflowX="hidden">
           <Text
-            color={selected ? 'cyan' : undefined}
+            color={selected ? accent : undefined}
             bold={selected}
             dimColor={dimmed}
             wrap="truncate"
@@ -183,7 +185,7 @@ const TableRow = memo(
         {columns.showStatus && (
           <Box width={columns.status} marginRight={gap} overflowX="hidden">
             <Text
-              color={selected ? 'cyan' : undefined}
+              color={selected ? accent : undefined}
               bold={selected}
               dimColor={dimmed}
               wrap="truncate"
@@ -196,7 +198,7 @@ const TableRow = memo(
         {columns.showAssignee && (
           <Box width={columns.assignee} marginRight={gap} overflowX="hidden">
             <Text
-              color={selected ? 'cyan' : undefined}
+              color={selected ? accent : undefined}
               bold={selected}
               dimColor={dimmed}
               wrap="truncate"
@@ -212,7 +214,7 @@ const TableRow = memo(
             overflowX="hidden"
           >
             <Text
-              color={selected ? 'cyan' : undefined}
+              color={selected ? accent : undefined}
               bold={selected}
               dimColor={dimmed}
               wrap="truncate"
@@ -224,7 +226,7 @@ const TableRow = memo(
         {columns.showPriority && (
           <Box width={columns.priority} overflowX="hidden">
             <Text
-              color={selected ? 'cyan' : undefined}
+              color={selected ? accent : undefined}
               bold={selected}
               dimColor={dimmed}
               wrap="truncate"
@@ -289,6 +291,7 @@ function TableLayoutInner({
   terminalWidth,
   sortStack,
 }: TableLayoutProps) {
+  const { mutedDim } = useThemeStore((s) => s.colors);
   const ss = sortStack ?? [];
   const columns = useMemo(
     () => computeColumnWidths(treeItems, capabilities, terminalWidth),
@@ -358,7 +361,7 @@ function TableLayoutInner({
         });
         return (
           <Box>
-            <Text dimColor>Sorted by: {parts.join(', ')}</Text>
+            <Text dimColor={mutedDim}>Sorted by: {parts.join(', ')}</Text>
           </Box>
         );
       })()}

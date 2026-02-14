@@ -12,6 +12,7 @@ import { backendDataStore } from './stores/backendDataStore.js';
 import { undoStore } from './stores/undoStore.js';
 import { recentCommandsStore } from './stores/recentCommandsStore.js';
 import { isSoftDeleteBackend } from './backends/types.js';
+import { initThemeFromConfig } from './stores/themeStore.js';
 
 if (process.argv.length > 2) {
   const { runCli } = await import('./cli/index.js');
@@ -28,6 +29,7 @@ if (process.argv.length > 2) {
   }
 
   await configStore.getState().init(cwd);
+  initThemeFromConfig();
 
   // Init is non-blocking - UI renders immediately with loading state
   backendDataStore.getState().init(cwd);

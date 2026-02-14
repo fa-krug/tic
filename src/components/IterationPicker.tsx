@@ -1,5 +1,6 @@
 import { Box, Text, useInput } from 'ink';
 import SelectInput from 'ink-select-input';
+import { useThemeStore } from '../stores/themeStore.js';
 import { useNavigationStore } from '../stores/navigationStore.js';
 import {
   useBackendDataStore,
@@ -7,6 +8,7 @@ import {
 } from '../stores/backendDataStore.js';
 
 export function IterationPicker() {
+  const { mutedDim } = useThemeStore((s) => s.colors);
   const backend = useBackendDataStore((s) => s.backend);
   const navigate = useNavigationStore((s) => s.navigate);
   const navigateToHelp = useNavigationStore((s) => s.navigateToHelp);
@@ -45,7 +47,9 @@ export function IterationPicker() {
         }}
       />
       <Box marginTop={1}>
-        <Text dimColor>{'↑↓ navigate  enter select  esc back  ? help'}</Text>
+        <Text dimColor={mutedDim}>
+          {'↑↓ navigate  enter select  esc back  ? help'}
+        </Text>
       </Box>
     </Box>
   );

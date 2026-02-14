@@ -1,0 +1,1 @@
+ALTER TABLE `project_config` ADD `theme` text DEFAULT 'default' NOT NULL;

@@ -1,5 +1,6 @@
 import { Component, type ReactNode } from 'react';
 import { Box, Text, useInput } from 'ink';
+import { useThemeStore } from '../stores/themeStore.js';
 
 interface Props {
   children: ReactNode;
@@ -16,6 +17,8 @@ function ErrorScreen({
   error: Error;
   onRetry: () => void;
 }) {
+  const { error: errorColor, mutedDim } = useThemeStore((s) => s.colors);
+
   useInput((input) => {
     if (input === 'q') {
       process.exit(1);
@@ -27,12 +30,12 @@ function ErrorScreen({
 
   return (
     <Box flexDirection="column" padding={1}>
-      <Text bold color="red">
+      <Text bold color={errorColor}>
         Something went wrong
       </Text>
       <Text>{error.message}</Text>
       <Box marginTop={1}>
-        <Text dimColor>Press r to retry, q to quit</Text>
+        <Text dimColor={mutedDim}>Press r to retry, q to quit</Text>
       </Box>
     </Box>
   );
