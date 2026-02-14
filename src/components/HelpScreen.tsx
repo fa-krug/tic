@@ -21,6 +21,7 @@ const SCREEN_LABELS: Record<string, string> = {
   list: 'List View',
   form: 'Form View',
   'iteration-picker': 'Iteration Picker',
+  'pr-list': 'Pull Requests',
   settings: 'Settings',
   status: 'Status',
 };
@@ -66,9 +67,7 @@ export function getShortcuts(
       if (capabilities.customTypes) {
         actions.push({ key: 't', description: 'Set type' });
       }
-      if (capabilities.fields.priority) {
-        actions.push({ key: 'P', description: 'Set priority' });
-      }
+      actions.push({ key: 'P', description: 'Pull requests' });
       if (capabilities.fields.assignee) {
         actions.push({ key: 'a', description: 'Set assignee' });
       }
@@ -195,6 +194,18 @@ export function getShortcuts(
               },
             ]
           : []),
+      ];
+    }
+
+    case 'pr-list': {
+      return [
+        {
+          label: 'Navigation',
+          shortcuts: [
+            { key: 'esc', description: 'Back to list' },
+            { key: '?', description: 'Help' },
+          ],
+        },
       ];
     }
 

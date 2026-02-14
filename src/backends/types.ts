@@ -4,6 +4,8 @@ import type {
   NewComment,
   Comment,
   Template,
+  PullRequest,
+  NewPullRequest,
 } from '../types.js';
 import { BackendCache } from './cache.js';
 
@@ -249,4 +251,31 @@ export abstract class BaseBackend implements Backend {
       throw new UnsupportedOperationError(operation, this.constructor.name);
     }
   }
+}
+
+export interface PrCapabilities {
+  pullRequests: boolean;
+  merge: boolean;
+  create: boolean;
+}
+
+export interface PrBackend {
+  getPrCapabilities(): PrCapabilities;
+  listPullRequests(): Promise<PullRequest[]>;
+  getPullRequest(id: string): Promise<PullRequest | null>;
+  createPullRequest(pr: NewPullRequest): Promise<PullRequest>;
+  updatePullRequest(
+    id: string,
+    updates: Partial<NewPullRequest>,
+  ): Promise<PullRequest>;
+  mergePullRequest(id: string): Promise<PullRequest>;
+  closePullRequest(id: string): Promise<PullRequest>;
+  getLinkedPullRequests(itemId: string): Promise<PullRequest[]>;
+  getLinkedItems(prId: string): Promise<string[]>;
+  linkItem(prId: string, itemId: string): Promise<void>;
+  unlinkItem(prId: string, itemId: string): Promise<void>;
+}
+
+export function isPrBackend(backend: Backend): backend is Backend & PrBackend {
+  return 'listPullRequests' in backend;
 }

@@ -13,7 +13,8 @@ import type {
   ItemUpdateOptions,
   ItemCommentOptions,
 } from './commands/item.js';
-import type { WorkItem } from '../types.js';
+import type { WorkItem, PullRequest } from '../types.js';
+import type { PrListOptions, PrCreateOptions } from './commands/pr.js';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -31,6 +32,37 @@ function itemToTsvRow(item: WorkItem): string {
     item.title,
     item.iteration,
   ]);
+}
+
+function prToTsvRow(pr: PullRequest): string {
+  return formatTsvRow([
+    `#${pr.number}`,
+    pr.status,
+    pr.title,
+    `${pr.sourceBranch}\u2192${pr.targetBranch}`,
+    pr.author,
+  ]);
+}
+
+function prToTsvDetail(pr: PullRequest): string {
+  const pairs: [string, string][] = [
+    ['id', pr.id],
+    ['number', String(pr.number)],
+    ['title', pr.title],
+    ['status', pr.status],
+    ['source_branch', pr.sourceBranch],
+    ['target_branch', pr.targetBranch],
+    ['author', pr.author],
+    ['linked_items', pr.linkedItems.join(',')],
+    ['url', pr.url],
+    ['created', pr.created],
+    ['updated', pr.updated],
+  ];
+  let output = formatTsvKeyValue(pairs);
+  if (pr.description) {
+    output += '\n\n' + pr.description;
+  }
+  return output;
 }
 
 function itemToTsvDetail(
@@ -407,6 +439,155 @@ export function createProgram(): Command {
         }
       });
   }
+
+  // tic pr ...
+  const pr = program.command('pr').description('Manage pull requests');
+
+  pr.command('list')
+    .description('List pull requests')
+    .option(
+      '--status <status>',
+      'Filter by status (open, merged, closed, draft)',
+    )
+    .action(async (opts: PrListOptions) => {
+      const parentOpts = program.opts<GlobalOpts>();
+      try {
+        const backend = await createBackend();
+        const { runPrList } = await import('./commands/pr.js');
+        const prs = await runPrList(backend, opts);
+        if (parentOpts.quiet) return;
+        if (parentOpts.json) {
+          console.log(formatJson(prs));
+        } else {
+          for (const p of prs) {
+            console.log(prToTsvRow(p));
+          }
+        }
+      } catch (err) {
+        handleError(err, parentOpts.json);
+      }
+    });
+
+  pr.command('show')
+    .description('Show pull request details')
+    .argument('<id>', 'Pull request ID')
+    .action(async (id: string) => {
+      const parentOpts = program.opts<GlobalOpts>();
+      try {
+        const backend = await createBackend();
+        const { runPrShow } = await import('./commands/pr.js');
+        const p = await runPrShow(backend, id);
+        output(p, () => prToTsvDetail(p), parentOpts);
+      } catch (err) {
+        handleError(err, parentOpts.json);
+      }
+    });
+
+  pr.command('create')
+    .description('Create a pull request')
+    .option('--title <title>', 'PR title')
+    .option('--source <branch>', 'Source branch')
+    .option('--target <branch>', 'Target branch')
+    .option('--link <item-ids>', 'Comma-separated work item IDs to link')
+    .action(async (opts: PrCreateOptions) => {
+      const parentOpts = program.opts<GlobalOpts>();
+      try {
+        const { backend } = await createBackendAndSync();
+        const { runPrCreate } = await import('./commands/pr.js');
+        const p = await runPrCreate(backend, opts);
+        output(p, () => prToTsvRow(p), parentOpts);
+      } catch (err) {
+        handleError(err, parentOpts.json);
+      }
+    });
+
+  pr.command('merge')
+    .description('Merge a pull request')
+    .argument('<id>', 'Pull request ID')
+    .action(async (id: string) => {
+      const parentOpts = program.opts<GlobalOpts>();
+      try {
+        const { backend } = await createBackendAndSync();
+        const { runPrMerge } = await import('./commands/pr.js');
+        const p = await runPrMerge(backend, id);
+        output(p, () => prToTsvRow(p), parentOpts);
+      } catch (err) {
+        handleError(err, parentOpts.json);
+      }
+    });
+
+  pr.command('close')
+    .description('Close a pull request')
+    .argument('<id>', 'Pull request ID')
+    .action(async (id: string) => {
+      const parentOpts = program.opts<GlobalOpts>();
+      try {
+        const { backend } = await createBackendAndSync();
+        const { runPrClose } = await import('./commands/pr.js');
+        const p = await runPrClose(backend, id);
+        output(p, () => prToTsvRow(p), parentOpts);
+      } catch (err) {
+        handleError(err, parentOpts.json);
+      }
+    });
+
+  pr.command('open')
+    .description('Open a pull request in the browser')
+    .argument('<id>', 'Pull request ID')
+    .action(async (id: string) => {
+      const parentOpts = program.opts<GlobalOpts>();
+      try {
+        const backend = await createBackend();
+        const { runPrOpen } = await import('./commands/pr.js');
+        await runPrOpen(backend, id);
+      } catch (err) {
+        handleError(err, parentOpts.json);
+      }
+    });
+
+  pr.command('link')
+    .description('Link a pull request to a work item')
+    .argument('<pr-id>', 'Pull request ID')
+    .argument('<item-id>', 'Work item ID')
+    .action(async (prId: string, itemId: string) => {
+      const parentOpts = program.opts<GlobalOpts>();
+      try {
+        const backend = await createBackend();
+        const { runPrLink } = await import('./commands/pr.js');
+        await runPrLink(backend, prId, itemId);
+        if (!parentOpts.quiet) {
+          if (parentOpts.json) {
+            console.log(formatJson({ linked: { prId, itemId } }));
+          } else {
+            console.log(`Linked PR ${prId} to item ${itemId}`);
+          }
+        }
+      } catch (err) {
+        handleError(err, parentOpts.json);
+      }
+    });
+
+  pr.command('unlink')
+    .description('Unlink a pull request from a work item')
+    .argument('<pr-id>', 'Pull request ID')
+    .argument('<item-id>', 'Work item ID')
+    .action(async (prId: string, itemId: string) => {
+      const parentOpts = program.opts<GlobalOpts>();
+      try {
+        const backend = await createBackend();
+        const { runPrUnlink } = await import('./commands/pr.js');
+        await runPrUnlink(backend, prId, itemId);
+        if (!parentOpts.quiet) {
+          if (parentOpts.json) {
+            console.log(formatJson({ unlinked: { prId, itemId } }));
+          } else {
+            console.log(`Unlinked PR ${prId} from item ${itemId}`);
+          }
+        }
+      } catch (err) {
+        handleError(err, parentOpts.json);
+      }
+    });
 
   // tic iteration ...
   if (!caps || caps.iterations) {

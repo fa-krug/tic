@@ -75,6 +75,8 @@ describe('createDatabase', () => {
     expect(tableNames).toContain('undo_item_snapshot_deps');
     expect(tableNames).toContain('file_sync_state');
     expect(tableNames).toContain('color_mappings');
-    expect(tableNames).toHaveLength(22);
+    expect(tableNames).toContain('pull_requests');
+    expect(tableNames).toContain('pr_item_links');
+    expect(tableNames).toHaveLength(24);
   });
 });

@@ -588,6 +588,10 @@ export function WorkItemList() {
       if (input === 'q') exit();
       if (input === 'i' && capabilities.iterations)
         navigate('iteration-picker');
+      if (input === 'P') {
+        navigate('pr-list');
+        return;
+      }
       if (input === ',') {
         if (updateInfo?.updateAvailable) {
           setSettingsInitialFocus('update-now');
@@ -794,17 +798,6 @@ export function WorkItemList() {
 
       if (input === 'B' && treeItems.length > 0) {
         openOverlay({ type: 'bulk-menu' });
-      }
-
-      if (
-        input === 'P' &&
-        capabilities.fields.priority &&
-        treeItems.length > 0
-      ) {
-        const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
-        if (targetIds.length > 0) {
-          openOverlay({ type: 'priority-picker', targetIds });
-        }
       }
 
       if (
