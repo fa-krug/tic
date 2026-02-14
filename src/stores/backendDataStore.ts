@@ -220,23 +220,28 @@ export const backendDataStore = createStore<BackendDataStoreState>(
 
       try {
         const iter = await currentBackend.getCurrentIteration();
-        const [statuses, iterations, types, assignees, labels, items] =
-          await Promise.all([
-            currentBackend.getStatuses(),
-            currentBackend.getIterations(),
-            currentBackend.getWorkItemTypes(),
-            currentBackend.getAssignees().catch(() => [] as string[]),
-            currentBackend.getLabels().catch(() => [] as string[]),
-            currentBackend.listWorkItems(iter),
-          ]);
+        const [statuses, iterations, types, items] = await Promise.all([
+          currentBackend.getStatuses(),
+          currentBackend.getIterations(),
+          currentBackend.getWorkItemTypes(),
+          currentBackend.listWorkItems(iter),
+        ]);
+
+        // Derive assignees and labels from loaded items
+        const assigneeSet = new Set<string>();
+        const labelSet = new Set<string>();
+        for (const item of items) {
+          if (item.assignee) assigneeSet.add(item.assignee);
+          for (const label of item.labels) labelSet.add(label);
+        }
 
         set({
           capabilities: currentBackend.getCapabilities(),
           statuses,
           iterations,
           types,
-          assignees,
-          labels,
+          assignees: [...assigneeSet].sort(),
+          labels: [...labelSet].sort(),
           currentIteration: iter,
           items,
           error: null,
@@ -258,14 +263,21 @@ export const backendDataStore = createStore<BackendDataStoreState>(
           } else {
             items.push(item);
           }
-          return { items };
+
+          // Re-derive assignees and labels from updated items list
+          const assigneeSet = new Set<string>();
+          const labelSet = new Set<string>();
+          for (const i of items) {
+            if (i.assignee) assigneeSet.add(i.assignee);
+            for (const label of i.labels) labelSet.add(label);
+          }
+
+          return {
+            items,
+            assignees: [...assigneeSet].sort(),
+            labels: [...labelSet].sort(),
+          };
         });
-        // Refresh dynamic lists that may have changed
-        const [assignees, labels] = await Promise.all([
-          currentBackend.getAssignees().catch(() => [] as string[]),
-          currentBackend.getLabels().catch(() => [] as string[]),
-        ]);
-        set({ assignees, labels });
       } catch (e) {
         set({ error: e instanceof Error ? e.message : String(e) });
       }
