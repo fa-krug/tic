@@ -6,6 +6,7 @@ import type { SyncQueueAdapter, SyncStatus } from '../sync/types.js';
 import type { SyncManager } from '../sync/SyncManager.js';
 import { configStore } from './configStore.js';
 import { undoStore } from './undoStore.js';
+import { themeStore } from './themeStore.js';
 
 export const defaultCapabilities: BackendCapabilities = {
   relationships: false,
@@ -112,6 +113,10 @@ async function createBackendAndSync(cwd: string): Promise<{
 
   // Re-read config from DB (may have been loaded with defaults before DB was available)
   await configStore.getState().init(cwd);
+
+  // Load user color overrides for field pills
+  const colorMappings = await primary.getColorMappings();
+  themeStore.getState().loadColorOverrides(colorMappings);
 
   const config = configStore.getState().config;
   const backendType = config.backend ?? 'none';
