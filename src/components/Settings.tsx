@@ -20,7 +20,13 @@ import { OverlayPanel } from './OverlayPanel.js';
 import { openInEditor } from '../editor.js';
 import { defaultConfig } from '../storage/config.js';
 import { useTerminalWidth } from '../hooks/useTerminalWidth.js';
-import { themeStore, useThemeStore, themes } from '../stores/themeStore.js';
+import {
+  themeStore,
+  useThemeStore,
+  themes,
+  autoFg,
+} from '../stores/themeStore.js';
+import type { FieldType } from '../stores/themeStore.js';
 
 type NavItem =
   | { kind: 'backend'; backend: string }
@@ -35,7 +41,11 @@ type NavItem =
   | { kind: 'update-toggle' }
   | { kind: 'branch-command' }
   | { kind: 'branch-clipboard-toggle' }
-  | { kind: 'theme' };
+  | { kind: 'theme' }
+  | { kind: 'color-status' }
+  | { kind: 'color-priority' }
+  | { kind: 'color-type' }
+  | { kind: 'color-label' };
 
 const JIRA_FIELDS = ['site', 'project', 'boardId'] as const;
 
@@ -63,6 +73,7 @@ export function Settings() {
   const { accent, success, mutedDim } = useThemeStore((s) => s.colors);
 
   const queue = useBackendDataStore((s) => s.queue);
+  const storeLabels = useBackendDataStore((s) => s.labels);
 
   const config = useConfigStore((s) => s.config);
   const configLoaded = useConfigStore((s) => s.loaded);
@@ -200,6 +211,10 @@ export function Settings() {
     items.push({ kind: 'branch-command' });
     items.push({ kind: 'branch-clipboard-toggle' });
     items.push({ kind: 'theme' });
+    items.push({ kind: 'color-status' as const });
+    items.push({ kind: 'color-priority' as const });
+    items.push({ kind: 'color-type' as const });
+    items.push({ kind: 'color-label' as const });
     if (capabilities.templates) {
       items.push({ kind: 'template-header' });
       for (const t of templates) {
@@ -357,6 +372,22 @@ export function Settings() {
             .catch(() => {});
         } else if (item.kind === 'theme') {
           openOverlay({ type: 'theme-picker' });
+        } else if (
+          item.kind === 'color-status' ||
+          item.kind === 'color-priority' ||
+          item.kind === 'color-type' ||
+          item.kind === 'color-label'
+        ) {
+          const fieldMap: Record<string, FieldType> = {
+            'color-status': 'status',
+            'color-priority': 'priority',
+            'color-type': 'type',
+            'color-label': 'label',
+          };
+          openOverlay({
+            type: 'color-value-picker',
+            fieldType: fieldMap[item.kind]!,
+          });
         }
       }
 
@@ -442,7 +473,11 @@ export function Settings() {
           item.kind === 'update-now' ||
           item.kind === 'update-check' ||
           item.kind === 'update-toggle' ||
-          item.kind === 'theme'
+          item.kind === 'theme' ||
+          item.kind === 'color-status' ||
+          item.kind === 'color-priority' ||
+          item.kind === 'color-type' ||
+          item.kind === 'color-label'
         ) {
           return null; // rendered separately below
         }
@@ -593,6 +628,36 @@ export function Settings() {
               </Text>
               <Text bold={focused} color={focused ? accent : undefined}>
                 Theme: {themeName}
+              </Text>
+            </Box>
+          );
+        })}
+      </Box>
+
+      <Box marginTop={1} flexDirection="column">
+        <Text bold>Colors:</Text>
+        {navItems.map((item, idx) => {
+          if (
+            item.kind !== 'color-status' &&
+            item.kind !== 'color-priority' &&
+            item.kind !== 'color-type' &&
+            item.kind !== 'color-label'
+          )
+            return null;
+          const focused = idx === cursor;
+          const label: Record<string, string> = {
+            'color-status': 'Status colors',
+            'color-priority': 'Priority colors',
+            'color-type': 'Type colors',
+            'color-label': 'Label colors',
+          };
+          return (
+            <Box key={item.kind} marginLeft={2}>
+              <Text color={focused ? accent : undefined}>
+                {focused ? '>' : ' '}{' '}
+              </Text>
+              <Text bold={focused} color={focused ? accent : undefined}>
+                {label[item.kind]} →
               </Text>
             </Box>
           );
@@ -785,6 +850,173 @@ export function Settings() {
           onCancel={() => closeOverlay()}
         />
       )}
+
+      {activeOverlay?.type === 'color-value-picker' &&
+        (() => {
+          const ft = activeOverlay.fieldType as FieldType;
+          const PRIORITIES = ['critical', 'high', 'medium', 'low'];
+          const values =
+            ft === 'status'
+              ? config.statuses
+              : ft === 'priority'
+                ? PRIORITIES
+                : ft === 'type'
+                  ? config.types
+                  : storeLabels;
+          const overrides = themeStore.getState().colorOverrides[ft] ?? {};
+          const items = [
+            { id: '__reset_all__', label: 'Reset all', value: '__reset_all__' },
+            ...values.map((v) => ({
+              id: v,
+              label: v,
+              value: v,
+              hint: overrides[v.toLowerCase()] ? '(custom)' : undefined,
+            })),
+          ];
+          return (
+            <OverlayPanel
+              title={`${ft.charAt(0).toUpperCase() + ft.slice(1)} Colors`}
+              items={items}
+              fieldType={ft}
+              onSelect={(item) => {
+                if (item.value === '__reset_all__') {
+                  const storage = backend as unknown as {
+                    deleteColorMappingsByField?: (
+                      fieldType: string,
+                    ) => Promise<void>;
+                    getColorMappings?: () => Promise<
+                      {
+                        fieldType: string;
+                        value: string;
+                        bg: string;
+                        fg: string;
+                      }[]
+                    >;
+                  };
+                  if (
+                    storage?.deleteColorMappingsByField &&
+                    storage?.getColorMappings
+                  ) {
+                    void storage
+                      .deleteColorMappingsByField(ft)
+                      .then(() => storage.getColorMappings!())
+                      .then((mappings) => {
+                        themeStore.getState().loadColorOverrides(mappings);
+                      })
+                      .catch(() => {});
+                  }
+                  closeOverlay();
+                } else {
+                  openOverlay({
+                    type: 'color-palette-picker',
+                    fieldType: ft,
+                    value: item.value,
+                  });
+                }
+              }}
+              onCancel={() => closeOverlay()}
+              emptyMessage="(no values configured)"
+            />
+          );
+        })()}
+
+      {activeOverlay?.type === 'color-palette-picker' &&
+        (() => {
+          const ft = activeOverlay.fieldType as FieldType;
+          const val = activeOverlay.value;
+          const TERMINAL_COLORS = [
+            'red',
+            'green',
+            'blue',
+            'magenta',
+            'cyan',
+            'yellow',
+            'gray',
+            'white',
+            'redBright',
+            'greenBright',
+            'blueBright',
+            'magentaBright',
+            'cyanBright',
+            'yellowBright',
+            'grayBright',
+            'whiteBright',
+          ];
+          const items = [
+            {
+              id: '__reset__',
+              label: 'Reset to default',
+              value: '__reset__',
+            },
+            ...TERMINAL_COLORS.map((c) => ({
+              id: c,
+              label: `${val} (${c})`,
+              value: c,
+            })),
+          ];
+          return (
+            <OverlayPanel
+              title={`Pick color for "${val}"`}
+              items={items}
+              fieldType={ft}
+              onSelect={(item) => {
+                const storage = backend as unknown as {
+                  setColorMapping?: (
+                    fieldType: string,
+                    value: string,
+                    bg: string,
+                    fg: string,
+                  ) => Promise<void>;
+                  deleteColorMapping?: (
+                    fieldType: string,
+                    value: string,
+                  ) => Promise<void>;
+                  getColorMappings?: () => Promise<
+                    {
+                      fieldType: string;
+                      value: string;
+                      bg: string;
+                      fg: string;
+                    }[]
+                  >;
+                };
+                if (!storage?.getColorMappings) {
+                  closeOverlay();
+                  return;
+                }
+
+                if (item.value === '__reset__') {
+                  if (storage.deleteColorMapping) {
+                    void storage
+                      .deleteColorMapping(ft, val)
+                      .then(() => storage.getColorMappings!())
+                      .then((mappings) => {
+                        themeStore.getState().loadColorOverrides(mappings);
+                      })
+                      .catch(() => {});
+                  }
+                } else {
+                  const bg = item.value;
+                  const fg = autoFg(bg);
+                  if (storage.setColorMapping) {
+                    void storage
+                      .setColorMapping(ft, val, bg, fg)
+                      .then(() => storage.getColorMappings!())
+                      .then((mappings) => {
+                        themeStore.getState().loadColorOverrides(mappings);
+                      })
+                      .catch(() => {});
+                  }
+                }
+                closeOverlay();
+              }}
+              onCancel={() => {
+                // Go back to value picker
+                openOverlay({ type: 'color-value-picker', fieldType: ft });
+              }}
+            />
+          );
+        })()}
 
       <Box marginTop={1}>
         <Text dimColor={mutedDim}>
