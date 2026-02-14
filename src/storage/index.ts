@@ -1190,4 +1190,51 @@ export class Storage extends BaseBackend implements SoftDeleteBackend {
       .where(eq(schema.templates.slug, slug))
       .run();
   }
+
+  // ── Color Mappings ────────────────────────────────
+
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async getColorMappings(): Promise<
+    { fieldType: string; value: string; bg: string; fg: string }[]
+  > {
+    return this.db.select().from(schema.colorMappings).all();
+  }
+
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async setColorMapping(
+    fieldType: string,
+    value: string,
+    bg: string,
+    fg: string,
+  ): Promise<void> {
+    this.db
+      .insert(schema.colorMappings)
+      .values({ fieldType, value, bg, fg })
+      .onConflictDoUpdate({
+        target: [schema.colorMappings.fieldType, schema.colorMappings.value],
+        set: { bg, fg },
+      })
+      .run();
+  }
+
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async deleteColorMapping(fieldType: string, value: string): Promise<void> {
+    this.db
+      .delete(schema.colorMappings)
+      .where(
+        and(
+          eq(schema.colorMappings.fieldType, fieldType),
+          eq(schema.colorMappings.value, value),
+        ),
+      )
+      .run();
+  }
+
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async deleteColorMappingsByField(fieldType: string): Promise<void> {
+    this.db
+      .delete(schema.colorMappings)
+      .where(eq(schema.colorMappings.fieldType, fieldType))
+      .run();
+  }
 }
