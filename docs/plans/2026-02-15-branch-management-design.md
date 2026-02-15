@@ -29,7 +29,7 @@ Match `tic/{id}-*` pattern against item IDs in `backendDataStore`. Resolved at r
 ## Performance — Two-Phase Loading with Auto-Fetch
 
 1. **Instant first render** — `git branch --format` + `git worktree list --porcelain` are fast (local-only). Show branch names, current branch, worktree status immediately.
-2. **Background fetch** — Kick off `git fetch --all --prune` on screen open. Show "Fetching..." indicator in header.
+2. **Background fetch** — Kick off `git fetch --all --prune` on screen open. Show "Fetching..." status via the existing `Header` component (same pattern as sync status).
 3. **Async remote status** — After fetch completes, query ahead/behind counts via `git for-each-ref --format='%(upstream:track)'` (single command for all branches). Update display.
 4. **Cache within session** — Cache branch list in component state. Re-query git only after an action (delete, merge, switch) or manual refresh (`r`).
 
