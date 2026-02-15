@@ -40,6 +40,7 @@ import {
 } from './pr.js';
 import type { PrCreateOptions } from './pr.js';
 import { isPrBackend } from '../../backends/types.js';
+import { isGitRepo } from '../../git.js';
 
 export interface ToolResult {
   [key: string]: unknown;
@@ -906,6 +907,109 @@ export function registerTools(
       },
       async (args) => {
         return handleGetLinkedPrs(backend, args);
+      },
+    );
+  }
+
+  // Branch tools — available if in a git repo
+  if (isGitRepo(root)) {
+    server.tool(
+      'tic-list_branches',
+      'List git branches with linked work items and worktree status',
+      {},
+      async () => {
+        const items = await backend.listWorkItems();
+        const { runBranchList } = await import('./branch.js');
+        const branches = runBranchList(root, items);
+        return {
+          content: [{ type: 'text', text: JSON.stringify(branches, null, 2) }],
+        };
+      },
+    );
+
+    server.tool(
+      'tic-switch_branch',
+      'Switch to a git branch',
+      {
+        name: z.string().describe('Branch name to switch to'),
+      },
+      async (args) => {
+        const { runBranchSwitch } = await import('./branch.js');
+        const result = runBranchSwitch(args.name, root);
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result) }],
+        };
+      },
+    );
+
+    server.tool(
+      'tic-create_branch',
+      'Create a new git branch',
+      {
+        name: z.string().describe('Branch name to create'),
+      },
+      async (args) => {
+        const { runBranchCreate } = await import('./branch.js');
+        const result = runBranchCreate(args.name, root);
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result) }],
+        };
+      },
+    );
+
+    server.tool(
+      'tic-delete_branch',
+      'Delete a git branch and its worktree if present',
+      {
+        name: z.string().describe('Branch name to delete'),
+        force: z
+          .boolean()
+          .optional()
+          .describe('Force delete if not fully merged'),
+      },
+      async (args) => {
+        const { runBranchDelete } = await import('./branch.js');
+        const result = await runBranchDelete(
+          args.name,
+          root,
+          args.force ?? false,
+        );
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result) }],
+        };
+      },
+    );
+
+    server.tool(
+      'tic-merge_branch',
+      'Merge a git branch into the current branch',
+      {
+        name: z.string().describe('Branch name to merge'),
+      },
+      async (args) => {
+        const { runBranchMerge } = await import('./branch.js');
+        const result = await runBranchMerge(args.name, root);
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result) }],
+        };
+      },
+    );
+
+    server.tool(
+      'tic-push_branch',
+      'Push a git branch to remote',
+      {
+        name: z
+          .string()
+          .optional()
+          .describe('Branch name (defaults to current)'),
+      },
+      async (args) => {
+        const { runBranchPush } = await import('./branch.js');
+        const result = await runBranchPush(args.name, root);
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result) }],
+        };
       },
     );
   }

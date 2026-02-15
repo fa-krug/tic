@@ -22,6 +22,7 @@ const SCREEN_LABELS: Record<string, string> = {
   form: 'Form View',
   'iteration-picker': 'Iteration Picker',
   'pr-list': 'Pull Requests',
+  'branch-list': 'Branches',
   settings: 'Settings',
   status: 'Status',
 };
@@ -72,6 +73,9 @@ export function getShortcuts(
         actions.push({ key: 'g', description: 'Set parent' });
       }
       actions.push({ key: 'P', description: 'Pull requests' });
+      if (gitAvailable) {
+        actions.push({ key: 'B', description: 'Branch management' });
+      }
       if (capabilities.fields.assignee) {
         actions.push({ key: 'a', description: 'Set assignee' });
       }
@@ -208,6 +212,32 @@ export function getShortcuts(
           shortcuts: [
             { key: 'esc', description: 'Back to list' },
             { key: '?', description: 'Help' },
+          ],
+        },
+      ];
+    }
+
+    case 'branch-list': {
+      return [
+        {
+          label: 'Navigation',
+          shortcuts: [
+            { key: 'j/k', description: 'Navigate branches' },
+            { key: 'esc', description: 'Back to list' },
+            { key: '?', description: 'Help' },
+          ],
+        },
+        {
+          label: 'Actions',
+          shortcuts: [
+            { key: 'enter', description: 'Switch to branch' },
+            { key: 'n', description: 'New branch' },
+            { key: 'd', description: 'Delete branch' },
+            { key: 'm', description: 'Merge into current' },
+            { key: 'P', description: 'Push to remote' },
+            { key: 'w', description: 'Open worktree shell' },
+            { key: 'r', description: 'Refresh (re-fetch)' },
+            { key: '/', description: 'Search branches' },
           ],
         },
       ];

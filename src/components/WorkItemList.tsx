@@ -594,6 +594,10 @@ export function WorkItemList() {
         navigate('pr-list');
         return;
       }
+      if (input === 'B' && gitAvailable) {
+        navigate('branch-list');
+        return;
+      }
       if (input === ',') {
         if (updateInfo?.updateAvailable) {
           setSettingsInitialFocus('update-now');

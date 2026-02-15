@@ -589,6 +589,115 @@ export function createProgram(): Command {
       }
     });
 
+  // tic branch ...
+  const branch = program.command('branch').description('Manage git branches');
+
+  branch
+    .command('list')
+    .description('List branches with linked items and worktree status')
+    .action(async () => {
+      const parentOpts = program.opts<GlobalOpts>();
+      try {
+        const backend = await createBackend();
+        const items = await backend.listWorkItems();
+        const { runBranchList } = await import('./commands/branch.js');
+        const branches = runBranchList(process.cwd(), items);
+        if (parentOpts.quiet) return;
+        if (parentOpts.json) {
+          console.log(formatJson(branches));
+        } else {
+          for (const b of branches) {
+            const prefix = b.current ? '* ' : '  ';
+            const item = b.linkedItemId ? ` → #${b.linkedItemId}` : '';
+            const wt = b.worktreePath ? ' [worktree]' : '';
+            console.log(`${prefix}${b.name}${item}${wt}`);
+          }
+        }
+      } catch (err) {
+        handleError(err, parentOpts.json);
+      }
+    });
+
+  branch
+    .command('switch')
+    .description('Switch to a branch')
+    .argument('<name>', 'Branch name')
+    .action(async (name: string) => {
+      const parentOpts = program.opts<GlobalOpts>();
+      try {
+        const { runBranchSwitch } = await import('./commands/branch.js');
+        const result = runBranchSwitch(name, process.cwd());
+        output(result, () => `Switched to ${result.branch}`, parentOpts);
+      } catch (err) {
+        handleError(err, parentOpts.json);
+      }
+    });
+
+  branch
+    .command('create')
+    .description('Create a new branch')
+    .argument('<name>', 'Branch name')
+    .action(async (name: string) => {
+      const parentOpts = program.opts<GlobalOpts>();
+      try {
+        const { runBranchCreate } = await import('./commands/branch.js');
+        const result = runBranchCreate(name, process.cwd());
+        output(result, () => `Created branch ${result.branch}`, parentOpts);
+      } catch (err) {
+        handleError(err, parentOpts.json);
+      }
+    });
+
+  branch
+    .command('delete')
+    .description('Delete a branch (and its worktree if present)')
+    .argument('<name>', 'Branch name')
+    .option('--force', 'Force delete even if not fully merged')
+    .action(async (name: string, opts: { force?: boolean }) => {
+      const parentOpts = program.opts<GlobalOpts>();
+      try {
+        const { runBranchDelete } = await import('./commands/branch.js');
+        const result = await runBranchDelete(
+          name,
+          process.cwd(),
+          opts.force ?? false,
+        );
+        output(result, () => `Deleted branch ${result.branch}`, parentOpts);
+      } catch (err) {
+        handleError(err, parentOpts.json);
+      }
+    });
+
+  branch
+    .command('merge')
+    .description('Merge a branch into the current branch')
+    .argument('<name>', 'Branch name')
+    .action(async (name: string) => {
+      const parentOpts = program.opts<GlobalOpts>();
+      try {
+        const { runBranchMerge } = await import('./commands/branch.js');
+        const result = await runBranchMerge(name, process.cwd());
+        output(result, () => result.message, parentOpts);
+      } catch (err) {
+        handleError(err, parentOpts.json);
+      }
+    });
+
+  branch
+    .command('push')
+    .description('Push a branch to remote')
+    .argument('[name]', 'Branch name (defaults to current)')
+    .action(async (name?: string) => {
+      const parentOpts = program.opts<GlobalOpts>();
+      try {
+        const { runBranchPush } = await import('./commands/branch.js');
+        const result = await runBranchPush(name, process.cwd());
+        output(result, () => `Pushed ${result.branch}`, parentOpts);
+      } catch (err) {
+        handleError(err, parentOpts.json);
+      }
+    });
+
   // tic iteration ...
   if (!caps || caps.iterations) {
     const iteration = program
