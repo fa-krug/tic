@@ -12,6 +12,8 @@ import { configStore, useConfigStore } from '../stores/configStore.js';
 import { uiStore, useUIStore, getOverlayTargetIds } from '../stores/uiStore.js';
 import { getMarkedDistribution } from './getMarkedDistribution.js';
 import { TableLayout } from './TableLayout.js';
+import type { ColumnDef } from './TableLayout.js';
+import { ColorPill } from './ColorPill.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { useScrollViewport } from '../hooks/useScrollViewport.js';
 import {
@@ -33,6 +35,7 @@ import type { WorkItem, Template } from '../types.js';
 import { undoStore } from '../stores/undoStore.js';
 import { CommandBar } from './CommandBar.js';
 import { isSoftDeleteBackend } from '../backends/types.js';
+import type { BackendCapabilities } from '../backends/types.js';
 
 import { filterStore, useFilterStore } from '../stores/filterStore.js';
 import { useThemeStore } from '../stores/themeStore.js';
@@ -46,6 +49,168 @@ import {
 export type { TreeItem } from './buildTree.js';
 
 const EMPTY_VIEWS: SavedView[] = [];
+
+function buildWorkItemColumns(
+  capabilities: BackendCapabilities,
+  collapsedIds: Set<string>,
+  accent: string,
+): ColumnDef<TreeItem>[] {
+  const columns: ColumnDef<TreeItem>[] = [];
+
+  // ID column
+  columns.push({
+    key: 'id',
+    header: 'ID',
+    width: 4, // overridden dynamically via useMemo
+    required: true,
+    sortable: true,
+    render: (ti, selected) => (
+      <Text
+        color={selected ? accent : undefined}
+        bold={selected}
+        dimColor={ti.isCrossType && !selected}
+      >
+        {ti.item.id}
+      </Text>
+    ),
+  });
+
+  // Title column (flex)
+  columns.push({
+    key: 'title',
+    header: 'Title',
+    width: -1,
+    required: true,
+    sortable: true,
+    render: (ti, selected) => {
+      const { item, prefix, isCrossType, hasChildren } = ti;
+      const collapseIndicator = hasChildren
+        ? collapsedIds.has(item.id)
+          ? '\u25B6 '
+          : '\u25BC '
+        : '  ';
+      const typeLabel = isCrossType ? ` (${item.type})` : '';
+      return (
+        <Text
+          color={selected ? accent : undefined}
+          bold={selected}
+          dimColor={isCrossType && !selected}
+          wrap="truncate"
+        >
+          {capabilities.relationships ? prefix : ''}
+          {collapseIndicator}
+          {item.title}
+          {typeLabel}
+        </Text>
+      );
+    },
+  });
+
+  // Status column
+  columns.push({
+    key: 'status',
+    header: 'Status',
+    width: 14,
+    hidePriority: 3,
+    sortable: true,
+    render: (ti, selected) => {
+      const hasUnresolvedDeps = ti.item.dependsOn.length > 0;
+      return (
+        <>
+          {capabilities.fields.dependsOn && hasUnresolvedDeps && (
+            <Text dimColor={ti.isCrossType && !selected}>{'\u29D7'} </Text>
+          )}
+          <ColorPill field="status" value={ti.item.status} />
+        </>
+      );
+    },
+  });
+
+  // Assignee column (conditional)
+  if (capabilities.fields.assignee) {
+    columns.push({
+      key: 'assignee',
+      header: 'Assignee',
+      width: 20,
+      hidePriority: 4,
+      sortable: true,
+      hasData: (items) => items.some(({ item }) => !!item.assignee),
+      render: (ti, selected) => (
+        <Text
+          color={selected ? accent : undefined}
+          bold={selected}
+          dimColor={ti.isCrossType && !selected}
+          wrap="truncate"
+        >
+          {ti.item.assignee}
+        </Text>
+      ),
+    });
+  }
+
+  // Labels column (conditional)
+  if (capabilities.fields.labels) {
+    columns.push({
+      key: 'labels',
+      header: 'Labels',
+      width: 20,
+      hidePriority: 2,
+      hasData: (items) => items.some(({ item }) => item.labels.length > 0),
+      render: (ti) => {
+        const maxWidth = 20;
+        const rendered: string[] = [];
+        let usedWidth = 0;
+        for (const label of ti.item.labels) {
+          const pillWidth = label.length + 2;
+          const needed = usedWidth === 0 ? pillWidth : pillWidth + 1;
+          if (usedWidth + needed > maxWidth) {
+            const remaining = ti.item.labels.length - rendered.length;
+            if (remaining > 0) {
+              return (
+                <Box gap={1}>
+                  {rendered.map((l) => (
+                    <ColorPill key={l} field="label" value={l} />
+                  ))}
+                  <Text dimColor>+{remaining}</Text>
+                </Box>
+              );
+            }
+            break;
+          }
+          rendered.push(label);
+          usedWidth += needed;
+        }
+        return (
+          <Box gap={1}>
+            {rendered.map((l) => (
+              <ColorPill key={l} field="label" value={l} />
+            ))}
+          </Box>
+        );
+      },
+    });
+  }
+
+  // Priority column (conditional)
+  if (capabilities.fields.priority) {
+    columns.push({
+      key: 'priority',
+      header: 'Priority',
+      width: 12,
+      hidePriority: 1,
+      sortable: true,
+      hasData: (items) => items.some(({ item }) => !!item.priority),
+      render: (ti) =>
+        ti.item.priority ? (
+          <ColorPill field="priority" value={ti.item.priority} />
+        ) : (
+          <Text> </Text>
+        ),
+    });
+  }
+
+  return columns;
+}
 
 type BulkAction =
   | 'status'
@@ -1224,6 +1389,16 @@ export function WorkItemList() {
     [treeItems, viewport.start, viewport.end],
   );
 
+  const workItemColumns = useMemo(() => {
+    const maxIdLen = visibleTreeItems.reduce(
+      (max, { item }) => Math.max(max, item.id.length),
+      2,
+    );
+    const cols = buildWorkItemColumns(capabilities, collapsedIds, accent);
+    cols[0]!.width = maxIdLen + 2;
+    return cols;
+  }, [visibleTreeItems, capabilities, collapsedIds, accent]);
+
   const positionText =
     treeItems.length > viewport.maxVisible
       ? `${cursor + 1}/${treeItems.length}`
@@ -1255,12 +1430,12 @@ export function WorkItemList() {
       </Box>
 
       <TableLayout
-        treeItems={visibleTreeItems}
+        items={visibleTreeItems}
+        columns={workItemColumns}
         cursor={viewport.visibleCursor}
-        capabilities={capabilities}
-        collapsedIds={collapsedIds}
-        markedIds={markedIds}
         terminalWidth={terminalWidth}
+        getKey={(ti) => `${ti.item.id}-${ti.item.type}`}
+        isMarked={(ti) => markedIds.has(ti.item.id)}
         sortStack={sortStack}
       />
 

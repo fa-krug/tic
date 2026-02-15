@@ -1,6 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
 import Spinner from 'ink-spinner';
+import { TableLayout } from './TableLayout.js';
+import type { ColumnDef } from './TableLayout.js';
+import type { BranchRow } from '../git.js';
 import { useThemeStore } from '../stores/themeStore.js';
 import {
   navigationStore,
@@ -25,6 +28,7 @@ import {
 } from '../git-async.js';
 import { spawnSync } from 'node:child_process';
 import { CommandBar } from './CommandBar.js';
+import { useTerminalWidth } from '../hooks/useTerminalWidth.js';
 
 type Confirmation =
   | {
@@ -39,6 +43,100 @@ type Confirmation =
 
 type InputMode = 'normal' | 'new-branch';
 
+function relativeTime(isoDate: string): string {
+  if (!isoDate) return '';
+  const diff = Date.now() - new Date(isoDate).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+function buildBranchColumns(
+  accent: string,
+  muted: string | undefined,
+  mutedDim: boolean,
+): ColumnDef<BranchRow>[] {
+  return [
+    {
+      key: 'branch',
+      header: 'Branch',
+      width: -1, // flex
+      required: true,
+      render: (row, selected) => {
+        const isTic = row.branch.name.startsWith('tic/');
+        const prefix = row.branch.current ? '* ' : '  ';
+        return (
+          <Text
+            color={selected ? accent : isTic ? accent : undefined}
+            bold={selected || isTic}
+            wrap="truncate"
+          >
+            {prefix}
+            {row.branch.name}
+          </Text>
+        );
+      },
+    },
+    {
+      key: 'item',
+      header: 'Item',
+      width: 30,
+      hidePriority: 3,
+      render: (row, selected) => {
+        const display = row.linkedItem
+          ? `#${row.linkedItem.id} ${row.linkedItem.title}`
+          : '';
+        return (
+          <Text
+            color={row.linkedItem ? (selected ? undefined : muted) : undefined}
+            dimColor={!row.linkedItem ? mutedDim : undefined}
+            wrap="truncate"
+          >
+            {display}
+          </Text>
+        );
+      },
+    },
+    {
+      key: 'worktree',
+      header: 'Worktree',
+      width: 10,
+      hidePriority: 1,
+      render: (row) => <Text>{row.worktree ? '\u2713' : ''}</Text>,
+    },
+    {
+      key: 'remote',
+      header: 'Remote',
+      width: 10,
+      hidePriority: 2,
+      render: (row) => {
+        if (!row.branch.upstream) return <Text>--</Text>;
+        const parts: string[] = [];
+        if (row.branch.ahead > 0) parts.push(`\u2191${row.branch.ahead}`);
+        if (row.branch.behind > 0) parts.push(`\u2193${row.branch.behind}`);
+        return <Text>{parts.length > 0 ? parts.join(' ') : '\u2713'}</Text>;
+      },
+    },
+    {
+      key: 'time',
+      header: 'Last Commit',
+      width: 10,
+      hidePriority: 0,
+      render: (row, selected) => (
+        <Text
+          color={selected ? undefined : muted}
+          dimColor={!selected ? mutedDim : undefined}
+        >
+          {relativeTime(row.branch.lastCommitDate)}
+        </Text>
+      ),
+    },
+  ];
+}
+
 export function BranchList() {
   const { accent, muted, mutedDim, warning } = useThemeStore((s) => s.colors);
   const navigate = useNavigationStore((s) => s.navigate);
@@ -47,6 +145,11 @@ export function BranchList() {
   const rows = useBackendDataStore((s) => s.branches);
   const fetching = useBackendDataStore((s) => s.branchesLoading);
   const cwd = process.cwd();
+  const termWidth = useTerminalWidth();
+  const branchColumns = useMemo(
+    () => buildBranchColumns(accent, muted, mutedDim),
+    [accent, muted, mutedDim],
+  );
 
   const [cursor, setCursor] = useState(0);
   const [confirmation, setConfirmation] = useState<Confirmation>(null);
@@ -317,18 +420,6 @@ export function BranchList() {
     }
   });
 
-  // --- Time formatting helper ---
-  const relativeTime = (isoDate: string): string => {
-    if (!isoDate) return '';
-    const diff = Date.now() - new Date(isoDate).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 60) return `${mins}m ago`;
-    const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours}h ago`;
-    const days = Math.floor(hours / 24);
-    return `${days}d ago`;
-  };
-
   // --- Render ---
   return (
     <Box flexDirection="column" padding={1}>
@@ -388,107 +479,13 @@ export function BranchList() {
           </Text>
         </Box>
       ) : (
-        <Box flexDirection="column">
-          {/* Header row */}
-          <Box>
-            <Box width={32}>
-              <Text bold color={muted} dimColor={mutedDim}>
-                Branch
-              </Text>
-            </Box>
-            <Box width={30}>
-              <Text bold color={muted} dimColor={mutedDim}>
-                Item
-              </Text>
-            </Box>
-            <Box width={20}>
-              <Text bold color={muted} dimColor={mutedDim}>
-                Worktree
-              </Text>
-            </Box>
-            <Box width={10}>
-              <Text bold color={muted} dimColor={mutedDim}>
-                Remote
-              </Text>
-            </Box>
-            <Box width={10}>
-              <Text bold color={muted} dimColor={mutedDim}>
-                Last Commit
-              </Text>
-            </Box>
-          </Box>
-
-          {/* Data rows */}
-          {rows.map((row, index) => {
-            const isSelected = index === clampedCursor;
-            const isTic = row.branch.name.startsWith('tic/');
-            const prefix = row.branch.current ? '* ' : '  ';
-            const branchDisplay = prefix + row.branch.name;
-            const truncBranch =
-              branchDisplay.length > 30
-                ? branchDisplay.slice(0, 30) + '\u2026'
-                : branchDisplay;
-
-            const itemDisplay = row.linkedItem
-              ? `#${row.linkedItem.id} ${row.linkedItem.title}`
-              : '';
-            const truncItem =
-              itemDisplay.length > 28
-                ? itemDisplay.slice(0, 28) + '\u2026'
-                : itemDisplay;
-
-            const wtDisplay = row.worktree ? '\u2713' : '';
-
-            let remoteDisplay = '--';
-            if (row.branch.upstream) {
-              const parts: string[] = [];
-              if (row.branch.ahead > 0) parts.push(`\u2191${row.branch.ahead}`);
-              if (row.branch.behind > 0)
-                parts.push(`\u2193${row.branch.behind}`);
-              remoteDisplay = parts.length > 0 ? parts.join(' ') : '\u2713';
-            }
-
-            return (
-              <Box key={row.branch.name}>
-                <Box width={32}>
-                  <Text
-                    inverse={isSelected}
-                    bold={isSelected || isTic}
-                    color={isTic && !isSelected ? accent : undefined}
-                  >
-                    {truncBranch}
-                  </Text>
-                </Box>
-                <Box width={30}>
-                  <Text
-                    inverse={isSelected}
-                    color={
-                      row.linkedItem
-                        ? isSelected
-                          ? undefined
-                          : muted
-                        : undefined
-                    }
-                    dimColor={!row.linkedItem ? mutedDim : undefined}
-                  >
-                    {truncItem}
-                  </Text>
-                </Box>
-                <Box width={20}>
-                  <Text inverse={isSelected}>{wtDisplay}</Text>
-                </Box>
-                <Box width={10}>
-                  <Text inverse={isSelected}>{remoteDisplay}</Text>
-                </Box>
-                <Box width={10}>
-                  <Text inverse={isSelected} color={muted} dimColor={mutedDim}>
-                    {relativeTime(row.branch.lastCommitDate)}
-                  </Text>
-                </Box>
-              </Box>
-            );
-          })}
-        </Box>
+        <TableLayout
+          items={rows}
+          columns={branchColumns}
+          cursor={clampedCursor}
+          terminalWidth={termWidth}
+          getKey={(row) => row.branch.name}
+        />
       )}
 
       {/* Toast */}

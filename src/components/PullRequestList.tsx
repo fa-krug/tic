@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { useThemeStore } from '../stores/themeStore.js';
 import {
@@ -9,11 +9,94 @@ import { useBackendDataStore } from '../stores/backendDataStore.js';
 import { uiStore } from '../stores/uiStore.js';
 import { ColorPill } from './ColorPill.js';
 import { CommandBar } from './CommandBar.js';
+import { TableLayout } from './TableLayout.js';
+import type { ColumnDef } from './TableLayout.js';
+import type { PullRequest } from '../types.js';
+import { useTerminalWidth } from '../hooks/useTerminalWidth.js';
 
 const openInBrowser = async (url: string) => {
   const { default: open } = await import('open');
   await open(url);
 };
+
+function buildPrColumns(
+  accent: string,
+  muted: string | undefined,
+  mutedDim: boolean,
+): ColumnDef<PullRequest>[] {
+  return [
+    {
+      key: 'number',
+      header: '#',
+      width: 8,
+      required: true,
+      render: (pr, selected) => (
+        <Text color={selected ? accent : undefined} bold={selected}>
+          #{pr.number}
+        </Text>
+      ),
+    },
+    {
+      key: 'title',
+      header: 'Title',
+      width: -1,
+      required: true,
+      render: (pr, selected) => (
+        <Text
+          color={selected ? accent : undefined}
+          bold={selected}
+          wrap="truncate"
+        >
+          {pr.title}
+        </Text>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      width: 12,
+      hidePriority: 3,
+      render: (pr) => <ColorPill field="status" value={pr.status} />,
+    },
+    {
+      key: 'branches',
+      header: 'Branches',
+      width: 30,
+      hidePriority: 2,
+      render: (pr, selected) => (
+        <Text
+          color={selected ? undefined : muted}
+          dimColor={!selected ? mutedDim : undefined}
+          wrap="truncate"
+        >
+          {pr.sourceBranch} \u2192 {pr.targetBranch}
+        </Text>
+      ),
+    },
+    {
+      key: 'author',
+      header: 'Author',
+      width: 16,
+      hidePriority: 1,
+      render: (pr, selected) => (
+        <Text color={selected ? accent : undefined} wrap="truncate">
+          {pr.author}
+        </Text>
+      ),
+    },
+    {
+      key: 'links',
+      header: 'Links',
+      width: 6,
+      hidePriority: 0,
+      render: (pr) => (
+        <Text>
+          {pr.linkedItems.length > 0 ? String(pr.linkedItems.length) : ''}
+        </Text>
+      ),
+    },
+  ];
+}
 
 export function PullRequestList() {
   const { accent, muted, mutedDim } = useThemeStore((s) => s.colors);
@@ -22,8 +105,13 @@ export function PullRequestList() {
   const selectedPrId = useNavigationStore((s) => s.selectedPrId);
   const pullRequests = useBackendDataStore((s) => s.pullRequests);
 
+  const termWidth = useTerminalWidth();
   const [cursor, setCursor] = useState(0);
   const { activeOverlay, openOverlay, closeOverlay } = uiStore.getState();
+  const prColumns = useMemo(
+    () => buildPrColumns(accent, muted, mutedDim),
+    [accent, muted, mutedDim],
+  );
 
   // Set initial cursor from navigation
   useEffect(() => {
@@ -97,88 +185,13 @@ export function PullRequestList() {
           </Text>
         </Box>
       ) : (
-        <Box flexDirection="column">
-          {/* Header row */}
-          <Box>
-            <Box width={8}>
-              <Text bold color={muted} dimColor={mutedDim}>
-                #
-              </Text>
-            </Box>
-            <Box width={40}>
-              <Text bold color={muted} dimColor={mutedDim}>
-                Title
-              </Text>
-            </Box>
-            <Box width={12}>
-              <Text bold color={muted} dimColor={mutedDim}>
-                Status
-              </Text>
-            </Box>
-            <Box width={30}>
-              <Text bold color={muted} dimColor={mutedDim}>
-                Branches
-              </Text>
-            </Box>
-            <Box width={16}>
-              <Text bold color={muted} dimColor={mutedDim}>
-                Author
-              </Text>
-            </Box>
-            <Box width={6}>
-              <Text bold color={muted} dimColor={mutedDim}>
-                Links
-              </Text>
-            </Box>
-          </Box>
-
-          {/* Data rows */}
-          {pullRequests.map((pr, index) => {
-            const isSelected = index === clampedCursor;
-            const title =
-              pr.title.length > 37 ? pr.title.slice(0, 37) + '...' : pr.title;
-            const branches = `${pr.sourceBranch} → ${pr.targetBranch}`;
-            const branchesDisplay =
-              branches.length > 27 ? branches.slice(0, 27) + '...' : branches;
-
-            return (
-              <Box key={pr.id}>
-                <Box width={8}>
-                  <Text inverse={isSelected} bold={isSelected}>
-                    #{pr.number}
-                  </Text>
-                </Box>
-                <Box width={40}>
-                  <Text inverse={isSelected} bold={isSelected}>
-                    {title}
-                  </Text>
-                </Box>
-                <Box width={12}>
-                  {isSelected ? (
-                    <Text inverse>{pr.status}</Text>
-                  ) : (
-                    <ColorPill field="status" value={pr.status} />
-                  )}
-                </Box>
-                <Box width={30}>
-                  <Text inverse={isSelected} color={muted} dimColor={mutedDim}>
-                    {branchesDisplay}
-                  </Text>
-                </Box>
-                <Box width={16}>
-                  <Text inverse={isSelected}>{pr.author}</Text>
-                </Box>
-                <Box width={6}>
-                  <Text inverse={isSelected}>
-                    {pr.linkedItems.length > 0
-                      ? String(pr.linkedItems.length)
-                      : ''}
-                  </Text>
-                </Box>
-              </Box>
-            );
-          })}
-        </Box>
+        <TableLayout
+          items={pullRequests}
+          columns={prColumns}
+          cursor={clampedCursor}
+          terminalWidth={termWidth}
+          getKey={(pr) => pr.id}
+        />
       )}
 
       {/* Footer keybinding hints */}
