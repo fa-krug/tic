@@ -59,6 +59,7 @@ The app uses screen-based routing via React Context (`AppContext` in `src/app.ts
 - `status` — sync status and error details
 - `help` — context-sensitive keyboard shortcut reference
 - `pr-list` — pull request list (when backend supports PRs)
+- `branch-list` — branch management (list, switch, create, delete, merge, push)
 
 ### Backend Abstraction
 
@@ -98,6 +99,7 @@ The app uses screen-based routing via React Context (`AppContext` in `src/app.ts
 - **AutocompleteInput** (`src/components/AutocompleteInput.tsx`) — single-value fuzzy autocomplete input.
 - **MultiAutocompleteInput** (`src/components/MultiAutocompleteInput.tsx`) — comma-separated multi-value autocomplete (used for labels).
 - **PullRequestList** (`src/components/PullRequestList.tsx`) — list view for pull requests. Shows PR number, title, status, branches, and author. Supports navigation, browser opening, and linking/unlinking work items.
+- **BranchList** (`src/components/BranchList.tsx`) — branch lifecycle management. Lists branches with linked work items, worktree status, remote tracking, and commit times. Supports switch, create, delete, merge, push, worktree shell, search, and background fetch.
 - **TableLayout** (`src/components/TableLayout.tsx`) — list rendering with responsive column visibility based on terminal width.
 - **Header** (`src/components/Header.tsx`) — top-level header bar.
 
@@ -117,7 +119,7 @@ State is managed via Zustand vanilla stores in `src/stores/`:
 
 ### CLI
 
-`src/cli/index.ts` defines the CLI commands using Commander. Commands include `init`, `item` (list/show/create/update/delete/open/comment), `pr` (list/show/create/merge/close/open/link/unlink), `iteration` (list/set), `config` (get/set), `auth` (login/status/logout), and `mcp serve`. Global options: `--json`, `--quiet`.
+`src/cli/index.ts` defines the CLI commands using Commander. Commands include `init`, `item` (list/show/create/update/delete/open/comment), `pr` (list/show/create/merge/close/open/link/unlink), `branch` (list/switch/create/delete/merge/push), `iteration` (list/set), `config` (get/set), `auth` (login/status/logout), and `mcp serve`. Global options: `--json`, `--quiet`.
 
 ### Authentication
 

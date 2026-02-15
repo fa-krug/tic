@@ -25,6 +25,7 @@ Built with TypeScript and [Ink](https://github.com/vadimdemedes/ink).
 - **External editor** — edit descriptions in your `$EDITOR` (falls back to vi)
 - **Settings screen** — switch backends and configure Jira connection from within the TUI
 - **Pull requests** — view, create, merge, and close PRs from the TUI (GitHub backend); link PRs to work items
+- **Branch management** — list, switch, create, delete, merge, and push branches from the TUI; linked work items shown for `tic/` branches; worktree support
 - **MCP server** — expose work items to AI assistants via the Model Context Protocol
 
 ## Installation
@@ -80,8 +81,9 @@ The main screen shows work items filtered by type and iteration, displayed as a 
 | `p` | Create pull request for selected item |
 | `m` | Toggle mark on current item |
 | `M` | Clear all marks |
-| `B` | Bulk actions menu |
+| `x` | Bulk actions menu |
 | `P` | Pull request list |
+| `B` | Branch management |
 | `a` | Set assignee (single or marked items) |
 | `l` | Set labels (single or marked items) |
 | `t` | Set type (single or marked items) |
@@ -159,6 +161,7 @@ That's it. The plugin installs tic automatically on first use.
 - Navigate parent-child hierarchies and dependencies
 - Add comments and manage iterations
 - Manage pull requests (list, create, merge, close, link to items)
+- Manage git branches (list, switch, create, delete, merge, push)
 - Initialize tic in new projects
 
 The plugin auto-detects your backend (GitHub, GitLab, Azure DevOps, Jira, or local) and adapts to its capabilities.
@@ -203,6 +206,12 @@ tic pr close 123                     # Close a PR
 tic pr open 123                      # Open PR in browser
 tic pr link 123 42                   # Link PR to work item
 tic pr unlink 123 42                 # Unlink PR from work item
+tic branch list                      # List branches with linked items
+tic branch switch feat/branch        # Switch to a branch
+tic branch create feat/new           # Create a new branch
+tic branch delete feat/old           # Delete a branch (and its worktree)
+tic branch merge feat/branch         # Merge into current branch
+tic branch push                      # Push current branch to remote
 ```
 
 Add `--json` to any command for machine-readable output, or `--quiet` to suppress non-essential output.
