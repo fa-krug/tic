@@ -13,7 +13,7 @@ export interface OverlayItem {
   hint?: string;
   category?: string;
   selected?: boolean;
-  kind?: 'command' | 'issue';
+  kind?: 'command' | 'issue' | 'pr' | 'branch';
 }
 
 export interface OverlayItemGroup {

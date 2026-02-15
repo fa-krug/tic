@@ -31,10 +31,7 @@ import { OverlayPanel, type OverlayItem } from './OverlayPanel.js';
 import { DetailPanel } from './DetailPanel.js';
 import type { WorkItem, Template } from '../types.js';
 import { undoStore } from '../stores/undoStore.js';
-import {
-  recentCommandsStore,
-  useRecentCommandsStore,
-} from '../stores/recentCommandsStore.js';
+import { CommandBar } from './CommandBar.js';
 import { isSoftDeleteBackend } from '../backends/types.js';
 
 import { filterStore, useFilterStore } from '../stores/filterStore.js';
@@ -196,11 +193,9 @@ export function WorkItemList() {
   } = listViewStore.getState();
 
   // Local state for inputs and templates
-  const [allSearchItems, setAllSearchItems] = useState<WorkItem[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [descriptionScrollOffset, setDescriptionScrollOffset] = useState(0);
-  const [commandBarQuery, setCommandBarQuery] = useState('');
 
   // UI overlay state from store
   const { activeOverlay, warning, toast } = useUIStore(
@@ -398,26 +393,6 @@ export function WorkItemList() {
     setShowFullDescription(false);
     setDescriptionScrollOffset(0);
   }, [cursor]);
-
-  useEffect(() => {
-    if (activeOverlay?.type !== 'command-bar' || !backend) return;
-    let cancelled = false;
-    void backend
-      .listWorkItems()
-      .then((items) => {
-        if (!cancelled) setAllSearchItems(items);
-      })
-      .catch((err: unknown) => {
-        uiStore
-          .getState()
-          .setToast(
-            err instanceof Error ? err.message : 'Failed to load items',
-          );
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [activeOverlay?.type, backend]);
 
   // Description viewport calculation
   const currentItem = treeItems[cursor]?.item;
@@ -870,13 +845,6 @@ export function WorkItemList() {
     { isActive: activeOverlay === null && !showFullDescription },
   );
 
-  const handleSearchSelect = (item: WorkItem) => {
-    setCommandBarQuery('');
-    closeOverlay();
-    selectWorkItem(item.id);
-    navigate('form');
-  };
-
   const commandContext: CommandContext = {
     screen: 'list',
     markedCount: markedIds.size,
@@ -902,66 +870,6 @@ export function WorkItemList() {
       gitAvailable,
     ],
   );
-
-  const recentIds = useRecentCommandsStore((s) => s.recentIds);
-
-  const commandBarItems: OverlayItem[] = useMemo(() => {
-    const query = commandBarQuery.toLowerCase();
-
-    // Build command items (recent + categorized)
-    const commandMap = new Map(paletteCommands.map((c) => [c.id, c]));
-    const recentItems: OverlayItem[] = [];
-    for (const id of recentIds) {
-      const cmd = commandMap.get(id);
-      if (cmd) {
-        recentItems.push({
-          id: `recent-${cmd.id}`,
-          label: cmd.label,
-          value: cmd.id,
-          category: 'Recent',
-          kind: 'command',
-        });
-      }
-    }
-
-    const commandItems: OverlayItem[] = paletteCommands.map((cmd) => ({
-      id: cmd.id,
-      label: cmd.label,
-      value: cmd.id,
-      category: cmd.category,
-      kind: 'command' as const,
-    }));
-
-    let allItems = [...recentItems, ...commandItems];
-
-    // Filter commands by query
-    if (query) {
-      allItems = allItems.filter((item) =>
-        item.label.toLowerCase().includes(query),
-      );
-
-      // Add up to 5 matching issues
-      const matchingIssues = allSearchItems
-        .filter(
-          (item) =>
-            item.title.toLowerCase().includes(query) ||
-            item.id.toLowerCase().includes(query),
-        )
-        .slice(0, 5)
-        .map((item) => ({
-          id: `issue-${item.id}`,
-          label: `#${item.id} ${item.title}`,
-          value: item.id,
-          hint: item.type,
-          category: 'Issues',
-          kind: 'issue' as const,
-        }));
-
-      allItems = [...allItems, ...matchingIssues];
-    }
-
-    return allItems;
-  }, [paletteCommands, recentIds, commandBarQuery, allSearchItems]);
 
   const sortPickerItems: OverlayItem[] = useMemo(() => {
     const columns: { column: SortColumn; label: string }[] = [
@@ -1111,9 +1019,7 @@ export function WorkItemList() {
   }, [savedViews, defaultView, activeViewName, lastViewName, filterCount]);
 
   const handleCommandSelect = (command: Command) => {
-    setCommandBarQuery('');
     closeOverlay();
-    recentCommandsStore.getState().addRecent(command.id);
     switch (command.id) {
       case 'create':
         selectWorkItem(null);
@@ -1400,27 +1306,10 @@ export function WorkItemList() {
             {positionText && <Text dimColor={mutedDim}> {positionText}</Text>}
           </Box>
         ) : activeOverlay?.type === 'command-bar' ? (
-          <OverlayPanel
-            title="Commands"
-            items={commandBarItems}
-            placeholder="Type to search..."
-            externalFilter
-            onQueryChange={setCommandBarQuery}
-            onSelect={(item) => {
-              if (item.kind === 'issue') {
-                const workItem = allSearchItems.find(
-                  (i) => i.id === item.value,
-                );
-                if (workItem) handleSearchSelect(workItem);
-              } else {
-                const cmd = paletteCommands.find((c) => c.id === item.value);
-                if (cmd) handleCommandSelect(cmd);
-              }
-            }}
-            onCancel={() => {
-              setCommandBarQuery('');
-              closeOverlay();
-            }}
+          <CommandBar
+            commands={paletteCommands}
+            onCommand={handleCommandSelect}
+            onCancel={closeOverlay}
           />
         ) : activeOverlay?.type === 'bulk-menu' ? (
           (() => {

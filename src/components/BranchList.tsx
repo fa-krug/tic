@@ -1,34 +1,30 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import Spinner from 'ink-spinner';
 import { useThemeStore } from '../stores/themeStore.js';
-import { useNavigationStore } from '../stores/navigationStore.js';
-import { useBackendDataStore } from '../stores/backendDataStore.js';
 import {
-  listBranches,
-  listWorktrees,
+  navigationStore,
+  useNavigationStore,
+} from '../stores/navigationStore.js';
+import {
+  backendDataStore,
+  useBackendDataStore,
+} from '../stores/backendDataStore.js';
+import { uiStore } from '../stores/uiStore.js';
+import {
   getCurrentBranch,
   checkoutBranch,
   hasUncommittedChanges,
   createBranch,
-  type BranchInfo,
-  type WorktreeInfo,
 } from '../git.js';
 import {
   deleteBranch,
   mergeBranch,
   removeWorktree,
-  fetchAll,
   pushBranch,
 } from '../git-async.js';
-import { linkBranchToItem } from '../branch-links.js';
 import { spawnSync } from 'node:child_process';
-
-interface BranchRow {
-  branch: BranchInfo;
-  linkedItem: { id: string; title: string } | null;
-  worktree: WorktreeInfo | null;
-}
+import { CommandBar } from './CommandBar.js';
 
 type Confirmation =
   | {
@@ -41,81 +37,41 @@ type Confirmation =
   | { type: 'force-delete'; branch: string; worktreePath: string | null }
   | null;
 
-type InputMode = 'normal' | 'new-branch' | 'search';
+type InputMode = 'normal' | 'new-branch';
 
 export function BranchList() {
   const { accent, muted, mutedDim, warning } = useThemeStore((s) => s.colors);
   const navigate = useNavigationStore((s) => s.navigate);
   const navigateToHelp = useNavigationStore((s) => s.navigateToHelp);
-  const items = useBackendDataStore((s) => s.items);
+  const selectedBranchName = useNavigationStore((s) => s.selectedBranchName);
+  const rows = useBackendDataStore((s) => s.branches);
+  const fetching = useBackendDataStore((s) => s.branchesLoading);
   const cwd = process.cwd();
 
-  const [rows, setRows] = useState<BranchRow[]>([]);
   const [cursor, setCursor] = useState(0);
-  const [fetching, setFetching] = useState(false);
   const [confirmation, setConfirmation] = useState<Confirmation>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [inputMode, setInputMode] = useState<InputMode>('normal');
   const [inputValue, setInputValue] = useState('');
-  const [filterText, setFilterText] = useState('');
+  const { activeOverlay, openOverlay, closeOverlay } = uiStore.getState();
 
-  const loadBranches = useCallback(() => {
-    const branches = listBranches(cwd);
-    const worktrees = listWorktrees(cwd);
-
-    const branchRows: BranchRow[] = branches.map((b) => {
-      const linked = linkBranchToItem(b.name, items);
-      const wt = worktrees.find((w) => w.branch === b.name) ?? null;
-      return {
-        branch: b,
-        linkedItem: linked ? { id: linked.id, title: linked.title } : null,
-        worktree: wt,
-      };
-    });
-
-    // Sort: current branch first, then tic/ branches, then alphabetical
-    branchRows.sort((a, b) => {
-      if (a.branch.current !== b.branch.current)
-        return a.branch.current ? -1 : 1;
-      const aIsTic = a.branch.name.startsWith('tic/');
-      const bIsTic = b.branch.name.startsWith('tic/');
-      if (aIsTic !== bIsTic) return aIsTic ? -1 : 1;
-      return a.branch.name.localeCompare(b.branch.name);
-    });
-
-    setRows(branchRows);
-  }, [cwd, items]);
-
-  // Initial load + background fetch
+  // Trigger background fetch on mount
   useEffect(() => {
-    loadBranches();
-    setFetching(true);
-    fetchAll(cwd)
-      .then(() => {
-        loadBranches(); // reload with updated remote info
-      })
-      .catch(() => {
-        // fetch failed (no remote, offline, etc) — ignore
-      })
-      .finally(() => {
-        setFetching(false);
-      });
-  }, [cwd, loadBranches]);
+    backendDataStore.getState().refreshBranches();
+  }, []);
 
-  // Filtered rows
-  const filteredRows = useMemo(() => {
-    if (!filterText) return rows;
-    const lower = filterText.toLowerCase();
-    return rows.filter(
-      (r) =>
-        r.branch.name.toLowerCase().includes(lower) ||
-        r.linkedItem?.title.toLowerCase().includes(lower),
-    );
-  }, [rows, filterText]);
+  // Set initial cursor from navigation
+  useEffect(() => {
+    if (selectedBranchName) {
+      const idx = rows.findIndex((r) => r.branch.name === selectedBranchName);
+      if (idx >= 0) setCursor(idx);
+      navigationStore.getState().selectBranch(null);
+    }
+  }, [selectedBranchName, rows]);
 
   // Clamp cursor
-  const clampedCursor = Math.max(0, Math.min(cursor, filteredRows.length - 1));
-  if (clampedCursor !== cursor && filteredRows.length > 0) {
+  const clampedCursor = Math.max(0, Math.min(cursor, rows.length - 1));
+  if (clampedCursor !== cursor && rows.length > 0) {
     setCursor(clampedCursor);
   }
 
@@ -127,10 +83,13 @@ export function BranchList() {
   }, [toastMessage]);
 
   const showToast = (msg: string) => setToastMessage(msg);
+  const reloadBranches = () => backendDataStore.getState().loadBranches();
 
-  const currentRow = filteredRows[clampedCursor];
+  const currentRow = rows[clampedCursor];
 
   useInput((input, key) => {
+    if (activeOverlay) return;
+
     // --- Confirmation mode ---
     if (confirmation) {
       if (input === 'y' || input === 'Y') {
@@ -145,7 +104,7 @@ export function BranchList() {
               }
               await deleteBranch(conf.branch, cwd, force);
               showToast(`Deleted ${conf.branch}`);
-              loadBranches();
+              reloadBranches();
             } else if (conf.type === 'merge') {
               const result = await mergeBranch(conf.branch, cwd);
               if (result.success) {
@@ -165,7 +124,7 @@ export function BranchList() {
               } else {
                 showToast(`Merge failed: ${result.message}`);
               }
-              loadBranches();
+              reloadBranches();
             }
           } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : String(err);
@@ -193,12 +152,11 @@ export function BranchList() {
       return; // block other input during confirmation
     }
 
-    // --- Input modes (new branch name, search) ---
+    // --- Input mode (new branch name) ---
     if (inputMode !== 'normal') {
       if (key.escape) {
         setInputMode('normal');
         setInputValue('');
-        if (inputMode === 'search') setFilterText('');
         return;
       }
       if (key.return) {
@@ -206,15 +164,12 @@ export function BranchList() {
           try {
             createBranch(inputValue.trim(), cwd);
             showToast(`Created branch ${inputValue.trim()}`);
-            loadBranches();
+            reloadBranches();
           } catch (err: unknown) {
             showToast(
               err instanceof Error ? err.message : 'Failed to create branch',
             );
           }
-        }
-        if (inputMode === 'search') {
-          setFilterText(inputValue);
         }
         setInputMode('normal');
         setInputValue('');
@@ -222,12 +177,10 @@ export function BranchList() {
       }
       if (key.backspace || key.delete) {
         setInputValue((v) => v.slice(0, -1));
-        if (inputMode === 'search') setFilterText(inputValue.slice(0, -1));
         return;
       }
       if (input && !key.ctrl && !key.meta) {
         setInputValue((v) => v + input);
-        if (inputMode === 'search') setFilterText(inputValue + input);
         return;
       }
       return;
@@ -235,10 +188,6 @@ export function BranchList() {
 
     // --- Normal mode ---
     if (key.escape) {
-      if (filterText) {
-        setFilterText('');
-        return;
-      }
       navigate('list');
       return;
     }
@@ -248,9 +197,14 @@ export function BranchList() {
       return;
     }
 
+    if (input === '/') {
+      openOverlay({ type: 'command-bar' });
+      return;
+    }
+
     // Navigation
     if (input === 'j' || key.downArrow) {
-      setCursor((c) => Math.min(c + 1, filteredRows.length - 1));
+      setCursor((c) => Math.min(c + 1, rows.length - 1));
       return;
     }
     if (input === 'k' || key.upArrow) {
@@ -273,7 +227,7 @@ export function BranchList() {
       try {
         checkoutBranch(currentRow.branch.name, cwd);
         showToast(`Switched to ${currentRow.branch.name}`);
-        loadBranches();
+        reloadBranches();
       } catch (err: unknown) {
         showToast(err instanceof Error ? err.message : 'Checkout failed');
       }
@@ -286,7 +240,6 @@ export function BranchList() {
         showToast('No worktree for this branch');
         return;
       }
-      // Spawn shell in worktree directory
       const shell = process.env['SHELL'] ?? '/bin/sh';
       process.stdin.setRawMode?.(false);
       spawnSync(shell, [], {
@@ -295,7 +248,7 @@ export function BranchList() {
         env: { ...process.env },
       });
       process.stdin.setRawMode?.(true);
-      loadBranches();
+      reloadBranches();
       return;
     }
 
@@ -336,7 +289,7 @@ export function BranchList() {
           showToast(`Pushing ${currentRow.branch.name}...`);
           await pushBranch(currentRow.branch.name, cwd);
           showToast(`Pushed ${currentRow.branch.name}`);
-          loadBranches();
+          reloadBranches();
         } catch (err: unknown) {
           showToast(err instanceof Error ? err.message : 'Push failed');
         }
@@ -344,34 +297,21 @@ export function BranchList() {
       return;
     }
 
-    // Create PR (reuse existing flow)
+    // Create PR
     if (input === 'p') {
-      // Navigate back to list and trigger PR creation for this branch
-      // For now, show toast — full integration in Task 7
       showToast('PR creation — use p from list view');
       return;
     }
 
     // Refresh
     if (input === 'r') {
-      setFetching(true);
-      fetchAll(cwd)
-        .then(() => loadBranches())
-        .catch(() => {})
-        .finally(() => setFetching(false));
+      backendDataStore.getState().refreshBranches();
       return;
     }
 
     // New branch
     if (input === 'n') {
       setInputMode('new-branch');
-      setInputValue('');
-      return;
-    }
-
-    // Search
-    if (input === '/') {
-      setInputMode('search');
       setInputValue('');
       return;
     }
@@ -399,18 +339,12 @@ export function BranchList() {
         </Text>
         <Text color={muted} dimColor={mutedDim}>
           {' '}
-          ({filteredRows.length})
+          ({rows.length})
         </Text>
         {fetching && (
           <Text color={warning}>
             {' '}
             <Spinner type="dots" /> Fetching...
-          </Text>
-        )}
-        {filterText && (
-          <Text color={muted} dimColor={mutedDim}>
-            {' '}
-            filter: {filterText}
           </Text>
         )}
       </Box>
@@ -419,15 +353,6 @@ export function BranchList() {
       {inputMode === 'new-branch' && (
         <Box marginBottom={1}>
           <Text color={accent}>New branch name: </Text>
-          <Text>{inputValue}</Text>
-          <Text color={muted} dimColor={mutedDim}>
-            █
-          </Text>
-        </Box>
-      )}
-      {inputMode === 'search' && (
-        <Box marginBottom={1}>
-          <Text color={accent}>/</Text>
           <Text>{inputValue}</Text>
           <Text color={muted} dimColor={mutedDim}>
             █
@@ -456,7 +381,7 @@ export function BranchList() {
         </Box>
       )}
 
-      {filteredRows.length === 0 ? (
+      {rows.length === 0 ? (
         <Box>
           <Text color={muted} dimColor={mutedDim}>
             No branches
@@ -494,7 +419,7 @@ export function BranchList() {
           </Box>
 
           {/* Data rows */}
-          {filteredRows.map((row, index) => {
+          {rows.map((row, index) => {
             const isSelected = index === clampedCursor;
             const isTic = row.branch.name.startsWith('tic/');
             const prefix = row.branch.current ? '* ' : '  ';
@@ -582,6 +507,14 @@ export function BranchList() {
           {'\u00b7'} ? help
         </Text>
       </Box>
+
+      {activeOverlay?.type === 'command-bar' && (
+        <CommandBar
+          commands={[]}
+          onCommand={() => closeOverlay()}
+          onCancel={closeOverlay}
+        />
+      )}
     </Box>
   );
 }

@@ -1,9 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { useThemeStore } from '../stores/themeStore.js';
-import { useNavigationStore } from '../stores/navigationStore.js';
+import {
+  navigationStore,
+  useNavigationStore,
+} from '../stores/navigationStore.js';
 import { useBackendDataStore } from '../stores/backendDataStore.js';
+import { uiStore } from '../stores/uiStore.js';
 import { ColorPill } from './ColorPill.js';
+import { CommandBar } from './CommandBar.js';
 
 const openInBrowser = async (url: string) => {
   const { default: open } = await import('open');
@@ -14,9 +19,20 @@ export function PullRequestList() {
   const { accent, muted, mutedDim } = useThemeStore((s) => s.colors);
   const navigate = useNavigationStore((s) => s.navigate);
   const navigateToHelp = useNavigationStore((s) => s.navigateToHelp);
+  const selectedPrId = useNavigationStore((s) => s.selectedPrId);
   const pullRequests = useBackendDataStore((s) => s.pullRequests);
 
   const [cursor, setCursor] = useState(0);
+  const { activeOverlay, openOverlay, closeOverlay } = uiStore.getState();
+
+  // Set initial cursor from navigation
+  useEffect(() => {
+    if (selectedPrId) {
+      const idx = pullRequests.findIndex((pr) => pr.id === selectedPrId);
+      if (idx >= 0) setCursor(idx);
+      navigationStore.getState().selectPr(null);
+    }
+  }, [selectedPrId, pullRequests]);
 
   // Clamp cursor to valid range
   const clampedCursor = Math.max(0, Math.min(cursor, pullRequests.length - 1));
@@ -25,6 +41,8 @@ export function PullRequestList() {
   }
 
   useInput((input, key) => {
+    if (activeOverlay) return;
+
     if (key.escape) {
       navigate('list');
       return;
@@ -32,6 +50,11 @@ export function PullRequestList() {
 
     if (input === '?') {
       navigateToHelp();
+      return;
+    }
+
+    if (input === '/') {
+      openOverlay({ type: 'command-bar' });
       return;
     }
 
@@ -161,9 +184,17 @@ export function PullRequestList() {
       {/* Footer keybinding hints */}
       <Box marginTop={1}>
         <Text color={muted} dimColor={mutedDim}>
-          j/k navigate · Enter/o open in browser · Esc back · ? help
+          j/k navigate · Enter/o open in browser · / search · Esc back · ? help
         </Text>
       </Box>
+
+      {activeOverlay?.type === 'command-bar' && (
+        <CommandBar
+          commands={[]}
+          onCommand={() => closeOverlay()}
+          onCancel={closeOverlay}
+        />
+      )}
     </Box>
   );
 }

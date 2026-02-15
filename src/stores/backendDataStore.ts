@@ -12,6 +12,14 @@ import type { SyncManager } from '../sync/SyncManager.js';
 import { configStore } from './configStore.js';
 import { undoStore } from './undoStore.js';
 import { themeStore } from './themeStore.js';
+import {
+  isGitRepo,
+  listBranches,
+  listWorktrees,
+  type BranchRow,
+} from '../git.js';
+import { fetchAll } from '../git-async.js';
+import { linkBranchToItem } from '../branch-links.js';
 
 export const defaultCapabilities: BackendCapabilities = {
   relationships: false,
@@ -69,6 +77,8 @@ export interface BackendDataStoreState {
   capabilities: BackendCapabilities;
   pullRequests: PullRequest[];
   prCapabilities: PrCapabilities;
+  branches: BranchRow[];
+  branchesLoading: boolean;
   statuses: string[];
   iterations: string[];
   types: string[];
@@ -111,6 +121,10 @@ export interface BackendDataStoreState {
   closePullRequest: (id: string) => Promise<PullRequest>;
   linkPrItem: (prId: string, itemId: string) => Promise<void>;
   unlinkPrItem: (prId: string, itemId: string) => Promise<void>;
+
+  // Branch operations
+  loadBranches: () => void;
+  refreshBranches: () => void;
 
   // Color mapping operations (delegate to Storage)
   setColorMapping(
@@ -194,6 +208,8 @@ export const backendDataStore = createStore<BackendDataStoreState>(
     capabilities: { ...defaultCapabilities },
     pullRequests: [],
     prCapabilities: { ...defaultPrCapabilities },
+    branches: [],
+    branchesLoading: false,
     statuses: [],
     iterations: [],
     types: [],
@@ -291,6 +307,7 @@ export const backendDataStore = createStore<BackendDataStoreState>(
         });
 
         await get().loadPullRequests();
+        get().loadBranches();
       } catch (e) {
         set({ error: e instanceof Error ? e.message : String(e) });
       }
@@ -579,6 +596,57 @@ export const backendDataStore = createStore<BackendDataStoreState>(
       }
     },
 
+    // Branch operations
+    loadBranches() {
+      if (!currentCwd || !isGitRepo(currentCwd)) {
+        set({ branches: [], branchesLoading: false });
+        return;
+      }
+      const cwd = currentCwd;
+      const items = get().items;
+      const branches = listBranches(cwd);
+      const worktrees = listWorktrees(cwd);
+
+      const rows: BranchRow[] = branches.map((b) => {
+        const linked = linkBranchToItem(b.name, items);
+        const wt = worktrees.find((w) => w.branch === b.name) ?? null;
+        return {
+          branch: b,
+          linkedItem: linked ? { id: linked.id, title: linked.title } : null,
+          worktree: wt,
+        };
+      });
+
+      rows.sort((a, b) => {
+        if (a.branch.current !== b.branch.current)
+          return a.branch.current ? -1 : 1;
+        const aIsTic = a.branch.name.startsWith('tic/');
+        const bIsTic = b.branch.name.startsWith('tic/');
+        if (aIsTic !== bIsTic) return aIsTic ? -1 : 1;
+        return a.branch.name.localeCompare(b.branch.name);
+      });
+
+      set({ branches: rows });
+    },
+
+    refreshBranches() {
+      if (!currentCwd || !isGitRepo(currentCwd)) return;
+      const cwd = currentCwd;
+      const gen = initGeneration;
+      get().loadBranches();
+      set({ branchesLoading: true });
+      fetchAll(cwd)
+        .then(() => {
+          if (gen !== initGeneration) return;
+          get().loadBranches();
+        })
+        .catch(() => {})
+        .finally(() => {
+          if (gen !== initGeneration) return;
+          set({ branchesLoading: false });
+        });
+    },
+
     async getLinkedPullRequests(itemId: string) {
       if (!currentBackend || !isPrBackend(currentBackend)) return [];
       return currentBackend.getLinkedPullRequests(itemId);
@@ -706,6 +774,8 @@ export const backendDataStore = createStore<BackendDataStoreState>(
         capabilities: { ...defaultCapabilities },
         pullRequests: [],
         prCapabilities: { ...defaultPrCapabilities },
+        branches: [],
+        branchesLoading: false,
         statuses: [],
         iterations: [],
         types: [],

@@ -158,6 +158,12 @@ export interface WorktreeInfo {
   bare: boolean;
 }
 
+export interface BranchRow {
+  branch: BranchInfo;
+  linkedItem: { id: string; title: string } | null;
+  worktree: WorktreeInfo | null;
+}
+
 export function listBranches(cwd: string): BranchInfo[] {
   const format =
     '%(HEAD)%00%(refname:short)%00%(upstream:short)%00%(upstream:track)%00%(committerdate:iso-strict)';

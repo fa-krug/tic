@@ -22,6 +22,8 @@ interface NavigationState {
 
   // Work item selection
   selectedWorkItemId: string | null;
+  selectedPrId: string | null;
+  selectedBranchName: string | null;
   navigationStack: string[];
 
   // Form context
@@ -41,6 +43,8 @@ interface NavigationState {
   navigateToHelp: () => void;
   navigateBackFromHelp: () => void;
   selectWorkItem: (id: string | null) => void;
+  selectPr: (id: string | null) => void;
+  selectBranch: (name: string | null) => void;
   pushWorkItem: (id: string) => void;
   popWorkItem: () => string | null;
   setActiveType: (type: string | null) => void;
@@ -56,6 +60,8 @@ const initialState = {
   screen: 'list' as Screen,
   previousScreen: 'list' as Screen,
   selectedWorkItemId: null,
+  selectedPrId: null,
+  selectedBranchName: null,
   navigationStack: [],
   activeType: null,
   activeTemplate: null,
@@ -78,6 +84,8 @@ const createNavigationStore = () =>
       set((state) => ({
         screen: newScreen,
         navigationStack: clearStack ? [] : state.navigationStack,
+        selectedPrId: null,
+        selectedBranchName: null,
       }));
     },
 
@@ -96,6 +104,14 @@ const createNavigationStore = () =>
 
     selectWorkItem: (id: string | null) => {
       set({ selectedWorkItemId: id });
+    },
+
+    selectPr: (id: string | null) => {
+      set({ selectedPrId: id });
+    },
+
+    selectBranch: (name: string | null) => {
+      set({ selectedBranchName: name });
     },
 
     pushWorkItem: (id: string) => {
