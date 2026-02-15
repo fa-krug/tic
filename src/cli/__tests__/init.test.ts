@@ -15,7 +15,7 @@ describe('tic init', () => {
   });
 
   afterEach(() => {
-    fs.rmSync(tmpDir, { recursive: true });
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
   it('creates .tic directory with tic.db', async () => {
@@ -81,13 +81,13 @@ describe('requireTicProject', () => {
     expect(() => requireTicProject(emptyDir)).toThrow(
       "Not a tic project (no .tic/ directory found). Run 'tic init' first.",
     );
-    fs.rmSync(emptyDir, { recursive: true });
+    fs.rmSync(emptyDir, { recursive: true, force: true });
   });
 
   it('does not throw when .tic directory exists', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-cli-project-'));
     fs.mkdirSync(path.join(dir, '.tic'), { recursive: true });
     expect(() => requireTicProject(dir)).not.toThrow();
-    fs.rmSync(dir, { recursive: true });
+    fs.rmSync(dir, { recursive: true, force: true });
   });
 });

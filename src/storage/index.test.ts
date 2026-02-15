@@ -5,40 +5,7 @@ import path from 'node:path';
 import { createDatabase, type TicDatabase } from './db.js';
 import { Storage } from './index.js';
 import { isSoftDeleteBackend } from '../backends/types.js';
-import type { NewWorkItem, Template } from '../types.js';
-
-function makeNewItem(overrides: Partial<NewWorkItem> = {}): NewWorkItem {
-  return {
-    title: 'Test item',
-    type: 'task',
-    status: 'todo',
-    iteration: 'default',
-    priority: 'medium',
-    assignee: '',
-    labels: [],
-    description: '',
-    parent: null,
-    dependsOn: [],
-    ...overrides,
-  };
-}
-
-function makeTemplate(overrides: Partial<Template> = {}): Template {
-  return {
-    slug: '',
-    name: 'Test Template',
-    type: 'task',
-    status: 'todo',
-    priority: 'medium',
-    assignee: '',
-    labels: [],
-    iteration: '',
-    parent: null,
-    dependsOn: [],
-    description: '',
-    ...overrides,
-  };
-}
+import { makeNewWorkItem, makeTemplate } from '../test-helpers.js';
 
 describe('Storage', () => {
   let db: TicDatabase;
@@ -123,18 +90,18 @@ describe('Storage', () => {
     });
 
     it('returns unique sorted assignees from work items', async () => {
-      await backend.createWorkItem(makeNewItem({ assignee: 'Charlie' }));
-      await backend.createWorkItem(makeNewItem({ assignee: 'Alice' }));
-      await backend.createWorkItem(makeNewItem({ assignee: 'Bob' }));
-      await backend.createWorkItem(makeNewItem({ assignee: 'Alice' })); // duplicate
+      await backend.createWorkItem(makeNewWorkItem({ assignee: 'Charlie' }));
+      await backend.createWorkItem(makeNewWorkItem({ assignee: 'Alice' }));
+      await backend.createWorkItem(makeNewWorkItem({ assignee: 'Bob' }));
+      await backend.createWorkItem(makeNewWorkItem({ assignee: 'Alice' })); // duplicate
 
       const assignees = await backend.getAssignees();
       expect(assignees).toEqual(['Alice', 'Bob', 'Charlie']);
     });
 
     it('excludes empty assignees', async () => {
-      await backend.createWorkItem(makeNewItem({ assignee: '' }));
-      await backend.createWorkItem(makeNewItem({ assignee: 'Alice' }));
+      await backend.createWorkItem(makeNewWorkItem({ assignee: '' }));
+      await backend.createWorkItem(makeNewWorkItem({ assignee: 'Alice' }));
 
       const assignees = await backend.getAssignees();
       expect(assignees).toEqual(['Alice']);
@@ -142,9 +109,9 @@ describe('Storage', () => {
 
     it('excludes assignees from soft-deleted items', async () => {
       const item = await backend.createWorkItem(
-        makeNewItem({ assignee: 'Deleted' }),
+        makeNewWorkItem({ assignee: 'Deleted' }),
       );
-      await backend.createWorkItem(makeNewItem({ assignee: 'Active' }));
+      await backend.createWorkItem(makeNewWorkItem({ assignee: 'Active' }));
       await backend.softDeleteWorkItem(item.id);
 
       const assignees = await backend.getAssignees();
@@ -162,9 +129,11 @@ describe('Storage', () => {
 
     it('returns unique sorted labels from work items', async () => {
       await backend.createWorkItem(
-        makeNewItem({ labels: ['bug', 'frontend'] }),
+        makeNewWorkItem({ labels: ['bug', 'frontend'] }),
       );
-      await backend.createWorkItem(makeNewItem({ labels: ['backend', 'bug'] })); // 'bug' is duplicate
+      await backend.createWorkItem(
+        makeNewWorkItem({ labels: ['backend', 'bug'] }),
+      ); // 'bug' is duplicate
 
       const labels = await backend.getLabels();
       expect(labels).toEqual(['backend', 'bug', 'frontend']);
@@ -172,9 +141,11 @@ describe('Storage', () => {
 
     it('excludes labels from soft-deleted items', async () => {
       const item = await backend.createWorkItem(
-        makeNewItem({ labels: ['deleted-label'] }),
+        makeNewWorkItem({ labels: ['deleted-label'] }),
       );
-      await backend.createWorkItem(makeNewItem({ labels: ['active-label'] }));
+      await backend.createWorkItem(
+        makeNewWorkItem({ labels: ['active-label'] }),
+      );
       await backend.softDeleteWorkItem(item.id);
 
       const labels = await backend.getLabels();
@@ -219,8 +190,8 @@ describe('Storage', () => {
     });
 
     it('returns all non-deleted items', async () => {
-      await backend.createWorkItem(makeNewItem({ title: 'Item 1' }));
-      await backend.createWorkItem(makeNewItem({ title: 'Item 2' }));
+      await backend.createWorkItem(makeNewWorkItem({ title: 'Item 1' }));
+      await backend.createWorkItem(makeNewWorkItem({ title: 'Item 2' }));
 
       const items = await backend.listWorkItems();
       expect(items).toHaveLength(2);
@@ -230,10 +201,10 @@ describe('Storage', () => {
 
     it('returns items with labels, deps, and comments', async () => {
       const item1 = await backend.createWorkItem(
-        makeNewItem({ title: 'Dep target' }),
+        makeNewWorkItem({ title: 'Dep target' }),
       );
       const item2 = await backend.createWorkItem(
-        makeNewItem({
+        makeNewWorkItem({
           title: 'Main item',
           labels: ['bug', 'urgent'],
           dependsOn: [item1.id],
@@ -249,10 +220,10 @@ describe('Storage', () => {
 
     it('filters by iteration', async () => {
       await backend.createWorkItem(
-        makeNewItem({ title: 'Sprint 1', iteration: 'sprint-1' }),
+        makeNewWorkItem({ title: 'Sprint 1', iteration: 'sprint-1' }),
       );
       await backend.createWorkItem(
-        makeNewItem({ title: 'Sprint 2', iteration: 'sprint-2' }),
+        makeNewWorkItem({ title: 'Sprint 2', iteration: 'sprint-2' }),
       );
 
       const items = await backend.listWorkItems('sprint-1');
@@ -262,9 +233,9 @@ describe('Storage', () => {
 
     it('excludes soft-deleted items', async () => {
       const item = await backend.createWorkItem(
-        makeNewItem({ title: 'To delete' }),
+        makeNewWorkItem({ title: 'To delete' }),
       );
-      await backend.createWorkItem(makeNewItem({ title: 'To keep' }));
+      await backend.createWorkItem(makeNewWorkItem({ title: 'To keep' }));
       await backend.softDeleteWorkItem(item.id);
 
       const items = await backend.listWorkItems();
@@ -274,7 +245,7 @@ describe('Storage', () => {
 
     it('returns items with correct WorkItem shape', async () => {
       await backend.createWorkItem(
-        makeNewItem({
+        makeNewWorkItem({
           title: 'Full item',
           type: 'issue',
           status: 'in-progress',
@@ -311,7 +282,7 @@ describe('Storage', () => {
   describe('getWorkItem', () => {
     it('returns work item by id', async () => {
       const created = await backend.createWorkItem(
-        makeNewItem({ title: 'Find me' }),
+        makeNewWorkItem({ title: 'Find me' }),
       );
 
       const item = await backend.getWorkItem(created.id);
@@ -327,7 +298,7 @@ describe('Storage', () => {
 
     it('throws when work item is soft-deleted', async () => {
       const created = await backend.createWorkItem(
-        makeNewItem({ title: 'Deleted' }),
+        makeNewWorkItem({ title: 'Deleted' }),
       );
       await backend.softDeleteWorkItem(created.id);
 
@@ -338,10 +309,10 @@ describe('Storage', () => {
 
     it('returns work item with labels and deps', async () => {
       const dep = await backend.createWorkItem(
-        makeNewItem({ title: 'Dependency' }),
+        makeNewWorkItem({ title: 'Dependency' }),
       );
       const item = await backend.createWorkItem(
-        makeNewItem({
+        makeNewWorkItem({
           title: 'With relations',
           labels: ['important', 'review'],
           dependsOn: [dep.id],
@@ -358,22 +329,22 @@ describe('Storage', () => {
 
   describe('getChildren', () => {
     it('returns empty array when no children', async () => {
-      const item = await backend.createWorkItem(makeNewItem());
+      const item = await backend.createWorkItem(makeNewWorkItem());
       const children = await backend.getChildren(item.id);
       expect(children).toEqual([]);
     });
 
     it('returns child items', async () => {
       const parent = await backend.createWorkItem(
-        makeNewItem({ title: 'Parent' }),
+        makeNewWorkItem({ title: 'Parent' }),
       );
       await backend.createWorkItem(
-        makeNewItem({ title: 'Child 1', parent: parent.id }),
+        makeNewWorkItem({ title: 'Child 1', parent: parent.id }),
       );
       await backend.createWorkItem(
-        makeNewItem({ title: 'Child 2', parent: parent.id }),
+        makeNewWorkItem({ title: 'Child 2', parent: parent.id }),
       );
-      await backend.createWorkItem(makeNewItem({ title: 'Not a child' }));
+      await backend.createWorkItem(makeNewWorkItem({ title: 'Not a child' }));
 
       const children = await backend.getChildren(parent.id);
       expect(children).toHaveLength(2);
@@ -385,13 +356,13 @@ describe('Storage', () => {
 
     it('excludes soft-deleted children', async () => {
       const parent = await backend.createWorkItem(
-        makeNewItem({ title: 'Parent' }),
+        makeNewWorkItem({ title: 'Parent' }),
       );
       const child = await backend.createWorkItem(
-        makeNewItem({ title: 'Deleted child', parent: parent.id }),
+        makeNewWorkItem({ title: 'Deleted child', parent: parent.id }),
       );
       await backend.createWorkItem(
-        makeNewItem({ title: 'Active child', parent: parent.id }),
+        makeNewWorkItem({ title: 'Active child', parent: parent.id }),
       );
       await backend.softDeleteWorkItem(child.id);
 
@@ -405,22 +376,22 @@ describe('Storage', () => {
 
   describe('getDependents', () => {
     it('returns empty array when no dependents', async () => {
-      const item = await backend.createWorkItem(makeNewItem());
+      const item = await backend.createWorkItem(makeNewWorkItem());
       const dependents = await backend.getDependents(item.id);
       expect(dependents).toEqual([]);
     });
 
     it('returns items that depend on the given item', async () => {
       const target = await backend.createWorkItem(
-        makeNewItem({ title: 'Target' }),
+        makeNewWorkItem({ title: 'Target' }),
       );
       await backend.createWorkItem(
-        makeNewItem({ title: 'Depends 1', dependsOn: [target.id] }),
+        makeNewWorkItem({ title: 'Depends 1', dependsOn: [target.id] }),
       );
       await backend.createWorkItem(
-        makeNewItem({ title: 'Depends 2', dependsOn: [target.id] }),
+        makeNewWorkItem({ title: 'Depends 2', dependsOn: [target.id] }),
       );
-      await backend.createWorkItem(makeNewItem({ title: 'Independent' }));
+      await backend.createWorkItem(makeNewWorkItem({ title: 'Independent' }));
 
       const dependents = await backend.getDependents(target.id);
       expect(dependents).toHaveLength(2);
@@ -432,13 +403,13 @@ describe('Storage', () => {
 
     it('excludes soft-deleted dependents', async () => {
       const target = await backend.createWorkItem(
-        makeNewItem({ title: 'Target' }),
+        makeNewWorkItem({ title: 'Target' }),
       );
       const dep = await backend.createWorkItem(
-        makeNewItem({ title: 'Deleted dep', dependsOn: [target.id] }),
+        makeNewWorkItem({ title: 'Deleted dep', dependsOn: [target.id] }),
       );
       await backend.createWorkItem(
-        makeNewItem({ title: 'Active dep', dependsOn: [target.id] }),
+        makeNewWorkItem({ title: 'Active dep', dependsOn: [target.id] }),
       );
       await backend.softDeleteWorkItem(dep.id);
 
@@ -461,14 +432,14 @@ describe('Storage', () => {
 
   describe('createWorkItem', () => {
     it('auto-increments IDs', async () => {
-      const item1 = await backend.createWorkItem(makeNewItem());
-      const item2 = await backend.createWorkItem(makeNewItem());
+      const item1 = await backend.createWorkItem(makeNewWorkItem());
+      const item2 = await backend.createWorkItem(makeNewWorkItem());
       expect(item1.id).toBe('1');
       expect(item2.id).toBe('2');
     });
 
     it('sets created and updated timestamps', async () => {
-      const item = await backend.createWorkItem(makeNewItem());
+      const item = await backend.createWorkItem(makeNewWorkItem());
       expect(item.created).toBeDefined();
       expect(item.updated).toBeDefined();
       // Timestamps should be ISO 8601
@@ -477,10 +448,10 @@ describe('Storage', () => {
 
     it('persists parent relationship', async () => {
       const parent = await backend.createWorkItem(
-        makeNewItem({ title: 'Parent' }),
+        makeNewWorkItem({ title: 'Parent' }),
       );
       const child = await backend.createWorkItem(
-        makeNewItem({ title: 'Child', parent: parent.id }),
+        makeNewWorkItem({ title: 'Child', parent: parent.id }),
       );
 
       const fetched = await backend.getWorkItem(child.id);
@@ -488,7 +459,9 @@ describe('Storage', () => {
     });
 
     it('adds new iteration to iterations table', async () => {
-      await backend.createWorkItem(makeNewItem({ iteration: 'new-sprint' }));
+      await backend.createWorkItem(
+        makeNewWorkItem({ iteration: 'new-sprint' }),
+      );
       const iterations = await backend.getIterations();
       expect(iterations).toContain('new-sprint');
     });
@@ -499,7 +472,7 @@ describe('Storage', () => {
   describe('createWorkItem (relationship validation)', () => {
     it('rejects self-referencing parent', async () => {
       // Create an item first so we know what ID "2" would be
-      const item = await backend.createWorkItem(makeNewItem());
+      const item = await backend.createWorkItem(makeNewWorkItem());
       // Now try to create an item that would be its own parent
       // Since the next ID will be "2", we can't directly self-reference on create
       // But we CAN verify it rejects a non-existent parent (which covers the lookup)
@@ -518,19 +491,19 @@ describe('Storage', () => {
 
     it('rejects non-existent parent', async () => {
       await expect(
-        backend.createWorkItem(makeNewItem({ parent: '999' })),
+        backend.createWorkItem(makeNewWorkItem({ parent: '999' })),
       ).rejects.toThrow('Parent #999 does not exist');
     });
 
     it('rejects circular parent chain', async () => {
       const grandparent = await backend.createWorkItem(
-        makeNewItem({ title: 'Grandparent' }),
+        makeNewWorkItem({ title: 'Grandparent' }),
       );
       const parent = await backend.createWorkItem(
-        makeNewItem({ title: 'Parent', parent: grandparent.id }),
+        makeNewWorkItem({ title: 'Parent', parent: grandparent.id }),
       );
       const child = await backend.createWorkItem(
-        makeNewItem({ title: 'Child', parent: parent.id }),
+        makeNewWorkItem({ title: 'Child', parent: parent.id }),
       );
 
       // Now try to set grandparent's parent to child — creates a cycle
@@ -543,7 +516,7 @@ describe('Storage', () => {
 
     it('rejects self-referencing dependency', async () => {
       // Create an item, then try to make it depend on itself via update
-      const item = await backend.createWorkItem(makeNewItem());
+      const item = await backend.createWorkItem(makeNewWorkItem());
       await expect(
         backend.updateWorkItem(item.id, { dependsOn: [item.id] }),
       ).rejects.toThrow(`Work item #${item.id} cannot depend on itself`);
@@ -551,17 +524,17 @@ describe('Storage', () => {
 
     it('rejects non-existent dependency', async () => {
       await expect(
-        backend.createWorkItem(makeNewItem({ dependsOn: ['999'] })),
+        backend.createWorkItem(makeNewWorkItem({ dependsOn: ['999'] })),
       ).rejects.toThrow('Dependency #999 does not exist');
     });
 
     it('rejects circular dependency chain', async () => {
-      const a = await backend.createWorkItem(makeNewItem({ title: 'A' }));
+      const a = await backend.createWorkItem(makeNewWorkItem({ title: 'A' }));
       const b = await backend.createWorkItem(
-        makeNewItem({ title: 'B', dependsOn: [a.id] }),
+        makeNewWorkItem({ title: 'B', dependsOn: [a.id] }),
       );
       const c = await backend.createWorkItem(
-        makeNewItem({ title: 'C', dependsOn: [b.id] }),
+        makeNewWorkItem({ title: 'C', dependsOn: [b.id] }),
       );
 
       // Now try to make A depend on C — creates a cycle: A -> C -> B -> A
@@ -576,7 +549,7 @@ describe('Storage', () => {
   describe('updateWorkItem', () => {
     it('updates title', async () => {
       const item = await backend.createWorkItem(
-        makeNewItem({ title: 'Original' }),
+        makeNewWorkItem({ title: 'Original' }),
       );
       const updated = await backend.updateWorkItem(item.id, {
         title: 'Updated',
@@ -590,7 +563,7 @@ describe('Storage', () => {
 
     it('updates status', async () => {
       const item = await backend.createWorkItem(
-        makeNewItem({ status: 'todo' }),
+        makeNewWorkItem({ status: 'todo' }),
       );
       const updated = await backend.updateWorkItem(item.id, {
         status: 'in-progress',
@@ -600,7 +573,7 @@ describe('Storage', () => {
 
     it('updates priority', async () => {
       const item = await backend.createWorkItem(
-        makeNewItem({ priority: 'low' }),
+        makeNewWorkItem({ priority: 'low' }),
       );
       const updated = await backend.updateWorkItem(item.id, {
         priority: 'high',
@@ -610,7 +583,7 @@ describe('Storage', () => {
 
     it('updates assignee', async () => {
       const item = await backend.createWorkItem(
-        makeNewItem({ assignee: 'Alice' }),
+        makeNewWorkItem({ assignee: 'Alice' }),
       );
       const updated = await backend.updateWorkItem(item.id, {
         assignee: 'Bob',
@@ -620,7 +593,7 @@ describe('Storage', () => {
 
     it('replaces labels', async () => {
       const item = await backend.createWorkItem(
-        makeNewItem({ labels: ['old-label', 'keep-label'] }),
+        makeNewWorkItem({ labels: ['old-label', 'keep-label'] }),
       );
       const updated = await backend.updateWorkItem(item.id, {
         labels: ['new-label', 'another-label'],
@@ -640,16 +613,16 @@ describe('Storage', () => {
 
     it('replaces dependencies', async () => {
       const dep1 = await backend.createWorkItem(
-        makeNewItem({ title: 'Dep 1' }),
+        makeNewWorkItem({ title: 'Dep 1' }),
       );
       const dep2 = await backend.createWorkItem(
-        makeNewItem({ title: 'Dep 2' }),
+        makeNewWorkItem({ title: 'Dep 2' }),
       );
       const dep3 = await backend.createWorkItem(
-        makeNewItem({ title: 'Dep 3' }),
+        makeNewWorkItem({ title: 'Dep 3' }),
       );
       const item = await backend.createWorkItem(
-        makeNewItem({ title: 'Main', dependsOn: [dep1.id, dep2.id] }),
+        makeNewWorkItem({ title: 'Main', dependsOn: [dep1.id, dep2.id] }),
       );
 
       const updated = await backend.updateWorkItem(item.id, {
@@ -664,7 +637,7 @@ describe('Storage', () => {
     });
 
     it('validates relationships on update', async () => {
-      const item = await backend.createWorkItem(makeNewItem());
+      const item = await backend.createWorkItem(makeNewWorkItem());
 
       // Non-existent parent
       await expect(
@@ -678,7 +651,7 @@ describe('Storage', () => {
     });
 
     it('sets updated timestamp', async () => {
-      const item = await backend.createWorkItem(makeNewItem());
+      const item = await backend.createWorkItem(makeNewWorkItem());
       const originalUpdated = item.updated;
 
       // Small delay to ensure timestamp differs
@@ -694,7 +667,7 @@ describe('Storage', () => {
     });
 
     it('does not change created timestamp', async () => {
-      const item = await backend.createWorkItem(makeNewItem());
+      const item = await backend.createWorkItem(makeNewWorkItem());
       const originalCreated = item.created;
 
       await new Promise((r) => setTimeout(r, 10));
@@ -713,7 +686,7 @@ describe('Storage', () => {
 
     it('handles partial updates without affecting other fields', async () => {
       const item = await backend.createWorkItem(
-        makeNewItem({
+        makeNewWorkItem({
           title: 'Original',
           status: 'todo',
           priority: 'high',
@@ -741,7 +714,7 @@ describe('Storage', () => {
 
   describe('deleteWorkItem', () => {
     it('removes item', async () => {
-      const item = await backend.createWorkItem(makeNewItem());
+      const item = await backend.createWorkItem(makeNewWorkItem());
       await backend.deleteWorkItem(item.id);
 
       await expect(backend.getWorkItem(item.id)).rejects.toThrow(
@@ -751,7 +724,7 @@ describe('Storage', () => {
 
     it('cascade deletes labels of the deleted item', async () => {
       const item = await backend.createWorkItem(
-        makeNewItem({ labels: ['bug', 'feature'] }),
+        makeNewWorkItem({ labels: ['bug', 'feature'] }),
       );
       await backend.deleteWorkItem(item.id);
 
@@ -766,10 +739,10 @@ describe('Storage', () => {
 
     it('cascade deletes deps of the deleted item', async () => {
       const dep = await backend.createWorkItem(
-        makeNewItem({ title: 'Dep target' }),
+        makeNewWorkItem({ title: 'Dep target' }),
       );
       const item = await backend.createWorkItem(
-        makeNewItem({ dependsOn: [dep.id] }),
+        makeNewWorkItem({ dependsOn: [dep.id] }),
       );
       await backend.deleteWorkItem(item.id);
 
@@ -783,7 +756,7 @@ describe('Storage', () => {
     });
 
     it('cascade deletes comments of the deleted item', async () => {
-      const item = await backend.createWorkItem(makeNewItem());
+      const item = await backend.createWorkItem(makeNewWorkItem());
       await backend.addComment(item.id, {
         author: 'Alice',
         body: 'A comment',
@@ -801,10 +774,10 @@ describe('Storage', () => {
 
     it('cleans up parent references (children get parent = null)', async () => {
       const parent = await backend.createWorkItem(
-        makeNewItem({ title: 'Parent' }),
+        makeNewWorkItem({ title: 'Parent' }),
       );
       const child = await backend.createWorkItem(
-        makeNewItem({ title: 'Child', parent: parent.id }),
+        makeNewWorkItem({ title: 'Child', parent: parent.id }),
       );
 
       await backend.deleteWorkItem(parent.id);
@@ -815,10 +788,10 @@ describe('Storage', () => {
 
     it('cleans up dependency references (deps pointing to deleted item removed)', async () => {
       const target = await backend.createWorkItem(
-        makeNewItem({ title: 'Target' }),
+        makeNewWorkItem({ title: 'Target' }),
       );
       const dependent = await backend.createWorkItem(
-        makeNewItem({ title: 'Dependent', dependsOn: [target.id] }),
+        makeNewWorkItem({ title: 'Dependent', dependsOn: [target.id] }),
       );
 
       await backend.deleteWorkItem(target.id);
@@ -832,7 +805,7 @@ describe('Storage', () => {
 
   describe('addComment', () => {
     it('adds comment to existing item', async () => {
-      const item = await backend.createWorkItem(makeNewItem());
+      const item = await backend.createWorkItem(makeNewWorkItem());
       const comment = await backend.addComment(item.id, {
         author: 'Alice',
         body: 'This is a comment',
@@ -845,7 +818,7 @@ describe('Storage', () => {
     });
 
     it('comment has author, date, and body', async () => {
-      const item = await backend.createWorkItem(makeNewItem());
+      const item = await backend.createWorkItem(makeNewWorkItem());
       const comment = await backend.addComment(item.id, {
         author: 'Bob',
         body: 'Hello world',
@@ -857,7 +830,7 @@ describe('Storage', () => {
     });
 
     it('comment is retrievable via getWorkItem', async () => {
-      const item = await backend.createWorkItem(makeNewItem());
+      const item = await backend.createWorkItem(makeNewWorkItem());
       await backend.addComment(item.id, {
         author: 'Alice',
         body: 'First comment',
@@ -876,7 +849,7 @@ describe('Storage', () => {
     });
 
     it('does not change item updated timestamp', async () => {
-      const item = await backend.createWorkItem(makeNewItem());
+      const item = await backend.createWorkItem(makeNewWorkItem());
       const originalUpdated = item.updated;
 
       await new Promise((r) => setTimeout(r, 10));
@@ -917,7 +890,7 @@ describe('Storage', () => {
 
   describe('SoftDeleteBackend', () => {
     it('soft-deletes by setting deletedAt', async () => {
-      const item = await backend.createWorkItem(makeNewItem());
+      const item = await backend.createWorkItem(makeNewWorkItem());
       await backend.softDeleteWorkItem(item.id);
 
       const items = await backend.listWorkItems();
@@ -926,7 +899,7 @@ describe('Storage', () => {
 
     it('restores soft-deleted item', async () => {
       const item = await backend.createWorkItem(
-        makeNewItem({ title: 'Restore me' }),
+        makeNewWorkItem({ title: 'Restore me' }),
       );
       await backend.softDeleteWorkItem(item.id);
 
@@ -945,7 +918,7 @@ describe('Storage', () => {
     });
 
     it('permanently deletes from trash', async () => {
-      const item = await backend.createWorkItem(makeNewItem());
+      const item = await backend.createWorkItem(makeNewWorkItem());
       await backend.softDeleteWorkItem(item.id);
       await backend.permanentlyDeleteWorkItem(item.id);
 
@@ -958,13 +931,13 @@ describe('Storage', () => {
 
     it('cleanup removes all soft-deleted items', async () => {
       const item1 = await backend.createWorkItem(
-        makeNewItem({ title: 'Item 1' }),
+        makeNewWorkItem({ title: 'Item 1' }),
       );
       const item2 = await backend.createWorkItem(
-        makeNewItem({ title: 'Item 2' }),
+        makeNewWorkItem({ title: 'Item 2' }),
       );
       const item3 = await backend.createWorkItem(
-        makeNewItem({ title: 'Item 3 (keep)' }),
+        makeNewWorkItem({ title: 'Item 3 (keep)' }),
       );
       await backend.softDeleteWorkItem(item1.id);
       await backend.softDeleteWorkItem(item2.id);
@@ -1242,12 +1215,12 @@ describe('Storage', () => {
         tempIds: true,
       });
 
-      const item = await tempBackend.createWorkItem(makeNewItem());
+      const item = await tempBackend.createWorkItem(makeNewWorkItem());
       expect(item.id).toMatch(/^local-/);
       expect(item.id).toBe('local-1');
 
       const item2 = await tempBackend.createWorkItem(
-        makeNewItem({ title: 'Second' }),
+        makeNewWorkItem({ title: 'Second' }),
       );
       expect(item2.id).toBe('local-2');
 
@@ -1255,7 +1228,7 @@ describe('Storage', () => {
     });
 
     it('uses numeric IDs when tempIds is false (default)', async () => {
-      const item = await backend.createWorkItem(makeNewItem());
+      const item = await backend.createWorkItem(makeNewWorkItem());
       expect(item.id).toBe('1');
       expect(item.id).not.toMatch(/^local-/);
     });
@@ -1275,14 +1248,14 @@ describe('Storage', () => {
 
   describe('comment loading', () => {
     it('listWorkItems omits comments by default', async () => {
-      const item = await backend.createWorkItem(makeNewItem());
+      const item = await backend.createWorkItem(makeNewWorkItem());
       await backend.addComment(item.id, { body: 'hello', author: 'me' });
       const items = await backend.listWorkItems();
       expect(items[0]!.comments).toEqual([]);
     });
 
     it('getWorkItem includes comments', async () => {
-      const item = await backend.createWorkItem(makeNewItem());
+      const item = await backend.createWorkItem(makeNewWorkItem());
       await backend.addComment(item.id, { body: 'hello', author: 'me' });
       const fetched = await backend.getWorkItem(item.id);
       expect(fetched.comments).toHaveLength(1);
@@ -1300,15 +1273,15 @@ describe('Storage', () => {
     });
 
     afterEach(() => {
-      fs.rmSync(tmpDir, { recursive: true });
+      fs.rmSync(tmpDir, { recursive: true, force: true });
     });
 
     it('recalculates nextId from existing items when YAML next_id is stale', async () => {
       // 1. Create initial Storage to get a DB with some items
       const initial = Storage.create(tmpDir);
-      await initial.createWorkItem(makeNewItem({ title: 'Item 1' }));
-      await initial.createWorkItem(makeNewItem({ title: 'Item 2' }));
-      await initial.createWorkItem(makeNewItem({ title: 'Item 3' }));
+      await initial.createWorkItem(makeNewWorkItem({ title: 'Item 1' }));
+      await initial.createWorkItem(makeNewWorkItem({ title: 'Item 2' }));
+      await initial.createWorkItem(makeNewWorkItem({ title: 'Item 3' }));
       // Items have IDs 1, 2, 3 — nextId is now 4
       initial.destroy();
 
@@ -1343,7 +1316,7 @@ describe('Storage', () => {
 
       // 5. Create a new item — should NOT collide with existing IDs
       const newItem = await reopened.createWorkItem(
-        makeNewItem({ title: 'Item 4' }),
+        makeNewWorkItem({ title: 'Item 4' }),
       );
       expect(Number(newItem.id)).toBeGreaterThanOrEqual(4);
 

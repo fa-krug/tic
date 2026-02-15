@@ -11,7 +11,7 @@ describe('createDatabase', () => {
   afterEach(() => {
     db?.close();
     if (tmpDir) {
-      fs.rmSync(tmpDir, { recursive: true });
+      fs.rmSync(tmpDir, { recursive: true, force: true });
       tmpDir = undefined;
     }
   });

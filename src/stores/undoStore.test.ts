@@ -1,26 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import type { WorkItem } from '../types.js';
+import { makeWorkItem } from '../test-helpers.js';
 import type { UndoEntry } from './undoStore.js';
 import { undoStore } from './undoStore.js';
 import { createDatabase, type TicDatabase } from '../storage/db.js';
 import { Storage } from '../storage/index.js';
-
-const makeSnapshot = (id: string): WorkItem => ({
-  id,
-  title: `Item ${id}`,
-  type: 'issue',
-  status: 'todo',
-  iteration: '',
-  priority: 'medium',
-  assignee: '',
-  labels: [],
-  created: '2026-01-01',
-  updated: '2026-01-01',
-  parent: null,
-  dependsOn: [],
-  description: '',
-  comments: [],
-});
 
 const makeEntry = (
   id: string,
@@ -28,7 +11,7 @@ const makeEntry = (
 ): UndoEntry => ({
   type,
   label: `Undo ${type} item ${id}`,
-  itemSnapshots: [makeSnapshot(id)],
+  itemSnapshots: [makeWorkItem(id)],
   syncItemIds: [id],
   syncAction: type,
 });

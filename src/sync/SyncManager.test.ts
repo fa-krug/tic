@@ -6,160 +6,9 @@ import { SyncManager } from './SyncManager.js';
 import { Storage } from '../storage/index.js';
 import { SyncQueue } from '../storage/syncQueue.js';
 import type { Backend } from '../backends/types.js';
-import type { WorkItem, NewWorkItem, NewComment, Comment } from '../types.js';
+import type { WorkItem } from '../types.js';
 import type { SyncStatus } from './types.js';
-
-function createMockRemote(items: WorkItem[] = []): Backend {
-  const store = new Map(items.map((i) => [i.id, i]));
-  let nextId = 100;
-  return {
-    getCapabilities: () => ({
-      relationships: true,
-      customTypes: true,
-      customStatuses: true,
-      iterations: true,
-      comments: true,
-      fields: {
-        priority: true,
-        assignee: true,
-        labels: true,
-        parent: true,
-        dependsOn: true,
-      },
-      templates: false,
-      templateFields: {
-        type: false,
-        status: false,
-        priority: false,
-        assignee: false,
-        labels: false,
-        iteration: false,
-        parent: false,
-        dependsOn: false,
-        description: false,
-      },
-    }),
-    // eslint-disable-next-line @typescript-eslint/require-await
-    getStatuses: async () => ['backlog', 'todo', 'in-progress', 'done'],
-    // eslint-disable-next-line @typescript-eslint/require-await
-    getIterations: async () => ['default'],
-    // eslint-disable-next-line @typescript-eslint/require-await
-    getWorkItemTypes: async () => ['epic', 'issue', 'task'],
-    // eslint-disable-next-line @typescript-eslint/require-await
-    getAssignees: async () => [],
-    // eslint-disable-next-line @typescript-eslint/require-await
-    getLabels: async () => [],
-    // eslint-disable-next-line @typescript-eslint/require-await
-    getCurrentIteration: async () => 'default',
-    setCurrentIteration: vi.fn(async () => {}),
-    // eslint-disable-next-line @typescript-eslint/require-await
-    listWorkItems: async () => [...store.values()],
-    // eslint-disable-next-line @typescript-eslint/require-await
-    getWorkItem: async (id: string) => {
-      const item = store.get(id);
-      if (!item) throw new Error(`Item #${id} not found`);
-      return item;
-    },
-    // eslint-disable-next-line @typescript-eslint/require-await
-    createWorkItem: async (data: NewWorkItem) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-      const id: string = (data as any).id ?? String(nextId++);
-      const item: WorkItem = {
-        ...data,
-        id,
-        created: new Date().toISOString(),
-        updated: new Date().toISOString(),
-        comments: [],
-      };
-      store.set(id, item);
-      return item;
-    },
-    // eslint-disable-next-line @typescript-eslint/require-await
-    updateWorkItem: async (id: string, data: Partial<WorkItem>) => {
-      const existing = store.get(id);
-      if (!existing) throw new Error(`Item #${id} not found`);
-      const updated = {
-        ...existing,
-        ...data,
-        id,
-        updated: new Date().toISOString(),
-      };
-      store.set(id, updated);
-      return updated;
-    },
-    // eslint-disable-next-line @typescript-eslint/require-await
-    deleteWorkItem: async (id: string) => {
-      store.delete(id);
-    },
-    // eslint-disable-next-line @typescript-eslint/require-await
-    addComment: async (workItemId: string, comment: NewComment) => {
-      const item = store.get(workItemId);
-      if (!item) throw new Error(`Item #${workItemId} not found`);
-      const c: Comment = {
-        author: comment.author,
-        date: new Date().toISOString(),
-        body: comment.body,
-      };
-      item.comments.push(c);
-      return c;
-    },
-    // eslint-disable-next-line @typescript-eslint/require-await
-    getChildren: async () => [],
-    // eslint-disable-next-line @typescript-eslint/require-await
-    getDependents: async () => [],
-    // eslint-disable-next-line @typescript-eslint/require-await
-    cachedCreateWorkItem: async (data: NewWorkItem) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-      const id: string = (data as any).id ?? String(nextId++);
-      const item: WorkItem = {
-        ...data,
-        id,
-        created: new Date().toISOString(),
-        updated: new Date().toISOString(),
-        comments: [],
-      };
-      store.set(id, item);
-      return item;
-    },
-    // eslint-disable-next-line @typescript-eslint/require-await
-    cachedUpdateWorkItem: async (id: string, data: Partial<WorkItem>) => {
-      const existing = store.get(id);
-      if (!existing) throw new Error(`Item #${id} not found`);
-      const updated = {
-        ...existing,
-        ...data,
-        id,
-        updated: new Date().toISOString(),
-      };
-      store.set(id, updated);
-      return updated;
-    },
-    // eslint-disable-next-line @typescript-eslint/require-await
-    cachedDeleteWorkItem: async (id: string) => {
-      store.delete(id);
-    },
-    getItemUrl: (id: string) => `https://remote/${id}`,
-    openItem: vi.fn(async () => {}),
-    // eslint-disable-next-line @typescript-eslint/require-await
-    listTemplates: async () => [],
-    // eslint-disable-next-line @typescript-eslint/require-await
-    getTemplate: async () => {
-      throw new Error('not supported');
-    },
-    // eslint-disable-next-line @typescript-eslint/require-await
-    createTemplate: async () => {
-      throw new Error('not supported');
-    },
-    // eslint-disable-next-line @typescript-eslint/require-await
-    updateTemplate: async () => {
-      throw new Error('not supported');
-    },
-    // eslint-disable-next-line @typescript-eslint/require-await
-    deleteTemplate: async () => {
-      throw new Error('not supported');
-    },
-  };
-}
+import { createMockRemote } from '../test-helpers.js';
 
 describe('SyncManager push phase', () => {
   let tmpDir: string;
@@ -178,7 +27,7 @@ describe('SyncManager push phase', () => {
 
   afterEach(() => {
     local.destroy();
-    fs.rmSync(tmpDir, { recursive: true });
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
   it('pushes a create and renames local temp ID to remote ID', async () => {
@@ -404,7 +253,7 @@ describe('SyncManager strips unsupported fields', () => {
 
   afterEach(() => {
     local.destroy();
-    fs.rmSync(tmpDir, { recursive: true });
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
   function createLimitedRemote(): Backend {
@@ -594,7 +443,7 @@ describe('SyncManager pull phase (via sync)', () => {
 
   afterEach(() => {
     local.destroy();
-    fs.rmSync(tmpDir, { recursive: true });
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
   it('pulls remote items into local storage', async () => {
@@ -728,7 +577,7 @@ describe('SyncManager status callbacks', () => {
 
   afterEach(() => {
     local.destroy();
-    fs.rmSync(tmpDir, { recursive: true });
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
   it('fires status change callbacks during sync', async () => {
@@ -835,7 +684,7 @@ describe('SyncManager progress reporting', () => {
 
   afterEach(() => {
     local.destroy();
-    fs.rmSync(tmpDir, { recursive: true });
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
   it('emits push progress with correct current/total', async () => {

@@ -24,7 +24,7 @@ describe('item commands', () => {
 
   afterEach(() => {
     backend.destroy();
-    fs.rmSync(tmpDir, { recursive: true });
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
   describe('runItemCreate', () => {

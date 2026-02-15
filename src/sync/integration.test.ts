@@ -1,144 +1,12 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Storage } from '../storage/index.js';
 import { SyncManager } from './SyncManager.js';
 import { SyncQueue } from '../storage/syncQueue.js';
-import type { Backend } from '../backends/types.js';
-import type { WorkItem, NewWorkItem, NewComment, Comment } from '../types.js';
-
-function createMockRemote(items: WorkItem[] = []): Backend {
-  const store = new Map(items.map((i) => [i.id, i]));
-  let nextId = 100;
-  /* eslint-disable @typescript-eslint/require-await */
-  return {
-    getCapabilities: () => ({
-      relationships: true,
-      customTypes: true,
-      customStatuses: true,
-      iterations: true,
-      comments: true,
-      fields: {
-        priority: true,
-        assignee: true,
-        labels: true,
-        parent: true,
-        dependsOn: true,
-      },
-      templates: false,
-      templateFields: {
-        type: false,
-        status: false,
-        priority: false,
-        assignee: false,
-        labels: false,
-        iteration: false,
-        parent: false,
-        dependsOn: false,
-        description: false,
-      },
-    }),
-    getStatuses: async () => ['backlog', 'todo', 'in-progress', 'done'],
-    getIterations: async () => ['default'],
-    getWorkItemTypes: async () => ['epic', 'issue', 'task'],
-    getAssignees: async () => [],
-    getLabels: async () => [],
-    getCurrentIteration: async () => 'default',
-    setCurrentIteration: vi.fn(async () => {}),
-    listWorkItems: async () => [...store.values()],
-    getWorkItem: async (id: string) => {
-      const item = store.get(id);
-      if (!item) throw new Error(`Item #${id} not found`);
-      return item;
-    },
-    createWorkItem: async (data: NewWorkItem) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-      const id: string = (data as any).id ?? String(nextId++);
-      const item: WorkItem = {
-        ...data,
-        id,
-        created: new Date().toISOString(),
-        updated: new Date().toISOString(),
-        comments: [],
-      };
-      store.set(id, item);
-      return item;
-    },
-    updateWorkItem: async (id: string, data: Partial<WorkItem>) => {
-      const existing = store.get(id);
-      if (!existing) throw new Error(`Item #${id} not found`);
-      const updated = {
-        ...existing,
-        ...data,
-        id,
-        updated: new Date().toISOString(),
-      };
-      store.set(id, updated);
-      return updated;
-    },
-    deleteWorkItem: async (id: string) => {
-      store.delete(id);
-    },
-    addComment: async (workItemId: string, comment: NewComment) => {
-      const item = store.get(workItemId);
-      if (!item) throw new Error(`Item #${workItemId} not found`);
-      const c: Comment = {
-        author: comment.author,
-        date: new Date().toISOString(),
-        body: comment.body,
-      };
-      item.comments.push(c);
-      return c;
-    },
-    getChildren: async () => [],
-    getDependents: async () => [],
-    cachedCreateWorkItem: async (data: NewWorkItem) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-      const id: string = (data as any).id ?? String(nextId++);
-      const item: WorkItem = {
-        ...data,
-        id,
-        created: new Date().toISOString(),
-        updated: new Date().toISOString(),
-        comments: [],
-      };
-      store.set(id, item);
-      return item;
-    },
-    cachedUpdateWorkItem: async (id: string, data: Partial<WorkItem>) => {
-      const existing = store.get(id);
-      if (!existing) throw new Error(`Item #${id} not found`);
-      const updated = {
-        ...existing,
-        ...data,
-        id,
-        updated: new Date().toISOString(),
-      };
-      store.set(id, updated);
-      return updated;
-    },
-    cachedDeleteWorkItem: async (id: string) => {
-      store.delete(id);
-    },
-    getItemUrl: (id: string) => `https://remote/${id}`,
-    openItem: vi.fn(async () => {}),
-    listTemplates: async () => [],
-    getTemplate: async () => {
-      throw new Error('not supported');
-    },
-    createTemplate: async () => {
-      throw new Error('not supported');
-    },
-    updateTemplate: async () => {
-      throw new Error('not supported');
-    },
-    deleteTemplate: async () => {
-      throw new Error('not supported');
-    },
-  };
-  /* eslint-enable @typescript-eslint/require-await */
-}
+import type { WorkItem } from '../types.js';
+import { createMockRemote } from '../test-helpers.js';
 
 describe('end-to-end sync', () => {
   let tmpDir: string;
@@ -150,7 +18,7 @@ describe('end-to-end sync', () => {
 
   afterEach(() => {
     local.destroy();
-    fs.rmSync(tmpDir, { recursive: true });
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
   it('full cycle: create locally, push, pull, verify', async () => {

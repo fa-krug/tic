@@ -17,7 +17,7 @@ describe('tic config', () => {
   });
 
   afterEach(() => {
-    fs.rmSync(tmpDir, { recursive: true });
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
   describe('get', () => {

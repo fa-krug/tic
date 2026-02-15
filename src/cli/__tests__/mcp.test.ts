@@ -31,8 +31,9 @@ describe('MCP handlers', () => {
   });
 
   afterEach(() => {
+    backend?.destroy();
     configStore.getState().destroy();
-    fs.rmSync(tmpDir, { recursive: true });
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
   let backend: Storage;

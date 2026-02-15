@@ -39,7 +39,7 @@ describe('backendDataStore', () => {
   afterEach(() => {
     backendDataStore.getState().destroy();
     configStore.getState().destroy();
-    fs.rmSync(tmpDir, { recursive: true });
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
   it('starts with default state', () => {

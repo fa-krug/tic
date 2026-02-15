@@ -13,6 +13,7 @@ import {
   cleanupTrash,
 } from './items.js';
 import type { WorkItem } from '../../types.js';
+import { makeWorkItem } from '../../test-helpers.js';
 
 describe('items', () => {
   let tmpDir: string;
@@ -25,7 +26,7 @@ describe('items', () => {
   });
 
   afterEach(() => {
-    fs.rmSync(tmpDir, { recursive: true });
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
   it('writes and reads a work item', async () => {
@@ -190,22 +191,13 @@ describe('items', () => {
   });
 
   describe('soft-delete and restore', () => {
-    const makeItem = (id: string): WorkItem => ({
-      id,
-      title: `Item ${id}`,
-      type: 'task',
-      status: 'todo',
-      iteration: 'v1',
-      priority: 'medium',
-      assignee: '',
-      labels: [],
-      created: '2026-01-31T00:00:00Z',
-      updated: '2026-01-31T00:00:00Z',
-      description: 'Test item.',
-      comments: [],
-      parent: null,
-      dependsOn: [],
-    });
+    const makeItem = (id: string): WorkItem =>
+      makeWorkItem(id, {
+        iteration: 'v1',
+        description: 'Test item.',
+        created: '2026-01-31T00:00:00Z',
+        updated: '2026-01-31T00:00:00Z',
+      });
 
     it('softDeleteWorkItem moves item to trash so readWorkItem fails', async () => {
       await writeWorkItem(tmpDir, makeItem('10'));

@@ -41,7 +41,9 @@ describe('file sync detection', () => {
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-sync-'));
-    fs.mkdirSync(path.join(tmpDir, '.tic', 'items'), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, '.tic', 'items'), {
+      recursive: true,
+    });
 
     db = createDatabase(':memory:');
     backend = Storage.createFromDb(db);
@@ -49,7 +51,7 @@ describe('file sync detection', () => {
 
   afterEach(() => {
     backend.destroy();
-    fs.rmSync(tmpDir, { recursive: true });
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
   it('computes hashes for files on disk', async () => {

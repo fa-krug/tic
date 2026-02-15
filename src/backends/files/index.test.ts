@@ -13,12 +13,14 @@ describe('FilesBackend', () => {
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-files-'));
-    fs.mkdirSync(path.join(tmpDir, '.tic', 'items'), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, '.tic', 'items'), {
+      recursive: true,
+    });
     backend = new FilesBackend(tmpDir);
   });
 
   afterEach(() => {
-    fs.rmSync(tmpDir, { recursive: true });
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
   it('lists empty items directory', async () => {

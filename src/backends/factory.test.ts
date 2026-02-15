@@ -27,11 +27,19 @@ describe('VALID_BACKENDS', () => {
 });
 
 describe('detectBackend', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-detect-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
   it('returns none when git remote fails', () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-detect-'));
     const result = detectBackend(tmpDir);
     expect(result).toBe('none');
-    fs.rmSync(tmpDir, { recursive: true });
   });
 });
 
@@ -48,7 +56,7 @@ describe('createBackend', () => {
 
   afterEach(() => {
     configStore.getState().destroy();
-    fs.rmSync(tmpDir, { recursive: true });
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
   it('always creates a Storage as primary', async () => {
@@ -87,7 +95,7 @@ describe('createBackendWithSync', () => {
 
   afterEach(() => {
     configStore.getState().destroy();
-    fs.rmSync(tmpDir, { recursive: true });
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
   it('returns Storage and null syncManager for none backend', async () => {
