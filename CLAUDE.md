@@ -22,7 +22,7 @@ npm run format:check # Check formatting without writing
 
 ### MCP Server
 
-`tic mcp serve` starts an MCP server on stdio, exposing 14 tools for work item management (plus up to 8 PR tools when the backend supports pull requests). Connect it to Claude Code with:
+`tic mcp serve` starts an MCP server on stdio, exposing 14 tools for work item management (plus up to 8 PR tools when the backend supports pull requests, and 6 branch tools when in a git repo). Connect it to Claude Code with:
 
 ```bash
 claude mcp add --scope project --transport stdio tic -- npx tic mcp serve
@@ -46,7 +46,7 @@ Or add `.mcp.json` to the project root:
 
 ### Entry Point & Rendering
 
-`src/index.tsx` is the CLI entry point. It renders `<App>` using Ink's `render()`. On first run, the TUI auto-initializes by detecting the backend from git remotes and creating `.tic/tic.db`. The app uses screen-based routing via React Context (`AppContext` in `src/app.tsx`), with screens: `list`, `form`, `iteration-picker`, `settings`, `status`, `help`, `pr-list`.
+`src/index.tsx` is the CLI entry point. It renders `<App>` using Ink's `render()`. On first run, the TUI auto-initializes by detecting the backend from git remotes and creating `.tic/tic.db`. The app uses screen-based routing via React Context (`AppContext` in `src/app.tsx`), with screens: `list`, `form`, `iteration-picker`, `settings`, `status`, `help`, `pr-list`, `branch-list`.
 
 ### Backend Abstraction
 
@@ -84,7 +84,7 @@ Key modules in `src/storage/`:
 
 ### Components
 
-- `WorkItemList` — collapsible tree-indented table with keyboard navigation. Supports bulk operations via mark/unmark (`m`/`M`), inline property pickers via OverlayPanel (`s` status, `a` assignee, `l` labels, `t` type), search (`/`), command palette (`:`), branch/worktree creation (`b`), quick PR creation (`p`), PR list (`P`), bulk actions menu (`B`), detail panel toggle (`v`), and undo (`u`). Shows `⧗` indicator for items with dependencies. Responsive column hiding based on terminal width. Status, priority, and labels render as colored pills via `ColorPill`.
+- `WorkItemList` — collapsible tree-indented table with keyboard navigation. Supports bulk operations via mark/unmark (`m`/`M`), inline property pickers via OverlayPanel (`s` status, `a` assignee, `l` labels, `t` type), search (`/`), command palette (`:`), branch/worktree creation (`b`), quick PR creation (`p`), PR list (`P`), branch management (`B`), bulk actions menu (`x`), detail panel toggle (`v`), and undo (`u`). Shows `⧗` indicator for items with dependencies. Responsive column hiding based on terminal width. Status, priority, and labels render as colored pills via `ColorPill`.
 - `WorkItemForm` — multi-field form for create/edit with dropdowns, autocomplete inputs, multi-autocomplete (labels), and external `$EDITOR` for descriptions. Navigable relationship links allow drilling into related items with a back-stack. Also serves as the template editor via `formMode`. Display values for status, priority, type, and labels render as colored pills.
 - `OverlayPanel` — unified overlay component for search, bulk actions, and all property pickers. Supports single-select, multi-select, and freeform input modes with fuzzy filtering and category grouping. Accepts optional `fieldType` prop to show `ColorPill` previews alongside picker items.
 - `ColorPill` — reusable component rendering colored background pills for field values (status, priority, type, label). Resolves color via `themeStore.resolveFieldColor()`. Falls back to plain text when no color matches.
@@ -97,6 +97,7 @@ Key modules in `src/storage/`:
 - `HelpScreen` — context-sensitive keyboard shortcut reference (press `?` from any screen)
 - `AutocompleteInput` / `MultiAutocompleteInput` — fuzzy autocomplete inputs for single and comma-separated multi-value fields
 - `PullRequestList` — list view for pull requests (accessible via `P` from WorkItemList). Shows PR number, title, status, source→target branches, and author. Supports navigation (`Enter` to view details, `o` to open in browser), linking/unlinking work items, and colored status pills.
+- `BranchList` — branch lifecycle management screen (accessible via `B` from WorkItemList). Lists all branches with linked work items (`tic/{id}-*` pattern), worktree status, remote tracking (ahead/behind), and relative commit times. Supports switch (`Enter`), create (`n`), delete (`d`), merge (`m`), push (`P`), worktree shell (`w`), refresh/fetch (`r`), and search (`/`). Two-phase loading: instant local data, then background `git fetch`.
 - `TableLayout` — list rendering with responsive column visibility based on terminal width
 
 ### State Management
@@ -116,7 +117,7 @@ Zustand vanilla stores in `src/stores/`:
 
 ### CLI
 
-`src/cli/index.ts` defines CLI commands via Commander: `init` (with `--backend`), `item` (list/show/create/update/delete/open/comment), `pr` (list/show/create/merge/close/open/link/unlink), `iteration` (list/set), `config` (get/set), `auth` (login/status/logout), `mcp serve`. Global options: `--json`, `--quiet`.
+`src/cli/index.ts` defines CLI commands via Commander: `init` (with `--backend`), `item` (list/show/create/update/delete/open/comment), `pr` (list/show/create/merge/close/open/link/unlink), `branch` (list/switch/create/delete/merge/push), `iteration` (list/set), `config` (get/set), `auth` (login/status/logout), `mcp serve`. Global options: `--json`, `--quiet`.
 
 ### Authentication
 
