@@ -132,7 +132,6 @@ const commands: Command[] = [
     id: 'set-priority',
     label: 'Set priority',
     category: 'Bulk',
-    shortcut: 'P',
     when: (ctx) =>
       ctx.screen === 'list' &&
       ctx.capabilities.fields.priority &&

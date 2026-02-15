@@ -24,6 +24,7 @@ Built with TypeScript and [Ink](https://github.com/vadimdemedes/ink).
 - **Undo** — undo delete, create, and property changes with `u` (up to 5 actions deep)
 - **External editor** — edit descriptions in your `$EDITOR` (falls back to vi)
 - **Settings screen** — switch backends and configure Jira connection from within the TUI
+- **Pull requests** — view, create, merge, and close PRs from the TUI (GitHub backend); link PRs to work items
 - **MCP server** — expose work items to AI assistants via the Model Context Protocol
 
 ## Installation
@@ -76,11 +77,11 @@ The main screen shows work items filtered by type and iteration, displayed as a 
 | `:` | Command palette |
 | `s` | Set status (single or marked items) |
 | `S` | Sync status screen |
-| `p` | Set parent for selected item |
+| `p` | Create pull request for selected item |
 | `m` | Toggle mark on current item |
 | `M` | Clear all marks |
 | `B` | Bulk actions menu |
-| `P` | Set priority (single or marked items) |
+| `P` | Pull request list |
 | `a` | Set assignee (single or marked items) |
 | `l` | Set labels (single or marked items) |
 | `t` | Set type (single or marked items) |
@@ -157,6 +158,7 @@ That's it. The plugin installs tic automatically on first use.
 - List, search, create, update, and delete work items
 - Navigate parent-child hierarchies and dependencies
 - Add comments and manage iterations
+- Manage pull requests (list, create, merge, close, link to items)
 - Initialize tic in new projects
 
 The plugin auto-detects your backend (GitHub, GitLab, Azure DevOps, Jira, or local) and adapts to its capabilities.
@@ -192,6 +194,15 @@ tic auth login ado                   # Authenticate with Azure DevOps (Entra ID)
 tic auth login ado --pat             # Authenticate with a Personal Access Token
 tic auth status                      # Show authentication status
 tic auth logout github               # Remove stored credentials
+tic pr list                          # List pull requests
+tic pr list --status open            # Filter PRs by status
+tic pr show 123                      # Show PR details
+tic pr create --title "Feature" --source feat/branch  # Create a PR
+tic pr merge 123                     # Merge a PR
+tic pr close 123                     # Close a PR
+tic pr open 123                      # Open PR in browser
+tic pr link 123 42                   # Link PR to work item
+tic pr unlink 123 42                 # Unlink PR from work item
 ```
 
 Add `--json` to any command for machine-readable output, or `--quiet` to suppress non-essential output.

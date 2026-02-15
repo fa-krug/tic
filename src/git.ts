@@ -38,6 +38,22 @@ export function isGitRepo(root: string): boolean {
 }
 
 /**
+ * Return the name of the currently checked-out branch, or null if detached HEAD.
+ */
+export function getCurrentBranch(cwd: string): string | null {
+  try {
+    const output = execFileSync('git', ['symbolic-ref', '--short', 'HEAD'], {
+      cwd,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    return output.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Check whether a branch exists in the repository.
  */
 export function branchExists(name: string, cwd: string): boolean {

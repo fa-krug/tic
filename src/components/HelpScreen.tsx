@@ -56,9 +56,7 @@ export function getShortcuts(
       actions.push({ key: 'F', description: 'Filter items' });
       actions.push({ key: 'X', description: 'Clear all filters' });
       actions.push({ key: '/', description: 'Command bar' });
-      if (capabilities.fields.parent) {
-        actions.push({ key: 'p', description: 'Set parent' });
-      }
+      actions.push({ key: 'p', description: 'Create pull request' });
       actions.push({ key: 'm', description: 'Toggle mark' });
       actions.push({ key: 'M', description: 'Toggle mark all' });
       actions.push({ key: 'shift+↑↓', description: 'Range select' });

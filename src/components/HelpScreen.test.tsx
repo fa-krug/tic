@@ -72,7 +72,7 @@ describe('getShortcuts', () => {
   it('omits capability-dependent shortcuts when not supported', () => {
     const groups = getShortcuts('list', minimalCapabilities, false, false);
     const allKeys = groups.flatMap((g) => g.shortcuts.map((s) => s.key));
-    expect(allKeys).not.toContain('p'); // parent - needs capabilities.fields.parent
+    // 'p' (create PR) is always shown regardless of capabilities
     expect(allKeys).not.toContain('tab'); // type cycling - needs customTypes
     expect(allKeys).not.toContain('i'); // iteration picker - needs iterations
     expect(allKeys).not.toContain('r'); // sync - needs syncManager

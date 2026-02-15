@@ -58,12 +58,15 @@ The app uses screen-based routing via React Context (`AppContext` in `src/app.ts
 - `settings` — backend selection and Jira configuration
 - `status` — sync status and error details
 - `help` — context-sensitive keyboard shortcut reference
+- `pr-list` — pull request list (when backend supports PRs)
 
 ### Backend Abstraction
 
 `src/backends/types.ts` defines the `Backend` interface — CRUD for work items, iteration management, status/iteration/type lists, and relationship queries (`getChildren(id)`, `getDependents(id)`). All UI components interact through this interface only.
 
 `BaseBackend` (`src/backends/types.ts`) is the abstract base class all backends extend. It provides `validateFields()` to throw `UnsupportedOperationError` for fields the backend doesn't support, and `assertSupported()` for gating entire operations. Each backend implements `getCapabilities()` returning a `BackendCapabilities` object that declares supported feature groups and fields. TUI components, CLI commands, and MCP tools use capabilities to hide unsupported features.
+
+`PrBackend` is a separate interface for pull request operations (list, show, create, merge, close, link/unlink items). `isPrBackend()` type guard checks support. `PrCapabilities` declares available PR operations.
 
 `src/backends/factory.ts` handles backend creation and auto-detection from git remotes.
 
@@ -94,6 +97,7 @@ The app uses screen-based routing via React Context (`AppContext` in `src/app.ts
 - **Breadcrumbs** (`src/components/Breadcrumbs.tsx`) — breadcrumb navigation for form drill-down stack.
 - **AutocompleteInput** (`src/components/AutocompleteInput.tsx`) — single-value fuzzy autocomplete input.
 - **MultiAutocompleteInput** (`src/components/MultiAutocompleteInput.tsx`) — comma-separated multi-value autocomplete (used for labels).
+- **PullRequestList** (`src/components/PullRequestList.tsx`) — list view for pull requests. Shows PR number, title, status, branches, and author. Supports navigation, browser opening, and linking/unlinking work items.
 - **TableLayout** (`src/components/TableLayout.tsx`) — list rendering with responsive column visibility based on terminal width.
 - **Header** (`src/components/Header.tsx`) — top-level header bar.
 
@@ -113,7 +117,7 @@ State is managed via Zustand vanilla stores in `src/stores/`:
 
 ### CLI
 
-`src/cli/index.ts` defines the CLI commands using Commander. Commands include `init`, `item` (list/show/create/update/delete/open/comment), `iteration` (list/set), `config` (get/set), `auth` (login/status/logout), and `mcp serve`. Global options: `--json`, `--quiet`.
+`src/cli/index.ts` defines the CLI commands using Commander. Commands include `init`, `item` (list/show/create/update/delete/open/comment), `pr` (list/show/create/merge/close/open/link/unlink), `iteration` (list/set), `config` (get/set), `auth` (login/status/logout), and `mcp serve`. Global options: `--json`, `--quiet`.
 
 ### Authentication
 
@@ -132,6 +136,7 @@ State is managed via Zustand vanilla stores in `src/stores/`:
 - `WorkItem` — includes `parent: string | null` and `dependsOn: string[]`
 - `Comment` — author, date, body
 - `NewWorkItem` / `NewComment` — creation inputs
+- `PullRequest` / `NewPullRequest` — pull request data and creation inputs
 
 Validation (circular references, referential integrity) is enforced at the backend level. References are cleaned up on delete.
 

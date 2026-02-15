@@ -6,7 +6,7 @@ import {
   useNavigationStore,
 } from '../stores/navigationStore.js';
 import { listViewStore, useListViewStore } from '../stores/listViewStore.js';
-import { isGitRepo } from '../git.js';
+import { isGitRepo, getCurrentBranch, slugify } from '../git.js';
 import { beginImplementation } from '../implement.js';
 import { configStore, useConfigStore } from '../stores/configStore.js';
 import { uiStore, useUIStore, getOverlayTargetIds } from '../stores/uiStore.js';
@@ -36,6 +36,7 @@ import {
   useRecentCommandsStore,
 } from '../stores/recentCommandsStore.js';
 import { isSoftDeleteBackend } from '../backends/types.js';
+
 import { filterStore, useFilterStore } from '../stores/filterStore.js';
 import { useThemeStore } from '../stores/themeStore.js';
 import {
@@ -108,6 +109,7 @@ export function WorkItemList() {
   const backend = useBackendDataStore((s) => s.backend);
   const syncManager = useBackendDataStore((s) => s.syncManager);
   const capabilities = useBackendDataStore((s) => s.capabilities);
+  const prCapabilities = useBackendDataStore((s) => s.prCapabilities);
 
   // Changes on data refresh (grouped with useShallow)
   const {
@@ -753,10 +755,28 @@ export function WorkItemList() {
         setDescriptionScrollOffset(0);
       }
 
-      if (input === 'p' && capabilities.fields.parent && treeItems.length > 0) {
-        const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
-        if (targetIds.length > 0) {
-          openOverlay({ type: 'parent-input', targetIds });
+      if (input === 'p' && prCapabilities.create && treeItems.length > 0) {
+        const item = treeItems[cursor]?.item;
+        if (item) {
+          const cwd = process.cwd();
+          const currentBranch = getCurrentBranch(cwd);
+          const expectedBranch = `tic/${slugify(item.id, item.title)}`;
+          const sourceBranch = currentBranch ?? expectedBranch;
+          void backendDataStore
+            .getState()
+            .createPullRequest({
+              title: item.title,
+              sourceBranch,
+              linkedItems: [item.id],
+            })
+            .then((pr) => {
+              setToast(`PR #${String(pr.number)} created`);
+            })
+            .catch((err: unknown) => {
+              setWarning(
+                err instanceof Error ? err.message : 'Failed to create PR',
+              );
+            });
         }
       }
 
@@ -1402,7 +1422,6 @@ export function WorkItemList() {
                 id: 'parent',
                 label: 'Set parent',
                 value: 'parent',
-                hint: 'p',
               });
             }
             if (capabilities.customTypes) {
@@ -1418,7 +1437,6 @@ export function WorkItemList() {
                 id: 'priority',
                 label: 'Set priority',
                 value: 'priority',
-                hint: 'P',
               });
             }
             if (capabilities.fields.assignee) {
