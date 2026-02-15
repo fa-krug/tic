@@ -816,8 +816,26 @@ export function WorkItemList() {
         }
       }
 
-      if (input === 'B' && treeItems.length > 0) {
+      if (input === 'x' && treeItems.length > 0) {
         openOverlay({ type: 'bulk-menu' });
+      }
+
+      if (
+        input === 'y' &&
+        capabilities.fields.priority &&
+        treeItems.length > 0
+      ) {
+        const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+        if (targetIds.length > 0) {
+          openOverlay({ type: 'priority-picker', targetIds });
+        }
+      }
+
+      if (input === 'g' && capabilities.fields.parent && treeItems.length > 0) {
+        const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+        if (targetIds.length > 0) {
+          openOverlay({ type: 'parent-input', targetIds });
+        }
       }
 
       if (
@@ -1422,6 +1440,7 @@ export function WorkItemList() {
                 id: 'parent',
                 label: 'Set parent',
                 value: 'parent',
+                hint: 'g',
               });
             }
             if (capabilities.customTypes) {
@@ -1437,6 +1456,7 @@ export function WorkItemList() {
                 id: 'priority',
                 label: 'Set priority',
                 value: 'priority',
+                hint: 'y',
               });
             }
             if (capabilities.fields.assignee) {

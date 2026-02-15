@@ -60,10 +60,16 @@ export function getShortcuts(
       actions.push({ key: 'm', description: 'Toggle mark' });
       actions.push({ key: 'M', description: 'Toggle mark all' });
       actions.push({ key: 'shift+↑↓', description: 'Range select' });
-      actions.push({ key: 'B', description: 'Bulk actions menu' });
+      actions.push({ key: 'x', description: 'Bulk actions menu' });
       actions.push({ key: 's', description: 'Set status' });
       if (capabilities.customTypes) {
         actions.push({ key: 't', description: 'Set type' });
+      }
+      if (capabilities.fields.priority) {
+        actions.push({ key: 'y', description: 'Set priority' });
+      }
+      if (capabilities.fields.parent) {
+        actions.push({ key: 'g', description: 'Set parent' });
       }
       actions.push({ key: 'P', description: 'Pull requests' });
       if (capabilities.fields.assignee) {

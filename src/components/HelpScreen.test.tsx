@@ -64,7 +64,7 @@ describe('getShortcuts', () => {
     expect(allKeys).toContain('tab');
     expect(allKeys).toContain('i');
     expect(allKeys).toContain('r');
-    expect(allKeys).toContain('B'); // bulk actions menu (always present)
+    expect(allKeys).toContain('x'); // bulk actions menu (always present)
     expect(allKeys).toContain('b'); // branch/worktree (git available)
     expect(allKeys).toContain('/');
   });
@@ -81,7 +81,7 @@ describe('getShortcuts', () => {
     expect(allKeys).toContain('enter');
     expect(allKeys).toContain('c');
     expect(allKeys).toContain('q');
-    expect(allKeys).toContain('B'); // bulk actions menu - always present
+    expect(allKeys).toContain('x'); // bulk actions menu - always present
   });
 
   it('returns form shortcuts', () => {
