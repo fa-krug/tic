@@ -3,10 +3,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import yaml from 'yaml';
 import { eq, and, isNull, isNotNull, inArray } from 'drizzle-orm';
-import { BaseBackend } from '../backends/types.js';
+import { BaseBackend, UnsupportedOperationError } from '../backends/types.js';
 import type {
   BackendCapabilities,
   SoftDeleteBackend,
+  PrBackend,
+  PrCapabilities,
 } from '../backends/types.js';
 import type {
   WorkItem,
@@ -14,6 +16,8 @@ import type {
   NewComment,
   Comment,
   Template,
+  PullRequest,
+  NewPullRequest,
 } from '../types.js';
 import { createDatabase, type TicDatabase } from './db.js';
 import * as schema from './schema.js';
@@ -22,6 +26,7 @@ import type { Config } from './config.js';
 import {
   rowToWorkItem,
   rowToTemplate,
+  rowToPullRequest,
   type WorkItemRow,
   type WorkItemLabelRow,
   type WorkItemDepRow,
@@ -44,7 +49,10 @@ export interface StorageOptions {
   tempIds?: boolean;
 }
 
-export class Storage extends BaseBackend implements SoftDeleteBackend {
+export class Storage
+  extends BaseBackend
+  implements SoftDeleteBackend, PrBackend
+{
   private db: TicDatabase;
   private root: string;
   private tempIds: boolean;
@@ -1236,5 +1244,206 @@ export class Storage extends BaseBackend implements SoftDeleteBackend {
       .delete(schema.colorMappings)
       .where(eq(schema.colorMappings.fieldType, fieldType))
       .run();
+  }
+
+  // ── Pull Requests ────────────────────────────────
+
+  getPrCapabilities(): PrCapabilities {
+    return {
+      pullRequests: true,
+      merge: false,
+      create: false,
+    };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async listPullRequests(): Promise<PullRequest[]> {
+    const prRows = this.db.select().from(schema.pullRequests).all();
+
+    if (prRows.length === 0) return [];
+
+    const prIds = prRows.map((r) => r.id);
+    const linkRows = this.db
+      .select()
+      .from(schema.prItemLinks)
+      .where(inArray(schema.prItemLinks.prId, prIds))
+      .all();
+
+    const linksByPr = new Map<string, string[]>();
+    for (const link of linkRows) {
+      const arr = linksByPr.get(link.prId);
+      if (arr) arr.push(link.itemId);
+      else linksByPr.set(link.prId, [link.itemId]);
+    }
+
+    return prRows.map((row) =>
+      rowToPullRequest(row, linksByPr.get(row.id) ?? []),
+    );
+  }
+
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async getPullRequest(id: string): Promise<PullRequest | null> {
+    const row = this.db
+      .select()
+      .from(schema.pullRequests)
+      .where(eq(schema.pullRequests.id, id))
+      .get();
+
+    if (!row) return null;
+
+    const linkRows = this.db
+      .select()
+      .from(schema.prItemLinks)
+      .where(eq(schema.prItemLinks.prId, id))
+      .all();
+
+    return rowToPullRequest(
+      row,
+      linkRows.map((l) => l.itemId),
+    );
+  }
+
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async importPullRequest(pr: PullRequest): Promise<void> {
+    this.db.transaction((tx) => {
+      // Upsert PR
+      tx.insert(schema.pullRequests)
+        .values({
+          id: pr.id,
+          number: pr.number,
+          title: pr.title,
+          description: pr.description,
+          status: pr.status,
+          sourceBranch: pr.sourceBranch,
+          targetBranch: pr.targetBranch,
+          author: pr.author,
+          url: pr.url,
+          created: pr.created,
+          updated: pr.updated,
+        })
+        .onConflictDoUpdate({
+          target: schema.pullRequests.id,
+          set: {
+            number: pr.number,
+            title: pr.title,
+            description: pr.description,
+            status: pr.status,
+            sourceBranch: pr.sourceBranch,
+            targetBranch: pr.targetBranch,
+            author: pr.author,
+            url: pr.url,
+            created: pr.created,
+            updated: pr.updated,
+          },
+        })
+        .run();
+
+      // Replace linked items
+      tx.delete(schema.prItemLinks)
+        .where(eq(schema.prItemLinks.prId, pr.id))
+        .run();
+
+      if (pr.linkedItems.length > 0) {
+        tx.insert(schema.prItemLinks)
+          .values(pr.linkedItems.map((itemId) => ({ prId: pr.id, itemId })))
+          .run();
+      }
+    });
+  }
+
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async getLinkedPullRequests(itemId: string): Promise<PullRequest[]> {
+    const linkRows = this.db
+      .select({ prId: schema.prItemLinks.prId })
+      .from(schema.prItemLinks)
+      .where(eq(schema.prItemLinks.itemId, itemId))
+      .all();
+
+    if (linkRows.length === 0) return [];
+
+    const prIds = linkRows.map((r) => r.prId);
+    const prRows = this.db
+      .select()
+      .from(schema.pullRequests)
+      .where(inArray(schema.pullRequests.id, prIds))
+      .all();
+
+    if (prRows.length === 0) return [];
+
+    // Get all links for these PRs to populate linkedItems
+    const allLinks = this.db
+      .select()
+      .from(schema.prItemLinks)
+      .where(inArray(schema.prItemLinks.prId, prIds))
+      .all();
+
+    const linksByPr = new Map<string, string[]>();
+    for (const link of allLinks) {
+      const arr = linksByPr.get(link.prId);
+      if (arr) arr.push(link.itemId);
+      else linksByPr.set(link.prId, [link.itemId]);
+    }
+
+    return prRows.map((row) =>
+      rowToPullRequest(row, linksByPr.get(row.id) ?? []),
+    );
+  }
+
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async getLinkedItems(prId: string): Promise<string[]> {
+    const rows = this.db
+      .select({ itemId: schema.prItemLinks.itemId })
+      .from(schema.prItemLinks)
+      .where(eq(schema.prItemLinks.prId, prId))
+      .all();
+
+    return rows.map((r) => r.itemId);
+  }
+
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async linkItem(prId: string, itemId: string): Promise<void> {
+    this.db
+      .insert(schema.prItemLinks)
+      .values({ prId, itemId })
+      .onConflictDoNothing()
+      .run();
+  }
+
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async unlinkItem(prId: string, itemId: string): Promise<void> {
+    this.db
+      .delete(schema.prItemLinks)
+      .where(
+        and(
+          eq(schema.prItemLinks.prId, prId),
+          eq(schema.prItemLinks.itemId, itemId),
+        ),
+      )
+      .run();
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/require-await
+  async createPullRequest(_pr: NewPullRequest): Promise<PullRequest> {
+    throw new UnsupportedOperationError('pull request operations', 'Storage');
+  }
+
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async updatePullRequest(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _id: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _updates: Partial<NewPullRequest>,
+  ): Promise<PullRequest> {
+    throw new UnsupportedOperationError('pull request operations', 'Storage');
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/require-await
+  async mergePullRequest(_id: string): Promise<PullRequest> {
+    throw new UnsupportedOperationError('pull request operations', 'Storage');
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/require-await
+  async closePullRequest(_id: string): Promise<PullRequest> {
+    throw new UnsupportedOperationError('pull request operations', 'Storage');
   }
 }

@@ -1,5 +1,5 @@
 import type { Backend } from '../backends/types.js';
-import { isSyncableBackend } from '../backends/types.js';
+import { isSyncableBackend, isPrBackend } from '../backends/types.js';
 import type { SyncQueueAdapter } from './types.js';
 import type {
   QueueEntry,
@@ -439,6 +439,18 @@ export class SyncManager {
       for (const slug of localSlugs) {
         if (!remoteSlugs.has(slug) && !pendingTemplateSlugs.has(slug)) {
           await this.primary.deleteTemplate(slug);
+        }
+      }
+    }
+
+    // Pull PRs if supported by remote
+    if (isPrBackend(this.remote)) {
+      const remotePrs = await this.remote.listPullRequests();
+      const primaryStorage = this
+        .primary as import('../storage/index.js').Storage;
+      if ('importPullRequest' in primaryStorage) {
+        for (const pr of remotePrs) {
+          await primaryStorage.importPullRequest(pr);
         }
       }
     }

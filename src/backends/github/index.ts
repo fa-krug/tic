@@ -1,19 +1,27 @@
 import { execSync } from 'node:child_process';
 import open from 'open';
 import { BaseBackend, UnsupportedOperationError } from '../types.js';
-import type { BackendCapabilities } from '../types.js';
+import type {
+  BackendCapabilities,
+  PrBackend,
+  PrCapabilities,
+} from '../types.js';
 import type {
   WorkItem,
   NewWorkItem,
   NewComment,
   Comment,
   Template,
+  PullRequest,
+  NewPullRequest,
 } from '../../types.js';
 import { getGitHubToken, authenticateGitHub } from '../../auth/github.js';
 import { AuthError } from '../shared/api-client.js';
 import { GitHubApiClient } from './api.js';
 import { mapIssueToWorkItem } from './mappers.js';
 import type { GhIssue, GhMilestone } from './mappers.js';
+import { mapGhPrToPullRequest } from './pr-mappers.js';
+import type { GhPullRequest } from './pr-mappers.js';
 
 const LIST_ISSUES_QUERY = `
   query($owner: String!, $repo: String!, $cursor: String) {
@@ -126,7 +134,7 @@ export interface GitHubBackendOptions {
   skipAuth?: boolean;
 }
 
-export class GitHubBackend extends BaseBackend {
+export class GitHubBackend extends BaseBackend implements PrBackend {
   private api: GitHubApiClient;
   private owner: string;
   private repo: string;
@@ -475,6 +483,109 @@ export class GitHubBackend extends BaseBackend {
   }
   async deleteTemplate(_slug: string): Promise<void> {
     throw new UnsupportedOperationError('templates', 'GitHubBackend');
+  }
+  /* eslint-enable @typescript-eslint/require-await, @typescript-eslint/no-unused-vars */
+
+  // --- PrBackend implementation ---
+
+  getPrCapabilities(): PrCapabilities {
+    return { pullRequests: true, merge: true, create: true };
+  }
+
+  async listPullRequests(): Promise<PullRequest[]> {
+    const allPrs: GhPullRequest[] = [];
+    for await (const page of this.api.paginate<GhPullRequest>(
+      `/repos/${this.owner}/${this.repo}/pulls?state=all`,
+    )) {
+      allPrs.push(...page);
+    }
+    return allPrs.map(mapGhPrToPullRequest);
+  }
+
+  async getPullRequest(id: string): Promise<PullRequest | null> {
+    const num = Number(id.replace('pr-', ''));
+    try {
+      const gh = await this.api.rest<GhPullRequest>(
+        'GET',
+        `/repos/${this.owner}/${this.repo}/pulls/${num}`,
+      );
+      return mapGhPrToPullRequest(gh);
+    } catch {
+      return null;
+    }
+  }
+
+  async createPullRequest(pr: NewPullRequest): Promise<PullRequest> {
+    const gh = await this.api.rest<GhPullRequest>(
+      'POST',
+      `/repos/${this.owner}/${this.repo}/pulls`,
+      {
+        title: pr.title,
+        body: pr.description || '',
+        head: pr.sourceBranch,
+        base: pr.targetBranch || 'main',
+      },
+    );
+    return mapGhPrToPullRequest(gh);
+  }
+
+  async updatePullRequest(
+    id: string,
+    updates: Partial<NewPullRequest>,
+  ): Promise<PullRequest> {
+    const num = Number(id.replace('pr-', ''));
+    const body: Record<string, unknown> = {};
+    if (updates.title !== undefined) body['title'] = updates.title;
+    if (updates.description !== undefined) body['body'] = updates.description;
+    const gh = await this.api.rest<GhPullRequest>(
+      'PATCH',
+      `/repos/${this.owner}/${this.repo}/pulls/${num}`,
+      body,
+    );
+    return mapGhPrToPullRequest(gh);
+  }
+
+  async mergePullRequest(id: string): Promise<PullRequest> {
+    const num = Number(id.replace('pr-', ''));
+    await this.api.rest(
+      'PUT',
+      `/repos/${this.owner}/${this.repo}/pulls/${num}/merge`,
+      {},
+    );
+    // Re-fetch to get updated status
+    const gh = await this.api.rest<GhPullRequest>(
+      'GET',
+      `/repos/${this.owner}/${this.repo}/pulls/${num}`,
+    );
+    return mapGhPrToPullRequest(gh);
+  }
+
+  async closePullRequest(id: string): Promise<PullRequest> {
+    const num = Number(id.replace('pr-', ''));
+    const gh = await this.api.rest<GhPullRequest>(
+      'PATCH',
+      `/repos/${this.owner}/${this.repo}/pulls/${num}`,
+      { state: 'closed' },
+    );
+    return mapGhPrToPullRequest(gh);
+  }
+
+  // These delegate to Storage (local), not GitHub API
+  /* eslint-disable @typescript-eslint/require-await, @typescript-eslint/no-unused-vars */
+  async getLinkedPullRequests(_itemId: string): Promise<PullRequest[]> {
+    return []; // Handled by Storage, not remote
+  }
+
+  async getLinkedItems(_prId: string): Promise<string[]> {
+    return []; // Handled by Storage, not remote
+  }
+
+  async linkItem(_prId: string, _itemId: string): Promise<void> {
+    // Handled by Storage, not remote
+  }
+
+  async unlinkItem(_prId: string, _itemId: string): Promise<void> {
+    // Handled by Storage, not remote
   }
   /* eslint-enable @typescript-eslint/require-await, @typescript-eslint/no-unused-vars */
 

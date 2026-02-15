@@ -5,7 +5,11 @@ export type QueueAction =
   | 'comment'
   | 'template-create'
   | 'template-update'
-  | 'template-delete';
+  | 'template-delete'
+  | 'pr-create'
+  | 'pr-update'
+  | 'pr-link'
+  | 'pr-unlink';
 
 export interface QueueEntry {
   action: QueueAction;

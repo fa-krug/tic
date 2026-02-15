@@ -1,4 +1,10 @@
-import type { WorkItem, Comment, Template } from '../types.js';
+import type {
+  WorkItem,
+  Comment,
+  Template,
+  PullRequest,
+  PullRequestStatus,
+} from '../types.js';
 import type {
   workItems,
   workItemLabels,
@@ -7,6 +13,8 @@ import type {
   templates,
   templateLabels,
   templateDeps,
+  pullRequests,
+  prItemLinks,
 } from './schema.js';
 
 /** Row type from the work_items table */
@@ -20,6 +28,12 @@ export type WorkItemDepRow = typeof workItemDeps.$inferSelect;
 
 /** Row type from the comments table */
 export type CommentRow = typeof comments.$inferSelect;
+
+/** Row type from the pull_requests table */
+export type PullRequestRow = typeof pullRequests.$inferSelect;
+
+/** Row type from the pr_item_links table */
+export type PrItemLinkRow = typeof prItemLinks.$inferSelect;
 
 /** Row type from the templates table */
 export type TemplateRow = typeof templates.$inferSelect;
@@ -112,5 +126,28 @@ export function rowToTemplate(
     parent: row.parent,
     dependsOn: deps.length > 0 ? deps.map((d) => d.dependsOnId) : undefined,
     description: row.description || undefined,
+  };
+}
+
+/**
+ * Assemble a PullRequest from a DB row plus linked item IDs.
+ */
+export function rowToPullRequest(
+  row: PullRequestRow,
+  linkedItemIds: string[],
+): PullRequest {
+  return {
+    id: row.id,
+    number: row.number,
+    title: row.title,
+    description: row.description,
+    status: row.status as PullRequestStatus,
+    sourceBranch: row.sourceBranch,
+    targetBranch: row.targetBranch,
+    author: row.author,
+    linkedItems: linkedItemIds,
+    created: row.created,
+    updated: row.updated,
+    url: row.url,
   };
 }

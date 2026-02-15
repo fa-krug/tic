@@ -1,7 +1,12 @@
 import { createStore } from 'zustand/vanilla';
 import { useStore } from 'zustand';
-import type { Backend, BackendCapabilities } from '../backends/types.js';
-import type { WorkItem } from '../types.js';
+import type {
+  Backend,
+  BackendCapabilities,
+  PrCapabilities,
+} from '../backends/types.js';
+import { isPrBackend } from '../backends/types.js';
+import type { WorkItem, PullRequest, NewPullRequest } from '../types.js';
 import type { SyncQueueAdapter, SyncStatus } from '../sync/types.js';
 import type { SyncManager } from '../sync/SyncManager.js';
 import { configStore } from './configStore.js';
@@ -53,9 +58,17 @@ export interface AuthFlowState {
   error?: string;
 }
 
+export const defaultPrCapabilities: PrCapabilities = {
+  pullRequests: false,
+  merge: false,
+  create: false,
+};
+
 export interface BackendDataStoreState {
   items: WorkItem[];
   capabilities: BackendCapabilities;
+  pullRequests: PullRequest[];
+  prCapabilities: PrCapabilities;
   statuses: string[];
   iterations: string[];
   types: string[];
@@ -90,6 +103,15 @@ export interface BackendDataStoreState {
   submitJiraCredentials(email: string, token: string): Promise<void>;
   destroy(): void;
 
+  // PR operations
+  loadPullRequests: () => Promise<void>;
+  getLinkedPullRequests: (itemId: string) => Promise<PullRequest[]>;
+  createPullRequest: (pr: NewPullRequest) => Promise<PullRequest>;
+  mergePullRequest: (id: string) => Promise<PullRequest>;
+  closePullRequest: (id: string) => Promise<PullRequest>;
+  linkPrItem: (prId: string, itemId: string) => Promise<void>;
+  unlinkPrItem: (prId: string, itemId: string) => Promise<void>;
+
   // Color mapping operations (delegate to Storage)
   setColorMapping(
     fieldType: string,
@@ -104,6 +126,7 @@ export interface BackendDataStoreState {
 
 // Module-level references (not reactive state)
 let currentBackend: Backend | null = null;
+let currentRemoteBackend: Backend | null = null;
 let currentCwd: string | null = null;
 let initGeneration = 0;
 let currentSyncUnsubscribe: (() => void) | null = null;
@@ -151,6 +174,8 @@ async function createBackendAndSync(cwd: string): Promise<{
     }
   }
 
+  currentRemoteBackend = remote;
+
   let syncManager: SyncManager | null = null;
   let queue: SyncQueueAdapter | null = null;
   if (remote) {
@@ -167,6 +192,8 @@ export const backendDataStore = createStore<BackendDataStoreState>(
   (set, get) => ({
     items: [],
     capabilities: { ...defaultCapabilities },
+    pullRequests: [],
+    prCapabilities: { ...defaultPrCapabilities },
     statuses: [],
     iterations: [],
     types: [],
@@ -262,6 +289,8 @@ export const backendDataStore = createStore<BackendDataStoreState>(
           items,
           error: null,
         });
+
+        await get().loadPullRequests();
       } catch (e) {
         set({ error: e instanceof Error ? e.message : String(e) });
       }
@@ -333,6 +362,8 @@ export const backendDataStore = createStore<BackendDataStoreState>(
           return;
         }
 
+        currentRemoteBackend = remote;
+
         const { SyncManager: SM } = await import('../sync/SyncManager.js');
         const { SyncQueue } = await import('../storage/syncQueue.js');
         type StorageType = import('../storage/index.js').Storage;
@@ -398,6 +429,8 @@ export const backendDataStore = createStore<BackendDataStoreState>(
         if (generation !== initGeneration || !remote || !currentBackend) {
           return;
         }
+
+        currentRemoteBackend = remote;
 
         const { SyncManager: SM } = await import('../sync/SyncManager.js');
         const { SyncQueue } = await import('../storage/syncQueue.js');
@@ -492,6 +525,8 @@ export const backendDataStore = createStore<BackendDataStoreState>(
           return;
         }
 
+        currentRemoteBackend = remote;
+
         const { SyncManager: SM } = await import('../sync/SyncManager.js');
         const { SyncQueue } = await import('../storage/syncQueue.js');
         type StorageType = import('../storage/index.js').Storage;
@@ -528,6 +563,77 @@ export const backendDataStore = createStore<BackendDataStoreState>(
           },
         });
       }
+    },
+
+    // PR operations
+    async loadPullRequests() {
+      if (!currentBackend) return;
+      if (isPrBackend(currentBackend)) {
+        const [pullRequests, prCapabilities] = await Promise.all([
+          currentBackend.listPullRequests(),
+          Promise.resolve(currentBackend.getPrCapabilities()),
+        ]);
+        set({ pullRequests, prCapabilities });
+      } else {
+        set({ pullRequests: [], prCapabilities: { ...defaultPrCapabilities } });
+      }
+    },
+
+    async getLinkedPullRequests(itemId: string) {
+      if (!currentBackend || !isPrBackend(currentBackend)) return [];
+      return currentBackend.getLinkedPullRequests(itemId);
+    },
+
+    async createPullRequest(pr: NewPullRequest) {
+      if (!currentRemoteBackend || !isPrBackend(currentRemoteBackend)) {
+        throw new Error('Remote backend does not support pull requests');
+      }
+      const result = await currentRemoteBackend.createPullRequest(pr);
+      // Import into local storage
+      if (currentBackend && isPrBackend(currentBackend)) {
+        type StorageType = import('../storage/index.js').Storage;
+        await (currentBackend as StorageType).importPullRequest(result);
+      }
+      await get().loadPullRequests();
+      return result;
+    },
+
+    async mergePullRequest(id: string) {
+      if (!currentRemoteBackend || !isPrBackend(currentRemoteBackend)) {
+        throw new Error('Remote backend does not support pull requests');
+      }
+      const result = await currentRemoteBackend.mergePullRequest(id);
+      if (currentBackend && isPrBackend(currentBackend)) {
+        type StorageType = import('../storage/index.js').Storage;
+        await (currentBackend as StorageType).importPullRequest(result);
+      }
+      await get().loadPullRequests();
+      return result;
+    },
+
+    async closePullRequest(id: string) {
+      if (!currentRemoteBackend || !isPrBackend(currentRemoteBackend)) {
+        throw new Error('Remote backend does not support pull requests');
+      }
+      const result = await currentRemoteBackend.closePullRequest(id);
+      if (currentBackend && isPrBackend(currentBackend)) {
+        type StorageType = import('../storage/index.js').Storage;
+        await (currentBackend as StorageType).importPullRequest(result);
+      }
+      await get().loadPullRequests();
+      return result;
+    },
+
+    async linkPrItem(prId: string, itemId: string) {
+      if (!currentBackend || !isPrBackend(currentBackend)) return;
+      await currentBackend.linkItem(prId, itemId);
+      await get().loadPullRequests();
+    },
+
+    async unlinkPrItem(prId: string, itemId: string) {
+      if (!currentBackend || !isPrBackend(currentBackend)) return;
+      await currentBackend.unlinkItem(prId, itemId);
+      await get().loadPullRequests();
     },
 
     async setColorMapping(
@@ -593,10 +699,13 @@ export const backendDataStore = createStore<BackendDataStoreState>(
         (currentBackend as { destroy(): void }).destroy();
       }
       currentBackend = null;
+      currentRemoteBackend = null;
       currentCwd = null;
       set({
         items: [],
         capabilities: { ...defaultCapabilities },
+        pullRequests: [],
+        prCapabilities: { ...defaultPrCapabilities },
         statuses: [],
         iterations: [],
         types: [],
