@@ -10,6 +10,7 @@ export type Screen =
   | 'form'
   | 'iteration-picker'
   | 'pr-list'
+  | 'branch-list'
   | 'settings'
   | 'status'
   | 'help';

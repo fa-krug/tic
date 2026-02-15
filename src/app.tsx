@@ -41,6 +41,11 @@ const PullRequestList = lazy(() =>
     default: m.PullRequestList,
   })),
 );
+const BranchList = lazy(() =>
+  import('./components/BranchList.js').then((m) => ({
+    default: m.BranchList,
+  })),
+);
 const AuthPrompt = lazy(() =>
   import('./components/AuthPrompt.js').then((m) => ({
     default: m.AuthPrompt,
@@ -80,6 +85,7 @@ export function App() {
             {screen === 'form' && <WorkItemForm />}
             {screen === 'iteration-picker' && <IterationPicker />}
             {screen === 'pr-list' && <PullRequestList />}
+            {screen === 'branch-list' && <BranchList />}
             {screen === 'settings' && <Settings />}
             {screen === 'status' && <StatusScreen />}
             {screen === 'help' && <HelpScreen sourceScreen={previousScreen} />}
