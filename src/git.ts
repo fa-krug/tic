@@ -141,3 +141,84 @@ export function worktreeExists(worktreePath: string): boolean {
     return false;
   }
 }
+
+export interface BranchInfo {
+  name: string;
+  current: boolean;
+  upstream: string | null;
+  ahead: number;
+  behind: number;
+  lastCommitDate: string;
+}
+
+export interface WorktreeInfo {
+  path: string;
+  branch: string | null;
+  head: string;
+  bare: boolean;
+}
+
+export function listBranches(cwd: string): BranchInfo[] {
+  const format =
+    '%(HEAD)%00%(refname:short)%00%(upstream:short)%00%(upstream:track)%00%(committerdate:iso-strict)';
+  const output = execFileSync(
+    'git',
+    ['for-each-ref', '--format', format, 'refs/heads/'],
+    { cwd, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] },
+  );
+
+  return output
+    .trim()
+    .split('\n')
+    .filter((line) => line.length > 0)
+    .map((line) => {
+      const [head, name, upstream, track, date] = line.split('\0');
+      const aheadMatch = track?.match(/ahead (\d+)/);
+      const behindMatch = track?.match(/behind (\d+)/);
+      return {
+        name: name!,
+        current: head === '*',
+        upstream: upstream || null,
+        ahead: aheadMatch ? parseInt(aheadMatch[1]!, 10) : 0,
+        behind: behindMatch ? parseInt(behindMatch[1]!, 10) : 0,
+        lastCommitDate: date ?? '',
+      };
+    });
+}
+
+export function listWorktrees(cwd: string): WorktreeInfo[] {
+  const output = execFileSync('git', ['worktree', 'list', '--porcelain'], {
+    cwd,
+    encoding: 'utf-8',
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+
+  const worktrees: WorktreeInfo[] = [];
+  let current: Partial<WorktreeInfo> = {};
+
+  for (const line of output.split('\n')) {
+    if (line.startsWith('worktree ')) {
+      current.path = line.slice('worktree '.length);
+    } else if (line.startsWith('HEAD ')) {
+      current.head = line.slice('HEAD '.length);
+    } else if (line.startsWith('branch ')) {
+      const ref = line.slice('branch '.length);
+      current.branch = ref.replace('refs/heads/', '');
+    } else if (line === 'bare') {
+      current.bare = true;
+    } else if (line === 'detached') {
+      current.branch = null;
+    } else if (line === '') {
+      if (current.path) {
+        worktrees.push({
+          path: current.path,
+          branch: current.branch ?? null,
+          head: current.head ?? '',
+          bare: current.bare ?? false,
+        });
+      }
+      current = {};
+    }
+  }
+  return worktrees;
+}

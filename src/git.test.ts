@@ -12,6 +12,8 @@ import {
   hasUncommittedChanges,
   createWorktree,
   worktreeExists,
+  listBranches,
+  listWorktrees,
 } from './git.js';
 
 describe('slugify', () => {
@@ -208,5 +210,109 @@ describe('git operations', () => {
       createWorktree(worktreePath, 'wt-exists-branch', tmpDir);
       expect(worktreeExists(worktreePath)).toBe(true);
     });
+  });
+});
+
+describe('listBranches', () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = fs.realpathSync(
+      fs.mkdtempSync(path.join(os.tmpdir(), 'tic-git-test-')),
+    );
+    execFileSync('git', ['init'], { cwd: dir, stdio: 'pipe' });
+    execFileSync('git', ['config', 'user.email', 'test@test.com'], {
+      cwd: dir,
+      stdio: 'pipe',
+    });
+    execFileSync('git', ['config', 'user.name', 'Test'], {
+      cwd: dir,
+      stdio: 'pipe',
+    });
+    fs.writeFileSync(path.join(dir, 'file.txt'), 'hello');
+    execFileSync('git', ['add', '.'], { cwd: dir, stdio: 'pipe' });
+    execFileSync('git', ['commit', '-m', 'initial'], {
+      cwd: dir,
+      stdio: 'pipe',
+    });
+  });
+
+  afterEach(() => {
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('lists branches with current branch marked', () => {
+    execFileSync('git', ['branch', 'feature-1'], { cwd: dir, stdio: 'pipe' });
+    const branches = listBranches(dir);
+    expect(branches.length).toBe(2);
+
+    const current = branches.find((b) => b.current);
+    expect(current).toBeDefined();
+    expect(current!.name).toMatch(/main|master/);
+
+    const feature = branches.find((b) => b.name === 'feature-1');
+    expect(feature).toBeDefined();
+    expect(feature!.current).toBe(false);
+  });
+
+  it('returns empty upstream for local-only branches', () => {
+    const branches = listBranches(dir);
+    expect(branches[0]!.upstream).toBeNull();
+    expect(branches[0]!.ahead).toBe(0);
+    expect(branches[0]!.behind).toBe(0);
+  });
+
+  it('includes last commit info', () => {
+    const branches = listBranches(dir);
+    expect(branches[0]!.lastCommitDate).toBeTruthy();
+  });
+});
+
+describe('listWorktrees', () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = fs.realpathSync(
+      fs.mkdtempSync(path.join(os.tmpdir(), 'tic-git-test-')),
+    );
+    execFileSync('git', ['init'], { cwd: dir, stdio: 'pipe' });
+    execFileSync('git', ['config', 'user.email', 'test@test.com'], {
+      cwd: dir,
+      stdio: 'pipe',
+    });
+    execFileSync('git', ['config', 'user.name', 'Test'], {
+      cwd: dir,
+      stdio: 'pipe',
+    });
+    fs.writeFileSync(path.join(dir, 'file.txt'), 'hello');
+    execFileSync('git', ['add', '.'], { cwd: dir, stdio: 'pipe' });
+    execFileSync('git', ['commit', '-m', 'initial'], {
+      cwd: dir,
+      stdio: 'pipe',
+    });
+  });
+
+  afterEach(() => {
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('lists the main worktree', () => {
+    const worktrees = listWorktrees(dir);
+    expect(worktrees.length).toBe(1);
+    expect(worktrees[0]!.branch).toMatch(/main|master/);
+  });
+
+  it('lists additional worktrees', () => {
+    execFileSync('git', ['branch', 'wt-branch'], { cwd: dir, stdio: 'pipe' });
+    const wtPath = path.join(dir, '.worktrees', 'wt-branch');
+    execFileSync('git', ['worktree', 'add', wtPath, 'wt-branch'], {
+      cwd: dir,
+      stdio: 'pipe',
+    });
+    const worktrees = listWorktrees(dir);
+    expect(worktrees.length).toBe(2);
+    const added = worktrees.find((w) => w.branch === 'wt-branch');
+    expect(added).toBeDefined();
+    expect(added!.path).toBe(wtPath);
   });
 });
