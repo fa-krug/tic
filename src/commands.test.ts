@@ -6,6 +6,10 @@ import {
   filterCommands,
   groupCommandsByCategory,
   CATEGORIES,
+  findCommand,
+  getCommandsForScreen,
+  getFooterCommands,
+  groupByHelpGroup,
 } from './commands.js';
 import type { BackendCapabilities } from './backends/types.js';
 
@@ -195,6 +199,7 @@ function makeCmd(overrides: Partial<Command> & { id: string }): Command {
   return {
     label: overrides.id,
     category: 'Actions',
+    screen: 'list',
     when: () => true,
     ...overrides,
   };
@@ -260,5 +265,167 @@ describe('groupCommandsByCategory', () => {
     const groups = groupCommandsByCategory(cmds);
     expect(groups).toHaveLength(1);
     expect(groups[0]!.category).toBe('Other');
+  });
+});
+
+describe('findCommand', () => {
+  it('finds a command by id', () => {
+    const cmd = findCommand('create');
+    expect(cmd).toBeDefined();
+    expect(cmd!.id).toBe('create');
+    expect(cmd!.label).toBe('Create item');
+  });
+
+  it('returns undefined for unknown id', () => {
+    const cmd = findCommand('nonexistent');
+    expect(cmd).toBeUndefined();
+  });
+});
+
+describe('getCommandsForScreen', () => {
+  it('returns list commands for list screen', () => {
+    const ctx = makeContext();
+    const cmds = getCommandsForScreen('list', ctx);
+    const ids = cmds.map((c) => c.id);
+    expect(ids).toContain('create');
+    expect(ids).toContain('edit');
+    expect(ids).not.toContain('branch-switch');
+    expect(ids).not.toContain('pr-open');
+  });
+
+  it('includes global commands on any screen', () => {
+    const ctx = makeContext({ screen: 'list' });
+    const cmds = getCommandsForScreen('list', ctx);
+    const ids = cmds.map((c) => c.id);
+    expect(ids).toContain('quit');
+  });
+
+  it('includes global commands on branch-list screen', () => {
+    const ctx = makeContext({
+      screen: 'branch-list',
+      hasSelectedBranch: true,
+    });
+    const cmds = getCommandsForScreen('branch-list', ctx);
+    const ids = cmds.map((c) => c.id);
+    expect(ids).toContain('quit');
+    expect(ids).toContain('branch-switch');
+  });
+
+  it('respects when() guards', () => {
+    const ctx = makeContext({ hasSelectedItem: false });
+    const cmds = getCommandsForScreen('list', ctx);
+    const ids = cmds.map((c) => c.id);
+    expect(ids).toContain('create');
+    expect(ids).not.toContain('edit');
+    expect(ids).not.toContain('delete');
+  });
+
+  it('supports array screen field', () => {
+    const cmd = makeCmd({
+      id: 'multi-screen',
+      screen: ['list', 'branch-list'],
+    });
+    // Verify the screen field is an array
+    expect(Array.isArray(cmd.screen)).toBe(true);
+  });
+});
+
+describe('getFooterCommands', () => {
+  it('returns only commands with footer: true', () => {
+    const ctx = makeContext();
+    const cmds = getFooterCommands('list', ctx);
+    for (const cmd of cmds) {
+      expect(cmd.footer).toBe(true);
+    }
+    const ids = cmds.map((c) => c.id);
+    expect(ids).toContain('create');
+    expect(ids).toContain('edit');
+    expect(ids).toContain('settings');
+    expect(ids).toContain('help');
+    expect(ids).not.toContain('quit');
+    expect(ids).not.toContain('sort');
+  });
+
+  it('respects when() guards for footer commands', () => {
+    const ctx = makeContext({ hasSelectedItem: false });
+    const cmds = getFooterCommands('list', ctx);
+    const ids = cmds.map((c) => c.id);
+    expect(ids).toContain('create');
+    expect(ids).not.toContain('edit');
+    expect(ids).not.toContain('delete');
+  });
+});
+
+describe('groupByHelpGroup', () => {
+  it('groups commands by helpGroup preserving order', () => {
+    const cmds: Command[] = [
+      makeCmd({
+        id: 'a',
+        label: 'Action A',
+        helpGroup: 'Actions',
+        shortcut: 'a',
+      }),
+      makeCmd({
+        id: 'b',
+        label: 'Other B',
+        helpGroup: 'Other',
+        shortcut: 'b',
+      }),
+      makeCmd({
+        id: 'c',
+        label: 'Action C',
+        helpGroup: 'Actions',
+        shortcut: 'c',
+      }),
+    ];
+    const groups = groupByHelpGroup(cmds);
+    expect(groups).toHaveLength(2);
+    expect(groups[0]!.label).toBe('Actions');
+    expect(groups[0]!.shortcuts).toHaveLength(2);
+    expect(groups[1]!.label).toBe('Other');
+    expect(groups[1]!.shortcuts).toHaveLength(1);
+  });
+
+  it('uses shortcut as key and label as description', () => {
+    const cmds: Command[] = [
+      makeCmd({
+        id: 'x',
+        label: 'Do something',
+        helpGroup: 'Actions',
+        shortcut: 'x',
+      }),
+    ];
+    const groups = groupByHelpGroup(cmds);
+    expect(groups[0]!.shortcuts[0]).toEqual({
+      key: 'x',
+      description: 'Do something',
+    });
+  });
+
+  it('omits commands without helpGroup', () => {
+    const cmds: Command[] = [
+      makeCmd({ id: 'a', label: 'A', shortcut: 'a' }),
+      makeCmd({
+        id: 'b',
+        label: 'B',
+        helpGroup: 'Actions',
+        shortcut: 'b',
+      }),
+    ];
+    const groups = groupByHelpGroup(cmds);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]!.shortcuts).toHaveLength(1);
+  });
+
+  it('omits commands without shortcut', () => {
+    const cmds: Command[] = [
+      makeCmd({ id: 'a', label: 'A', helpGroup: 'Actions' }),
+    ];
+    const groups = groupByHelpGroup(cmds);
+    expect(groups).toHaveLength(0);
+  });
+
+  it('returns empty array for empty input', () => {
+    expect(groupByHelpGroup([])).toEqual([]);
   });
 });

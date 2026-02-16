@@ -36,7 +36,11 @@ export interface Command {
   label: string;
   category: CommandCategory;
   shortcut?: string;
-  when: (ctx: CommandContext) => boolean;
+  screen: Screen | Screen[] | 'global';
+  helpGroup?: string;
+  footer?: boolean;
+  footerLabel?: string;
+  when?: (ctx: CommandContext) => boolean;
 }
 
 const commands: Command[] = [
@@ -46,6 +50,10 @@ const commands: Command[] = [
     label: 'Create item',
     category: 'Actions',
     shortcut: 'c',
+    screen: 'list',
+    helpGroup: 'Actions',
+    footer: true,
+    footerLabel: 'create',
     when: (ctx) => ctx.screen === 'list',
   },
   {
@@ -53,6 +61,10 @@ const commands: Command[] = [
     label: 'Edit item',
     category: 'Actions',
     shortcut: 'enter',
+    screen: 'list',
+    helpGroup: 'Actions',
+    footer: true,
+    footerLabel: 'edit',
     when: (ctx) => ctx.screen === 'list' && ctx.hasSelectedItem,
   },
   {
@@ -60,6 +72,10 @@ const commands: Command[] = [
     label: 'Delete item',
     category: 'Actions',
     shortcut: 'd',
+    screen: 'list',
+    helpGroup: 'Actions',
+    footer: true,
+    footerLabel: 'delete',
     when: (ctx) => ctx.screen === 'list' && ctx.hasSelectedItem,
   },
   {
@@ -67,6 +83,8 @@ const commands: Command[] = [
     label: 'Open in browser',
     category: 'Actions',
     shortcut: 'o',
+    screen: 'list',
+    helpGroup: 'Actions',
     when: (ctx) => ctx.screen === 'list' && ctx.hasSelectedItem,
   },
   {
@@ -74,6 +92,8 @@ const commands: Command[] = [
     label: 'Create branch/worktree',
     category: 'Actions',
     shortcut: 'b',
+    screen: 'list',
+    helpGroup: 'Other',
     when: (ctx) =>
       ctx.screen === 'list' && ctx.hasSelectedItem && ctx.gitAvailable,
   },
@@ -82,6 +102,8 @@ const commands: Command[] = [
     label: 'Refresh/sync',
     category: 'Actions',
     shortcut: 'r',
+    screen: 'list',
+    helpGroup: 'Other',
     when: (ctx) => ctx.screen === 'list' && ctx.hasSyncManager,
   },
   {
@@ -89,6 +111,8 @@ const commands: Command[] = [
     label: 'Order by...',
     category: 'Actions',
     shortcut: 'O',
+    screen: 'list',
+    helpGroup: 'Actions',
     when: (ctx) => ctx.screen === 'list',
   },
   // Navigation
@@ -97,6 +121,8 @@ const commands: Command[] = [
     label: 'Go to iterations',
     category: 'Navigation',
     shortcut: 'i',
+    screen: 'list',
+    helpGroup: 'Switching',
     when: (ctx) => ctx.screen === 'list' && ctx.capabilities.iterations,
   },
   {
@@ -104,6 +130,10 @@ const commands: Command[] = [
     label: 'Go to settings',
     category: 'Navigation',
     shortcut: ',',
+    screen: 'list',
+    helpGroup: 'Switching',
+    footer: true,
+    footerLabel: 'settings',
     when: (ctx) => ctx.screen === 'list',
   },
   {
@@ -111,6 +141,8 @@ const commands: Command[] = [
     label: 'Go to status',
     category: 'Navigation',
     shortcut: 's',
+    screen: 'list',
+    helpGroup: 'Actions',
     when: (ctx) => ctx.screen === 'list',
   },
   {
@@ -118,6 +150,9 @@ const commands: Command[] = [
     label: 'Go to help',
     category: 'Navigation',
     shortcut: '?',
+    screen: 'global',
+    footer: true,
+    footerLabel: 'help',
     when: (ctx) =>
       ctx.screen === 'list' ||
       ctx.screen === 'branch-list' ||
@@ -129,6 +164,8 @@ const commands: Command[] = [
     label: 'Mark/unmark item',
     category: 'Bulk',
     shortcut: 'm',
+    screen: 'list',
+    helpGroup: 'Actions',
     when: (ctx) => ctx.screen === 'list' && ctx.hasSelectedItem,
   },
   {
@@ -136,12 +173,16 @@ const commands: Command[] = [
     label: 'Clear all marks',
     category: 'Bulk',
     shortcut: 'M',
+    screen: 'list',
+    helpGroup: 'Bulk',
     when: (ctx) => ctx.screen === 'list' && ctx.markedCount > 0,
   },
   {
     id: 'set-priority',
     label: 'Set priority',
     category: 'Bulk',
+    screen: 'list',
+    helpGroup: 'Bulk',
     when: (ctx) =>
       ctx.screen === 'list' &&
       ctx.capabilities.fields.priority &&
@@ -152,6 +193,8 @@ const commands: Command[] = [
     label: 'Set assignee',
     category: 'Bulk',
     shortcut: 'a',
+    screen: 'list',
+    helpGroup: 'Actions',
     when: (ctx) =>
       ctx.screen === 'list' &&
       ctx.capabilities.fields.assignee &&
@@ -162,6 +205,8 @@ const commands: Command[] = [
     label: 'Set labels',
     category: 'Bulk',
     shortcut: 'l',
+    screen: 'list',
+    helpGroup: 'Actions',
     when: (ctx) =>
       ctx.screen === 'list' &&
       ctx.capabilities.fields.labels &&
@@ -172,6 +217,8 @@ const commands: Command[] = [
     label: 'Set type',
     category: 'Bulk',
     shortcut: 't',
+    screen: 'list',
+    helpGroup: 'Bulk',
     when: (ctx) =>
       ctx.screen === 'list' &&
       ctx.capabilities.customTypes &&
@@ -182,6 +229,8 @@ const commands: Command[] = [
     label: 'Bulk actions menu',
     category: 'Bulk',
     shortcut: 'B',
+    screen: 'list',
+    helpGroup: 'Bulk',
     when: (ctx) => ctx.screen === 'list' && ctx.markedCount > 0,
   },
   {
@@ -189,6 +238,8 @@ const commands: Command[] = [
     label: 'Filter...',
     category: 'Actions',
     shortcut: 'F',
+    screen: 'list',
+    helpGroup: 'Actions',
     when: (ctx) => ctx.screen === 'list',
   },
   {
@@ -196,6 +247,8 @@ const commands: Command[] = [
     label: 'Clear filters',
     category: 'Actions',
     shortcut: 'X',
+    screen: 'list',
+    helpGroup: 'Actions',
     when: (ctx) => ctx.screen === 'list' && ctx.hasActiveFilters,
   },
   {
@@ -203,18 +256,22 @@ const commands: Command[] = [
     label: 'Load view...',
     category: 'Actions',
     shortcut: 'V',
+    screen: 'list',
+    helpGroup: 'Actions',
     when: (ctx) => ctx.screen === 'list',
   },
   {
     id: 'save-view',
     label: 'Save current view...',
     category: 'Actions',
+    screen: 'list',
     when: (ctx) => ctx.screen === 'list' && ctx.hasActiveFilters,
   },
   {
     id: 'delete-view',
     label: 'Delete view...',
     category: 'Actions',
+    screen: 'list',
     when: (ctx) => ctx.screen === 'list' && ctx.hasSavedViews,
   },
   // Branch list actions
@@ -223,6 +280,8 @@ const commands: Command[] = [
     label: 'Switch to branch',
     category: 'Actions',
     shortcut: 'enter',
+    screen: 'branch-list',
+    helpGroup: 'Actions',
     when: (ctx) =>
       ctx.screen === 'branch-list' &&
       ctx.hasSelectedBranch &&
@@ -233,6 +292,8 @@ const commands: Command[] = [
     label: 'Create new branch',
     category: 'Actions',
     shortcut: 'c',
+    screen: 'branch-list',
+    helpGroup: 'Actions',
     when: (ctx) => ctx.screen === 'branch-list',
   },
   {
@@ -240,6 +301,8 @@ const commands: Command[] = [
     label: 'Delete branch',
     category: 'Actions',
     shortcut: 'd',
+    screen: 'branch-list',
+    helpGroup: 'Actions',
     when: (ctx) =>
       ctx.screen === 'branch-list' &&
       ctx.hasSelectedBranch &&
@@ -250,6 +313,8 @@ const commands: Command[] = [
     label: 'Merge into current',
     category: 'Actions',
     shortcut: 'm',
+    screen: 'branch-list',
+    helpGroup: 'Actions',
     when: (ctx) =>
       ctx.screen === 'branch-list' &&
       ctx.hasSelectedBranch &&
@@ -260,6 +325,8 @@ const commands: Command[] = [
     label: 'Push to remote',
     category: 'Actions',
     shortcut: 'P',
+    screen: 'branch-list',
+    helpGroup: 'Actions',
     when: (ctx) => ctx.screen === 'branch-list' && ctx.hasSelectedBranch,
   },
   {
@@ -267,6 +334,8 @@ const commands: Command[] = [
     label: 'Create PR for branch',
     category: 'Actions',
     shortcut: 'p',
+    screen: 'branch-list',
+    helpGroup: 'Actions',
     when: (ctx) =>
       ctx.screen === 'branch-list' &&
       ctx.hasSelectedBranch &&
@@ -277,6 +346,8 @@ const commands: Command[] = [
     label: 'Open worktree shell',
     category: 'Actions',
     shortcut: 'w',
+    screen: 'branch-list',
+    helpGroup: 'Actions',
     when: (ctx) =>
       ctx.screen === 'branch-list' && ctx.hasSelectedBranch && ctx.hasWorktree,
   },
@@ -285,6 +356,8 @@ const commands: Command[] = [
     label: 'Refresh branches',
     category: 'Actions',
     shortcut: 'r',
+    screen: 'branch-list',
+    helpGroup: 'Actions',
     when: (ctx) => ctx.screen === 'branch-list',
   },
   {
@@ -292,6 +365,8 @@ const commands: Command[] = [
     label: 'Back to items',
     category: 'Navigation',
     shortcut: 'esc',
+    screen: 'branch-list',
+    helpGroup: 'Navigation',
     when: (ctx) => ctx.screen === 'branch-list',
   },
   // PR list actions
@@ -300,6 +375,8 @@ const commands: Command[] = [
     label: 'Open in browser',
     category: 'Actions',
     shortcut: 'enter',
+    screen: 'pr-list',
+    helpGroup: 'Actions',
     when: (ctx) => ctx.screen === 'pr-list' && ctx.hasSelectedPr,
   },
   {
@@ -307,6 +384,8 @@ const commands: Command[] = [
     label: 'Back to items',
     category: 'Navigation',
     shortcut: 'esc',
+    screen: 'pr-list',
+    helpGroup: 'Navigation',
     when: (ctx) => ctx.screen === 'pr-list',
   },
   // Other
@@ -315,6 +394,8 @@ const commands: Command[] = [
     label: 'Toggle detail panel',
     category: 'Other',
     shortcut: 'v',
+    screen: 'list',
+    helpGroup: 'Other',
     when: (ctx) => ctx.screen === 'list',
   },
   {
@@ -322,6 +403,8 @@ const commands: Command[] = [
     label: 'Quit',
     category: 'Other',
     shortcut: 'q',
+    screen: 'global',
+    helpGroup: 'Other',
     when: () => true,
   },
 ];
@@ -349,7 +432,7 @@ export function groupCommandsByCategory(commands: Command[]): CommandGroup[] {
 }
 
 export function getVisibleCommands(ctx: CommandContext): Command[] {
-  const visible = commands.filter((cmd) => cmd.when(ctx));
+  const visible = commands.filter((cmd) => !cmd.when || cmd.when(ctx));
 
   // Add dynamic switch-type commands
   if (ctx.screen === 'list' && ctx.capabilities.customTypes) {
@@ -361,10 +444,61 @@ export function getVisibleCommands(ctx: CommandContext): Command[] {
         label: `Switch to ${plural}`,
         category: 'Switching',
         shortcut: 'tab',
+        screen: 'list',
         when: () => true,
       });
     }
   }
 
   return visible;
+}
+
+export function findCommand(id: string): Command | undefined {
+  return commands.find((cmd) => cmd.id === id);
+}
+
+export function getCommandsForScreen(
+  screen: Screen,
+  ctx: CommandContext,
+): Command[] {
+  return commands.filter((cmd) => {
+    const screens = cmd.screen;
+    if (screens === 'global') {
+      // global matches all
+    } else if (Array.isArray(screens)) {
+      if (!screens.includes(screen)) return false;
+    } else {
+      if (screens !== screen) return false;
+    }
+    if (cmd.when && !cmd.when(ctx)) return false;
+    return true;
+  });
+}
+
+export function getFooterCommands(
+  screen: Screen,
+  ctx: CommandContext,
+): Command[] {
+  return getCommandsForScreen(screen, ctx).filter((cmd) => cmd.footer);
+}
+
+export interface ShortcutGroup {
+  label: string;
+  shortcuts: { key: string; description: string }[];
+}
+
+export function groupByHelpGroup(commands: Command[]): ShortcutGroup[] {
+  const groups: ShortcutGroup[] = [];
+  const seen = new Map<string, ShortcutGroup>();
+  for (const cmd of commands) {
+    if (!cmd.helpGroup || !cmd.shortcut) continue;
+    let group = seen.get(cmd.helpGroup);
+    if (!group) {
+      group = { label: cmd.helpGroup, shortcuts: [] };
+      seen.set(cmd.helpGroup, group);
+      groups.push(group);
+    }
+    group.shortcuts.push({ key: cmd.shortcut, description: cmd.label });
+  }
+  return groups;
 }
