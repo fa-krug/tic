@@ -32,6 +32,7 @@ import { useTerminalWidth } from '../hooks/useTerminalWidth.js';
 import {
   getVisibleCommands,
   buildFooterHints,
+  matchesCommand,
   type Command,
   type CommandContext,
 } from '../commands.js';
@@ -432,62 +433,62 @@ export function BranchList() {
     }
 
     // --- Normal mode ---
-    if (key.escape) {
+    if (matchesCommand('nav-back', input, key)) {
       navigate('list');
       return;
     }
 
-    if (input === '?') {
+    if (matchesCommand('help', input, key)) {
       navigateToHelp();
       return;
     }
 
-    if (input === '/') {
+    if (matchesCommand('branch-search', input, key)) {
       openOverlay({ type: 'command-bar' });
       return;
     }
 
     // Navigation
-    if (key.downArrow) {
-      setCursor((c) => Math.min(c + 1, rows.length - 1));
-      return;
-    }
-    if (key.upArrow) {
-      setCursor((c) => Math.max(c - 1, 0));
+    if (matchesCommand('branch-navigate', input, key)) {
+      if (key.downArrow) {
+        setCursor((c) => Math.min(c + 1, rows.length - 1));
+      } else {
+        setCursor((c) => Math.max(c - 1, 0));
+      }
       return;
     }
 
     if (!currentRow) return;
 
-    if (key.return) {
+    if (matchesCommand('branch-switch', input, key)) {
       doSwitch();
       return;
     }
-    if (input === 'w') {
+    if (matchesCommand('branch-worktree', input, key)) {
       doWorktree();
       return;
     }
-    if (input === 'd') {
+    if (matchesCommand('branch-delete', input, key)) {
       doDelete();
       return;
     }
-    if (input === 'm') {
+    if (matchesCommand('branch-merge', input, key)) {
       doMerge();
       return;
     }
-    if (input === 'P') {
+    if (matchesCommand('branch-push', input, key)) {
       doPush();
       return;
     }
-    if (input === 'p') {
+    if (matchesCommand('branch-create-pr', input, key)) {
       doCreatePr();
       return;
     }
-    if (input === 'r') {
+    if (matchesCommand('branch-refresh', input, key)) {
       doRefresh();
       return;
     }
-    if (input === 'c') {
+    if (matchesCommand('branch-create', input, key)) {
       doCreateBranch();
       return;
     }
