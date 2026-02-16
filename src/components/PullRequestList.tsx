@@ -177,7 +177,7 @@ export function PullRequestList() {
         case 'pr-open':
           doOpenInBrowser();
           break;
-        case 'pr-back':
+        case 'nav-back':
           navigate('list');
           break;
         case 'help':

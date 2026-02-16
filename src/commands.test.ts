@@ -115,18 +115,11 @@ describe('getVisibleCommands', () => {
     expect(labels).not.toContain('Go to iterations');
   });
 
-  it('hides bulk actions menu (B) when no items are marked', () => {
-    const ctx = makeContext({ markedCount: 0 });
-    const commands = getVisibleCommands(ctx);
-    const ids = commands.map((c) => c.id);
-    expect(ids).not.toContain('bulk-menu');
-  });
-
-  it('shows bulk actions menu (B) when items are marked', () => {
-    const ctx = makeContext({ markedCount: 3 });
-    const commands = getVisibleCommands(ctx);
-    const ids = commands.map((c) => c.id);
-    expect(ids).toContain('bulk-menu');
+  it('shows bulk actions menu (x) regardless of marked count', () => {
+    const ctx0 = makeContext({ markedCount: 0 });
+    const ctx3 = makeContext({ markedCount: 3 });
+    expect(getVisibleCommands(ctx0).map((c) => c.id)).toContain('bulk-menu');
+    expect(getVisibleCommands(ctx3).map((c) => c.id)).toContain('bulk-menu');
   });
 
   it('hides clear marks when no items are marked', () => {

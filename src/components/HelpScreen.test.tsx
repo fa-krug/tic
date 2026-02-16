@@ -137,12 +137,12 @@ describe('getShortcuts', () => {
     expect(keys).toContain('s');
     expect(keys).toContain('esc');
     const escShortcuts = allShortcuts.filter((s) => s.key === 'esc');
-    expect(escShortcuts.some((s) => s.description.includes('revert'))).toBe(
-      true,
-    );
-    expect(escShortcuts.some((s) => s.description.includes('discard'))).toBe(
-      true,
-    );
+    expect(
+      escShortcuts.some((s) => s.description.toLowerCase().includes('revert')),
+    ).toBe(true);
+    expect(
+      escShortcuts.some((s) => s.description.toLowerCase().includes('discard')),
+    ).toBe(true);
   });
 
   it('includes command bar shortcut on list screen', () => {

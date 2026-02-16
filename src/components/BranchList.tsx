@@ -371,7 +371,7 @@ export function BranchList() {
         case 'branch-refresh':
           doRefresh();
           break;
-        case 'branch-back':
+        case 'nav-back':
           navigate('list');
           break;
         case 'help':

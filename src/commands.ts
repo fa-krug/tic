@@ -140,9 +140,9 @@ const commands: Command[] = [
     id: 'status',
     label: 'Go to status',
     category: 'Navigation',
-    shortcut: 's',
+    shortcut: 'S',
     screen: 'list',
-    helpGroup: 'Actions',
+    helpGroup: 'Switching',
     when: (ctx) => ctx.screen === 'list',
   },
   {
@@ -224,10 +224,9 @@ const commands: Command[] = [
     id: 'bulk-menu',
     label: 'Bulk actions menu',
     category: 'Bulk',
-    shortcut: 'B',
+    shortcut: 'x',
     screen: 'list',
     helpGroup: 'Bulk',
-    when: (ctx) => ctx.screen === 'list' && ctx.markedCount > 0,
   },
   {
     id: 'filter',
@@ -377,14 +376,6 @@ const commands: Command[] = [
     helpGroup: 'Actions',
   },
   {
-    id: 'list-bulk-actions',
-    label: 'Bulk actions menu',
-    category: 'Bulk',
-    shortcut: 'x',
-    screen: 'list',
-    helpGroup: 'Actions',
-  },
-  {
     id: 'list-tab',
     label: 'Cycle work item type',
     category: 'Switching',
@@ -392,14 +383,6 @@ const commands: Command[] = [
     screen: 'list',
     helpGroup: 'Switching',
     when: (ctx) => ctx.capabilities.customTypes,
-  },
-  {
-    id: 'list-load-view',
-    label: 'Load saved view',
-    category: 'Switching',
-    shortcut: 'V',
-    screen: 'list',
-    helpGroup: 'Switching',
   },
   {
     id: 'list-toggle-description',
@@ -429,6 +412,10 @@ const commands: Command[] = [
     helpGroup: 'Navigation',
     footer: true,
     footerLabel: 'back',
+    when: (ctx) =>
+      ctx.screen === 'pr-list' ||
+      ctx.screen === 'branch-list' ||
+      ctx.screen === 'iteration-picker',
   },
   // Branch list actions
   {

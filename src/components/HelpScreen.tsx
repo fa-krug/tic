@@ -29,6 +29,11 @@ export function getShortcuts(
   gitAvailable: boolean,
   hasSyncManager: boolean,
 ): ShortcutGroup[] {
+  // Don't show shortcuts when viewing help screen itself
+  if (screen === 'help') {
+    return [];
+  }
+
   const ctx: CommandContext = {
     screen,
     markedCount: 0,
