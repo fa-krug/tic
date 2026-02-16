@@ -782,7 +782,7 @@ export function WorkItemForm() {
 
       if (configLoading || itemLoading || saving) return;
       if (!editing) {
-        if (_input === '?') {
+        if (matchesCommand('help', _input, key)) {
           navigateToHelp();
           return;
         }
