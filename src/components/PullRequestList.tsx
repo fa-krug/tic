@@ -15,6 +15,7 @@ import type { PullRequest } from '../types.js';
 import { useTerminalWidth } from '../hooks/useTerminalWidth.js';
 import {
   getVisibleCommands,
+  buildFooterHints,
   type Command,
   type CommandContext,
 } from '../commands.js';
@@ -253,7 +254,7 @@ export function PullRequestList() {
       {/* Footer keybinding hints */}
       <Box marginTop={1}>
         <Text color={muted} dimColor={mutedDim}>
-          j/k navigate · Enter/o open in browser · / search · Esc back · ? help
+          {buildFooterHints('pr-list', commandContext, termWidth)}
         </Text>
       </Box>
 

@@ -26,6 +26,7 @@ import { buildTree, sortTree, type TreeItem } from './buildTree.js';
 import type { SortColumn, SortEntry } from '../stores/listViewStore.js';
 import {
   getVisibleCommands,
+  buildFooterHints,
   type Command,
   type CommandContext,
 } from '../commands.js';
@@ -230,29 +231,6 @@ export function getTargetIds(
     return [...markedIds];
   }
   return cursorItem ? [cursorItem.id] : [];
-}
-
-export function buildHelpText(availableWidth: number): string {
-  const shortcuts = [
-    { key: '↑↓', label: 'navigate' },
-    { key: '←→', label: 'expand' },
-    { key: 'enter', label: 'edit' },
-    { key: 'c', label: 'create' },
-    { key: 'd', label: 'delete' },
-    { key: 'u', label: 'undo' },
-    { key: '/', label: 'commands' },
-    { key: ',', label: 'settings' },
-    { key: '?', label: 'help' },
-  ];
-  const sep = '  ';
-  let result = '';
-  for (const s of shortcuts) {
-    const entry = `${s.key} ${s.label}`;
-    const candidate = result ? result + sep + entry : entry;
-    if (candidate.length > availableWidth) break;
-    result = candidate;
-  }
-  return result;
 }
 
 export function WorkItemList() {
@@ -2195,7 +2173,9 @@ export function WorkItemList() {
         ) : (
           <Box>
             <Text dimColor={mutedDim}>
-              {buildHelpText(
+              {buildFooterHints(
+                'list',
+                commandContext,
                 terminalWidth - (positionText ? positionText.length + 2 : 0),
               )}
             </Text>

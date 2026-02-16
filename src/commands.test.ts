@@ -9,6 +9,7 @@ import {
   findCommand,
   getCommandsForScreen,
   getFooterCommands,
+  buildFooterHints,
   groupByHelpGroup,
 } from './commands.js';
 import type { BackendCapabilities } from './backends/types.js';
@@ -114,18 +115,18 @@ describe('getVisibleCommands', () => {
     expect(labels).not.toContain('Go to iterations');
   });
 
-  it('hides bulk actions menu when no items are marked', () => {
+  it('hides bulk actions menu (B) when no items are marked', () => {
     const ctx = makeContext({ markedCount: 0 });
     const commands = getVisibleCommands(ctx);
-    const labels = commands.map((c) => c.label);
-    expect(labels).not.toContain('Bulk actions menu');
+    const ids = commands.map((c) => c.id);
+    expect(ids).not.toContain('bulk-menu');
   });
 
-  it('shows bulk actions menu when items are marked', () => {
+  it('shows bulk actions menu (B) when items are marked', () => {
     const ctx = makeContext({ markedCount: 3 });
     const commands = getVisibleCommands(ctx);
-    const labels = commands.map((c) => c.label);
-    expect(labels).toContain('Bulk actions menu');
+    const ids = commands.map((c) => c.id);
+    expect(ids).toContain('bulk-menu');
   });
 
   it('hides clear marks when no items are marked', () => {
@@ -177,11 +178,14 @@ describe('getVisibleCommands', () => {
     expect(labels).toContain('Order by...');
   });
 
-  it('shows only quit on non-list screens', () => {
+  it('hides list-specific commands on non-list screens', () => {
     const ctx = makeContext({ screen: 'form' });
     const commands = getVisibleCommands(ctx);
-    expect(commands).toHaveLength(1);
-    expect(commands[0]!.id).toBe('quit');
+    const ids = commands.map((c) => c.id);
+    expect(ids).not.toContain('create');
+    expect(ids).not.toContain('edit');
+    expect(ids).not.toContain('delete');
+    expect(ids).toContain('quit');
   });
 
   it('every command has an id, label, and category', () => {
@@ -427,5 +431,164 @@ describe('groupByHelpGroup', () => {
 
   it('returns empty array for empty input', () => {
     expect(groupByHelpGroup([])).toEqual([]);
+  });
+});
+
+describe('non-list screen commands', () => {
+  it('has branch-list commands', () => {
+    const ctx = makeContext({
+      screen: 'branch-list',
+      hasSelectedBranch: true,
+      hasWorktree: true,
+    });
+    const cmds = getCommandsForScreen('branch-list', ctx);
+    const ids = cmds.map((c) => c.id);
+    expect(ids).toContain('branch-switch');
+    expect(ids).toContain('branch-create');
+    expect(ids).toContain('branch-delete');
+    expect(ids).toContain('branch-merge');
+    expect(ids).toContain('branch-push');
+    expect(ids).toContain('branch-worktree');
+    expect(ids).toContain('branch-refresh');
+    expect(ids).toContain('nav-back');
+  });
+
+  it('has pr-list commands', () => {
+    const ctx = makeContext({ screen: 'pr-list', hasSelectedPr: true });
+    const cmds = getCommandsForScreen('pr-list', ctx);
+    const ids = cmds.map((c) => c.id);
+    expect(ids).toContain('pr-open');
+    expect(ids).toContain('nav-back');
+  });
+
+  it('has form commands', () => {
+    const ctx = makeContext({ screen: 'form' });
+    const cmds = getCommandsForScreen('form', ctx);
+    const ids = cmds.map((c) => c.id);
+    expect(ids).toContain('form-navigate');
+    expect(ids).toContain('form-edit');
+    expect(ids).toContain('form-save');
+    expect(ids).toContain('form-back');
+  });
+
+  it('has settings commands', () => {
+    const ctx = makeContext({ screen: 'settings' });
+    const cmds = getCommandsForScreen('settings', ctx);
+    const ids = cmds.map((c) => c.id);
+    expect(ids).toContain('settings-navigate');
+    expect(ids).toContain('settings-select');
+    expect(ids).toContain('settings-back');
+  });
+
+  it('has settings template commands when capability present', () => {
+    const ctx = makeContext({ screen: 'settings' });
+    const cmds = getCommandsForScreen('settings', ctx);
+    const ids = cmds.map((c) => c.id);
+    expect(ids).toContain('settings-create-template');
+    expect(ids).toContain('settings-delete-template');
+  });
+
+  it('hides settings template commands when no template capability', () => {
+    const ctx = makeContext({
+      screen: 'settings',
+      capabilities: { ...ALL_CAPS, templates: false },
+    });
+    const cmds = getCommandsForScreen('settings', ctx);
+    const ids = cmds.map((c) => c.id);
+    expect(ids).not.toContain('settings-create-template');
+    expect(ids).not.toContain('settings-delete-template');
+  });
+
+  it('has status screen commands', () => {
+    const ctx = makeContext({ screen: 'status' });
+    const cmds = getCommandsForScreen('status', ctx);
+    const ids = cmds.map((c) => c.id);
+    expect(ids).toContain('status-scroll');
+    expect(ids).toContain('status-back');
+  });
+
+  it('has status retry when sync manager present', () => {
+    const ctx = makeContext({ screen: 'status', hasSyncManager: true });
+    const cmds = getCommandsForScreen('status', ctx);
+    const ids = cmds.map((c) => c.id);
+    expect(ids).toContain('status-retry');
+  });
+
+  it('hides status retry when no sync manager', () => {
+    const ctx = makeContext({ screen: 'status', hasSyncManager: false });
+    const cmds = getCommandsForScreen('status', ctx);
+    const ids = cmds.map((c) => c.id);
+    expect(ids).not.toContain('status-retry');
+  });
+
+  it('has iteration-picker commands', () => {
+    const ctx = makeContext({ screen: 'iteration-picker' });
+    const cmds = getCommandsForScreen('iteration-picker', ctx);
+    const ids = cmds.map((c) => c.id);
+    expect(ids).toContain('iter-navigate');
+    expect(ids).toContain('iter-select');
+  });
+
+  it('help command appears on all screens', () => {
+    for (const screen of [
+      'list',
+      'form',
+      'settings',
+      'branch-list',
+      'pr-list',
+      'status',
+      'iteration-picker',
+    ] as const) {
+      const ctx = makeContext({ screen });
+      const cmds = getCommandsForScreen(screen, ctx);
+      const ids = cmds.map((c) => c.id);
+      expect(ids).toContain('help');
+    }
+  });
+});
+
+describe('buildFooterHints', () => {
+  it('returns formatted footer string for list screen', () => {
+    const ctx = makeContext({ screen: 'list' });
+    const result = buildFooterHints('list', ctx, 200);
+    expect(result).toContain('navigate');
+    expect(result).toContain('create');
+    expect(result).toContain('help');
+  });
+
+  it('returns formatted footer string for branch-list', () => {
+    const ctx = makeContext({
+      screen: 'branch-list',
+      hasSelectedBranch: true,
+    });
+    const result = buildFooterHints('branch-list', ctx, 200);
+    expect(result).toContain('switch');
+    expect(result).toContain('delete');
+    expect(result).toContain('merge');
+  });
+
+  it('truncates to available width', () => {
+    const ctx = makeContext({ screen: 'list' });
+    const result = buildFooterHints('list', ctx, 30);
+    expect(result.length).toBeLessThanOrEqual(30);
+  });
+
+  it('uses footerLabel when available', () => {
+    const ctx = makeContext({ screen: 'list' });
+    const result = buildFooterHints('list', ctx, 200);
+    // 'create' is the footerLabel, not 'Create item'
+    expect(result).toContain('create');
+    expect(result).not.toContain('Create item');
+  });
+
+  it('returns empty string when width is zero', () => {
+    const ctx = makeContext({ screen: 'list' });
+    expect(buildFooterHints('list', ctx, 0)).toBe('');
+  });
+
+  it('separates entries with double space', () => {
+    const ctx = makeContext({ screen: 'list' });
+    const result = buildFooterHints('list', ctx, 200);
+    expect(result).toContain('navigate  ');
   });
 });

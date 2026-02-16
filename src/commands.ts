@@ -153,10 +153,6 @@ const commands: Command[] = [
     screen: 'global',
     footer: true,
     footerLabel: 'help',
-    when: (ctx) =>
-      ctx.screen === 'list' ||
-      ctx.screen === 'branch-list' ||
-      ctx.screen === 'pr-list',
   },
   // Bulk
   {
@@ -274,7 +270,187 @@ const commands: Command[] = [
     screen: 'list',
     when: (ctx) => ctx.screen === 'list' && ctx.hasSavedViews,
   },
+  // List-screen navigation
+  {
+    id: 'list-navigate',
+    label: 'Navigate items',
+    category: 'Navigation',
+    shortcut: '↑/↓',
+    screen: 'list',
+    helpGroup: 'Navigation',
+    footer: true,
+    footerLabel: 'navigate',
+  },
+  {
+    id: 'list-page',
+    label: 'Page up / page down',
+    category: 'Navigation',
+    shortcut: 'pgup/pgdn',
+    screen: 'list',
+    helpGroup: 'Navigation',
+  },
+  {
+    id: 'list-home-end',
+    label: 'Jump to first / last item',
+    category: 'Navigation',
+    shortcut: 'home/end',
+    screen: 'list',
+    helpGroup: 'Navigation',
+  },
+  {
+    id: 'list-collapse',
+    label: 'Collapse or jump to parent',
+    category: 'Navigation',
+    shortcut: '←',
+    screen: 'list',
+    helpGroup: 'Navigation',
+    when: (ctx) => ctx.capabilities.relationships,
+  },
+  {
+    id: 'list-expand',
+    label: 'Expand children',
+    category: 'Navigation',
+    shortcut: '→',
+    screen: 'list',
+    helpGroup: 'Navigation',
+    when: (ctx) => ctx.capabilities.relationships,
+  },
+  // List-screen actions missing from registry
+  {
+    id: 'list-undo',
+    label: 'Undo last action',
+    category: 'Actions',
+    shortcut: 'u',
+    screen: 'list',
+    helpGroup: 'Actions',
+    footer: true,
+    footerLabel: 'undo',
+  },
+  {
+    id: 'list-status',
+    label: 'Set status',
+    category: 'Actions',
+    shortcut: 's',
+    screen: 'list',
+    helpGroup: 'Actions',
+  },
+  {
+    id: 'list-parent',
+    label: 'Set parent',
+    category: 'Actions',
+    shortcut: 'g',
+    screen: 'list',
+    helpGroup: 'Actions',
+    when: (ctx) => ctx.capabilities.fields.parent,
+  },
+  {
+    id: 'list-pr-create',
+    label: 'Create pull request',
+    category: 'Actions',
+    shortcut: 'p',
+    screen: 'list',
+    helpGroup: 'Actions',
+  },
+  {
+    id: 'list-pr-list',
+    label: 'Pull requests',
+    category: 'Navigation',
+    shortcut: 'P',
+    screen: 'list',
+    helpGroup: 'Actions',
+  },
+  {
+    id: 'list-branch-manage',
+    label: 'Branch management',
+    category: 'Navigation',
+    shortcut: 'B',
+    screen: 'list',
+    helpGroup: 'Actions',
+    when: (ctx) => ctx.gitAvailable,
+  },
+  {
+    id: 'list-range-select',
+    label: 'Range select',
+    category: 'Bulk',
+    shortcut: 'shift+↑↓',
+    screen: 'list',
+    helpGroup: 'Actions',
+  },
+  {
+    id: 'list-bulk-actions',
+    label: 'Bulk actions menu',
+    category: 'Bulk',
+    shortcut: 'x',
+    screen: 'list',
+    helpGroup: 'Actions',
+  },
+  {
+    id: 'list-tab',
+    label: 'Cycle work item type',
+    category: 'Switching',
+    shortcut: 'tab',
+    screen: 'list',
+    helpGroup: 'Switching',
+    when: (ctx) => ctx.capabilities.customTypes,
+  },
+  {
+    id: 'list-load-view',
+    label: 'Load saved view',
+    category: 'Switching',
+    shortcut: 'V',
+    screen: 'list',
+    helpGroup: 'Switching',
+  },
+  {
+    id: 'list-toggle-description',
+    label: 'Toggle full description',
+    category: 'Other',
+    shortcut: 'space',
+    screen: 'list',
+    helpGroup: 'Other',
+  },
+  {
+    id: 'list-command-bar',
+    label: 'Command bar',
+    category: 'Actions',
+    shortcut: '/',
+    screen: 'list',
+    helpGroup: 'Actions',
+    footer: true,
+    footerLabel: 'commands',
+  },
+  // Navigation shared across sub-screens
+  {
+    id: 'nav-back',
+    label: 'Back to list',
+    category: 'Navigation',
+    shortcut: 'esc',
+    screen: ['pr-list', 'branch-list', 'iteration-picker'],
+    helpGroup: 'Navigation',
+    footer: true,
+    footerLabel: 'back',
+  },
   // Branch list actions
+  {
+    id: 'branch-navigate',
+    label: 'Navigate branches',
+    category: 'Navigation',
+    shortcut: 'j/k',
+    screen: 'branch-list',
+    helpGroup: 'Navigation',
+    footer: true,
+    footerLabel: 'navigate',
+  },
+  {
+    id: 'branch-search',
+    label: 'Search branches',
+    category: 'Actions',
+    shortcut: '/',
+    screen: 'branch-list',
+    helpGroup: 'Actions',
+    footer: true,
+    footerLabel: 'search',
+  },
   {
     id: 'branch-switch',
     label: 'Switch to branch',
@@ -282,6 +458,8 @@ const commands: Command[] = [
     shortcut: 'enter',
     screen: 'branch-list',
     helpGroup: 'Actions',
+    footer: true,
+    footerLabel: 'switch',
     when: (ctx) =>
       ctx.screen === 'branch-list' &&
       ctx.hasSelectedBranch &&
@@ -294,6 +472,8 @@ const commands: Command[] = [
     shortcut: 'c',
     screen: 'branch-list',
     helpGroup: 'Actions',
+    footer: true,
+    footerLabel: 'new',
     when: (ctx) => ctx.screen === 'branch-list',
   },
   {
@@ -303,6 +483,8 @@ const commands: Command[] = [
     shortcut: 'd',
     screen: 'branch-list',
     helpGroup: 'Actions',
+    footer: true,
+    footerLabel: 'delete',
     when: (ctx) =>
       ctx.screen === 'branch-list' &&
       ctx.hasSelectedBranch &&
@@ -315,6 +497,8 @@ const commands: Command[] = [
     shortcut: 'm',
     screen: 'branch-list',
     helpGroup: 'Actions',
+    footer: true,
+    footerLabel: 'merge',
     when: (ctx) =>
       ctx.screen === 'branch-list' &&
       ctx.hasSelectedBranch &&
@@ -327,6 +511,8 @@ const commands: Command[] = [
     shortcut: 'P',
     screen: 'branch-list',
     helpGroup: 'Actions',
+    footer: true,
+    footerLabel: 'push',
     when: (ctx) => ctx.screen === 'branch-list' && ctx.hasSelectedBranch,
   },
   {
@@ -348,6 +534,8 @@ const commands: Command[] = [
     shortcut: 'w',
     screen: 'branch-list',
     helpGroup: 'Actions',
+    footer: true,
+    footerLabel: 'worktree',
     when: (ctx) =>
       ctx.screen === 'branch-list' && ctx.hasSelectedBranch && ctx.hasWorktree,
   },
@@ -358,35 +546,201 @@ const commands: Command[] = [
     shortcut: 'r',
     screen: 'branch-list',
     helpGroup: 'Actions',
-    when: (ctx) => ctx.screen === 'branch-list',
-  },
-  {
-    id: 'branch-back',
-    label: 'Back to items',
-    category: 'Navigation',
-    shortcut: 'esc',
-    screen: 'branch-list',
-    helpGroup: 'Navigation',
+    footer: true,
+    footerLabel: 'refresh',
     when: (ctx) => ctx.screen === 'branch-list',
   },
   // PR list actions
   {
+    id: 'pr-navigate',
+    label: 'Navigate pull requests',
+    category: 'Navigation',
+    shortcut: 'j/k',
+    screen: 'pr-list',
+    helpGroup: 'Navigation',
+    footer: true,
+    footerLabel: 'navigate',
+  },
+  {
     id: 'pr-open',
     label: 'Open in browser',
     category: 'Actions',
-    shortcut: 'enter',
+    shortcut: 'enter/o',
     screen: 'pr-list',
     helpGroup: 'Actions',
+    footer: true,
+    footerLabel: 'open',
     when: (ctx) => ctx.screen === 'pr-list' && ctx.hasSelectedPr,
   },
   {
-    id: 'pr-back',
-    label: 'Back to items',
+    id: 'pr-search',
+    label: 'Search pull requests',
+    category: 'Actions',
+    shortcut: '/',
+    screen: 'pr-list',
+    helpGroup: 'Actions',
+    footer: true,
+    footerLabel: 'search',
+  },
+  // Form commands
+  {
+    id: 'form-navigate',
+    label: 'Move between fields',
+    category: 'Navigation',
+    shortcut: '↑/↓',
+    screen: 'form',
+    helpGroup: 'Navigation',
+  },
+  {
+    id: 'form-edit',
+    label: 'Edit field / open $EDITOR (description) / navigate to related item',
+    category: 'Actions',
+    shortcut: 'enter',
+    screen: 'form',
+    helpGroup: 'Editing',
+  },
+  {
+    id: 'form-revert',
+    label: 'Revert field to previous value (in edit mode)',
+    category: 'Actions',
+    shortcut: 'esc',
+    screen: 'form',
+    helpGroup: 'Editing',
+  },
+  {
+    id: 'form-confirm',
+    label: 'Confirm field value',
+    category: 'Actions',
+    shortcut: 'enter/select',
+    screen: 'form',
+    helpGroup: 'Editing',
+  },
+  {
+    id: 'form-save',
+    label: 'Save and go back',
+    category: 'Actions',
+    shortcut: 's',
+    screen: 'form',
+    helpGroup: 'Save & Exit',
+  },
+  {
+    id: 'form-back',
+    label: 'Go back (prompts to save/discard if unsaved changes)',
     category: 'Navigation',
     shortcut: 'esc',
-    screen: 'pr-list',
+    screen: 'form',
+    helpGroup: 'Save & Exit',
+  },
+  // Iteration picker commands
+  {
+    id: 'iter-navigate',
+    label: 'Navigate iterations',
+    category: 'Navigation',
+    shortcut: '↑/↓',
+    screen: 'iteration-picker',
     helpGroup: 'Navigation',
-    when: (ctx) => ctx.screen === 'pr-list',
+  },
+  {
+    id: 'iter-select',
+    label: 'Select iteration',
+    category: 'Actions',
+    shortcut: 'enter',
+    screen: 'iteration-picker',
+    helpGroup: 'Navigation',
+  },
+  // Settings commands
+  {
+    id: 'settings-navigate',
+    label: 'Navigate options',
+    category: 'Navigation',
+    shortcut: '↑/↓',
+    screen: 'settings',
+    helpGroup: 'Navigation',
+  },
+  {
+    id: 'settings-select',
+    label: 'Select or edit',
+    category: 'Actions',
+    shortcut: 'enter',
+    screen: 'settings',
+    helpGroup: 'Navigation',
+  },
+  {
+    id: 'settings-back',
+    label: 'Go back',
+    category: 'Navigation',
+    shortcut: 'esc/,',
+    screen: 'settings',
+    helpGroup: 'Navigation',
+  },
+  {
+    id: 'settings-edit',
+    label: 'Edit field value',
+    category: 'Actions',
+    shortcut: 'type',
+    screen: 'settings',
+    helpGroup: 'Editing',
+  },
+  {
+    id: 'settings-confirm',
+    label: 'Confirm',
+    category: 'Actions',
+    shortcut: 'enter/esc',
+    screen: 'settings',
+    helpGroup: 'Editing',
+  },
+  {
+    id: 'settings-create-template',
+    label: 'Create template',
+    category: 'Actions',
+    shortcut: 'c',
+    screen: 'settings',
+    helpGroup: 'Templates',
+    when: (ctx) => ctx.capabilities.templates,
+  },
+  {
+    id: 'settings-delete-template',
+    label: 'Delete template',
+    category: 'Actions',
+    shortcut: 'd',
+    screen: 'settings',
+    helpGroup: 'Templates',
+    when: (ctx) => ctx.capabilities.templates,
+  },
+  {
+    id: 'settings-edit-template',
+    label: 'Edit template',
+    category: 'Actions',
+    shortcut: 'enter',
+    screen: 'settings',
+    helpGroup: 'Templates',
+    when: (ctx) => ctx.capabilities.templates,
+  },
+  // Status screen commands
+  {
+    id: 'status-scroll',
+    label: 'Scroll errors',
+    category: 'Navigation',
+    shortcut: '↑/↓',
+    screen: 'status',
+    helpGroup: 'Navigation',
+  },
+  {
+    id: 'status-back',
+    label: 'Go back',
+    category: 'Navigation',
+    shortcut: 'esc/q',
+    screen: 'status',
+    helpGroup: 'Navigation',
+  },
+  {
+    id: 'status-retry',
+    label: 'Retry failed sync operations',
+    category: 'Actions',
+    shortcut: 'r',
+    screen: 'status',
+    helpGroup: 'Actions',
+    when: (ctx) => ctx.hasSyncManager,
   },
   // Other
   {
@@ -480,6 +834,25 @@ export function getFooterCommands(
   ctx: CommandContext,
 ): Command[] {
   return getCommandsForScreen(screen, ctx).filter((cmd) => cmd.footer);
+}
+
+export function buildFooterHints(
+  screen: Screen,
+  ctx: CommandContext,
+  availableWidth: number,
+): string {
+  const footerCmds = getFooterCommands(screen, ctx);
+  const sep = '  ';
+  let result = '';
+  for (const cmd of footerCmds) {
+    if (!cmd.shortcut) continue;
+    const label = cmd.footerLabel ?? cmd.label;
+    const entry = `${cmd.shortcut} ${label}`;
+    const candidate = result ? result + sep + entry : entry;
+    if (candidate.length > availableWidth) break;
+    result = candidate;
+  }
+  return result;
 }
 
 export interface ShortcutGroup {

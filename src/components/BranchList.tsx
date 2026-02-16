@@ -31,6 +31,7 @@ import { OverlayPanel } from './OverlayPanel.js';
 import { useTerminalWidth } from '../hooks/useTerminalWidth.js';
 import {
   getVisibleCommands,
+  buildFooterHints,
   type Command,
   type CommandContext,
 } from '../commands.js';
@@ -543,10 +544,7 @@ export function BranchList() {
       {/* Footer keybinding hints */}
       <Box marginTop={1}>
         <Text color={muted} dimColor={mutedDim}>
-          ↑/↓ navigate {'\u00b7'} Enter switch {'\u00b7'} d delete {'\u00b7'} m
-          merge {'\u00b7'} p PR {'\u00b7'} P push {'\u00b7'} c new {'\u00b7'} w
-          worktree {'\u00b7'} r refresh {'\u00b7'} / search {'\u00b7'} Esc back{' '}
-          {'\u00b7'} ? help
+          {buildFooterHints('branch-list', commandContext, termWidth)}
         </Text>
       </Box>
 
