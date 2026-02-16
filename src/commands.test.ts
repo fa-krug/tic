@@ -11,6 +11,7 @@ import {
   getFooterCommands,
   buildFooterHints,
   groupByHelpGroup,
+  matchesCommand,
 } from './commands.js';
 import type { BackendCapabilities } from './backends/types.js';
 
@@ -660,5 +661,88 @@ describe('buildFooterHints', () => {
     const ctx = makeContext({ screen: 'list' });
     const result = buildFooterHints('list', ctx, 200);
     expect(result).toContain('navigate  ');
+  });
+});
+
+describe('matchesCommand', () => {
+  const noKey: Record<string, boolean> = {
+    upArrow: false,
+    downArrow: false,
+    leftArrow: false,
+    rightArrow: false,
+    pageDown: false,
+    pageUp: false,
+    home: false,
+    end: false,
+    return: false,
+    escape: false,
+    ctrl: false,
+    shift: false,
+    tab: false,
+    backspace: false,
+    delete: false,
+    meta: false,
+  };
+
+  it('matches a single character key', () => {
+    expect(matchesCommand('create', 'c', noKey)).toBe(true);
+    expect(matchesCommand('create', 'd', noKey)).toBe(false);
+  });
+
+  it('matches a special key', () => {
+    expect(matchesCommand('edit', '', { ...noKey, return: true })).toBe(true);
+    expect(matchesCommand('edit', '', noKey)).toBe(false);
+  });
+
+  it('matches a modifier + special key', () => {
+    expect(
+      matchesCommand('list-range-select', '', {
+        ...noKey,
+        upArrow: true,
+        shift: true,
+      }),
+    ).toBe(true);
+    expect(
+      matchesCommand('list-range-select', '', { ...noKey, upArrow: true }),
+    ).toBe(false);
+  });
+
+  it('does not match non-modifier special when shift is held', () => {
+    expect(
+      matchesCommand('list-navigate', '', {
+        ...noKey,
+        upArrow: true,
+        shift: true,
+      }),
+    ).toBe(false);
+    expect(
+      matchesCommand('list-navigate', '', { ...noKey, upArrow: true }),
+    ).toBe(true);
+  });
+
+  it('matches any of multiple keys', () => {
+    expect(matchesCommand('pr-open', 'o', noKey)).toBe(true);
+    expect(matchesCommand('pr-open', '', { ...noKey, return: true })).toBe(
+      true,
+    );
+    expect(matchesCommand('pr-open', 'x', noKey)).toBe(false);
+  });
+
+  it('returns false for unknown command', () => {
+    expect(matchesCommand('nonexistent', 'c', noKey)).toBe(false);
+  });
+
+  it('returns false for command without keys', () => {
+    expect(matchesCommand('save-view', 's', noKey)).toBe(false);
+  });
+});
+
+describe('Parity', () => {
+  it('every command with keys also has a shortcut for display', () => {
+    const allCmds = getVisibleCommands(makeContext());
+    const withKeys = allCmds.filter((c) => c.keys && c.keys.length > 0);
+    for (const cmd of withKeys) {
+      expect(cmd.shortcut, `${cmd.id} has keys but no shortcut`).toBeDefined();
+    }
   });
 });
