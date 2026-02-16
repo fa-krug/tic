@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { useThemeStore } from '../stores/themeStore.js';
 import {
@@ -13,6 +13,11 @@ import { TableLayout } from './TableLayout.js';
 import type { ColumnDef } from './TableLayout.js';
 import type { PullRequest } from '../types.js';
 import { useTerminalWidth } from '../hooks/useTerminalWidth.js';
+import {
+  getVisibleCommands,
+  type Command,
+  type CommandContext,
+} from '../commands.js';
 
 const openInBrowser = async (url: string) => {
   const { default: open } = await import('open');
@@ -104,6 +109,7 @@ export function PullRequestList() {
   const navigateToHelp = useNavigationStore((s) => s.navigateToHelp);
   const selectedPrId = useNavigationStore((s) => s.selectedPrId);
   const pullRequests = useBackendDataStore((s) => s.pullRequests);
+  const capabilities = useBackendDataStore((s) => s.capabilities);
 
   const termWidth = useTerminalWidth();
   const [cursor, setCursor] = useState(0);
@@ -128,6 +134,59 @@ export function PullRequestList() {
     setCursor(clampedCursor);
   }
 
+  const currentPr = pullRequests[clampedCursor];
+
+  // --- Action functions ---
+
+  const doOpenInBrowser = useCallback(() => {
+    if (currentPr?.url) {
+      void openInBrowser(currentPr.url);
+    }
+  }, [currentPr]);
+
+  // --- Command palette ---
+
+  const commandContext: CommandContext = {
+    screen: 'pr-list',
+    markedCount: 0,
+    hasSelectedItem: false,
+    capabilities,
+    types: [],
+    activeType: null,
+    hasSyncManager: false,
+    gitAvailable: false,
+    hasActiveFilters: false,
+    hasSavedViews: false,
+    hasSelectedBranch: false,
+    isCurrentBranch: false,
+    hasWorktree: false,
+    hasPrCreateCapability: false,
+    hasSelectedPr: currentPr !== undefined,
+  };
+
+  const paletteCommands = useMemo(
+    () => getVisibleCommands(commandContext),
+    [commandContext.hasSelectedPr],
+  );
+
+  const handleCommandSelect = useCallback(
+    (cmd: Command) => {
+      closeOverlay();
+      switch (cmd.id) {
+        case 'pr-open':
+          doOpenInBrowser();
+          break;
+        case 'pr-back':
+          navigate('list');
+          break;
+        case 'help':
+          navigateToHelp();
+          break;
+      }
+    },
+    [closeOverlay, doOpenInBrowser, navigate, navigateToHelp],
+  );
+
   useInput((input, key) => {
     if (activeOverlay) return;
 
@@ -147,21 +206,18 @@ export function PullRequestList() {
     }
 
     // Navigation
-    if (input === 'j' || key.downArrow) {
+    if (key.downArrow) {
       setCursor((c) => Math.min(c + 1, pullRequests.length - 1));
       return;
     }
-    if (input === 'k' || key.upArrow) {
+    if (key.upArrow) {
       setCursor((c) => Math.max(c - 1, 0));
       return;
     }
 
     // Open in browser
     if (key.return || input === 'o') {
-      const pr = pullRequests[clampedCursor];
-      if (pr?.url) {
-        void openInBrowser(pr.url);
-      }
+      doOpenInBrowser();
       return;
     }
   });
@@ -203,8 +259,8 @@ export function PullRequestList() {
 
       {activeOverlay?.type === 'command-bar' && (
         <CommandBar
-          commands={[]}
-          onCommand={() => closeOverlay()}
+          commands={paletteCommands}
+          onCommand={handleCommandSelect}
           onCancel={closeOverlay}
         />
       )}

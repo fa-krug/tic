@@ -222,7 +222,7 @@ export function getShortcuts(
         {
           label: 'Navigation',
           shortcuts: [
-            { key: 'j/k', description: 'Navigate branches' },
+            { key: '↑/↓', description: 'Navigate branches' },
             { key: 'esc', description: 'Back to list' },
             { key: '?', description: 'Help' },
           ],
@@ -231,9 +231,10 @@ export function getShortcuts(
           label: 'Actions',
           shortcuts: [
             { key: 'enter', description: 'Switch to branch' },
-            { key: 'n', description: 'New branch' },
+            { key: 'c', description: 'New branch' },
             { key: 'd', description: 'Delete branch' },
             { key: 'm', description: 'Merge into current' },
+            { key: 'p', description: 'Create PR for branch' },
             { key: 'P', description: 'Push to remote' },
             { key: 'w', description: 'Open worktree shell' },
             { key: 'r', description: 'Refresh (re-fetch)' },

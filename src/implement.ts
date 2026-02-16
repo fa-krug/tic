@@ -173,7 +173,9 @@ export function beginImplementation(
   // Spawn shell / run branch command
   let commandFailed = false;
   if (!options?.skipShell) {
-    const env = {
+    // Strip Node.js debug env vars so child processes (e.g. claude) don't
+    // inherit debugger settings that conflict with their own startup.
+    const env: Record<string, string | undefined> = {
       ...process.env,
       TIC_ITEM_ID: item.id,
       TIC_ITEM_TITLE: item.title,
@@ -185,19 +187,21 @@ export function beginImplementation(
       TIC_BRANCH: branch,
       TIC_TARGET_DIR: targetDir,
     };
+    delete env['NODE_OPTIONS'];
+    delete env['NODE_INSPECT_PUBLISH_UID'];
 
     const shell = process.env['SHELL'] || '/bin/sh';
     const command = config.branchCommand;
 
     if (command) {
-      // Run the branchCommand via /bin/sh
+      // Run the branchCommand via user's shell for proper PATH resolution
       const result = spawnSync(command, [], {
         cwd: targetDir,
         stdio: 'inherit',
         env,
-        shell: '/bin/sh',
+        shell,
       });
-      if (result.status !== 0 && result.status !== null) {
+      if (result.error || (result.status !== 0 && result.status !== null)) {
         commandFailed = true;
       }
     }

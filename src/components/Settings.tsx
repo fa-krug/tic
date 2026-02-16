@@ -358,12 +358,17 @@ export function Settings() {
           try {
             const current =
               config?.branchCommand ?? defaultConfig.branchCommand ?? '';
+            process.stdin.setRawMode?.(false);
             const edited = openInEditor(current);
+            process.stdin.setRawMode?.(true);
+            console.clear();
             void configStore
               .getState()
               .update({ branchCommand: edited.trim() })
               .catch(() => {});
           } catch {
+            process.stdin.setRawMode?.(true);
+            console.clear();
             // Editor failed, ignore
           }
         } else if (item.kind === 'branch-clipboard-toggle') {

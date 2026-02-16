@@ -600,10 +600,20 @@ export const backendDataStore = createStore<BackendDataStoreState>(
     async loadPullRequests() {
       if (!currentBackend) return;
       if (isPrBackend(currentBackend)) {
-        const [pullRequests, prCapabilities] = await Promise.all([
+        const [pullRequests, localCaps] = await Promise.all([
           currentBackend.listPullRequests(),
           Promise.resolve(currentBackend.getPrCapabilities()),
         ]);
+        // Merge with remote backend capabilities (e.g. GitHub supports create/merge)
+        const remoteCaps =
+          currentRemoteBackend && isPrBackend(currentRemoteBackend)
+            ? currentRemoteBackend.getPrCapabilities()
+            : defaultPrCapabilities;
+        const prCapabilities: PrCapabilities = {
+          pullRequests: localCaps.pullRequests || remoteCaps.pullRequests,
+          merge: localCaps.merge || remoteCaps.merge,
+          create: localCaps.create || remoteCaps.create,
+        };
         set({ pullRequests, prCapabilities });
       } else {
         set({ pullRequests: [], prCapabilities: { ...defaultPrCapabilities } });

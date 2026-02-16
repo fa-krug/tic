@@ -878,9 +878,14 @@ export function WorkItemForm() {
           } else if (currentField === 'description') {
             // Open external editor for description
             try {
+              process.stdin.setRawMode?.(false);
               const edited = openInEditor(description);
+              process.stdin.setRawMode?.(true);
+              console.clear();
               setDescription(edited);
             } catch {
+              process.stdin.setRawMode?.(true);
+              console.clear();
               // Editor failed, fall back to inline editing
               setEditing(true);
             }

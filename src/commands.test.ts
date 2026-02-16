@@ -48,6 +48,11 @@ function makeContext(overrides: Partial<CommandContext> = {}): CommandContext {
     gitAvailable: true,
     hasActiveFilters: false,
     hasSavedViews: false,
+    hasSelectedBranch: false,
+    isCurrentBranch: false,
+    hasWorktree: false,
+    hasPrCreateCapability: false,
+    hasSelectedPr: false,
     ...overrides,
   };
 }

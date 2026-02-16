@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { TableLayout } from './TableLayout.js';
 import type { ColumnDef } from './TableLayout.js';
@@ -29,6 +29,11 @@ import { spawnSync } from 'node:child_process';
 import { CommandBar } from './CommandBar.js';
 import { OverlayPanel } from './OverlayPanel.js';
 import { useTerminalWidth } from '../hooks/useTerminalWidth.js';
+import {
+  getVisibleCommands,
+  type Command,
+  type CommandContext,
+} from '../commands.js';
 
 type InputMode = 'normal' | 'new-branch';
 
@@ -132,6 +137,8 @@ export function BranchList() {
   const navigateToHelp = useNavigationStore((s) => s.navigateToHelp);
   const selectedBranchName = useNavigationStore((s) => s.selectedBranchName);
   const rows = useBackendDataStore((s) => s.branches);
+  const prCapabilities = useBackendDataStore((s) => s.prCapabilities);
+  const capabilities = useBackendDataStore((s) => s.capabilities);
   const cwd = process.cwd();
   const termWidth = useTerminalWidth();
   const branchColumns = useMemo(
@@ -177,6 +184,214 @@ export function BranchList() {
   const reloadBranches = () => backendDataStore.getState().loadBranches();
 
   const currentRow = rows[clampedCursor];
+
+  // --- Action functions (shared between useInput and command palette) ---
+
+  const doSwitch = useCallback(() => {
+    if (!currentRow) return;
+    if (currentRow.branch.current) {
+      showToast('Already on this branch');
+      return;
+    }
+    if (hasUncommittedChanges(cwd)) {
+      showToast('Uncommitted changes — stash or commit first');
+      return;
+    }
+    try {
+      checkoutBranch(currentRow.branch.name, cwd);
+      showToast(`Switched to ${currentRow.branch.name}`);
+      reloadBranches();
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : 'Checkout failed');
+    }
+  }, [currentRow, cwd]);
+
+  const doWorktree = useCallback(() => {
+    if (!currentRow) return;
+    if (!currentRow.worktree) {
+      showToast('No worktree for this branch');
+      return;
+    }
+    const shell = process.env['SHELL'] ?? '/bin/sh';
+    // Strip Node.js debug env vars so child processes don't inherit debugger settings
+    const env: Record<string, string | undefined> = { ...process.env };
+    delete env['NODE_OPTIONS'];
+    delete env['NODE_INSPECT_PUBLISH_UID'];
+    process.stdin.setRawMode?.(false);
+    spawnSync(shell, [], {
+      cwd: currentRow.worktree.path,
+      stdio: 'inherit',
+      env,
+    });
+    process.stdin.setRawMode?.(true);
+    console.clear();
+    reloadBranches();
+  }, [currentRow]);
+
+  const doDelete = useCallback(() => {
+    if (!currentRow) return;
+    if (currentRow.branch.current) {
+      showToast('Cannot delete current branch');
+      return;
+    }
+    openOverlay({
+      type: 'branch-delete-confirm',
+      branch: currentRow.branch.name,
+      worktreePath: currentRow.worktree?.path ?? null,
+    });
+  }, [currentRow, openOverlay]);
+
+  const doMerge = useCallback(() => {
+    if (!currentRow) return;
+    if (currentRow.branch.current) {
+      showToast('Cannot merge current branch into itself');
+      return;
+    }
+    const currentBranch = getCurrentBranch(cwd) ?? 'current branch';
+    openOverlay({
+      type: 'branch-merge-confirm',
+      branch: currentRow.branch.name,
+      into: currentBranch,
+    });
+  }, [currentRow, cwd, openOverlay]);
+
+  const doPush = useCallback(() => {
+    if (!currentRow) return;
+    void (async () => {
+      try {
+        showToast(`Pushing ${currentRow.branch.name}...`);
+        await pushBranch(currentRow.branch.name, cwd);
+        showToast(`Pushed ${currentRow.branch.name}`);
+        reloadBranches();
+      } catch (err: unknown) {
+        showToast(err instanceof Error ? err.message : 'Push failed');
+      }
+    })();
+  }, [currentRow, cwd]);
+
+  const doCreatePr = useCallback(() => {
+    if (!currentRow) return;
+    const { prCapabilities: prCaps, createPullRequest } =
+      backendDataStore.getState();
+    if (!prCaps.create) {
+      showToast('Backend does not support PR creation');
+      return;
+    }
+    if (currentRow.branch.current) {
+      showToast('Cannot create PR from current branch');
+      return;
+    }
+    const title = currentRow.linkedItem
+      ? currentRow.linkedItem.title
+      : currentRow.branch.name;
+    const linkedItems = currentRow.linkedItem ? [currentRow.linkedItem.id] : [];
+    void createPullRequest({
+      title,
+      sourceBranch: currentRow.branch.name,
+      linkedItems,
+    })
+      .then((pr) => {
+        showToast(`PR #${String(pr.number)} created`);
+        backendDataStore
+          .getState()
+          .loadPullRequests()
+          .catch(() => {});
+      })
+      .catch((err: unknown) => {
+        showToast(err instanceof Error ? err.message : 'Failed to create PR');
+      });
+  }, [currentRow]);
+
+  const doRefresh = useCallback(() => {
+    backendDataStore.getState().refreshBranches();
+  }, []);
+
+  const doCreateBranch = useCallback(() => {
+    setInputMode('new-branch');
+    setInputValue('');
+  }, []);
+
+  // --- Command palette ---
+
+  const commandContext: CommandContext = {
+    screen: 'branch-list',
+    markedCount: 0,
+    hasSelectedItem: false,
+    capabilities,
+    types: [],
+    activeType: null,
+    hasSyncManager: false,
+    gitAvailable: true,
+    hasActiveFilters: false,
+    hasSavedViews: false,
+    hasSelectedBranch: currentRow !== undefined,
+    isCurrentBranch: currentRow?.branch.current ?? false,
+    hasWorktree:
+      currentRow?.worktree !== undefined && currentRow?.worktree !== null,
+    hasPrCreateCapability: prCapabilities.create,
+    hasSelectedPr: false,
+  };
+
+  const paletteCommands = useMemo(
+    () => getVisibleCommands(commandContext),
+    [
+      commandContext.hasSelectedBranch,
+      commandContext.isCurrentBranch,
+      commandContext.hasWorktree,
+      prCapabilities.create,
+    ],
+  );
+
+  const handleCommandSelect = useCallback(
+    (cmd: Command) => {
+      closeOverlay();
+      switch (cmd.id) {
+        case 'branch-switch':
+          doSwitch();
+          break;
+        case 'branch-create':
+          doCreateBranch();
+          break;
+        case 'branch-delete':
+          doDelete();
+          break;
+        case 'branch-merge':
+          doMerge();
+          break;
+        case 'branch-push':
+          doPush();
+          break;
+        case 'branch-create-pr':
+          doCreatePr();
+          break;
+        case 'branch-worktree':
+          doWorktree();
+          break;
+        case 'branch-refresh':
+          doRefresh();
+          break;
+        case 'branch-back':
+          navigate('list');
+          break;
+        case 'help':
+          navigateToHelp();
+          break;
+      }
+    },
+    [
+      closeOverlay,
+      doSwitch,
+      doCreateBranch,
+      doDelete,
+      doMerge,
+      doPush,
+      doCreatePr,
+      doWorktree,
+      doRefresh,
+      navigate,
+      navigateToHelp,
+    ],
+  );
 
   useInput((input, key) => {
     if (activeOverlay) return;
@@ -243,104 +458,36 @@ export function BranchList() {
 
     if (!currentRow) return;
 
-    // Switch to branch
     if (key.return) {
-      if (currentRow.branch.current) {
-        showToast('Already on this branch');
-        return;
-      }
-      if (hasUncommittedChanges(cwd)) {
-        showToast('Uncommitted changes — stash or commit first');
-        return;
-      }
-      try {
-        checkoutBranch(currentRow.branch.name, cwd);
-        showToast(`Switched to ${currentRow.branch.name}`);
-        reloadBranches();
-      } catch (err: unknown) {
-        showToast(err instanceof Error ? err.message : 'Checkout failed');
-      }
+      doSwitch();
       return;
     }
-
-    // Open worktree shell
     if (input === 'w') {
-      if (!currentRow.worktree) {
-        showToast('No worktree for this branch');
-        return;
-      }
-      const shell = process.env['SHELL'] ?? '/bin/sh';
-      process.stdin.setRawMode?.(false);
-      spawnSync(shell, [], {
-        cwd: currentRow.worktree.path,
-        stdio: 'inherit',
-        env: { ...process.env },
-      });
-      process.stdin.setRawMode?.(true);
-      reloadBranches();
+      doWorktree();
       return;
     }
-
-    // Delete branch
     if (input === 'd') {
-      if (currentRow.branch.current) {
-        showToast('Cannot delete current branch');
-        return;
-      }
-      openOverlay({
-        type: 'branch-delete-confirm',
-        branch: currentRow.branch.name,
-        worktreePath: currentRow.worktree?.path ?? null,
-      });
+      doDelete();
       return;
     }
-
-    // Merge branch
     if (input === 'm') {
-      if (currentRow.branch.current) {
-        showToast('Cannot merge current branch into itself');
-        return;
-      }
-      const currentBranch = getCurrentBranch(cwd) ?? 'current branch';
-      openOverlay({
-        type: 'branch-merge-confirm',
-        branch: currentRow.branch.name,
-        into: currentBranch,
-      });
+      doMerge();
       return;
     }
-
-    // Push branch
     if (input === 'P') {
-      void (async () => {
-        try {
-          showToast(`Pushing ${currentRow.branch.name}...`);
-          await pushBranch(currentRow.branch.name, cwd);
-          showToast(`Pushed ${currentRow.branch.name}`);
-          reloadBranches();
-        } catch (err: unknown) {
-          showToast(err instanceof Error ? err.message : 'Push failed');
-        }
-      })();
+      doPush();
       return;
     }
-
-    // Create PR
     if (input === 'p') {
-      showToast('PR creation — use p from list view');
+      doCreatePr();
       return;
     }
-
-    // Refresh
     if (input === 'r') {
-      backendDataStore.getState().refreshBranches();
+      doRefresh();
       return;
     }
-
-    // New branch
-    if (input === 'n') {
-      setInputMode('new-branch');
-      setInputValue('');
+    if (input === 'c') {
+      doCreateBranch();
       return;
     }
   });
@@ -397,16 +544,16 @@ export function BranchList() {
       <Box marginTop={1}>
         <Text color={muted} dimColor={mutedDim}>
           ↑/↓ navigate {'\u00b7'} Enter switch {'\u00b7'} d delete {'\u00b7'} m
-          merge {'\u00b7'} P push {'\u00b7'} n new {'\u00b7'} w worktree{' '}
-          {'\u00b7'} r refresh {'\u00b7'} / search {'\u00b7'} Esc back{' '}
+          merge {'\u00b7'} p PR {'\u00b7'} P push {'\u00b7'} c new {'\u00b7'} w
+          worktree {'\u00b7'} r refresh {'\u00b7'} / search {'\u00b7'} Esc back{' '}
           {'\u00b7'} ? help
         </Text>
       </Box>
 
       {activeOverlay?.type === 'command-bar' && (
         <CommandBar
-          commands={[]}
-          onCommand={() => closeOverlay()}
+          commands={paletteCommands}
+          onCommand={handleCommandSelect}
           onCancel={closeOverlay}
         />
       )}

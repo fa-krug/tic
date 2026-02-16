@@ -831,6 +831,8 @@ export function WorkItemList() {
         const comments = item.comments;
         try {
           const itemUrl = backend?.getItemUrl(item.id) || '';
+          // Suspend terminal for interactive child process
+          process.stdin.setRawMode?.(false);
           const result = beginImplementation(
             item,
             comments,
@@ -838,8 +840,9 @@ export function WorkItemList() {
             process.cwd(),
             { itemUrl },
           );
-          // Restore raw mode after interactive shell changed terminal settings
+          // Restore terminal after interactive shell
           process.stdin.setRawMode?.(true);
+          console.clear();
           let msg = result.resumed
             ? `Resumed work on #${item.id}`
             : `Started work on #${item.id}`;
@@ -849,6 +852,7 @@ export function WorkItemList() {
           setWarning(msg);
         } catch (e) {
           process.stdin.setRawMode?.(true);
+          console.clear();
           setWarning(
             e instanceof Error ? e.message : 'Failed to start implementation',
           );
@@ -1021,6 +1025,11 @@ export function WorkItemList() {
     gitAvailable,
     hasActiveFilters: filterCount > 0,
     hasSavedViews: savedViews.length > 0,
+    hasSelectedBranch: false,
+    isCurrentBranch: false,
+    hasWorktree: false,
+    hasPrCreateCapability: false,
+    hasSelectedPr: false,
   };
 
   const paletteCommands = useMemo(
@@ -1222,6 +1231,7 @@ export function WorkItemList() {
           const comments = item.comments;
           try {
             const itemUrl = backend?.getItemUrl(item.id) || '';
+            process.stdin.setRawMode?.(false);
             const result = beginImplementation(
               item,
               comments,
@@ -1230,6 +1240,7 @@ export function WorkItemList() {
               { itemUrl },
             );
             process.stdin.setRawMode?.(true);
+            console.clear();
             let msg = result.resumed
               ? `Resumed work on #${item.id}`
               : `Started work on #${item.id}`;
@@ -1239,6 +1250,7 @@ export function WorkItemList() {
             setWarning(msg);
           } catch (e) {
             process.stdin.setRawMode?.(true);
+            console.clear();
             setWarning(
               e instanceof Error ? e.message : 'Failed to start implementation',
             );

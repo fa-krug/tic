@@ -22,6 +22,13 @@ export interface CommandContext {
   gitAvailable: boolean;
   hasActiveFilters: boolean;
   hasSavedViews: boolean;
+  // Branch list context
+  hasSelectedBranch: boolean;
+  isCurrentBranch: boolean;
+  hasWorktree: boolean;
+  hasPrCreateCapability: boolean;
+  // PR list context
+  hasSelectedPr: boolean;
 }
 
 export interface Command {
@@ -111,7 +118,10 @@ const commands: Command[] = [
     label: 'Go to help',
     category: 'Navigation',
     shortcut: '?',
-    when: (ctx) => ctx.screen === 'list',
+    when: (ctx) =>
+      ctx.screen === 'list' ||
+      ctx.screen === 'branch-list' ||
+      ctx.screen === 'pr-list',
   },
   // Bulk
   {
@@ -206,6 +216,98 @@ const commands: Command[] = [
     label: 'Delete view...',
     category: 'Actions',
     when: (ctx) => ctx.screen === 'list' && ctx.hasSavedViews,
+  },
+  // Branch list actions
+  {
+    id: 'branch-switch',
+    label: 'Switch to branch',
+    category: 'Actions',
+    shortcut: 'enter',
+    when: (ctx) =>
+      ctx.screen === 'branch-list' &&
+      ctx.hasSelectedBranch &&
+      !ctx.isCurrentBranch,
+  },
+  {
+    id: 'branch-create',
+    label: 'Create new branch',
+    category: 'Actions',
+    shortcut: 'c',
+    when: (ctx) => ctx.screen === 'branch-list',
+  },
+  {
+    id: 'branch-delete',
+    label: 'Delete branch',
+    category: 'Actions',
+    shortcut: 'd',
+    when: (ctx) =>
+      ctx.screen === 'branch-list' &&
+      ctx.hasSelectedBranch &&
+      !ctx.isCurrentBranch,
+  },
+  {
+    id: 'branch-merge',
+    label: 'Merge into current',
+    category: 'Actions',
+    shortcut: 'm',
+    when: (ctx) =>
+      ctx.screen === 'branch-list' &&
+      ctx.hasSelectedBranch &&
+      !ctx.isCurrentBranch,
+  },
+  {
+    id: 'branch-push',
+    label: 'Push to remote',
+    category: 'Actions',
+    shortcut: 'P',
+    when: (ctx) => ctx.screen === 'branch-list' && ctx.hasSelectedBranch,
+  },
+  {
+    id: 'branch-create-pr',
+    label: 'Create PR for branch',
+    category: 'Actions',
+    shortcut: 'p',
+    when: (ctx) =>
+      ctx.screen === 'branch-list' &&
+      ctx.hasSelectedBranch &&
+      ctx.hasPrCreateCapability,
+  },
+  {
+    id: 'branch-worktree',
+    label: 'Open worktree shell',
+    category: 'Actions',
+    shortcut: 'w',
+    when: (ctx) =>
+      ctx.screen === 'branch-list' && ctx.hasSelectedBranch && ctx.hasWorktree,
+  },
+  {
+    id: 'branch-refresh',
+    label: 'Refresh branches',
+    category: 'Actions',
+    shortcut: 'r',
+    when: (ctx) => ctx.screen === 'branch-list',
+  },
+  {
+    id: 'branch-back',
+    label: 'Back to items',
+    category: 'Navigation',
+    shortcut: 'esc',
+    when: (ctx) => ctx.screen === 'branch-list',
+  },
+  // PR list actions
+  {
+    id: 'pr-open',
+    label: 'Open in browser',
+    category: 'Actions',
+    shortcut: 'enter',
+    when: (ctx) => ctx.screen === 'pr-list' && ctx.hasSelectedPr,
+  },
+  {
+    id: 'pr-back',
+    label: 'Back to items',
+    category: 'Navigation',
+    shortcut: 'esc',
+    when: (ctx) => ctx.screen === 'pr-list',
   },
   // Other
   {
