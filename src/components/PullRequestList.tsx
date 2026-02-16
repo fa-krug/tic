@@ -16,6 +16,7 @@ import { useTerminalWidth } from '../hooks/useTerminalWidth.js';
 import {
   getVisibleCommands,
   buildFooterHints,
+  matchesCommand,
   type Command,
   type CommandContext,
 } from '../commands.js';
@@ -191,33 +192,33 @@ export function PullRequestList() {
   useInput((input, key) => {
     if (activeOverlay) return;
 
-    if (key.escape) {
+    if (matchesCommand('nav-back', input, key)) {
       navigate('list');
       return;
     }
 
-    if (input === '?') {
+    if (matchesCommand('help', input, key)) {
       navigateToHelp();
       return;
     }
 
-    if (input === '/') {
+    if (matchesCommand('pr-search', input, key)) {
       openOverlay({ type: 'command-bar' });
       return;
     }
 
     // Navigation
-    if (key.downArrow) {
-      setCursor((c) => Math.min(c + 1, pullRequests.length - 1));
-      return;
-    }
-    if (key.upArrow) {
-      setCursor((c) => Math.max(c - 1, 0));
+    if (matchesCommand('pr-navigate', input, key)) {
+      if (key.downArrow) {
+        setCursor((c) => Math.min(c + 1, pullRequests.length - 1));
+      } else {
+        setCursor((c) => Math.max(c - 1, 0));
+      }
       return;
     }
 
     // Open in browser
-    if (key.return || input === 'o') {
+    if (matchesCommand('pr-open', input, key)) {
       doOpenInBrowser();
       return;
     }
