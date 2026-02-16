@@ -107,6 +107,7 @@ export interface BackendDataStoreState {
   removeItem(id: string): void;
   setSyncStatus(status: SyncStatus): void;
   dismissAuthPrompt(): void;
+  retryAuth(): void;
   startAuthFlow(): Promise<void>;
   startPatFlow(): void;
   submitAdoPat(pat: string): Promise<void>;
@@ -357,6 +358,19 @@ export const backendDataStore = createStore<BackendDataStoreState>(
 
     dismissAuthPrompt() {
       set({ authPrompt: null, authFlow: null, authDismissed: true });
+    },
+
+    retryAuth() {
+      const backendType = configStore.getState().config.backend ?? 'none';
+      if (backendType === 'none' || backendType === 'files') return;
+      set({
+        authDismissed: false,
+        authPrompt: {
+          backendType,
+          message: 'Authentication required',
+        },
+        authFlow: null,
+      });
     },
 
     startPatFlow() {

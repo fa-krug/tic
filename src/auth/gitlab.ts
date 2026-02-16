@@ -69,6 +69,12 @@ function isTokenError(
   return 'error' in response;
 }
 
+function urlEncode(params: Record<string, string>): string {
+  return Object.entries(params)
+    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+    .join('&');
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -102,9 +108,9 @@ export async function authenticateGitLab(
       method: 'POST',
       headers: {
         Accept: 'application/json',
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: JSON.stringify({
+      body: urlEncode({
         client_id: clientId,
         scope: 'api',
       }),
@@ -132,8 +138,9 @@ export async function authenticateGitLab(
 
   // Step 3: Poll for access token
   let interval = deviceCode.interval * 1000; // Convert to ms
+  const deadline = Date.now() + deviceCode.expires_in * 1000;
 
-  while (true) {
+  while (Date.now() < deadline) {
     await sleep(interval);
 
     const tokenController = new AbortController();
@@ -148,9 +155,9 @@ export async function authenticateGitLab(
         method: 'POST',
         headers: {
           Accept: 'application/json',
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: JSON.stringify({
+        body: urlEncode({
           client_id: clientId,
           device_code: deviceCode.device_code,
           grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
@@ -200,4 +207,8 @@ export async function authenticateGitLab(
     setToken(GITLAB_ACCOUNT, data.access_token);
     return data.access_token;
   }
+
+  throw new Error(
+    'Device code has expired. Please restart the authentication flow.',
+  );
 }

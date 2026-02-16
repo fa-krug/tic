@@ -162,30 +162,23 @@ describe('gitlab auth', () => {
       expect(token).toBe('gl_oauth_token123');
       expect(fetchMock).toHaveBeenCalledTimes(3);
 
-      // Verify device code request
+      // Verify device code request uses form-encoded body
       expect(fetchMock).toHaveBeenNthCalledWith(
         1,
         'https://gitlab.com/oauth/authorize_device',
         expect.objectContaining({
           method: 'POST',
-          body: JSON.stringify({
-            client_id: DEFAULT_GITLAB_CLIENT_ID,
-            scope: 'api',
-          }),
+          body: `client_id=${encodeURIComponent(DEFAULT_GITLAB_CLIENT_ID)}&scope=api`,
         }),
       );
 
-      // Verify token poll request
+      // Verify token poll request uses form-encoded body
       expect(fetchMock).toHaveBeenNthCalledWith(
         2,
         'https://gitlab.com/oauth/token',
         expect.objectContaining({
           method: 'POST',
-          body: JSON.stringify({
-            client_id: DEFAULT_GITLAB_CLIENT_ID,
-            device_code: 'dc_gl_test123',
-            grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
-          }),
+          body: `client_id=${encodeURIComponent(DEFAULT_GITLAB_CLIENT_ID)}&device_code=dc_gl_test123&grant_type=${encodeURIComponent('urn:ietf:params:oauth:grant-type:device_code')}`,
         }),
       );
     });
@@ -204,10 +197,7 @@ describe('gitlab auth', () => {
         1,
         'https://gitlab.com/oauth/authorize_device',
         expect.objectContaining({
-          body: JSON.stringify({
-            client_id: 'custom_gl_client_id',
-            scope: 'api',
-          }),
+          body: 'client_id=custom_gl_client_id&scope=api',
         }),
       );
 
@@ -215,11 +205,7 @@ describe('gitlab auth', () => {
         2,
         'https://gitlab.com/oauth/token',
         expect.objectContaining({
-          body: JSON.stringify({
-            client_id: 'custom_gl_client_id',
-            device_code: 'dc_gl_test123',
-            grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
-          }),
+          body: `client_id=custom_gl_client_id&device_code=dc_gl_test123&grant_type=${encodeURIComponent('urn:ietf:params:oauth:grant-type:device_code')}`,
         }),
       );
     });

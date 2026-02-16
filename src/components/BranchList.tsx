@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
-import Spinner from 'ink-spinner';
 import { TableLayout } from './TableLayout.js';
 import type { ColumnDef } from './TableLayout.js';
 import type { BranchRow } from '../git.js';
@@ -13,7 +12,7 @@ import {
   backendDataStore,
   useBackendDataStore,
 } from '../stores/backendDataStore.js';
-import { uiStore } from '../stores/uiStore.js';
+import { uiStore, useUIStore } from '../stores/uiStore.js';
 import {
   getCurrentBranch,
   checkoutBranch,
@@ -28,18 +27,8 @@ import {
 } from '../git-async.js';
 import { spawnSync } from 'node:child_process';
 import { CommandBar } from './CommandBar.js';
+import { OverlayPanel } from './OverlayPanel.js';
 import { useTerminalWidth } from '../hooks/useTerminalWidth.js';
-
-type Confirmation =
-  | {
-      type: 'delete';
-      branch: string;
-      worktreePath: string | null;
-      unmerged: boolean;
-    }
-  | { type: 'merge'; branch: string; into: string }
-  | { type: 'force-delete'; branch: string; worktreePath: string | null }
-  | null;
 
 type InputMode = 'normal' | 'new-branch';
 
@@ -143,7 +132,6 @@ export function BranchList() {
   const navigateToHelp = useNavigationStore((s) => s.navigateToHelp);
   const selectedBranchName = useNavigationStore((s) => s.selectedBranchName);
   const rows = useBackendDataStore((s) => s.branches);
-  const fetching = useBackendDataStore((s) => s.branchesLoading);
   const cwd = process.cwd();
   const termWidth = useTerminalWidth();
   const branchColumns = useMemo(
@@ -152,11 +140,11 @@ export function BranchList() {
   );
 
   const [cursor, setCursor] = useState(0);
-  const [confirmation, setConfirmation] = useState<Confirmation>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [inputMode, setInputMode] = useState<InputMode>('normal');
   const [inputValue, setInputValue] = useState('');
-  const { activeOverlay, openOverlay, closeOverlay } = uiStore.getState();
+  const activeOverlay = useUIStore((s) => s.activeOverlay);
+  const { openOverlay, closeOverlay } = uiStore.getState();
 
   // Trigger background fetch on mount
   useEffect(() => {
@@ -181,7 +169,7 @@ export function BranchList() {
   // Auto-clear toast
   useEffect(() => {
     if (!toastMessage) return;
-    const timer = setTimeout(() => setToastMessage(null), 3000);
+    const timer = setTimeout(() => setToastMessage(null), 10000);
     return () => clearTimeout(timer);
   }, [toastMessage]);
 
@@ -192,68 +180,6 @@ export function BranchList() {
 
   useInput((input, key) => {
     if (activeOverlay) return;
-
-    // --- Confirmation mode ---
-    if (confirmation) {
-      if (input === 'y' || input === 'Y') {
-        const conf = confirmation;
-        setConfirmation(null);
-        void (async () => {
-          try {
-            if (conf.type === 'delete' || conf.type === 'force-delete') {
-              const force = conf.type === 'force-delete';
-              if (conf.worktreePath) {
-                await removeWorktree(conf.worktreePath, cwd, true);
-              }
-              await deleteBranch(conf.branch, cwd, force);
-              showToast(`Deleted ${conf.branch}`);
-              reloadBranches();
-            } else if (conf.type === 'merge') {
-              const result = await mergeBranch(conf.branch, cwd);
-              if (result.success) {
-                showToast(`Merged ${conf.branch} into ${conf.into}`);
-                // Offer to delete merged branch
-                const wt =
-                  rows.find((r) => r.branch.name === conf.branch)?.worktree ??
-                  null;
-                setConfirmation({
-                  type: 'delete',
-                  branch: conf.branch,
-                  worktreePath: wt?.path ?? null,
-                  unmerged: false,
-                });
-              } else if (result.hasConflicts) {
-                showToast('Merge conflicts — resolve in terminal');
-              } else {
-                showToast(`Merge failed: ${result.message}`);
-              }
-              reloadBranches();
-            }
-          } catch (err: unknown) {
-            const msg = err instanceof Error ? err.message : String(err);
-            if (
-              conf.type === 'delete' &&
-              !conf.unmerged &&
-              msg.includes('not fully merged')
-            ) {
-              setConfirmation({
-                type: 'force-delete',
-                branch: conf.branch,
-                worktreePath: conf.worktreePath,
-              });
-            } else {
-              showToast(msg.split('\n')[0] ?? 'Error');
-            }
-          }
-        })();
-        return;
-      }
-      if (input === 'n' || input === 'N' || key.escape) {
-        setConfirmation(null);
-        return;
-      }
-      return; // block other input during confirmation
-    }
 
     // --- Input mode (new branch name) ---
     if (inputMode !== 'normal') {
@@ -361,11 +287,10 @@ export function BranchList() {
         showToast('Cannot delete current branch');
         return;
       }
-      setConfirmation({
-        type: 'delete',
+      openOverlay({
+        type: 'branch-delete-confirm',
         branch: currentRow.branch.name,
         worktreePath: currentRow.worktree?.path ?? null,
-        unmerged: false,
       });
       return;
     }
@@ -377,8 +302,8 @@ export function BranchList() {
         return;
       }
       const currentBranch = getCurrentBranch(cwd) ?? 'current branch';
-      setConfirmation({
-        type: 'merge',
+      openOverlay({
+        type: 'branch-merge-confirm',
         branch: currentRow.branch.name,
         into: currentBranch,
       });
@@ -432,12 +357,6 @@ export function BranchList() {
           {' '}
           ({rows.length})
         </Text>
-        {fetching && (
-          <Text color={warning}>
-            {' '}
-            <Spinner type="dots" /> Fetching...
-          </Text>
-        )}
       </Box>
 
       {/* Input prompts */}
@@ -447,27 +366,6 @@ export function BranchList() {
           <Text>{inputValue}</Text>
           <Text color={muted} dimColor={mutedDim}>
             █
-          </Text>
-        </Box>
-      )}
-
-      {/* Confirmation dialog */}
-      {confirmation && (
-        <Box marginBottom={1}>
-          <Text color={warning}>
-            {confirmation.type === 'delete' &&
-              `Delete branch "${confirmation.branch}"?` +
-                (confirmation.worktreePath
-                  ? ` This will also remove worktree at ${confirmation.worktreePath}.`
-                  : '')}
-            {confirmation.type === 'force-delete' &&
-              `Branch "${confirmation.branch}" is not fully merged. Force delete?` +
-                (confirmation.worktreePath
-                  ? ` This will also remove worktree at ${confirmation.worktreePath}.`
-                  : '')}
-            {confirmation.type === 'merge' &&
-              `Merge "${confirmation.branch}" into "${confirmation.into}"?`}
-            {' (y/n)'}
           </Text>
         </Box>
       )}
@@ -510,6 +408,125 @@ export function BranchList() {
           commands={[]}
           onCommand={() => closeOverlay()}
           onCancel={closeOverlay}
+        />
+      )}
+
+      {activeOverlay?.type === 'branch-delete-confirm' && (
+        <OverlayPanel
+          title={`Delete "${activeOverlay.branch}"?${activeOverlay.worktreePath ? ' (worktree will also be removed)' : ''}`}
+          items={[
+            { id: 'yes', label: 'Yes, delete', value: 'yes' },
+            { id: 'no', label: 'Cancel', value: 'no' },
+          ]}
+          onSelect={(item) => {
+            if (item.value === 'yes') {
+              const { branch, worktreePath } = activeOverlay;
+              closeOverlay();
+              void (async () => {
+                try {
+                  if (worktreePath) {
+                    await removeWorktree(worktreePath, cwd, true);
+                  }
+                  await deleteBranch(branch, cwd, false);
+                  showToast(`Deleted ${branch}`);
+                  reloadBranches();
+                } catch (err: unknown) {
+                  const msg = err instanceof Error ? err.message : String(err);
+                  if (msg.includes('not fully merged')) {
+                    openOverlay({
+                      type: 'branch-force-delete-confirm',
+                      branch,
+                      worktreePath,
+                    });
+                  } else {
+                    showToast(msg.split('\n')[0] ?? 'Error');
+                  }
+                }
+              })();
+            } else {
+              closeOverlay();
+            }
+          }}
+          onCancel={() => closeOverlay()}
+        />
+      )}
+
+      {activeOverlay?.type === 'branch-force-delete-confirm' && (
+        <OverlayPanel
+          title={`"${activeOverlay.branch}" is not fully merged. Force delete?`}
+          items={[
+            { id: 'yes', label: 'Yes, force delete', value: 'yes' },
+            { id: 'no', label: 'Cancel', value: 'no' },
+          ]}
+          onSelect={(item) => {
+            if (item.value === 'yes') {
+              const { branch, worktreePath } = activeOverlay;
+              closeOverlay();
+              void (async () => {
+                try {
+                  if (worktreePath) {
+                    await removeWorktree(worktreePath, cwd, true);
+                  }
+                  await deleteBranch(branch, cwd, true);
+                  showToast(`Deleted ${branch}`);
+                  reloadBranches();
+                } catch (err: unknown) {
+                  showToast(
+                    err instanceof Error
+                      ? (err.message.split('\n')[0] ?? 'Error')
+                      : 'Error',
+                  );
+                }
+              })();
+            } else {
+              closeOverlay();
+            }
+          }}
+          onCancel={() => closeOverlay()}
+        />
+      )}
+
+      {activeOverlay?.type === 'branch-merge-confirm' && (
+        <OverlayPanel
+          title={`Merge "${activeOverlay.branch}" into "${activeOverlay.into}"?`}
+          items={[
+            { id: 'yes', label: 'Yes, merge', value: 'yes' },
+            { id: 'no', label: 'Cancel', value: 'no' },
+          ]}
+          onSelect={(item) => {
+            if (item.value === 'yes') {
+              const { branch } = activeOverlay;
+              closeOverlay();
+              void (async () => {
+                try {
+                  const result = await mergeBranch(branch, cwd);
+                  if (result.success) {
+                    showToast(`Merged ${branch} into ${activeOverlay.into}`);
+                    const wt =
+                      rows.find((r) => r.branch.name === branch)?.worktree ??
+                      null;
+                    openOverlay({
+                      type: 'branch-delete-confirm',
+                      branch,
+                      worktreePath: wt?.path ?? null,
+                    });
+                  } else if (result.hasConflicts) {
+                    showToast('Merge conflicts — resolve in terminal');
+                  } else {
+                    showToast(`Merge failed: ${result.message}`);
+                  }
+                  reloadBranches();
+                } catch (err: unknown) {
+                  showToast(
+                    err instanceof Error ? err.message : 'Merge failed',
+                  );
+                }
+              })();
+            } else {
+              closeOverlay();
+            }
+          }}
+          onCancel={() => closeOverlay()}
         />
       )}
     </Box>

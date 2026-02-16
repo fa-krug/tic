@@ -1,4 +1,4 @@
-import { Box, Text } from 'ink';
+import { Text } from 'ink';
 import { useThemeStore } from '../stores/themeStore.js';
 import type { FieldType } from '../stores/themeStore.js';
 
@@ -13,12 +13,5 @@ export function ColorPill({
     value ? s.resolveFieldColor(field, value) : null,
   );
   if (!resolved) return <Text>{value}</Text>;
-  return (
-    <Box>
-      <Text backgroundColor={resolved.bg} color={resolved.fg}>
-        {' '}
-        {value}{' '}
-      </Text>
-    </Box>
-  );
+  return <Text color={resolved.bg}>{value}</Text>;
 }

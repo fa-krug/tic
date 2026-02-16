@@ -28,6 +28,7 @@ const ART_LINES = ['        ██', '       ██ ', '  ██  ██  ', '  
 
 function getStatusDisplay(
   loading: boolean,
+  branchesLoading: boolean,
   initError: string | null,
   syncStatus: {
     state: string;
@@ -39,6 +40,9 @@ function getStatusDisplay(
 ): { showSpinner: boolean; text: string | null; isError?: boolean } {
   if (loading) {
     return { showSpinner: true, text: 'Loading...' };
+  }
+  if (branchesLoading) {
+    return { showSpinner: true, text: 'Fetching...' };
   }
   if (initError) {
     return { showSpinner: false, text: `⚠ Connection failed`, isError: true };
@@ -78,6 +82,7 @@ export function Header() {
   const { accent, error, warning, mutedDim } = useThemeStore((s) => s.colors);
   const backendType = useConfigStore((s) => s.config.backend ?? 'none');
   const loading = useBackendDataStore((s) => s.loading);
+  const branchesLoading = useBackendDataStore((s) => s.branchesLoading);
   const initError = useBackendDataStore((s) => s.error);
   const syncStatus = useBackendDataStore((s) => s.syncStatus);
   const authDismissed = useBackendDataStore((s) => s.authDismissed);
@@ -89,7 +94,13 @@ export function Header() {
     showSpinner,
     text: statusText,
     isError,
-  } = getStatusDisplay(loading, initError, syncStatus, authDismissed);
+  } = getStatusDisplay(
+    loading,
+    branchesLoading,
+    initError,
+    syncStatus,
+    authDismissed,
+  );
 
   return (
     <Box marginTop={1} marginBottom={1}>

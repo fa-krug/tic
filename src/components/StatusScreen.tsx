@@ -4,7 +4,10 @@ import { useThemeStore } from '../stores/themeStore.js';
 import { useNavigationStore } from '../stores/navigationStore.js';
 import type { BackendCapabilities } from '../backends/types.js';
 import { useScrollViewport } from '../hooks/useScrollViewport.js';
-import { useBackendDataStore } from '../stores/backendDataStore.js';
+import {
+  useBackendDataStore,
+  backendDataStore,
+} from '../stores/backendDataStore.js';
 import { useConfigStore } from '../stores/configStore.js';
 import { BACKEND_LABELS } from './Header.js';
 
@@ -115,11 +118,17 @@ export function StatusScreen() {
       return;
     }
 
-    if (input === 'r' && syncManager && syncStatus?.state !== 'syncing') {
-      void syncManager.sync().catch(() => {
-        // Errors recorded in syncStatus by SyncManager
-      });
-      return;
+    if (input === 'r') {
+      if (authDismissed && !syncManager) {
+        backendDataStore.getState().retryAuth();
+        return;
+      }
+      if (syncManager && syncStatus?.state !== 'syncing') {
+        void syncManager.sync().catch(() => {
+          // Errors recorded in syncStatus by SyncManager
+        });
+        return;
+      }
     }
 
     if (key.upArrow) {
@@ -324,8 +333,10 @@ export function StatusScreen() {
         <Text dimColor={mutedDim}>
           {syncManager &&
           (errors.length > 0 || (syncStatus?.pendingCount ?? 0) > 0)
-            ? '↑↓ scroll  r retry  esc back  ? help'
-            : '↑↓ scroll  esc back  ? help'}
+            ? '↑↓ scroll  r retry sync  esc back  ? help'
+            : authDismissed && !syncManager
+              ? '↑↓ scroll  r retry auth  esc back  ? help'
+              : '↑↓ scroll  esc back  ? help'}
         </Text>
       </Box>
     </Box>

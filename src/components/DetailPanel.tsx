@@ -88,26 +88,20 @@ export function DetailPanel({
         </Box>
       )}
       {hasDescription && !showFullDescription && (
-        <Box>
+        <Box marginTop={1}>
           <Text dimColor={mutedDim} wrap="truncate">
             {truncateDescription(item.description, contentWidth)}
           </Text>
         </Box>
       )}
       {showFullDescription && hasDescription && (
-        <>
-          <Box>
-            <Text dimColor={mutedDim}>
-              {'─── description '}
-              {'─'.repeat(Math.max(0, contentWidth - 17))}
-            </Text>
-          </Box>
+        <Box flexDirection="column" marginTop={1}>
           {visibleLines.map((line, idx) => (
             <Box key={idx}>
               <Text dimColor={mutedDim}>{line || ' '}</Text>
             </Box>
           ))}
-        </>
+        </Box>
       )}
     </Box>
   );

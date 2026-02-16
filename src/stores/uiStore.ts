@@ -25,7 +25,19 @@ export type ActiveOverlay =
   | { type: 'settings-edit' }
   | { type: 'theme-picker' }
   | { type: 'color-value-picker'; fieldType: string }
-  | { type: 'color-palette-picker'; fieldType: string; value: string };
+  | { type: 'color-palette-picker'; fieldType: string; value: string }
+  // BranchList overlays
+  | {
+      type: 'branch-delete-confirm';
+      branch: string;
+      worktreePath: string | null;
+    }
+  | {
+      type: 'branch-force-delete-confirm';
+      branch: string;
+      worktreePath: string | null;
+    }
+  | { type: 'branch-merge-confirm'; branch: string; into: string };
 
 export interface UIStoreState {
   activeOverlay: ActiveOverlay | null;
