@@ -23,6 +23,7 @@ import { openInEditor } from '../editor.js';
 import { slugifyTemplateName } from '../backends/local/templates.js';
 import { Breadcrumbs } from './Breadcrumbs.js';
 import { ColorPill } from './ColorPill.js';
+import { matchesCommand } from '../commands.js';
 import { uiStore } from '../stores/uiStore.js';
 import { undoStore } from '../stores/undoStore.js';
 import { useFormValidation } from '../hooks/useFormValidation.js';
@@ -646,7 +647,10 @@ export function WorkItemForm() {
     (_input, key) => {
       // Dirty prompt overlay — capture s/d/esc only
       if (showDirtyPrompt) {
-        if (_input === 's' && (selectedWorkItemId !== null || title.trim())) {
+        if (
+          matchesCommand('form-save', _input, key) &&
+          (selectedWorkItemId !== null || title.trim())
+        ) {
           void (async () => {
             await save();
             if (pendingRelNav) {
@@ -745,7 +749,7 @@ export function WorkItemForm() {
       }
 
       // Esc in navigation mode
-      if (key.escape && !editing) {
+      if (matchesCommand('form-back', _input, key) && !editing) {
         if (configLoading || itemLoading || saving) {
           // Allow escape even while loading (no save)
           formStackStore.getState().pop();
@@ -784,7 +788,7 @@ export function WorkItemForm() {
         }
 
         // S: save and go back
-        if (_input === 's') {
+        if (matchesCommand('form-save', _input, key)) {
           // Run full validation before save
           const fieldValues: Record<string, string> = { type, status };
           const hasErr = validate(
@@ -818,23 +822,20 @@ export function WorkItemForm() {
           return;
         }
 
-        if (key.upArrow) {
+        if (matchesCommand('form-navigate', _input, key)) {
           const leavingField = fields[focusedField];
           if (leavingField === 'title') {
             validate('title', { title, parentId, dependsOn });
           }
-          setFocusedField((f) => Math.max(0, f - 1));
-        }
-
-        if (key.downArrow) {
-          const leavingField = fields[focusedField];
-          if (leavingField === 'title') {
-            validate('title', { title, parentId, dependsOn });
+          if (key.upArrow) {
+            setFocusedField((f) => Math.max(0, f - 1));
+          } else {
+            setFocusedField((f) => Math.min(fields.length - 1, f + 1));
           }
-          setFocusedField((f) => Math.min(fields.length - 1, f + 1));
+          return;
         }
 
-        if (key.return) {
+        if (matchesCommand('form-edit', _input, key)) {
           if (isRelationshipField) {
             let targetId: string | null = null;
             if (currentField === 'rel-parent' && existingItem?.parent) {
@@ -914,7 +915,7 @@ export function WorkItemForm() {
           }
         }
       } else {
-        if (key.escape) {
+        if (matchesCommand('form-revert', _input, key)) {
           // Revert field to value before editing started
           switch (currentField) {
             case 'title':
