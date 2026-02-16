@@ -19,6 +19,7 @@ import { VERSION } from '../version.js';
 import { requestUpdate } from '../updater.js';
 import { OverlayPanel } from './OverlayPanel.js';
 import { openInEditor } from '../editor.js';
+import { matchesCommand } from '../commands.js';
 import { defaultConfig } from '../storage/config.js';
 import { useTerminalWidth } from '../hooks/useTerminalWidth.js';
 import {
@@ -271,44 +272,46 @@ export function Settings() {
     (input, key) => {
       if (!configLoaded) return;
 
-      if (input === '?') {
+      if (matchesCommand('help', input, key)) {
         navigateToHelp();
         return;
       }
 
-      if (key.escape || input === ',') {
+      if (matchesCommand('settings-back', input, key)) {
         navigate('list');
         return;
       }
 
-      if (key.upArrow) {
-        setCursor((c) => {
-          let next = c - 1;
-          while (
-            next >= 0 &&
-            (navItems[next]?.kind === 'template-header' ||
-              navItems[next]?.kind === 'updates-header')
-          ) {
-            next--;
-          }
-          return Math.max(0, next);
-        });
-      }
-      if (key.downArrow) {
-        setCursor((c) => {
-          let next = c + 1;
-          while (
-            next < navItems.length &&
-            (navItems[next]?.kind === 'template-header' ||
-              navItems[next]?.kind === 'updates-header')
-          ) {
-            next++;
-          }
-          return Math.min(navItems.length - 1, next);
-        });
+      if (matchesCommand('settings-navigate', input, key)) {
+        if (key.upArrow) {
+          setCursor((c) => {
+            let next = c - 1;
+            while (
+              next >= 0 &&
+              (navItems[next]?.kind === 'template-header' ||
+                navItems[next]?.kind === 'updates-header')
+            ) {
+              next--;
+            }
+            return Math.max(0, next);
+          });
+        } else {
+          setCursor((c) => {
+            let next = c + 1;
+            while (
+              next < navItems.length &&
+              (navItems[next]?.kind === 'template-header' ||
+                navItems[next]?.kind === 'updates-header')
+            ) {
+              next++;
+            }
+            return Math.min(navItems.length - 1, next);
+          });
+        }
+        return;
       }
 
-      if (key.return) {
+      if (matchesCommand('settings-select', input, key)) {
         const item = navItems[cursor]!;
         if (item.kind === 'backend') {
           if (availability[item.backend as BackendType] !== 'available') return;
@@ -397,14 +400,17 @@ export function Settings() {
         }
       }
 
-      if (input === 'c' && capabilities.templates) {
+      if (
+        matchesCommand('settings-create-template', input, key) &&
+        capabilities.templates
+      ) {
         setFormMode('template');
         setEditingTemplateSlug(null);
         selectWorkItem(null);
         navigate('form');
       }
 
-      if (input === 'd') {
+      if (matchesCommand('settings-delete-template', input, key)) {
         const item = navItems[cursor];
         if (item && item.kind === 'template') {
           openOverlay({
