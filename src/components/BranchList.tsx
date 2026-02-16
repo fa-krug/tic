@@ -232,11 +232,11 @@ export function BranchList() {
     }
 
     // Navigation
-    if (input === 'j' || key.downArrow) {
+    if (key.downArrow) {
       setCursor((c) => Math.min(c + 1, rows.length - 1));
       return;
     }
-    if (input === 'k' || key.upArrow) {
+    if (key.upArrow) {
       setCursor((c) => Math.max(c - 1, 0));
       return;
     }
@@ -396,7 +396,7 @@ export function BranchList() {
       {/* Footer keybinding hints */}
       <Box marginTop={1}>
         <Text color={muted} dimColor={mutedDim}>
-          j/k navigate {'\u00b7'} Enter switch {'\u00b7'} d delete {'\u00b7'} m
+          ↑/↓ navigate {'\u00b7'} Enter switch {'\u00b7'} d delete {'\u00b7'} m
           merge {'\u00b7'} P push {'\u00b7'} n new {'\u00b7'} w worktree{' '}
           {'\u00b7'} r refresh {'\u00b7'} / search {'\u00b7'} Esc back{' '}
           {'\u00b7'} ? help
