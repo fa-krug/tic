@@ -6,6 +6,7 @@ import {
   useBackendDataStore,
   backendDataStore,
 } from '../stores/backendDataStore.js';
+import { matchesCommand } from '../commands.js';
 
 export function IterationPicker() {
   const { mutedDim } = useThemeStore((s) => s.colors);
@@ -16,10 +17,10 @@ export function IterationPicker() {
   const current = useBackendDataStore((s) => s.currentIteration);
 
   useInput((input, key) => {
-    if (key.escape) {
+    if (matchesCommand('nav-back', input, key)) {
       navigate('list');
     }
-    if (input === '?') {
+    if (matchesCommand('help', input, key)) {
       navigateToHelp();
     }
   });

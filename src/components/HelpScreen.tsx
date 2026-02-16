@@ -9,6 +9,7 @@ import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import {
   getCommandsForScreen,
   groupByHelpGroup,
+  matchesCommand,
   type ShortcutGroup,
   type CommandContext,
 } from '../commands.js';
@@ -126,16 +127,18 @@ export function HelpScreen({ sourceScreen }: { sourceScreen: Screen }) {
 
   const [scrollOffset, setScrollOffset] = useState(0);
 
-  useInput((_input, key) => {
-    if (key.escape) {
+  useInput((input, key) => {
+    if (matchesCommand('help-back', input, key)) {
       navigateBackFromHelp();
       return;
     }
-    if (key.upArrow) {
-      setScrollOffset((o) => Math.max(0, o - 1));
-    }
-    if (key.downArrow) {
-      setScrollOffset((o) => Math.min(maxScroll, o + 1));
+    if (matchesCommand('help-scroll', input, key)) {
+      if (key.upArrow) {
+        setScrollOffset((o) => Math.max(0, o - 1));
+      } else {
+        setScrollOffset((o) => Math.min(maxScroll, o + 1));
+      }
+      return;
     }
   });
 

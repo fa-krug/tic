@@ -10,6 +10,7 @@ import {
 } from '../stores/backendDataStore.js';
 import { useConfigStore } from '../stores/configStore.js';
 import { BACKEND_LABELS } from './Header.js';
+import { matchesCommand } from '../commands.js';
 
 function CapabilityLine({
   label,
@@ -108,17 +109,17 @@ export function StatusScreen() {
   const maxLogScroll = Math.max(0, syncLog.length - logViewport.maxVisible);
 
   useInput((input, key) => {
-    if (key.escape || input === 'q') {
+    if (matchesCommand('status-back', input, key)) {
       navigate('list');
       return;
     }
 
-    if (input === '?') {
+    if (matchesCommand('help', input, key)) {
       navigateToHelp();
       return;
     }
 
-    if (input === 'r') {
+    if (matchesCommand('status-retry', input, key)) {
       if (authDismissed && !syncManager) {
         backendDataStore.getState().retryAuth();
         return;
@@ -131,19 +132,21 @@ export function StatusScreen() {
       }
     }
 
-    if (key.upArrow) {
-      if (syncLog.length > 0) {
-        setLogScrollOffset((o) => Math.max(0, o - 1));
+    if (matchesCommand('status-scroll', input, key)) {
+      if (key.upArrow) {
+        if (syncLog.length > 0) {
+          setLogScrollOffset((o) => Math.max(0, o - 1));
+        } else {
+          setScrollOffset((o) => Math.max(0, o - 1));
+        }
       } else {
-        setScrollOffset((o) => Math.max(0, o - 1));
+        if (syncLog.length > 0) {
+          setLogScrollOffset((o) => Math.min(maxLogScroll, o + 1));
+        } else {
+          setScrollOffset((o) => Math.min(maxScroll, o + 1));
+        }
       }
-    }
-    if (key.downArrow) {
-      if (syncLog.length > 0) {
-        setLogScrollOffset((o) => Math.min(maxLogScroll, o + 1));
-      } else {
-        setScrollOffset((o) => Math.min(maxScroll, o + 1));
-      }
+      return;
     }
   });
 
