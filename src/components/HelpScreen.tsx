@@ -6,16 +6,12 @@ import { useBackendDataStore } from '../stores/backendDataStore.js';
 import { isGitRepo } from '../git.js';
 import type { BackendCapabilities } from '../backends/types.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
-
-interface ShortcutEntry {
-  key: string;
-  description: string;
-}
-
-interface ShortcutGroup {
-  label: string;
-  shortcuts: ShortcutEntry[];
-}
+import {
+  getCommandsForScreen,
+  groupByHelpGroup,
+  type ShortcutGroup,
+  type CommandContext,
+} from '../commands.js';
 
 const SCREEN_LABELS: Record<string, string> = {
   list: 'List View',
@@ -33,241 +29,24 @@ export function getShortcuts(
   gitAvailable: boolean,
   hasSyncManager: boolean,
 ): ShortcutGroup[] {
-  switch (screen) {
-    case 'list': {
-      const nav: ShortcutEntry[] = [
-        { key: '\u2191/\u2193', description: 'Navigate items' },
-        { key: 'pgup/pgdn', description: 'Page up / page down' },
-        { key: 'home/end', description: 'Jump to first / last item' },
-      ];
-      if (capabilities.relationships) {
-        nav.push({ key: '\u2190', description: 'Collapse or jump to parent' });
-        nav.push({ key: '\u2192', description: 'Expand children' });
-      }
-
-      const actions: ShortcutEntry[] = [
-        { key: 'enter', description: 'Edit item' },
-        { key: 'c', description: 'Create item (template picker if available)' },
-        { key: 'd', description: 'Delete item' },
-        { key: 'u', description: 'Undo last action' },
-        { key: 'o', description: 'Open in browser' },
-        { key: 'S', description: 'Status screen' },
-      ];
-      actions.push({ key: 'O', description: 'Order by column' });
-      actions.push({ key: 'F', description: 'Filter items' });
-      actions.push({ key: 'X', description: 'Clear all filters' });
-      actions.push({ key: '/', description: 'Command bar' });
-      actions.push({ key: 'p', description: 'Create pull request' });
-      actions.push({ key: 'm', description: 'Toggle mark' });
-      actions.push({ key: 'M', description: 'Toggle mark all' });
-      actions.push({ key: 'shift+↑↓', description: 'Range select' });
-      actions.push({ key: 'x', description: 'Bulk actions menu' });
-      actions.push({ key: 's', description: 'Set status' });
-      if (capabilities.customTypes) {
-        actions.push({ key: 't', description: 'Set type' });
-      }
-      if (capabilities.fields.priority) {
-        actions.push({ key: 'y', description: 'Set priority' });
-      }
-      if (capabilities.fields.parent) {
-        actions.push({ key: 'g', description: 'Set parent' });
-      }
-      actions.push({ key: 'P', description: 'Pull requests' });
-      if (gitAvailable) {
-        actions.push({ key: 'B', description: 'Branch management' });
-      }
-      if (capabilities.fields.assignee) {
-        actions.push({ key: 'a', description: 'Set assignee' });
-      }
-      if (capabilities.fields.labels) {
-        actions.push({ key: 'l', description: 'Set labels' });
-      }
-
-      const switching: ShortcutEntry[] = [];
-      if (capabilities.customTypes) {
-        switching.push({ key: 'tab', description: 'Cycle work item type' });
-      }
-      if (capabilities.iterations) {
-        switching.push({ key: 'i', description: 'Iteration picker' });
-      }
-      switching.push({ key: 'V', description: 'Load saved view' });
-      switching.push({ key: ',', description: 'Settings' });
-
-      const other: ShortcutEntry[] = [];
-      other.push({ key: 'v', description: 'Toggle detail panel' });
-      other.push({ key: 'space', description: 'Toggle full description' });
-      if (hasSyncManager) {
-        other.push({ key: 'r', description: 'Sync' });
-      }
-      if (gitAvailable) {
-        other.push({
-          key: 'b',
-          description: 'Branch / worktree (runs branchCommand from settings)',
-        });
-      }
-      other.push({ key: 'q', description: 'Quit' });
-
-      const groups: ShortcutGroup[] = [
-        { label: 'Navigation', shortcuts: nav },
-        { label: 'Actions', shortcuts: actions },
-      ];
-      if (switching.length > 0) {
-        groups.push({ label: 'Switching', shortcuts: switching });
-      }
-      groups.push({ label: 'Other', shortcuts: other });
-      return groups;
-    }
-
-    case 'form': {
-      return [
-        {
-          label: 'Navigation',
-          shortcuts: [
-            { key: '\u2191/\u2193', description: 'Move between fields' },
-          ],
-        },
-        {
-          label: 'Editing',
-          shortcuts: [
-            {
-              key: 'enter',
-              description:
-                'Edit field / open $EDITOR (description) / navigate to related item',
-            },
-            {
-              key: 'esc',
-              description: 'revert field to previous value (in edit mode)',
-            },
-            {
-              key: 'enter/select',
-              description: 'Confirm field value',
-            },
-          ],
-        },
-        {
-          label: 'Save & Exit',
-          shortcuts: [
-            {
-              key: 's',
-              description: 'Save and go back',
-            },
-            {
-              key: 'esc',
-              description:
-                'Go back (prompts to save/discard if unsaved changes)',
-            },
-          ],
-        },
-      ];
-    }
-
-    case 'iteration-picker': {
-      return [
-        {
-          label: 'Navigation',
-          shortcuts: [
-            { key: '\u2191/\u2193', description: 'Navigate iterations' },
-            { key: 'enter', description: 'Select iteration' },
-          ],
-        },
-      ];
-    }
-
-    case 'settings': {
-      return [
-        {
-          label: 'Navigation',
-          shortcuts: [
-            { key: '\u2191/\u2193', description: 'Navigate options' },
-            { key: 'enter', description: 'Select or edit' },
-            { key: 'esc/,', description: 'Go back' },
-          ],
-        },
-        {
-          label: 'Editing',
-          shortcuts: [
-            { key: 'type', description: 'Edit field value' },
-            { key: 'enter/esc', description: 'Confirm' },
-          ],
-        },
-        ...(capabilities.templates
-          ? [
-              {
-                label: 'Templates',
-                shortcuts: [
-                  { key: 'enter', description: 'Edit template' },
-                  { key: 'c', description: 'Create template' },
-                  { key: 'd', description: 'Delete template' },
-                ],
-              },
-            ]
-          : []),
-      ];
-    }
-
-    case 'pr-list': {
-      return [
-        {
-          label: 'Navigation',
-          shortcuts: [
-            { key: 'esc', description: 'Back to list' },
-            { key: '?', description: 'Help' },
-          ],
-        },
-      ];
-    }
-
-    case 'branch-list': {
-      return [
-        {
-          label: 'Navigation',
-          shortcuts: [
-            { key: '↑/↓', description: 'Navigate branches' },
-            { key: 'esc', description: 'Back to list' },
-            { key: '?', description: 'Help' },
-          ],
-        },
-        {
-          label: 'Actions',
-          shortcuts: [
-            { key: 'enter', description: 'Switch to branch' },
-            { key: 'c', description: 'New branch' },
-            { key: 'd', description: 'Delete branch' },
-            { key: 'm', description: 'Merge into current' },
-            { key: 'p', description: 'Create PR for branch' },
-            { key: 'P', description: 'Push to remote' },
-            { key: 'w', description: 'Open worktree shell' },
-            { key: 'r', description: 'Refresh (re-fetch)' },
-            { key: '/', description: 'Search branches' },
-          ],
-        },
-      ];
-    }
-
-    case 'status': {
-      const groups: ShortcutGroup[] = [
-        {
-          label: 'Navigation',
-          shortcuts: [
-            { key: '\u2191/\u2193', description: 'Scroll errors' },
-            { key: 'esc/q', description: 'Go back' },
-          ],
-        },
-      ];
-      if (hasSyncManager) {
-        groups.push({
-          label: 'Actions',
-          shortcuts: [
-            { key: 'r', description: 'Retry failed sync operations' },
-          ],
-        });
-      }
-      return groups;
-    }
-
-    default:
-      return [];
-  }
+  const ctx: CommandContext = {
+    screen,
+    markedCount: 0,
+    hasSelectedItem: true,
+    capabilities,
+    types: [],
+    activeType: null,
+    hasSyncManager,
+    gitAvailable,
+    hasActiveFilters: false,
+    hasSavedViews: false,
+    hasSelectedBranch: true,
+    isCurrentBranch: false,
+    hasWorktree: true,
+    hasPrCreateCapability: true,
+    hasSelectedPr: true,
+  };
+  return groupByHelpGroup(getCommandsForScreen(screen, ctx));
 }
 
 export type LineEntry =
