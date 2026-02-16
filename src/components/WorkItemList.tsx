@@ -27,6 +27,7 @@ import type { SortColumn, SortEntry } from '../stores/listViewStore.js';
 import {
   getVisibleCommands,
   buildFooterHints,
+  matchesCommand,
   type Command,
   type CommandContext,
 } from '../commands.js';
@@ -591,7 +592,10 @@ export function WorkItemList() {
   // Block 1.5: Description scroll handler — active when full description is shown
   useInput(
     (_input, key) => {
-      if (_input === ' ' || key.escape) {
+      if (
+        matchesCommand('list-toggle-description', _input, key) ||
+        key.escape
+      ) {
         setShowFullDescription(false);
         setDescriptionScrollOffset(0);
         return;
@@ -613,68 +617,59 @@ export function WorkItemList() {
   // Block 3: Main input handler — only active when no overlay is open
   useInput(
     (input, key) => {
-      if (input === '/') {
+      if (matchesCommand('list-command-bar', input, key)) {
         openOverlay({ type: 'command-bar' });
         return;
       }
 
-      if (input === '?') {
+      if (matchesCommand('help', input, key)) {
         navigateToHelp();
         return;
       }
 
-      if (key.upArrow) {
-        if (key.shift) {
-          const anchor = rangeAnchor ?? cursor;
-          if (rangeAnchor === null) setRangeAnchor(cursor);
-          const newCursor = Math.max(0, cursor - 1);
-          setCursor(newCursor);
-          const start = Math.min(anchor, newCursor);
-          const end = Math.max(anchor, newCursor);
-          setMarkedIds(
-            new Set(treeItems.slice(start, end + 1).map((t) => t.item.id)),
-          );
-        } else {
-          if (rangeAnchor !== null) setRangeAnchor(null);
-          setCursor(Math.max(0, cursor - 1));
-        }
+      if (matchesCommand('list-range-select', input, key)) {
+        const anchor = rangeAnchor ?? cursor;
+        if (rangeAnchor === null) setRangeAnchor(cursor);
+        const newCursor = key.upArrow
+          ? Math.max(0, cursor - 1)
+          : Math.min(treeItems.length - 1, cursor + 1);
+        setCursor(newCursor);
+        const start = Math.min(anchor, newCursor);
+        const end = Math.max(anchor, newCursor);
+        setMarkedIds(
+          new Set(treeItems.slice(start, end + 1).map((t) => t.item.id)),
+        );
         clearWarning();
       }
-      if (key.downArrow) {
-        if (key.shift) {
-          const anchor = rangeAnchor ?? cursor;
-          if (rangeAnchor === null) setRangeAnchor(cursor);
-          const newCursor = Math.min(treeItems.length - 1, cursor + 1);
-          setCursor(newCursor);
-          const start = Math.min(anchor, newCursor);
-          const end = Math.max(anchor, newCursor);
-          setMarkedIds(
-            new Set(treeItems.slice(start, end + 1).map((t) => t.item.id)),
-          );
+      if (matchesCommand('list-navigate', input, key)) {
+        if (rangeAnchor !== null) setRangeAnchor(null);
+        if (key.upArrow) {
+          setCursor(Math.max(0, cursor - 1));
         } else {
-          if (rangeAnchor !== null) setRangeAnchor(null);
           setCursor(Math.min(treeItems.length - 1, cursor + 1));
         }
         clearWarning();
       }
-      if (key.pageUp) {
-        setCursor(Math.max(0, cursor - viewport.maxVisible));
+      if (matchesCommand('list-page', input, key)) {
+        if (key.pageUp) {
+          setCursor(Math.max(0, cursor - viewport.maxVisible));
+        } else {
+          setCursor(
+            Math.min(treeItems.length - 1, cursor + viewport.maxVisible),
+          );
+        }
         clearWarning();
       }
-      if (key.pageDown) {
-        setCursor(Math.min(treeItems.length - 1, cursor + viewport.maxVisible));
-        clearWarning();
-      }
-      if (key.home) {
-        setCursor(0);
-        clearWarning();
-      }
-      if (key.end) {
-        setCursor(treeItems.length - 1);
+      if (matchesCommand('list-home-end', input, key)) {
+        if (key.home) {
+          setCursor(0);
+        } else {
+          setCursor(treeItems.length - 1);
+        }
         clearWarning();
       }
 
-      if (key.rightArrow && treeItems.length > 0) {
+      if (matchesCommand('list-expand', input, key) && treeItems.length > 0) {
         const current = treeItems[cursor];
         if (
           current &&
@@ -685,7 +680,7 @@ export function WorkItemList() {
         }
       }
 
-      if (key.leftArrow && treeItems.length > 0) {
+      if (matchesCommand('list-collapse', input, key) && treeItems.length > 0) {
         const current = treeItems[cursor];
         if (current) {
           if (current.hasChildren && !collapsedIds.has(current.item.id)) {
@@ -699,31 +694,31 @@ export function WorkItemList() {
         }
       }
 
-      if (key.return && treeItems.length > 0) {
+      if (matchesCommand('edit', input, key) && treeItems.length > 0) {
         setFormMode('item');
         selectWorkItem(treeItems[cursor]!.item.id);
         navigate('form');
       }
 
-      if (input === 'q') exit();
-      if (input === 'i' && capabilities.iterations)
+      if (matchesCommand('quit', input, key)) exit();
+      if (matchesCommand('iterations', input, key) && capabilities.iterations)
         navigate('iteration-picker');
-      if (input === 'P') {
+      if (matchesCommand('list-pr-list', input, key)) {
         navigate('pr-list');
         return;
       }
-      if (input === 'B' && gitAvailable) {
+      if (matchesCommand('list-branch-manage', input, key) && gitAvailable) {
         navigate('branch-list');
         return;
       }
-      if (input === ',') {
+      if (matchesCommand('settings', input, key)) {
         if (updateInfo?.updateAvailable) {
           setSettingsInitialFocus('update-now');
         }
         navigate('settings');
       }
 
-      if (input === 'c') {
+      if (matchesCommand('create', input, key)) {
         if (capabilities.templates && templates.length > 0) {
           openOverlay({ type: 'template-picker' });
         } else {
@@ -734,14 +729,14 @@ export function WorkItemList() {
         }
       }
 
-      if (input === 'd' && treeItems.length > 0) {
+      if (matchesCommand('delete', input, key) && treeItems.length > 0) {
         const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
         if (targetIds.length > 0) {
           openOverlay({ type: 'delete-confirm', targetIds });
         }
       }
 
-      if (input === 'u') {
+      if (matchesCommand('list-undo', input, key)) {
         const entry = undoStore.getState().popUndo();
         if (!entry || !backend) return;
         void (async () => {
@@ -793,7 +788,11 @@ export function WorkItemList() {
         });
       }
 
-      if (input === 'o' && treeItems.length > 0 && backend) {
+      if (
+        matchesCommand('open', input, key) &&
+        treeItems.length > 0 &&
+        backend
+      ) {
         void (async () => {
           const itemId = treeItems[cursor]!.item.id;
           await backend.openItem(itemId);
@@ -804,7 +803,11 @@ export function WorkItemList() {
         })().catch(() => {});
       }
 
-      if (input === 'b' && gitAvailable && treeItems.length > 0) {
+      if (
+        matchesCommand('branch', input, key) &&
+        gitAvailable &&
+        treeItems.length > 0
+      ) {
         const item = treeItems[cursor]!.item;
         const comments = item.comments;
         try {
@@ -841,47 +844,55 @@ export function WorkItemList() {
           .catch(() => {});
       }
 
-      if (input === 'S') {
+      if (matchesCommand('status', input, key)) {
         navigate('status');
       }
 
-      if (input === 'O') {
+      if (matchesCommand('sort', input, key)) {
         openOverlay({ type: 'sort-picker' });
       }
 
-      if (input === 'F') {
+      if (matchesCommand('filter', input, key)) {
         openOverlay({ type: 'filter-picker' });
       }
 
-      if (input === 'V') {
+      if (matchesCommand('load-view', input, key)) {
         openOverlay({ type: 'view-picker' });
       }
 
-      if (input === 'X' && filterCount > 0) {
+      if (matchesCommand('clear-filters', input, key) && filterCount > 0) {
         filterStore.getState().clearFilters();
         setToast('Filters cleared');
       }
 
-      if (input === 's' && treeItems.length > 0) {
+      if (matchesCommand('list-status', input, key) && treeItems.length > 0) {
         const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
         if (targetIds.length > 0) {
           openOverlay({ type: 'status-picker', targetIds });
         }
       }
 
-      if (input === 'v') {
+      if (matchesCommand('toggle-detail-panel', input, key)) {
         void configStore
           .getState()
           .update({ showDetailPanel: !showDetailPanel })
           .catch(() => {});
       }
 
-      if (input === ' ' && showDetailPanel && hasDescription) {
+      if (
+        matchesCommand('list-toggle-description', input, key) &&
+        showDetailPanel &&
+        hasDescription
+      ) {
         setShowFullDescription(true);
         setDescriptionScrollOffset(0);
       }
 
-      if (input === 'p' && prCapabilities.create && treeItems.length > 0) {
+      if (
+        matchesCommand('list-pr-create', input, key) &&
+        prCapabilities.create &&
+        treeItems.length > 0
+      ) {
         const item = treeItems[cursor]?.item;
         if (item) {
           const cwd = process.cwd();
@@ -906,7 +917,11 @@ export function WorkItemList() {
         }
       }
 
-      if (key.tab && capabilities.customTypes && types.length > 0) {
+      if (
+        matchesCommand('list-tab', input, key) &&
+        capabilities.customTypes &&
+        types.length > 0
+      ) {
         const currentIdx = types.indexOf(activeType ?? '');
         const nextType = types[(currentIdx + 1) % types.length]!;
         setActiveType(nextType);
@@ -914,7 +929,7 @@ export function WorkItemList() {
         clearWarning();
       }
 
-      if (input === 'r' && syncManager) {
+      if (matchesCommand('sync', input, key) && syncManager) {
         void syncManager
           .sync()
           .then(() => {
@@ -925,13 +940,13 @@ export function WorkItemList() {
           });
       }
 
-      if (input === 'm' && treeItems.length > 0) {
+      if (matchesCommand('mark', input, key) && treeItems.length > 0) {
         setRangeAnchor(null);
         const itemId = treeItems[cursor]!.item.id;
         toggleMarked(itemId);
       }
 
-      if (input === 'M' && treeItems.length > 0) {
+      if (matchesCommand('clear-marks', input, key) && treeItems.length > 0) {
         setRangeAnchor(null);
         const visibleIds = treeItems.map((t) => t.item.id);
         const allMarked = visibleIds.every((id) => markedIds.has(id));
@@ -942,12 +957,12 @@ export function WorkItemList() {
         }
       }
 
-      if (input === 'x' && treeItems.length > 0) {
+      if (matchesCommand('bulk-menu', input, key) && treeItems.length > 0) {
         openOverlay({ type: 'bulk-menu' });
       }
 
       if (
-        input === 'y' &&
+        matchesCommand('set-priority', input, key) &&
         capabilities.fields.priority &&
         treeItems.length > 0
       ) {
@@ -957,7 +972,11 @@ export function WorkItemList() {
         }
       }
 
-      if (input === 'g' && capabilities.fields.parent && treeItems.length > 0) {
+      if (
+        matchesCommand('list-parent', input, key) &&
+        capabilities.fields.parent &&
+        treeItems.length > 0
+      ) {
         const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
         if (targetIds.length > 0) {
           openOverlay({ type: 'parent-input', targetIds });
@@ -965,7 +984,7 @@ export function WorkItemList() {
       }
 
       if (
-        input === 'a' &&
+        matchesCommand('set-assignee', input, key) &&
         capabilities.fields.assignee &&
         treeItems.length > 0
       ) {
@@ -975,14 +994,22 @@ export function WorkItemList() {
         }
       }
 
-      if (input === 'l' && capabilities.fields.labels && treeItems.length > 0) {
+      if (
+        matchesCommand('set-labels', input, key) &&
+        capabilities.fields.labels &&
+        treeItems.length > 0
+      ) {
         const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
         if (targetIds.length > 0) {
           openOverlay({ type: 'labels-input', targetIds });
         }
       }
 
-      if (input === 't' && capabilities.customTypes && treeItems.length > 0) {
+      if (
+        matchesCommand('set-type', input, key) &&
+        capabilities.customTypes &&
+        treeItems.length > 0
+      ) {
         const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
         if (targetIds.length > 0) {
           openOverlay({ type: 'type-picker', targetIds });
