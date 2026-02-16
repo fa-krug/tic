@@ -547,6 +547,83 @@ describe('non-list screen commands', () => {
   });
 });
 
+describe('registry completeness', () => {
+  it('every command with a helpGroup and shortcut appears in help output', () => {
+    const ctx = makeContext({ screen: 'list' });
+    const cmds = getCommandsForScreen('list', ctx);
+    const withHelp = cmds.filter((c) => c.helpGroup && c.shortcut);
+    const groups = groupByHelpGroup(cmds);
+    const allShortcuts = groups.flatMap((g) => g.shortcuts);
+    for (const cmd of withHelp) {
+      const found = allShortcuts.find(
+        (s) => s.key === cmd.shortcut && s.description === cmd.label,
+      );
+      expect(
+        found,
+        `Missing help entry for ${cmd.id} (${cmd.shortcut})`,
+      ).toBeDefined();
+    }
+  });
+
+  it('every command with footer: true has a shortcut', () => {
+    const ctx = makeContext({ screen: 'list' });
+    const cmds = getCommandsForScreen('list', ctx);
+    const footerCmds = cmds.filter((c) => c.footer);
+    for (const cmd of footerCmds) {
+      expect(
+        cmd.shortcut,
+        `Footer command ${cmd.id} has no shortcut`,
+      ).toBeTruthy();
+    }
+  });
+
+  it('no duplicate command ids', () => {
+    const allScreens = [
+      'list',
+      'form',
+      'settings',
+      'branch-list',
+      'pr-list',
+      'status',
+      'iteration-picker',
+    ] as const;
+    for (const screen of allScreens) {
+      const ctx = makeContext({ screen });
+      const cmds = getCommandsForScreen(screen, ctx);
+      for (const cmd of cmds) {
+        expect(findCommand(cmd.id)).toBeDefined();
+      }
+    }
+  });
+
+  it('footer commands across all screens have footerLabel or label', () => {
+    const allScreens = [
+      'list',
+      'form',
+      'settings',
+      'branch-list',
+      'pr-list',
+      'status',
+      'iteration-picker',
+    ] as const;
+    for (const screen of allScreens) {
+      const ctx = makeContext({ screen });
+      const footerCmds = getFooterCommands(screen, ctx);
+      for (const cmd of footerCmds) {
+        const label = cmd.footerLabel ?? cmd.label;
+        expect(
+          label,
+          `Footer command ${cmd.id} on ${screen} has no label`,
+        ).toBeTruthy();
+        expect(
+          cmd.shortcut,
+          `Footer command ${cmd.id} on ${screen} has no shortcut`,
+        ).toBeTruthy();
+      }
+    }
+  });
+});
+
 describe('buildFooterHints', () => {
   it('returns formatted footer string for list screen', () => {
     const ctx = makeContext({ screen: 'list' });
