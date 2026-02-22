@@ -52,6 +52,14 @@ describe('editorStore', () => {
       expect(editorStore.getState().lines).toEqual(['abc']);
       expect(editorStore.getState().cursor.col).toBe(2);
     });
+
+    it('handles multi-character input (paste)', () => {
+      editorStore.getState().init('ac');
+      editorStore.getState().moveCursorTo(0, 1);
+      editorStore.getState().insertChar('bbb');
+      expect(editorStore.getState().lines).toEqual(['abbbc']);
+      expect(editorStore.getState().cursor.col).toBe(4);
+    });
   });
 
   describe('insertNewline', () => {

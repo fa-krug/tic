@@ -253,7 +253,7 @@ export const editorStore = createStore<EditorState>((set, get) => ({
     newLines[cursor.row] = newLine;
     set({
       lines: newLines,
-      cursor: { row: cursor.row, col: cursor.col + 1 },
+      cursor: { row: cursor.row, col: cursor.col + char.length },
       undoStack: newUndo,
       redoStack: [],
       dirty: true,
