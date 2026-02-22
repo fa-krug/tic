@@ -8,6 +8,7 @@ import { formStackStore } from './formStackStore.js';
 export type Screen =
   | 'list'
   | 'form'
+  | 'editor'
   | 'iteration-picker'
   | 'pr-list'
   | 'branch-list'
@@ -77,7 +78,7 @@ const createNavigationStore = () =>
 
     navigate: (newScreen: Screen) => {
       uiStore.getState().reset();
-      const clearStack = newScreen !== 'form';
+      const clearStack = newScreen !== 'form' && newScreen !== 'editor';
       if (clearStack) {
         formStackStore.getState().clear();
       }

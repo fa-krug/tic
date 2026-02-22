@@ -823,6 +823,43 @@ const commands: Command[] = [
     helpGroup: 'Other',
     when: () => true,
   },
+  // Editor commands
+  {
+    id: 'editor-save',
+    label: 'Save and return',
+    category: 'Actions',
+    shortcut: 'Ctrl+S',
+    keys: [],
+    screen: 'editor',
+    helpGroup: 'Editor',
+  },
+  {
+    id: 'editor-cancel',
+    label: 'Cancel and return',
+    category: 'Navigation',
+    shortcut: 'Esc',
+    keys: [],
+    screen: 'editor',
+    helpGroup: 'Editor',
+  },
+  {
+    id: 'editor-undo',
+    label: 'Undo',
+    category: 'Actions',
+    shortcut: 'Ctrl+Z',
+    keys: [],
+    screen: 'editor',
+    helpGroup: 'Editor',
+  },
+  {
+    id: 'editor-redo',
+    label: 'Redo',
+    category: 'Actions',
+    shortcut: 'Ctrl+Shift+Z',
+    keys: [],
+    screen: 'editor',
+    helpGroup: 'Editor',
+  },
   // Help screen commands
   {
     id: 'help-scroll',
