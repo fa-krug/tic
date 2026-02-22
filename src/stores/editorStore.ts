@@ -11,6 +11,11 @@ interface Snapshot {
   cursor: Cursor;
 }
 
+export interface VisibleLine {
+  lineIndex: number;
+  text: string;
+}
+
 interface EditorState {
   lines: string[];
   cursor: Cursor;
@@ -28,6 +33,13 @@ interface EditorState {
   destroy: () => void;
   getContent: () => string;
 
+  // Viewport scrolling
+  updateScroll: (viewportHeight: number, terminalWidth: number) => void;
+  getVisibleLines: (
+    viewportHeight: number,
+    terminalWidth: number,
+  ) => VisibleLine[];
+
   // Navigation
   moveCursorTo: (row: number, col: number) => void;
   moveLeft: () => void;
@@ -44,6 +56,13 @@ interface EditorState {
   insertNewline: () => void;
   deleteBefore: () => void;
   deleteAt: () => void;
+
+  // Kill/Yank
+  killToEnd: () => void;
+  killToStart: () => void;
+  deleteWordBack: () => void;
+  yank: () => void;
+  insertTab: () => void;
 
   // Undo/Redo
   undo: () => void;
@@ -64,6 +83,12 @@ const initialState = {
   showDiscardPrompt: false,
   initialContent: '',
 };
+
+function visualHeight(line: string, width: number): number {
+  if (width <= 0) return 1;
+  if (line.length === 0) return 1;
+  return Math.ceil(line.length / width);
+}
 
 export const editorStore = createStore<EditorState>((set, get) => ({
   ...initialState,
@@ -86,6 +111,57 @@ export const editorStore = createStore<EditorState>((set, get) => ({
   },
 
   getContent: () => get().lines.join('\n'),
+
+  updateScroll: (viewportHeight: number, terminalWidth: number) => {
+    const { lines, cursor, scrollOffset } = get();
+    // Calculate visual row of cursor
+    let visualRow = 0;
+    for (let i = 0; i < cursor.row; i++) {
+      visualRow += visualHeight(lines[i]!, terminalWidth);
+    }
+    // Add the visual row within the current wrapped line
+    if (terminalWidth > 0 && lines[cursor.row]!.length > 0) {
+      visualRow += Math.floor(cursor.col / terminalWidth);
+    }
+
+    let newOffset = scrollOffset;
+    if (visualRow < newOffset) {
+      newOffset = visualRow;
+    } else if (visualRow >= newOffset + viewportHeight) {
+      newOffset = visualRow - viewportHeight + 1;
+    }
+    if (newOffset !== scrollOffset) {
+      set({ scrollOffset: newOffset });
+    }
+  },
+
+  getVisibleLines: (
+    viewportHeight: number,
+    terminalWidth: number,
+  ): VisibleLine[] => {
+    const { lines, scrollOffset } = get();
+    const result: VisibleLine[] = [];
+    let visualRow = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+      const h = visualHeight(lines[i]!, terminalWidth);
+      const lineStart = visualRow;
+      const lineEnd = visualRow + h; // exclusive
+
+      // If this line overlaps the viewport window [scrollOffset, scrollOffset+viewportHeight)
+      if (lineEnd > scrollOffset && lineStart < scrollOffset + viewportHeight) {
+        result.push({ lineIndex: i, text: lines[i]! });
+      }
+
+      visualRow += h;
+      // Early exit if we've passed the viewport
+      if (visualRow >= scrollOffset + viewportHeight) {
+        break;
+      }
+    }
+
+    return result;
+  },
 
   moveCursorTo: (row: number, col: number) => {
     set({ cursor: { row, col }, goalCol: col });
@@ -275,6 +351,127 @@ export const editorStore = createStore<EditorState>((set, get) => ({
       });
     }
     // else: end of document, do nothing
+  },
+
+  killToEnd: () => {
+    const { lines, cursor, undoStack } = get();
+    const line = lines[cursor.row]!;
+    if (cursor.col < line.length) {
+      // Kill from cursor to end of line
+      const killed = line.slice(cursor.col);
+      const newUndo = [
+        ...undoStack.slice(-(MAX_UNDO - 1)),
+        { lines: [...lines], cursor: { ...cursor } },
+      ];
+      const newLines = [...lines];
+      newLines[cursor.row] = line.slice(0, cursor.col);
+      set({
+        lines: newLines,
+        undoStack: newUndo,
+        redoStack: [],
+        killBuffer: killed,
+        dirty: true,
+      });
+    } else if (cursor.row < lines.length - 1) {
+      // At end of line: join with next line
+      const newUndo = [
+        ...undoStack.slice(-(MAX_UNDO - 1)),
+        { lines: [...lines], cursor: { ...cursor } },
+      ];
+      const newLines = [...lines];
+      newLines[cursor.row] = line + newLines[cursor.row + 1]!;
+      newLines.splice(cursor.row + 1, 1);
+      set({
+        lines: newLines,
+        undoStack: newUndo,
+        redoStack: [],
+        dirty: true,
+      });
+    }
+  },
+
+  killToStart: () => {
+    const { lines, cursor, undoStack } = get();
+    const line = lines[cursor.row]!;
+    const killed = line.slice(0, cursor.col);
+    const newUndo = [
+      ...undoStack.slice(-(MAX_UNDO - 1)),
+      { lines: [...lines], cursor: { ...cursor } },
+    ];
+    const newLines = [...lines];
+    newLines[cursor.row] = line.slice(cursor.col);
+    set({
+      lines: newLines,
+      cursor: { row: cursor.row, col: 0 },
+      undoStack: newUndo,
+      redoStack: [],
+      killBuffer: killed,
+      dirty: true,
+    });
+  },
+
+  deleteWordBack: () => {
+    const { lines, cursor, undoStack } = get();
+    const line = lines[cursor.row]!;
+    let col = cursor.col;
+    // Skip spaces backward
+    while (col > 0 && line[col - 1] === ' ') col--;
+    // Skip non-spaces backward
+    while (col > 0 && line[col - 1] !== ' ') col--;
+    if (col === cursor.col) return;
+    const newUndo = [
+      ...undoStack.slice(-(MAX_UNDO - 1)),
+      { lines: [...lines], cursor: { ...cursor } },
+    ];
+    const newLines = [...lines];
+    newLines[cursor.row] = line.slice(0, col) + line.slice(cursor.col);
+    set({
+      lines: newLines,
+      cursor: { row: cursor.row, col },
+      undoStack: newUndo,
+      redoStack: [],
+      dirty: true,
+    });
+  },
+
+  yank: () => {
+    const { lines, cursor, undoStack, killBuffer } = get();
+    if (!killBuffer) return;
+    const newUndo = [
+      ...undoStack.slice(-(MAX_UNDO - 1)),
+      { lines: [...lines], cursor: { ...cursor } },
+    ];
+    const line = lines[cursor.row]!;
+    const newLine =
+      line.slice(0, cursor.col) + killBuffer + line.slice(cursor.col);
+    const newLines = [...lines];
+    newLines[cursor.row] = newLine;
+    set({
+      lines: newLines,
+      cursor: { row: cursor.row, col: cursor.col + killBuffer.length },
+      undoStack: newUndo,
+      redoStack: [],
+      dirty: true,
+    });
+  },
+
+  insertTab: () => {
+    const { lines, cursor, undoStack } = get();
+    const newUndo = [
+      ...undoStack.slice(-(MAX_UNDO - 1)),
+      { lines: [...lines], cursor: { ...cursor } },
+    ];
+    const line = lines[cursor.row]!;
+    const newLine = line.slice(0, cursor.col) + '  ' + line.slice(cursor.col);
+    const newLines = [...lines];
+    newLines[cursor.row] = newLine;
+    set({
+      lines: newLines,
+      cursor: { row: cursor.row, col: cursor.col + 2 },
+      undoStack: newUndo,
+      redoStack: [],
+      dirty: true,
+    });
   },
 
   undo: () => {

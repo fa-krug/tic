@@ -213,6 +213,112 @@ describe('editorStore', () => {
     });
   });
 
+  describe('kill/yank', () => {
+    it('killToEnd removes from cursor to end of line', () => {
+      editorStore.getState().init('hello world');
+      editorStore.getState().moveCursorTo(0, 5);
+      editorStore.getState().killToEnd();
+      expect(editorStore.getState().lines).toEqual(['hello']);
+      expect(editorStore.getState().killBuffer).toBe(' world');
+    });
+
+    it('killToEnd at end of line joins with next', () => {
+      editorStore.getState().init('hello\nworld');
+      editorStore.getState().moveCursorTo(0, 5);
+      editorStore.getState().killToEnd();
+      expect(editorStore.getState().lines).toEqual(['helloworld']);
+    });
+
+    it('killToStart removes from start to cursor', () => {
+      editorStore.getState().init('hello world');
+      editorStore.getState().moveCursorTo(0, 5);
+      editorStore.getState().killToStart();
+      expect(editorStore.getState().lines).toEqual([' world']);
+      expect(editorStore.getState().cursor.col).toBe(0);
+    });
+
+    it('deleteWordBack removes previous word', () => {
+      editorStore.getState().init('hello world');
+      editorStore.getState().moveCursorTo(0, 11);
+      editorStore.getState().deleteWordBack();
+      expect(editorStore.getState().lines).toEqual(['hello ']);
+      expect(editorStore.getState().cursor.col).toBe(6);
+    });
+
+    it('yank inserts kill buffer at cursor', () => {
+      editorStore.getState().init('hello world');
+      editorStore.getState().moveCursorTo(0, 5);
+      editorStore.getState().killToEnd();
+      editorStore.getState().moveCursorTo(0, 0);
+      editorStore.getState().yank();
+      expect(editorStore.getState().lines).toEqual([' worldhello']);
+    });
+
+    it('insertTab inserts two spaces', () => {
+      editorStore.getState().init('hello');
+      editorStore.getState().moveCursorTo(0, 0);
+      editorStore.getState().insertTab();
+      expect(editorStore.getState().lines).toEqual(['  hello']);
+      expect(editorStore.getState().cursor.col).toBe(2);
+    });
+  });
+
+  describe('viewport scrolling', () => {
+    it('updateScroll keeps cursor visible when below viewport', () => {
+      editorStore.getState().init('a\nb\nc\nd\ne\nf');
+      // viewport of 3 visual rows, terminal width 80 (no wrapping)
+      editorStore.getState().moveCursorTo(4, 0); // row 4 "e"
+      editorStore.getState().updateScroll(3, 80);
+      // cursor at visual row 4, viewport 3 → scroll so cursor is visible
+      expect(editorStore.getState().scrollOffset).toBe(2);
+    });
+
+    it('scrolls up when cursor moves above viewport', () => {
+      editorStore.getState().init('a\nb\nc\nd\ne');
+      editorStore.getState().moveCursorTo(4, 0);
+      editorStore.getState().updateScroll(3, 80);
+      editorStore.getState().moveCursorTo(1, 0);
+      editorStore.getState().updateScroll(3, 80);
+      expect(editorStore.getState().scrollOffset).toBe(1);
+    });
+
+    it('does not scroll when cursor is within viewport', () => {
+      editorStore.getState().init('a\nb\nc\nd\ne');
+      editorStore.getState().moveCursorTo(1, 0);
+      editorStore.getState().updateScroll(3, 80);
+      expect(editorStore.getState().scrollOffset).toBe(0);
+    });
+
+    it('accounts for soft-wrapped lines', () => {
+      // Line of 160 chars at width 80 takes 2 visual rows
+      editorStore.getState().init('x'.repeat(160) + '\nb\nc');
+      editorStore.getState().moveCursorTo(2, 0); // row 2 "c"
+      editorStore.getState().updateScroll(3, 80);
+      // visual rows: row0=2, row1=1, row2=1 → cursor at visual row 3
+      // viewport=3, so need to scroll
+      expect(editorStore.getState().scrollOffset).toBeGreaterThan(0);
+    });
+
+    it('getVisibleLines returns lines within viewport', () => {
+      editorStore.getState().init('a\nb\nc\nd\ne');
+      editorStore.getState().moveCursorTo(3, 0);
+      editorStore.getState().updateScroll(3, 80);
+      const visible = editorStore.getState().getVisibleLines(3, 80);
+      expect(visible.length).toBeLessThanOrEqual(5); // at most all lines
+      expect(visible.length).toBeGreaterThan(0);
+    });
+
+    it('getVisibleLines returns correct line indices after scroll', () => {
+      editorStore.getState().init('a\nb\nc\nd\ne');
+      editorStore.getState().moveCursorTo(4, 0);
+      editorStore.getState().updateScroll(3, 80);
+      // scrollOffset should be 2, so lines at index 2,3,4 visible
+      const visible = editorStore.getState().getVisibleLines(3, 80);
+      expect(visible.map((v) => v.lineIndex)).toEqual([2, 3, 4]);
+      expect(visible.map((v) => v.text)).toEqual(['c', 'd', 'e']);
+    });
+  });
+
   describe('undo/redo', () => {
     it('undo reverses last edit', () => {
       editorStore.getState().init('hello');
