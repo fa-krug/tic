@@ -212,4 +212,58 @@ describe('editorStore', () => {
       expect(editorStore.getState().cursor.col).toBe(11);
     });
   });
+
+  describe('undo/redo', () => {
+    it('undo reverses last edit', () => {
+      editorStore.getState().init('hello');
+      editorStore.getState().moveCursorTo(0, 5);
+      editorStore.getState().insertChar('!');
+      expect(editorStore.getState().lines).toEqual(['hello!']);
+      editorStore.getState().undo();
+      expect(editorStore.getState().lines).toEqual(['hello']);
+      expect(editorStore.getState().cursor).toEqual({ row: 0, col: 5 });
+    });
+
+    it('redo restores undone edit', () => {
+      editorStore.getState().init('hello');
+      editorStore.getState().moveCursorTo(0, 5);
+      editorStore.getState().insertChar('!');
+      editorStore.getState().undo();
+      editorStore.getState().redo();
+      expect(editorStore.getState().lines).toEqual(['hello!']);
+    });
+
+    it('new edit clears redo stack', () => {
+      editorStore.getState().init('hello');
+      editorStore.getState().moveCursorTo(0, 5);
+      editorStore.getState().insertChar('!');
+      editorStore.getState().undo();
+      editorStore.getState().insertChar('?');
+      editorStore.getState().redo(); // should do nothing
+      expect(editorStore.getState().lines).toEqual(['hello?']);
+    });
+
+    it('undo does nothing when stack is empty', () => {
+      editorStore.getState().init('hello');
+      editorStore.getState().undo();
+      expect(editorStore.getState().lines).toEqual(['hello']);
+    });
+
+    it('undo stack is capped at 50', () => {
+      editorStore.getState().init('');
+      for (let i = 0; i < 60; i++) {
+        editorStore.getState().insertChar('x');
+      }
+      expect(editorStore.getState().undoStack.length).toBeLessThanOrEqual(50);
+    });
+
+    it('undo restores dirty to false when back to initial', () => {
+      editorStore.getState().init('hello');
+      editorStore.getState().moveCursorTo(0, 5);
+      editorStore.getState().insertChar('!');
+      expect(editorStore.getState().dirty).toBe(true);
+      editorStore.getState().undo();
+      expect(editorStore.getState().dirty).toBe(false);
+    });
+  });
 });

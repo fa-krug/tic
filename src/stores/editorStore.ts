@@ -21,6 +21,7 @@ interface EditorState {
   killBuffer: string;
   dirty: boolean;
   showDiscardPrompt: boolean;
+  initialContent: string;
 
   // Lifecycle
   init: (content: string) => void;
@@ -43,6 +44,10 @@ interface EditorState {
   insertNewline: () => void;
   deleteBefore: () => void;
   deleteAt: () => void;
+
+  // Undo/Redo
+  undo: () => void;
+  redo: () => void;
 }
 
 const MAX_UNDO = 50;
@@ -57,6 +62,7 @@ const initialState = {
   killBuffer: '',
   dirty: false,
   showDiscardPrompt: false,
+  initialContent: '',
 };
 
 export const editorStore = createStore<EditorState>((set, get) => ({
@@ -71,6 +77,7 @@ export const editorStore = createStore<EditorState>((set, get) => ({
       goalCol: 0,
       undoStack: [],
       redoStack: [],
+      initialContent: content,
     });
   },
 
@@ -268,6 +275,44 @@ export const editorStore = createStore<EditorState>((set, get) => ({
       });
     }
     // else: end of document, do nothing
+  },
+
+  undo: () => {
+    const { undoStack, lines, cursor, redoStack, initialContent } = get();
+    if (undoStack.length === 0) return;
+    const newRedo = [
+      ...redoStack,
+      { lines: [...lines], cursor: { ...cursor } },
+    ];
+    const entry = undoStack[undoStack.length - 1]!;
+    const newUndo = undoStack.slice(0, -1);
+    const restoredContent = entry.lines.join('\n');
+    set({
+      lines: entry.lines,
+      cursor: entry.cursor,
+      undoStack: newUndo,
+      redoStack: newRedo,
+      dirty: restoredContent !== initialContent,
+    });
+  },
+
+  redo: () => {
+    const { redoStack, lines, cursor, undoStack, initialContent } = get();
+    if (redoStack.length === 0) return;
+    const newUndo = [
+      ...undoStack,
+      { lines: [...lines], cursor: { ...cursor } },
+    ];
+    const entry = redoStack[redoStack.length - 1]!;
+    const newRedo = redoStack.slice(0, -1);
+    const restoredContent = entry.lines.join('\n');
+    set({
+      lines: entry.lines,
+      cursor: entry.cursor,
+      undoStack: newUndo,
+      redoStack: newRedo,
+      dirty: restoredContent !== initialContent,
+    });
   },
 }));
 
