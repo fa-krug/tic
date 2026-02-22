@@ -19,7 +19,8 @@ import {
   backendDataStore,
 } from '../stores/backendDataStore.js';
 import { useShallow } from 'zustand/shallow';
-import { openInEditor } from '../editor.js';
+import { editorStore } from '../stores/editorStore.js';
+import { navigationStore } from '../stores/navigationStore.js';
 import { slugifyTemplateName } from '../backends/local/templates.js';
 import { Breadcrumbs } from './Breadcrumbs.js';
 import { ColorPill } from './ColorPill.js';
@@ -877,19 +878,8 @@ export function WorkItemForm() {
               }
             }
           } else if (currentField === 'description') {
-            // Open external editor for description
-            try {
-              process.stdin.setRawMode?.(false);
-              const edited = openInEditor(description);
-              process.stdin.setRawMode?.(true);
-              console.clear();
-              setDescription(edited);
-            } catch {
-              process.stdin.setRawMode?.(true);
-              console.clear();
-              // Editor failed, fall back to inline editing
-              setEditing(true);
-            }
+            editorStore.getState().init(description);
+            navigationStore.getState().navigate('editor');
           } else {
             // Capture current value before editing for revert on Esc
             const fieldValue = (() => {
@@ -1270,9 +1260,7 @@ export function WorkItemForm() {
             </Text>
             <Text wrap="truncate">
               {preview || <Text dimColor={mutedDim}>(empty)</Text>}
-              {focused && (
-                <Text dimColor={mutedDim}> [enter opens $EDITOR]</Text>
-              )}
+              {focused && <Text dimColor={mutedDim}> [enter to edit]</Text>}
             </Text>
           </Box>
         </Box>
