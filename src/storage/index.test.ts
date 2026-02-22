@@ -458,6 +458,33 @@ describe('Storage', () => {
       expect(fetched.parent).toBe(parent.id);
     });
 
+    it('assigns unique IDs when two connections create items', async () => {
+      // Regression test for #37: UNIQUE constraint errors with concurrent MCP calls.
+      // The actual race requires separate processes; this verifies two DB connections
+      // sharing the same file produce unique IDs via IMMEDIATE transactions.
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-race-'));
+      const db1 = createDatabase(tmpDir);
+      const db2 = createDatabase(tmpDir);
+      const storage1 = Storage.createFromDb(db1);
+      const storage2 = Storage.createFromDb(db2);
+
+      try {
+        const [item1, item2] = await Promise.all([
+          storage1.createWorkItem(makeNewWorkItem({ title: 'From conn 1' })),
+          storage2.createWorkItem(makeNewWorkItem({ title: 'From conn 2' })),
+        ]);
+
+        expect(item1.id).not.toBe(item2.id);
+
+        const all = await storage1.listWorkItems();
+        expect(all).toHaveLength(2);
+      } finally {
+        db1.close();
+        db2.close();
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
+
     it('adds new iteration to iterations table', async () => {
       await backend.createWorkItem(
         makeNewWorkItem({ iteration: 'new-sprint' }),

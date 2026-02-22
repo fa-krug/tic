@@ -596,69 +596,76 @@ export class Storage
     this.validateFields(data);
     const now = new Date().toISOString();
 
-    // Allocate ID atomically inside transaction to prevent race conditions
-    const { id } = this.db.transaction((tx) => {
-      const config = tx
-        .select()
-        .from(schema.projectConfig)
-        .where(eq(schema.projectConfig.id, 1))
-        .get();
-      const nid = config?.nextId ?? 1;
-      tx.update(schema.projectConfig)
-        .set({ nextId: nid + 1 })
-        .where(eq(schema.projectConfig.id, 1))
-        .run();
-      return { id: this.tempIds ? `local-${nid}` : String(nid), nextId: nid };
-    });
-
-    // Validate relationships before inserting
-    this.validateRelationships(id, data.parent, data.dependsOn);
-
-    this.db.transaction((tx) => {
-      // Ensure iteration exists
-      if (data.iteration) {
-        tx.insert(schema.iterations)
-          .values({ name: data.iteration, sortOrder: 0 })
-          .onConflictDoNothing()
+    // Single IMMEDIATE transaction: allocate ID + validate + insert atomically.
+    // IMMEDIATE acquires a write lock upfront, preventing the race condition where
+    // two processes (e.g., parallel MCP calls) read the same nextId before either
+    // commits (#37).
+    const id = this.db.transaction(
+      (tx) => {
+        // Allocate ID
+        const config = tx
+          .select()
+          .from(schema.projectConfig)
+          .where(eq(schema.projectConfig.id, 1))
+          .get();
+        const nid = config?.nextId ?? 1;
+        const itemId = this.tempIds ? `local-${nid}` : String(nid);
+        tx.update(schema.projectConfig)
+          .set({ nextId: nid + 1 })
+          .where(eq(schema.projectConfig.id, 1))
           .run();
-      }
 
-      // Insert work item
-      tx.insert(schema.workItems)
-        .values({
-          id,
-          title: data.title,
-          type: data.type,
-          status: data.status,
-          iteration: data.iteration,
-          priority: data.priority,
-          assignee: data.assignee,
-          description: data.description,
-          parent: data.parent,
-          created: now,
-          updated: now,
-        })
-        .run();
+        // Validate relationships
+        this.validateRelationships(itemId, data.parent, data.dependsOn);
 
-      // Insert labels
-      if (data.labels.length > 0) {
-        tx.insert(schema.workItemLabels)
-          .values(data.labels.map((label) => ({ workItemId: id, label })))
+        // Ensure iteration exists
+        if (data.iteration) {
+          tx.insert(schema.iterations)
+            .values({ name: data.iteration, sortOrder: 0 })
+            .onConflictDoNothing()
+            .run();
+        }
+
+        // Insert work item
+        tx.insert(schema.workItems)
+          .values({
+            id: itemId,
+            title: data.title,
+            type: data.type,
+            status: data.status,
+            iteration: data.iteration,
+            priority: data.priority,
+            assignee: data.assignee,
+            description: data.description,
+            parent: data.parent,
+            created: now,
+            updated: now,
+          })
           .run();
-      }
 
-      // Insert deps
-      if (data.dependsOn.length > 0) {
-        tx.insert(schema.workItemDeps)
-          .values(
-            data.dependsOn.map((dependsOnId) => ({
-              workItemId: id,
-              dependsOnId,
-            })),
-          )
-          .run();
-      }
-    });
+        // Insert labels
+        if (data.labels.length > 0) {
+          tx.insert(schema.workItemLabels)
+            .values(data.labels.map((label) => ({ workItemId: itemId, label })))
+            .run();
+        }
+
+        // Insert deps
+        if (data.dependsOn.length > 0) {
+          tx.insert(schema.workItemDeps)
+            .values(
+              data.dependsOn.map((dependsOnId) => ({
+                workItemId: itemId,
+                dependsOnId,
+              })),
+            )
+            .run();
+        }
+
+        return itemId;
+      },
+      { behavior: 'immediate' },
+    );
 
     this.invalidateCache();
 
