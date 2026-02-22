@@ -230,11 +230,12 @@ describe('editorStore', () => {
       expect(editorStore.getState().killBuffer).toBe(' world');
     });
 
-    it('killToEnd at end of line joins with next', () => {
+    it('killToEnd at end of line joins with next and stores newline in killBuffer', () => {
       editorStore.getState().init('hello\nworld');
       editorStore.getState().moveCursorTo(0, 5);
       editorStore.getState().killToEnd();
       expect(editorStore.getState().lines).toEqual(['helloworld']);
+      expect(editorStore.getState().killBuffer).toBe('\n');
     });
 
     it('killToStart removes from start to cursor', () => {
@@ -260,6 +261,17 @@ describe('editorStore', () => {
       editorStore.getState().moveCursorTo(0, 0);
       editorStore.getState().yank();
       expect(editorStore.getState().lines).toEqual([' worldhello']);
+    });
+
+    it('yank newline from killBuffer splits line', () => {
+      editorStore.getState().init('hello\nworld');
+      editorStore.getState().moveCursorTo(0, 5);
+      editorStore.getState().killToEnd(); // joins lines, killBuffer = '\n'
+      expect(editorStore.getState().lines).toEqual(['helloworld']);
+      editorStore.getState().moveCursorTo(0, 5);
+      editorStore.getState().yank(); // yank '\n' → split line
+      expect(editorStore.getState().lines).toEqual(['hello', 'world']);
+      expect(editorStore.getState().cursor).toEqual({ row: 1, col: 0 });
     });
 
     it('insertTab inserts two spaces', () => {

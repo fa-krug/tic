@@ -4,7 +4,7 @@ import { editorStore, useEditorStore } from '../stores/editorStore.js';
 import { formStackStore, useFormStackStore } from '../stores/formStackStore.js';
 import { navigationStore } from '../stores/navigationStore.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
-import { highlightLine } from './markdownHighlight.js';
+import { highlightLine, highlightLineWithCursor } from './markdownHighlight.js';
 import { useThemeStore } from '../stores/themeStore.js';
 
 export function MarkdownEditor() {
@@ -144,15 +144,8 @@ export function MarkdownEditor() {
 
   function renderLine(lineIndex: number, text: string) {
     if (lineIndex === cursor.row) {
-      const before = text.slice(0, cursor.col);
-      const cursorChar = text[cursor.col] || ' ';
-      const after = text.slice(cursor.col + 1);
       return (
-        <Box key={lineIndex}>
-          <Text>{highlightLine(before)}</Text>
-          <Text inverse>{cursorChar}</Text>
-          <Text>{highlightLine(after)}</Text>
-        </Box>
+        <Box key={lineIndex}>{highlightLineWithCursor(text, cursor.col)}</Box>
       );
     }
     return <Box key={lineIndex}>{highlightLine(text)}</Box>;

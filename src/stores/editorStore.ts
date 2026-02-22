@@ -373,7 +373,7 @@ export const editorStore = createStore<EditorState>((set, get) => ({
         dirty: true,
       });
     } else if (cursor.row < lines.length - 1) {
-      // At end of line: join with next line
+      // At end of line: join with next line, store newline in kill buffer
       const newUndo = [
         ...undoStack.slice(-(MAX_UNDO - 1)),
         { lines: [...lines], cursor: { ...cursor } },
@@ -385,6 +385,7 @@ export const editorStore = createStore<EditorState>((set, get) => ({
         lines: newLines,
         undoStack: newUndo,
         redoStack: [],
+        killBuffer: '\n',
         dirty: true,
       });
     }
@@ -442,17 +443,44 @@ export const editorStore = createStore<EditorState>((set, get) => ({
       { lines: [...lines], cursor: { ...cursor } },
     ];
     const line = lines[cursor.row]!;
-    const newLine =
-      line.slice(0, cursor.col) + killBuffer + line.slice(cursor.col);
-    const newLines = [...lines];
-    newLines[cursor.row] = newLine;
-    set({
-      lines: newLines,
-      cursor: { row: cursor.row, col: cursor.col + killBuffer.length },
-      undoStack: newUndo,
-      redoStack: [],
-      dirty: true,
-    });
+
+    if (killBuffer.includes('\n')) {
+      // Multi-line yank: split at newlines
+      const parts = killBuffer.split('\n');
+      const before = line.slice(0, cursor.col);
+      const after = line.slice(cursor.col);
+      const newLines = [...lines];
+      // First part appends to current line before cursor
+      newLines[cursor.row] = before + parts[0]!;
+      // Middle parts inserted as new lines
+      for (let i = 1; i < parts.length; i++) {
+        newLines.splice(cursor.row + i, 0, parts[i]!);
+      }
+      // Last part gets the remainder of the original line
+      const lastPartIdx = cursor.row + parts.length - 1;
+      newLines[lastPartIdx] = newLines[lastPartIdx]! + after;
+      const newRow = cursor.row + parts.length - 1;
+      const newCol = parts[parts.length - 1]!.length;
+      set({
+        lines: newLines,
+        cursor: { row: newRow, col: newCol },
+        undoStack: newUndo,
+        redoStack: [],
+        dirty: true,
+      });
+    } else {
+      const newLine =
+        line.slice(0, cursor.col) + killBuffer + line.slice(cursor.col);
+      const newLines = [...lines];
+      newLines[cursor.row] = newLine;
+      set({
+        lines: newLines,
+        cursor: { row: cursor.row, col: cursor.col + killBuffer.length },
+        undoStack: newUndo,
+        redoStack: [],
+        dirty: true,
+      });
+    }
   },
 
   insertTab: () => {

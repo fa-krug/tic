@@ -96,8 +96,8 @@ export function tokenize(line: string): Token[] {
     ];
   }
 
-  // List bullet (don't return — process remainder for inline tokens)
-  const listMatch = /^(\s*[-*+]\s)(.*)/.exec(line);
+  // List bullet or ordered list (process remainder for inline tokens)
+  const listMatch = /^(\s*(?:[-*+]|\d+\.)\s)(.*)/.exec(line);
   if (listMatch) {
     const marker: Token = { type: 'list-marker', text: listMatch[1]! };
     const rest = tokenizeInline(listMatch[2]!);
@@ -126,6 +126,69 @@ const tokenStyles: Record<
   text: {},
 };
 
+export interface CursorSplit {
+  before: Token[];
+  cursor: { type: TokenType; char: string };
+  after: Token[];
+}
+
+export function splitTokensAtCol(tokens: Token[], col: number): CursorSplit {
+  let pos = 0;
+  const totalLen = tokens.reduce((sum, t) => sum + t.text.length, 0);
+
+  // Cursor past end of line
+  if (col >= totalLen) {
+    return {
+      before: tokens,
+      cursor: { type: 'text', char: ' ' },
+      after: [],
+    };
+  }
+
+  const before: Token[] = [];
+  const after: Token[] = [];
+
+  let cursorResult: { type: TokenType; char: string } | null = null;
+
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i]!;
+    const tokenStart = pos;
+    const tokenEnd = pos + token.text.length;
+
+    if (cursorResult) {
+      // Already found cursor, remaining tokens go to after
+      after.push(token);
+    } else if (col < tokenEnd) {
+      // Cursor is within this token
+      const offsetInToken = col - tokenStart;
+      if (offsetInToken > 0) {
+        before.push({
+          type: token.type,
+          text: token.text.slice(0, offsetInToken),
+        });
+      }
+      cursorResult = { type: token.type, char: token.text[offsetInToken]! };
+      if (offsetInToken + 1 < token.text.length) {
+        after.push({
+          type: token.type,
+          text: token.text.slice(offsetInToken + 1),
+        });
+      }
+    } else {
+      // Entire token is before cursor
+      before.push(token);
+    }
+
+    pos = tokenEnd;
+  }
+
+  return {
+    before,
+    cursor: cursorResult ?? { type: 'text', char: ' ' },
+    after,
+  };
+}
+
 export function highlightLine(line: string): React.ReactNode {
   const tokens = tokenize(line);
   if (tokens.length === 1 && tokens[0]!.type === 'text') {
@@ -139,5 +202,37 @@ export function highlightLine(line: string): React.ReactNode {
       const style = tokenStyles[token.type];
       return React.createElement(Text, { key: i, ...style }, token.text);
     }),
+  );
+}
+
+function renderTokens(tokens: Token[], keyOffset: number): React.ReactNode[] {
+  return tokens.map((token, i) => {
+    const style = tokenStyles[token.type];
+    return React.createElement(
+      Text,
+      { key: keyOffset + i, ...style },
+      token.text,
+    );
+  });
+}
+
+export function highlightLineWithCursor(
+  line: string,
+  cursorCol: number,
+): React.ReactNode {
+  const tokens = tokenize(line);
+  const { before, cursor, after } = splitTokensAtCol(tokens, cursorCol);
+  const cursorStyle = tokenStyles[cursor.type];
+
+  return React.createElement(
+    React.Fragment,
+    null,
+    ...renderTokens(before, 0),
+    React.createElement(
+      Text,
+      { key: 'cursor', ...cursorStyle, inverse: true },
+      cursor.char,
+    ),
+    ...renderTokens(after, before.length + 1),
   );
 }
