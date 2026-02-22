@@ -29,6 +29,14 @@ interface EditorState {
 
   // Navigation
   moveCursorTo: (row: number, col: number) => void;
+  moveLeft: () => void;
+  moveRight: () => void;
+  moveUp: () => void;
+  moveDown: () => void;
+  moveToLineStart: () => void;
+  moveToLineEnd: () => void;
+  moveWordLeft: () => void;
+  moveWordRight: () => void;
 
   // Editing
   insertChar: (char: string) => void;
@@ -73,7 +81,81 @@ export const editorStore = createStore<EditorState>((set, get) => ({
   getContent: () => get().lines.join('\n'),
 
   moveCursorTo: (row: number, col: number) => {
-    set({ cursor: { row, col } });
+    set({ cursor: { row, col }, goalCol: col });
+  },
+
+  moveLeft: () => {
+    const { cursor, lines } = get();
+    if (cursor.col > 0) {
+      const col = cursor.col - 1;
+      set({ cursor: { row: cursor.row, col }, goalCol: col });
+    } else if (cursor.row > 0) {
+      const row = cursor.row - 1;
+      const col = lines[row]!.length;
+      set({ cursor: { row, col }, goalCol: col });
+    }
+  },
+
+  moveRight: () => {
+    const { cursor, lines } = get();
+    const lineLen = lines[cursor.row]!.length;
+    if (cursor.col < lineLen) {
+      const col = cursor.col + 1;
+      set({ cursor: { row: cursor.row, col }, goalCol: col });
+    } else if (cursor.row < lines.length - 1) {
+      set({ cursor: { row: cursor.row + 1, col: 0 }, goalCol: 0 });
+    }
+  },
+
+  moveUp: () => {
+    const { cursor, lines, goalCol } = get();
+    if (cursor.row > 0) {
+      const newRow = cursor.row - 1;
+      const col = Math.min(goalCol, lines[newRow]!.length);
+      set({ cursor: { row: newRow, col } });
+    }
+  },
+
+  moveDown: () => {
+    const { cursor, lines, goalCol } = get();
+    if (cursor.row < lines.length - 1) {
+      const newRow = cursor.row + 1;
+      const col = Math.min(goalCol, lines[newRow]!.length);
+      set({ cursor: { row: newRow, col } });
+    }
+  },
+
+  moveToLineStart: () => {
+    const { cursor } = get();
+    set({ cursor: { row: cursor.row, col: 0 }, goalCol: 0 });
+  },
+
+  moveToLineEnd: () => {
+    const { cursor, lines } = get();
+    const col = lines[cursor.row]!.length;
+    set({ cursor: { row: cursor.row, col }, goalCol: col });
+  },
+
+  moveWordLeft: () => {
+    const { cursor, lines } = get();
+    const line = lines[cursor.row]!;
+    let col = cursor.col;
+    // Skip spaces backward
+    while (col > 0 && line[col - 1] === ' ') col--;
+    // Skip non-spaces backward
+    while (col > 0 && line[col - 1] !== ' ') col--;
+    set({ cursor: { row: cursor.row, col }, goalCol: col });
+  },
+
+  moveWordRight: () => {
+    const { cursor, lines } = get();
+    const line = lines[cursor.row]!;
+    let col = cursor.col;
+    // Skip spaces forward
+    while (col < line.length && line[col] === ' ') col++;
+    // Skip non-spaces forward
+    while (col < line.length && line[col] !== ' ') col++;
+    set({ cursor: { row: cursor.row, col }, goalCol: col });
   },
 
   insertChar: (char: string) => {

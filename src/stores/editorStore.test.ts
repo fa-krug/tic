@@ -113,4 +113,103 @@ describe('editorStore', () => {
       expect(editorStore.getState().lines).toEqual(['hello']);
     });
   });
+
+  describe('cursor movement', () => {
+    it('moves left', () => {
+      editorStore.getState().init('abc');
+      editorStore.getState().moveCursorTo(0, 2);
+      editorStore.getState().moveLeft();
+      expect(editorStore.getState().cursor.col).toBe(1);
+    });
+
+    it('moves left wraps to previous line end', () => {
+      editorStore.getState().init('ab\ncd');
+      editorStore.getState().moveCursorTo(1, 0);
+      editorStore.getState().moveLeft();
+      expect(editorStore.getState().cursor).toEqual({ row: 0, col: 2 });
+    });
+
+    it('moves left does nothing at document start', () => {
+      editorStore.getState().init('abc');
+      editorStore.getState().moveCursorTo(0, 0);
+      editorStore.getState().moveLeft();
+      expect(editorStore.getState().cursor).toEqual({ row: 0, col: 0 });
+    });
+
+    it('moves right', () => {
+      editorStore.getState().init('abc');
+      editorStore.getState().moveCursorTo(0, 1);
+      editorStore.getState().moveRight();
+      expect(editorStore.getState().cursor.col).toBe(2);
+    });
+
+    it('moves right wraps to next line start', () => {
+      editorStore.getState().init('ab\ncd');
+      editorStore.getState().moveCursorTo(0, 2);
+      editorStore.getState().moveRight();
+      expect(editorStore.getState().cursor).toEqual({ row: 1, col: 0 });
+    });
+
+    it('moves right does nothing at document end', () => {
+      editorStore.getState().init('abc');
+      editorStore.getState().moveCursorTo(0, 3);
+      editorStore.getState().moveRight();
+      expect(editorStore.getState().cursor).toEqual({ row: 0, col: 3 });
+    });
+
+    it('moves up preserving goalCol', () => {
+      editorStore.getState().init('long line\nhi\nanother long');
+      editorStore.getState().moveCursorTo(0, 8);
+      editorStore.getState().moveDown(); // row 1, col clamped to 2
+      expect(editorStore.getState().cursor).toEqual({ row: 1, col: 2 });
+      editorStore.getState().moveDown(); // row 2, col restored to 8
+      expect(editorStore.getState().cursor).toEqual({ row: 2, col: 8 });
+    });
+
+    it('moveUp does nothing at first line', () => {
+      editorStore.getState().init('abc');
+      editorStore.getState().moveUp();
+      expect(editorStore.getState().cursor.row).toBe(0);
+    });
+
+    it('moveDown does nothing at last line', () => {
+      editorStore.getState().init('abc');
+      editorStore.getState().moveDown();
+      expect(editorStore.getState().cursor.row).toBe(0);
+    });
+
+    it('moveToLineStart sets col to 0', () => {
+      editorStore.getState().init('hello');
+      editorStore.getState().moveCursorTo(0, 3);
+      editorStore.getState().moveToLineStart();
+      expect(editorStore.getState().cursor.col).toBe(0);
+    });
+
+    it('moveToLineEnd sets col to line length', () => {
+      editorStore.getState().init('hello');
+      editorStore.getState().moveCursorTo(0, 0);
+      editorStore.getState().moveToLineEnd();
+      expect(editorStore.getState().cursor.col).toBe(5);
+    });
+
+    it('moveWordLeft jumps to previous word boundary', () => {
+      editorStore.getState().init('hello world foo');
+      editorStore.getState().moveCursorTo(0, 15);
+      editorStore.getState().moveWordLeft();
+      expect(editorStore.getState().cursor.col).toBe(12);
+      editorStore.getState().moveWordLeft();
+      expect(editorStore.getState().cursor.col).toBe(6);
+      editorStore.getState().moveWordLeft();
+      expect(editorStore.getState().cursor.col).toBe(0);
+    });
+
+    it('moveWordRight jumps to next word boundary', () => {
+      editorStore.getState().init('hello world foo');
+      editorStore.getState().moveCursorTo(0, 0);
+      editorStore.getState().moveWordRight();
+      expect(editorStore.getState().cursor.col).toBe(5);
+      editorStore.getState().moveWordRight();
+      expect(editorStore.getState().cursor.col).toBe(11);
+    });
+  });
 });
