@@ -88,6 +88,7 @@ export interface BackendDataStoreState {
 
   loaded: boolean;
   loading: boolean;
+  itemLoading: boolean;
   error: string | null;
   syncStatus: SyncStatus | null;
 
@@ -220,6 +221,7 @@ export const backendDataStore = createStore<BackendDataStoreState>(
 
     loaded: false,
     loading: false,
+    itemLoading: false,
     error: null,
     syncStatus: null,
 

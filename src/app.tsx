@@ -46,6 +46,11 @@ const BranchList = lazy(() =>
     default: m.BranchList,
   })),
 );
+const MarkdownEditor = lazy(() =>
+  import('./components/MarkdownEditor.js').then((m) => ({
+    default: m.MarkdownEditor,
+  })),
+);
 const AuthPrompt = lazy(() =>
   import('./components/AuthPrompt.js').then((m) => ({
     default: m.AuthPrompt,
@@ -88,6 +93,7 @@ export function App() {
             {screen === 'branch-list' && <BranchList />}
             {screen === 'settings' && <Settings />}
             {screen === 'status' && <StatusScreen />}
+            {screen === 'editor' && <MarkdownEditor />}
             {screen === 'help' && <HelpScreen sourceScreen={previousScreen} />}
           </Suspense>
         </>

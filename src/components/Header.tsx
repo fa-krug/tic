@@ -28,6 +28,7 @@ const ART_LINES = ['        ██', '       ██ ', '  ██  ██  ', '  
 
 function getStatusDisplay(
   loading: boolean,
+  itemLoading: boolean,
   branchesLoading: boolean,
   initError: string | null,
   syncStatus: {
@@ -40,6 +41,9 @@ function getStatusDisplay(
 ): { showSpinner: boolean; text: string | null; isError?: boolean } {
   if (loading) {
     return { showSpinner: true, text: 'Loading...' };
+  }
+  if (itemLoading) {
+    return { showSpinner: true, text: null };
   }
   if (branchesLoading) {
     return { showSpinner: true, text: 'Fetching...' };
@@ -82,6 +86,7 @@ export function Header() {
   const { accent, error, warning, mutedDim } = useThemeStore((s) => s.colors);
   const backendType = useConfigStore((s) => s.config.backend ?? 'none');
   const loading = useBackendDataStore((s) => s.loading);
+  const itemLoading = useBackendDataStore((s) => s.itemLoading);
   const branchesLoading = useBackendDataStore((s) => s.branchesLoading);
   const initError = useBackendDataStore((s) => s.error);
   const syncStatus = useBackendDataStore((s) => s.syncStatus);
@@ -96,6 +101,7 @@ export function Header() {
     isError,
   } = getStatusDisplay(
     loading,
+    itemLoading,
     branchesLoading,
     initError,
     syncStatus,

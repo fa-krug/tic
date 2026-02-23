@@ -19,7 +19,8 @@ import {
   backendDataStore,
 } from '../stores/backendDataStore.js';
 import { useShallow } from 'zustand/shallow';
-import { openInEditor } from '../editor.js';
+import { editorStore } from '../stores/editorStore.js';
+import { navigationStore } from '../stores/navigationStore.js';
 import { slugifyTemplateName } from '../backends/local/templates.js';
 import { Breadcrumbs } from './Breadcrumbs.js';
 import { ColorPill } from './ColorPill.js';
@@ -156,7 +157,9 @@ export function WorkItemForm() {
   const [children, setChildren] = useState<WorkItem[]>([]);
   const [dependents, setDependents] = useState<WorkItem[]>([]);
   const [parentItem, setParentItem] = useState<WorkItem | null>(null);
-  const [itemLoading, setItemLoading] = useState(selectedWorkItemId !== null);
+  const itemLoading = useBackendDataStore((s) => s.itemLoading);
+  const setItemLoading = (v: boolean) =>
+    backendDataStore.setState({ itemLoading: v });
 
   useEffect(() => {
     if (selectedWorkItemId === null) {
@@ -200,6 +203,7 @@ export function WorkItemForm() {
     })().catch(() => {});
     return () => {
       cancelled = true;
+      setItemLoading(false);
     };
   }, [selectedWorkItemId, backend, capabilities.relationships]);
 
@@ -351,6 +355,9 @@ export function WorkItemForm() {
   useEffect(() => {
     if (!existingItem) return;
     setComments(existingItem.comments ?? []);
+
+    // Don't overwrite fields if the user has already made edits (e.g. via editor)
+    if (formStackStore.getState().isDirty()) return;
 
     // Build field values
     const parentIdValue =
@@ -877,19 +884,8 @@ export function WorkItemForm() {
               }
             }
           } else if (currentField === 'description') {
-            // Open external editor for description
-            try {
-              process.stdin.setRawMode?.(false);
-              const edited = openInEditor(description);
-              process.stdin.setRawMode?.(true);
-              console.clear();
-              setDescription(edited);
-            } catch {
-              process.stdin.setRawMode?.(true);
-              console.clear();
-              // Editor failed, fall back to inline editing
-              setEditing(true);
-            }
+            editorStore.getState().init(description);
+            navigationStore.getState().navigate('editor');
           } else {
             // Capture current value before editing for revert on Esc
             const fieldValue = (() => {
@@ -1270,9 +1266,7 @@ export function WorkItemForm() {
             </Text>
             <Text wrap="truncate">
               {preview || <Text dimColor={mutedDim}>(empty)</Text>}
-              {focused && (
-                <Text dimColor={mutedDim}> [enter opens $EDITOR]</Text>
-              )}
+              {focused && <Text dimColor={mutedDim}> [enter to edit]</Text>}
             </Text>
           </Box>
         </Box>
@@ -1504,18 +1498,6 @@ export function WorkItemForm() {
     cursor: focusedField,
     chromeLines,
   });
-
-  // Show placeholder when item is still loading
-  if (itemLoading) {
-    return (
-      <Box flexDirection="column">
-        <Box marginBottom={1}>
-          <Text bold>Loading item...</Text>
-        </Box>
-        <Text dimColor={mutedDim}>esc back ? help</Text>
-      </Box>
-    );
-  }
 
   const mode =
     formMode === 'template'
