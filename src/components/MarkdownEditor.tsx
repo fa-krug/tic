@@ -1,15 +1,21 @@
-import { useEffect } from 'react';
+import { useLayoutEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { editorStore, useEditorStore } from '../stores/editorStore.js';
 import { formStackStore, useFormStackStore } from '../stores/formStackStore.js';
 import { navigationStore } from '../stores/navigationStore.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
-import { highlightLine, highlightLineWithCursor } from './markdownHighlight.js';
+import {
+  highlightLine,
+  highlightLineWithCursor,
+  computeLineContexts,
+  type LineContext,
+} from './markdownHighlight.js';
 import { useThemeStore } from '../stores/themeStore.js';
 
 export function MarkdownEditor() {
   const lines = useEditorStore((s) => s.lines);
   const cursor = useEditorStore((s) => s.cursor);
+  const scrollOffset = useEditorStore((s) => s.scrollOffset);
   const dirty = useEditorStore((s) => s.dirty);
   const showDiscardPrompt = useEditorStore((s) => s.showDiscardPrompt);
   const draft = useFormStackStore((s) => s.currentDraft());
@@ -17,10 +23,17 @@ export function MarkdownEditor() {
   const accent = useThemeStore((s) => s.colors.accent);
   const viewportHeight = height - 2; // status bar + help bar
 
-  // Keep scroll in sync with cursor
-  useEffect(() => {
+  // Keep scroll in sync with cursor (useLayoutEffect to update before paint)
+  useLayoutEffect(() => {
     editorStore.getState().updateScroll(viewportHeight, width);
-  }, [cursor.row, cursor.col, lines.length, viewportHeight, width]);
+  }, [
+    cursor.row,
+    cursor.col,
+    lines.length,
+    viewportHeight,
+    width,
+    scrollOffset,
+  ]);
 
   useInput((input, key) => {
     const s = editorStore.getState();
@@ -76,12 +89,8 @@ export function MarkdownEditor() {
       s.moveToLineEnd();
       return;
     }
-    if (input === 'k' && key.ctrl) {
-      s.killToEnd();
-      return;
-    }
     if (input === 'u' && key.ctrl) {
-      s.killToStart();
+      s.killLine();
       return;
     }
     if (input === 'w' && key.ctrl) {
@@ -92,31 +101,50 @@ export function MarkdownEditor() {
       s.yank();
       return;
     }
+    if (input === 'd' && key.ctrl) {
+      s.deleteAt();
+      return;
+    }
 
-    // Arrow keys
+    // Alt/Option + letter (macOS sends ESC+b / ESC+f for Option+Left/Right)
+    if (input === 'b' && key.meta) {
+      s.moveWordLeft();
+      return;
+    }
+    if (input === 'f' && key.meta) {
+      s.moveWordRight();
+      return;
+    }
+
+    // Arrow keys (Option+Arrow sends Ctrl modifier on some macOS terminals)
     if (key.upArrow) {
-      s.moveUp();
+      if (key.meta || key.ctrl) s.pageUp(viewportHeight);
+      else s.moveUp();
       return;
     }
     if (key.downArrow) {
-      s.moveDown();
+      if (key.meta || key.ctrl) s.pageDown(viewportHeight);
+      else s.moveDown();
       return;
     }
     if (key.leftArrow) {
-      if (key.ctrl) s.moveWordLeft();
+      if (key.meta || key.ctrl) s.moveWordLeft();
       else s.moveLeft();
       return;
     }
     if (key.rightArrow) {
-      if (key.ctrl) s.moveWordRight();
+      if (key.meta || key.ctrl) s.moveWordRight();
       else s.moveRight();
       return;
     }
 
     // Backspace & Delete
+    // Ink 6 maps the physical Backspace key (\x7f) to key.delete, not
+    // key.backspace (\x08/ctrl+h). Both the physical Backspace and Delete
+    // keys report key.delete, so we treat key.delete as backspace (the
+    // common case) and use Ctrl+D for forward-delete.
     if (key.backspace || key.delete) {
-      if (key.backspace) s.deleteBefore();
-      else s.deleteAt();
+      s.deleteBefore();
       return;
     }
 
@@ -141,14 +169,17 @@ export function MarkdownEditor() {
   const visibleLines = editorStore
     .getState()
     .getVisibleLines(viewportHeight, width);
+  const lineContexts = computeLineContexts(lines);
 
-  function renderLine(lineIndex: number, text: string) {
+  function renderLine(lineIndex: number, text: string, context: LineContext) {
     if (lineIndex === cursor.row) {
       return (
-        <Box key={lineIndex}>{highlightLineWithCursor(text, cursor.col)}</Box>
+        <Box key={lineIndex}>
+          {highlightLineWithCursor(text, cursor.col, context)}
+        </Box>
       );
     }
-    return <Box key={lineIndex}>{highlightLine(text)}</Box>;
+    return <Box key={lineIndex}>{highlightLine(text, context)}</Box>;
   }
 
   return (
@@ -167,7 +198,9 @@ export function MarkdownEditor() {
 
       {/* Editor area */}
       <Box flexDirection="column" height={viewportHeight}>
-        {visibleLines.map(({ lineIndex, text }) => renderLine(lineIndex, text))}
+        {visibleLines.map(({ lineIndex, text }) =>
+          renderLine(lineIndex, text, lineContexts[lineIndex] ?? 'normal'),
+        )}
         {/* Fill remaining viewport with empty lines */}
         {Array.from({
           length: Math.max(0, viewportHeight - visibleLines.length),
@@ -187,7 +220,8 @@ export function MarkdownEditor() {
           </Text>
         ) : (
           <Text dimColor>
-            Ctrl+S save Esc cancel Ctrl+Z undo Ctrl+K cut Ctrl+Y yank
+            Ctrl+S save Esc cancel Ctrl+Z undo Ctrl+U kill line Ctrl+Y yank
+            Alt+↑↓ page Alt+←→ word
           </Text>
         )}
       </Box>

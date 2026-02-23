@@ -8,12 +8,40 @@ export type TokenType =
   | 'bold'
   | 'italic'
   | 'code'
+  | 'code-fence'
+  | 'code-block'
   | 'link'
   | 'image'
   | 'blockquote-marker'
   | 'blockquote-text'
   | 'list-marker'
   | 'hr';
+
+export type LineContext = 'normal' | 'code-fence' | 'code-block';
+
+const CODE_FENCE_RE = /^\s*```/;
+
+export function computeLineContexts(lines: string[]): LineContext[] {
+  const contexts: LineContext[] = [];
+  let inCodeBlock = false;
+
+  for (const line of lines) {
+    const isFence = CODE_FENCE_RE.test(line);
+    if (isFence && !inCodeBlock) {
+      contexts.push('code-fence');
+      inCodeBlock = true;
+    } else if (isFence && inCodeBlock) {
+      contexts.push('code-fence');
+      inCodeBlock = false;
+    } else if (inCodeBlock) {
+      contexts.push('code-block');
+    } else {
+      contexts.push('normal');
+    }
+  }
+
+  return contexts;
+}
 
 export interface Token {
   type: TokenType;
@@ -72,7 +100,18 @@ function tokenizeInline(text: string): Token[] {
   return tokens;
 }
 
-export function tokenize(line: string): Token[] {
+export function tokenize(
+  line: string,
+  context: LineContext = 'normal',
+): Token[] {
+  // Code block contexts — no inline parsing
+  if (context === 'code-fence') {
+    return [{ type: 'code-fence', text: line }];
+  }
+  if (context === 'code-block') {
+    return [{ type: 'code-block', text: line }];
+  }
+
   // Horizontal rule (must check before list bullet since --- starts with -)
   if (/^---+$/.test(line)) {
     return [{ type: 'hr', text: line }];
@@ -117,6 +156,8 @@ const tokenStyles: Record<
   bold: { bold: true },
   italic: { dimColor: true },
   code: { color: 'yellow' },
+  'code-fence': { dimColor: true },
+  'code-block': { color: 'yellow' },
   link: { color: 'blue', underline: true },
   image: { color: 'green' },
   'blockquote-marker': { dimColor: true },
@@ -189,8 +230,15 @@ export function splitTokensAtCol(tokens: Token[], col: number): CursorSplit {
   };
 }
 
-export function highlightLine(line: string): React.ReactNode {
-  const tokens = tokenize(line);
+export function highlightLine(
+  line: string,
+  context: LineContext = 'normal',
+): React.ReactNode {
+  const tokens = tokenize(line, context);
+  // Empty lines must render a space so the Box maintains 1 row of height
+  if (tokens.length === 0) {
+    return React.createElement(Text, null, ' ');
+  }
   if (tokens.length === 1 && tokens[0]!.type === 'text') {
     return React.createElement(Text, null, tokens[0]!.text);
   }
@@ -219,8 +267,9 @@ function renderTokens(tokens: Token[], keyOffset: number): React.ReactNode[] {
 export function highlightLineWithCursor(
   line: string,
   cursorCol: number,
+  context: LineContext = 'normal',
 ): React.ReactNode {
-  const tokens = tokenize(line);
+  const tokens = tokenize(line, context);
   const { before, cursor, after } = splitTokensAtCol(tokens, cursorCol);
   const cursorStyle = tokenStyles[cursor.type];
 

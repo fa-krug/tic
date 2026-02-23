@@ -58,11 +58,14 @@ interface EditorState {
   deleteAt: () => void;
 
   // Kill/Yank
-  killToEnd: () => void;
-  killToStart: () => void;
+  killLine: () => void;
   deleteWordBack: () => void;
   yank: () => void;
   insertTab: () => void;
+
+  // Page navigation
+  pageUp: (viewportHeight: number) => void;
+  pageDown: (viewportHeight: number) => void;
 
   // Undo/Redo
   undo: () => void;
@@ -88,6 +91,36 @@ function visualHeight(line: string, width: number): number {
   if (width <= 0) return 1;
   if (line.length === 0) return 1;
   return Math.ceil(line.length / width);
+}
+
+// Regex for list markers: captures indent, marker, and content after marker
+// Supports: "- ", "* ", "+ ", "1. ", "- [ ] ", "- [x] ", "* [ ] ", "* [x] "
+const LIST_RE = /^(\s*)([-*+] \[[xX ]\] |[-*+] |\d+\. )(.*)$/;
+
+interface ListMatch {
+  indent: string;
+  marker: string;
+  content: string;
+}
+
+function parseListMarker(line: string): ListMatch | null {
+  const m = LIST_RE.exec(line);
+  if (!m) return null;
+  return { indent: m[1]!, marker: m[2]!, content: m[3]! };
+}
+
+function nextMarker(marker: string): string {
+  // Checkbox markers → always unchecked
+  if (/^[-*+] \[[xX ]\] $/.test(marker)) {
+    return marker[0] + ' [ ] ';
+  }
+  // Numbered list → increment
+  const numMatch = /^(\d+)\. $/.exec(marker);
+  if (numMatch) {
+    return parseInt(numMatch[1]!, 10) + 1 + '. ';
+  }
+  // Unordered marker unchanged
+  return marker;
 }
 
 export const editorStore = createStore<EditorState>((set, get) => ({
@@ -196,6 +229,8 @@ export const editorStore = createStore<EditorState>((set, get) => ({
       const newRow = cursor.row - 1;
       const col = Math.min(goalCol, lines[newRow]!.length);
       set({ cursor: { row: newRow, col } });
+    } else {
+      set({ cursor: { row: 0, col: 0 }, goalCol: 0 });
     }
   },
 
@@ -205,6 +240,9 @@ export const editorStore = createStore<EditorState>((set, get) => ({
       const newRow = cursor.row + 1;
       const col = Math.min(goalCol, lines[newRow]!.length);
       set({ cursor: { row: newRow, col } });
+    } else {
+      const col = lines[cursor.row]!.length;
+      set({ cursor: { row: cursor.row, col }, goalCol: col });
     }
   },
 
@@ -269,6 +307,41 @@ export const editorStore = createStore<EditorState>((set, get) => ({
     const line = lines[cursor.row]!;
     const before = line.slice(0, cursor.col);
     const after = line.slice(cursor.col);
+
+    // List continuation: only when cursor is at end of line
+    if (cursor.col === line.length) {
+      const listMatch = parseListMarker(line);
+      if (listMatch) {
+        const { indent, marker, content } = listMatch;
+        // Empty list item (marker only, no content) — clear the marker in place
+        if (content === '') {
+          const newLines = [...lines];
+          newLines[cursor.row] = '';
+          set({
+            lines: newLines,
+            cursor: { row: cursor.row, col: 0 },
+            undoStack: newUndo,
+            redoStack: [],
+            dirty: true,
+          });
+          return;
+        }
+        // Continue with same marker
+        const newMarker = nextMarker(marker);
+        const prefix = indent + newMarker;
+        const newLines = [...lines];
+        newLines.splice(cursor.row, 1, before, prefix + after);
+        set({
+          lines: newLines,
+          cursor: { row: cursor.row + 1, col: prefix.length },
+          undoStack: newUndo,
+          redoStack: [],
+          dirty: true,
+        });
+        return;
+      }
+    }
+
     const newLines = [...lines];
     newLines.splice(cursor.row, 1, before, after);
     set({
@@ -353,62 +426,39 @@ export const editorStore = createStore<EditorState>((set, get) => ({
     // else: end of document, do nothing
   },
 
-  killToEnd: () => {
+  killLine: () => {
     const { lines, cursor, undoStack } = get();
-    const line = lines[cursor.row]!;
-    if (cursor.col < line.length) {
-      // Kill from cursor to end of line
-      const killed = line.slice(cursor.col);
-      const newUndo = [
-        ...undoStack.slice(-(MAX_UNDO - 1)),
-        { lines: [...lines], cursor: { ...cursor } },
-      ];
-      const newLines = [...lines];
-      newLines[cursor.row] = line.slice(0, cursor.col);
-      set({
-        lines: newLines,
-        undoStack: newUndo,
-        redoStack: [],
-        killBuffer: killed,
-        dirty: true,
-      });
-    } else if (cursor.row < lines.length - 1) {
-      // At end of line: join with next line, store newline in kill buffer
-      const newUndo = [
-        ...undoStack.slice(-(MAX_UNDO - 1)),
-        { lines: [...lines], cursor: { ...cursor } },
-      ];
-      const newLines = [...lines];
-      newLines[cursor.row] = line + newLines[cursor.row + 1]!;
-      newLines.splice(cursor.row + 1, 1);
-      set({
-        lines: newLines,
-        undoStack: newUndo,
-        redoStack: [],
-        killBuffer: '\n',
-        dirty: true,
-      });
-    }
-  },
-
-  killToStart: () => {
-    const { lines, cursor, undoStack } = get();
-    const line = lines[cursor.row]!;
-    const killed = line.slice(0, cursor.col);
+    const killed = lines[cursor.row]!;
     const newUndo = [
       ...undoStack.slice(-(MAX_UNDO - 1)),
       { lines: [...lines], cursor: { ...cursor } },
     ];
     const newLines = [...lines];
-    newLines[cursor.row] = line.slice(cursor.col);
-    set({
-      lines: newLines,
-      cursor: { row: cursor.row, col: 0 },
-      undoStack: newUndo,
-      redoStack: [],
-      killBuffer: killed,
-      dirty: true,
-    });
+    if (lines.length === 1) {
+      // Single line: clear it but keep the empty line
+      newLines[0] = '';
+      set({
+        lines: newLines,
+        cursor: { row: 0, col: 0 },
+        undoStack: newUndo,
+        redoStack: [],
+        killBuffer: killed,
+        dirty: true,
+      });
+    } else {
+      // Multiple lines: remove the line entirely
+      newLines.splice(cursor.row, 1);
+      const newRow = Math.min(cursor.row, newLines.length - 1);
+      const newCol = Math.min(cursor.col, newLines[newRow]!.length);
+      set({
+        lines: newLines,
+        cursor: { row: newRow, col: newCol },
+        undoStack: newUndo,
+        redoStack: [],
+        killBuffer: killed,
+        dirty: true,
+      });
+    }
   },
 
   deleteWordBack: () => {
@@ -500,6 +550,22 @@ export const editorStore = createStore<EditorState>((set, get) => ({
       redoStack: [],
       dirty: true,
     });
+  },
+
+  pageUp: (viewportHeight: number) => {
+    const { cursor, lines, goalCol } = get();
+    const jump = Math.max(1, Math.floor(viewportHeight / 2));
+    const newRow = Math.max(0, cursor.row - jump);
+    const col = Math.min(goalCol, lines[newRow]!.length);
+    set({ cursor: { row: newRow, col } });
+  },
+
+  pageDown: (viewportHeight: number) => {
+    const { cursor, lines, goalCol } = get();
+    const jump = Math.max(1, Math.floor(viewportHeight / 2));
+    const newRow = Math.min(lines.length - 1, cursor.row + jump);
+    const col = Math.min(goalCol, lines[newRow]!.length);
+    set({ cursor: { row: newRow, col } });
   },
 
   undo: () => {

@@ -157,7 +157,9 @@ export function WorkItemForm() {
   const [children, setChildren] = useState<WorkItem[]>([]);
   const [dependents, setDependents] = useState<WorkItem[]>([]);
   const [parentItem, setParentItem] = useState<WorkItem | null>(null);
-  const [itemLoading, setItemLoading] = useState(selectedWorkItemId !== null);
+  const itemLoading = useBackendDataStore((s) => s.itemLoading);
+  const setItemLoading = (v: boolean) =>
+    backendDataStore.setState({ itemLoading: v });
 
   useEffect(() => {
     if (selectedWorkItemId === null) {
@@ -201,6 +203,7 @@ export function WorkItemForm() {
     })().catch(() => {});
     return () => {
       cancelled = true;
+      setItemLoading(false);
     };
   }, [selectedWorkItemId, backend, capabilities.relationships]);
 
@@ -352,6 +355,9 @@ export function WorkItemForm() {
   useEffect(() => {
     if (!existingItem) return;
     setComments(existingItem.comments ?? []);
+
+    // Don't overwrite fields if the user has already made edits (e.g. via editor)
+    if (formStackStore.getState().isDirty()) return;
 
     // Build field values
     const parentIdValue =
@@ -1492,18 +1498,6 @@ export function WorkItemForm() {
     cursor: focusedField,
     chromeLines,
   });
-
-  // Show placeholder when item is still loading
-  if (itemLoading) {
-    return (
-      <Box flexDirection="column">
-        <Box marginBottom={1}>
-          <Text bold>Loading item...</Text>
-        </Box>
-        <Text dimColor={mutedDim}>esc back ? help</Text>
-      </Box>
-    );
-  }
 
   const mode =
     formMode === 'template'

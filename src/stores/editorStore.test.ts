@@ -71,6 +71,114 @@ describe('editorStore', () => {
       expect(s.lines).toEqual(['hello', ' world']);
       expect(s.cursor).toEqual({ row: 1, col: 0 });
     });
+
+    it('continues "- " list marker at end of line', () => {
+      editorStore.getState().init('- item one');
+      editorStore.getState().moveCursorTo(0, 10);
+      editorStore.getState().insertNewline();
+      const s = editorStore.getState();
+      expect(s.lines).toEqual(['- item one', '- ']);
+      expect(s.cursor).toEqual({ row: 1, col: 2 });
+    });
+
+    it('continues "* " list marker at end of line', () => {
+      editorStore.getState().init('* item one');
+      editorStore.getState().moveCursorTo(0, 10);
+      editorStore.getState().insertNewline();
+      const s = editorStore.getState();
+      expect(s.lines).toEqual(['* item one', '* ']);
+      expect(s.cursor).toEqual({ row: 1, col: 2 });
+    });
+
+    it('continues "+ " list marker at end of line', () => {
+      editorStore.getState().init('+ item one');
+      editorStore.getState().moveCursorTo(0, 10);
+      editorStore.getState().insertNewline();
+      const s = editorStore.getState();
+      expect(s.lines).toEqual(['+ item one', '+ ']);
+      expect(s.cursor).toEqual({ row: 1, col: 2 });
+    });
+
+    it('continues numbered list marker at end of line', () => {
+      editorStore.getState().init('1. first item');
+      editorStore.getState().moveCursorTo(0, 13);
+      editorStore.getState().insertNewline();
+      const s = editorStore.getState();
+      expect(s.lines).toEqual(['1. first item', '2. ']);
+      expect(s.cursor).toEqual({ row: 1, col: 3 });
+    });
+
+    it('increments multi-digit numbered list', () => {
+      editorStore.getState().init('99. item');
+      editorStore.getState().moveCursorTo(0, 8);
+      editorStore.getState().insertNewline();
+      const s = editorStore.getState();
+      expect(s.lines).toEqual(['99. item', '100. ']);
+      expect(s.cursor).toEqual({ row: 1, col: 5 });
+    });
+
+    it('continues "- [ ] " todo marker at end of line', () => {
+      editorStore.getState().init('- [ ] todo item');
+      editorStore.getState().moveCursorTo(0, 15);
+      editorStore.getState().insertNewline();
+      const s = editorStore.getState();
+      expect(s.lines).toEqual(['- [ ] todo item', '- [ ] ']);
+      expect(s.cursor).toEqual({ row: 1, col: 6 });
+    });
+
+    it('continues checked "- [x] " as unchecked on new line', () => {
+      editorStore.getState().init('- [x] done item');
+      editorStore.getState().moveCursorTo(0, 15);
+      editorStore.getState().insertNewline();
+      const s = editorStore.getState();
+      expect(s.lines).toEqual(['- [x] done item', '- [ ] ']);
+      expect(s.cursor).toEqual({ row: 1, col: 6 });
+    });
+
+    it('preserves indentation with list marker', () => {
+      editorStore.getState().init('  - nested item');
+      editorStore.getState().moveCursorTo(0, 15);
+      editorStore.getState().insertNewline();
+      const s = editorStore.getState();
+      expect(s.lines).toEqual(['  - nested item', '  - ']);
+      expect(s.cursor).toEqual({ row: 1, col: 4 });
+    });
+
+    it('preserves indentation with numbered list', () => {
+      editorStore.getState().init('    1. deep item');
+      editorStore.getState().moveCursorTo(0, 16);
+      editorStore.getState().insertNewline();
+      const s = editorStore.getState();
+      expect(s.lines).toEqual(['    1. deep item', '    2. ']);
+      expect(s.cursor).toEqual({ row: 1, col: 7 });
+    });
+
+    it('removes marker when pressing enter on empty list item', () => {
+      editorStore.getState().init('- item\n- ');
+      editorStore.getState().moveCursorTo(1, 2);
+      editorStore.getState().insertNewline();
+      const s = editorStore.getState();
+      expect(s.lines).toEqual(['- item', '']);
+      expect(s.cursor).toEqual({ row: 1, col: 0 });
+    });
+
+    it('removes marker when pressing enter on empty todo item', () => {
+      editorStore.getState().init('- [ ] item\n- [ ] ');
+      editorStore.getState().moveCursorTo(1, 6);
+      editorStore.getState().insertNewline();
+      const s = editorStore.getState();
+      expect(s.lines).toEqual(['- [ ] item', '']);
+      expect(s.cursor).toEqual({ row: 1, col: 0 });
+    });
+
+    it('does not continue list when cursor is in the middle of line', () => {
+      editorStore.getState().init('- item one');
+      editorStore.getState().moveCursorTo(0, 5);
+      editorStore.getState().insertNewline();
+      const s = editorStore.getState();
+      expect(s.lines).toEqual(['- ite', 'm one']);
+      expect(s.cursor).toEqual({ row: 1, col: 0 });
+    });
   });
 
   describe('deleteBefore (backspace)', () => {
@@ -174,16 +282,18 @@ describe('editorStore', () => {
       expect(editorStore.getState().cursor).toEqual({ row: 2, col: 8 });
     });
 
-    it('moveUp does nothing at first line', () => {
+    it('moveUp on first line jumps to start of line', () => {
       editorStore.getState().init('abc');
+      editorStore.getState().moveCursorTo(0, 2);
       editorStore.getState().moveUp();
-      expect(editorStore.getState().cursor.row).toBe(0);
+      expect(editorStore.getState().cursor).toEqual({ row: 0, col: 0 });
     });
 
-    it('moveDown does nothing at last line', () => {
+    it('moveDown on last line jumps to end of line', () => {
       editorStore.getState().init('abc');
+      editorStore.getState().moveCursorTo(0, 0);
       editorStore.getState().moveDown();
-      expect(editorStore.getState().cursor.row).toBe(0);
+      expect(editorStore.getState().cursor).toEqual({ row: 0, col: 3 });
     });
 
     it('moveToLineStart sets col to 0', () => {
@@ -222,28 +332,30 @@ describe('editorStore', () => {
   });
 
   describe('kill/yank', () => {
-    it('killToEnd removes from cursor to end of line', () => {
-      editorStore.getState().init('hello world');
-      editorStore.getState().moveCursorTo(0, 5);
-      editorStore.getState().killToEnd();
-      expect(editorStore.getState().lines).toEqual(['hello']);
-      expect(editorStore.getState().killBuffer).toBe(' world');
+    it('killLine removes entire line and stores in killBuffer', () => {
+      editorStore.getState().init('hello\nworld\nfoo');
+      editorStore.getState().moveCursorTo(1, 3);
+      editorStore.getState().killLine();
+      expect(editorStore.getState().lines).toEqual(['hello', 'foo']);
+      expect(editorStore.getState().killBuffer).toBe('world');
+      expect(editorStore.getState().cursor.row).toBe(1);
     });
 
-    it('killToEnd at end of line joins with next and stores newline in killBuffer', () => {
+    it('killLine on single line clears it but keeps empty line', () => {
+      editorStore.getState().init('hello');
+      editorStore.getState().moveCursorTo(0, 3);
+      editorStore.getState().killLine();
+      expect(editorStore.getState().lines).toEqual(['']);
+      expect(editorStore.getState().killBuffer).toBe('hello');
+      expect(editorStore.getState().cursor).toEqual({ row: 0, col: 0 });
+    });
+
+    it('killLine on last line moves cursor up', () => {
       editorStore.getState().init('hello\nworld');
-      editorStore.getState().moveCursorTo(0, 5);
-      editorStore.getState().killToEnd();
-      expect(editorStore.getState().lines).toEqual(['helloworld']);
-      expect(editorStore.getState().killBuffer).toBe('\n');
-    });
-
-    it('killToStart removes from start to cursor', () => {
-      editorStore.getState().init('hello world');
-      editorStore.getState().moveCursorTo(0, 5);
-      editorStore.getState().killToStart();
-      expect(editorStore.getState().lines).toEqual([' world']);
-      expect(editorStore.getState().cursor.col).toBe(0);
+      editorStore.getState().moveCursorTo(1, 3);
+      editorStore.getState().killLine();
+      expect(editorStore.getState().lines).toEqual(['hello']);
+      expect(editorStore.getState().cursor.row).toBe(0);
     });
 
     it('deleteWordBack removes previous word', () => {
@@ -255,23 +367,13 @@ describe('editorStore', () => {
     });
 
     it('yank inserts kill buffer at cursor', () => {
-      editorStore.getState().init('hello world');
-      editorStore.getState().moveCursorTo(0, 5);
-      editorStore.getState().killToEnd();
+      editorStore.getState().init('hello\nworld');
+      editorStore.getState().moveCursorTo(0, 0);
+      editorStore.getState().killLine();
+      // killed "hello", now lines = ["world"], cursor at row 0
       editorStore.getState().moveCursorTo(0, 0);
       editorStore.getState().yank();
-      expect(editorStore.getState().lines).toEqual([' worldhello']);
-    });
-
-    it('yank newline from killBuffer splits line', () => {
-      editorStore.getState().init('hello\nworld');
-      editorStore.getState().moveCursorTo(0, 5);
-      editorStore.getState().killToEnd(); // joins lines, killBuffer = '\n'
       expect(editorStore.getState().lines).toEqual(['helloworld']);
-      editorStore.getState().moveCursorTo(0, 5);
-      editorStore.getState().yank(); // yank '\n' → split line
-      expect(editorStore.getState().lines).toEqual(['hello', 'world']);
-      expect(editorStore.getState().cursor).toEqual({ row: 1, col: 0 });
     });
 
     it('insertTab inserts two spaces', () => {
@@ -280,6 +382,43 @@ describe('editorStore', () => {
       editorStore.getState().insertTab();
       expect(editorStore.getState().lines).toEqual(['  hello']);
       expect(editorStore.getState().cursor.col).toBe(2);
+    });
+  });
+
+  describe('page navigation', () => {
+    it('pageDown jumps half viewport down', () => {
+      editorStore.getState().init('a\nb\nc\nd\ne\nf\ng\nh\ni\nj');
+      editorStore.getState().moveCursorTo(0, 0);
+      editorStore.getState().pageDown(10); // jump = 5
+      expect(editorStore.getState().cursor.row).toBe(5);
+    });
+
+    it('pageUp jumps half viewport up', () => {
+      editorStore.getState().init('a\nb\nc\nd\ne\nf\ng\nh\ni\nj');
+      editorStore.getState().moveCursorTo(8, 0);
+      editorStore.getState().pageUp(10); // jump = 5
+      expect(editorStore.getState().cursor.row).toBe(3);
+    });
+
+    it('pageDown clamps to last line', () => {
+      editorStore.getState().init('a\nb\nc');
+      editorStore.getState().moveCursorTo(1, 0);
+      editorStore.getState().pageDown(10); // jump = 5, but only 3 lines
+      expect(editorStore.getState().cursor.row).toBe(2);
+    });
+
+    it('pageUp clamps to first line', () => {
+      editorStore.getState().init('a\nb\nc');
+      editorStore.getState().moveCursorTo(1, 0);
+      editorStore.getState().pageUp(10); // jump = 5
+      expect(editorStore.getState().cursor.row).toBe(0);
+    });
+
+    it('pageDown preserves goalCol', () => {
+      editorStore.getState().init('long line\na\nb\nc\nd\nanother long');
+      editorStore.getState().moveCursorTo(0, 8); // goalCol = 8
+      editorStore.getState().pageDown(4); // jump = 2, row 2 "b" len=1
+      expect(editorStore.getState().cursor).toEqual({ row: 2, col: 1 });
     });
   });
 

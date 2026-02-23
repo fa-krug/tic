@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { tokenize, splitTokensAtCol } from './markdownHighlight.js';
+import {
+  tokenize,
+  splitTokensAtCol,
+  computeLineContexts,
+} from './markdownHighlight.js';
 
 describe('tokenize', () => {
   it('returns plain text for no markdown', () => {
@@ -89,6 +93,85 @@ describe('tokenize', () => {
     expect(tokens.length).toBe(4);
     expect(tokens[1]!.type).toBe('bold');
     expect(tokens[3]!.type).toBe('code');
+  });
+
+  it('highlights code fence line', () => {
+    const tokens = tokenize('```js', 'code-fence');
+    expect(tokens).toEqual([{ type: 'code-fence', text: '```js' }]);
+  });
+
+  it('highlights code block content as code-block', () => {
+    const tokens = tokenize('const x = 1;', 'code-block');
+    expect(tokens).toEqual([{ type: 'code-block', text: 'const x = 1;' }]);
+  });
+
+  it('does not parse inline markdown inside code block', () => {
+    const tokens = tokenize('**not bold** and `not code`', 'code-block');
+    expect(tokens).toEqual([
+      { type: 'code-block', text: '**not bold** and `not code`' },
+    ]);
+  });
+});
+
+describe('computeLineContexts', () => {
+  it('returns normal for non-code-block lines', () => {
+    const contexts = computeLineContexts(['hello', 'world']);
+    expect(contexts).toEqual(['normal', 'normal']);
+  });
+
+  it('marks fenced code block lines correctly', () => {
+    const lines = ['before', '```', 'code here', '```', 'after'];
+    const contexts = computeLineContexts(lines);
+    expect(contexts).toEqual([
+      'normal',
+      'code-fence',
+      'code-block',
+      'code-fence',
+      'normal',
+    ]);
+  });
+
+  it('handles code fence with language specifier', () => {
+    const lines = ['```typescript', 'const x = 1;', '```'];
+    const contexts = computeLineContexts(lines);
+    expect(contexts).toEqual(['code-fence', 'code-block', 'code-fence']);
+  });
+
+  it('handles unclosed code block (extends to end)', () => {
+    const lines = ['text', '```', 'code', 'more code'];
+    const contexts = computeLineContexts(lines);
+    expect(contexts).toEqual([
+      'normal',
+      'code-fence',
+      'code-block',
+      'code-block',
+    ]);
+  });
+
+  it('handles multiple code blocks', () => {
+    const lines = ['```', 'a', '```', 'between', '```', 'b', '```'];
+    const contexts = computeLineContexts(lines);
+    expect(contexts).toEqual([
+      'code-fence',
+      'code-block',
+      'code-fence',
+      'normal',
+      'code-fence',
+      'code-block',
+      'code-fence',
+    ]);
+  });
+
+  it('handles indented code fences', () => {
+    const lines = ['  ```', '  code', '  ```'];
+    const contexts = computeLineContexts(lines);
+    expect(contexts).toEqual(['code-fence', 'code-block', 'code-fence']);
+  });
+
+  it('handles empty code block', () => {
+    const lines = ['```', '```'];
+    const contexts = computeLineContexts(lines);
+    expect(contexts).toEqual(['code-fence', 'code-fence']);
   });
 });
 
