@@ -2,3 +2,4 @@ dist/
 node_modules/
 .worktrees/
 .tic/
+**/.DS_Store
