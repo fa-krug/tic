@@ -146,7 +146,8 @@ describe('gitlab auth', () => {
     it('completes the full device flow successfully', async () => {
       const fetchMock = mockFetchResponses(
         { json: mockDeviceCodeResponse },
-        { json: { error: 'authorization_pending' } },
+        // GitLab returns authorization_pending as HTTP 400 per RFC 8628
+        { ok: false, status: 400, json: { error: 'authorization_pending' } },
         { json: mockTokenSuccess },
       );
 
@@ -247,7 +248,7 @@ describe('gitlab auth', () => {
     it('throws on access_denied', async () => {
       mockFetchResponses(
         { json: mockDeviceCodeResponse },
-        { json: { error: 'access_denied' } },
+        { ok: false, status: 400, json: { error: 'access_denied' } },
       );
 
       const promise = authenticateGitLab();
@@ -261,7 +262,7 @@ describe('gitlab auth', () => {
     it('throws on expired_token', async () => {
       mockFetchResponses(
         { json: mockDeviceCodeResponse },
-        { json: { error: 'expired_token' } },
+        { ok: false, status: 400, json: { error: 'expired_token' } },
       );
 
       const promise = authenticateGitLab();
@@ -275,7 +276,8 @@ describe('gitlab auth', () => {
     it('increases polling interval on slow_down', async () => {
       const fetchMock = mockFetchResponses(
         { json: mockDeviceCodeResponse },
-        { json: { error: 'slow_down' } },
+        // GitLab returns slow_down as HTTP 400 per RFC 8628
+        { ok: false, status: 400, json: { error: 'slow_down' } },
         { json: mockTokenSuccess },
       );
 
@@ -310,15 +312,27 @@ describe('gitlab auth', () => {
       );
     });
 
-    it('throws when token poll request fails', async () => {
-      mockFetchResponses(
-        { json: mockDeviceCodeResponse },
-        { ok: false, status: 500, json: {} },
-      );
+    it('throws when token poll response is not parseable JSON', async () => {
+      const fetchMock = vi.fn();
+      // Device code request succeeds
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        json: () => Promise.resolve(mockDeviceCodeResponse),
+      });
+      // Token poll returns non-JSON error
+      fetchMock.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error',
+        json: () => Promise.reject(new Error('not json')),
+      });
+      vi.stubGlobal('fetch', fetchMock);
 
       const promise = authenticateGitLab();
       const rejection = expect(promise).rejects.toThrow(
-        'Failed to poll for token',
+        'Failed to poll for token: 500 Internal Server Error',
       );
       await vi.advanceTimersByTimeAsync(5000);
       await rejection;
@@ -328,6 +342,8 @@ describe('gitlab auth', () => {
       mockFetchResponses(
         { json: mockDeviceCodeResponse },
         {
+          ok: false,
+          status: 400,
           json: {
             error: 'some_unknown_error',
             error_description: 'Something went wrong',

@@ -173,13 +173,16 @@ export async function authenticateGitLab(
       clearTimeout(tokenTimeout);
     }
 
-    if (!tokenResponse.ok) {
+    // RFC 8628: authorization_pending and slow_down are returned as HTTP 400
+    // with a JSON error body. We must parse the body before deciding to throw.
+    let data: TokenPollResponse;
+    try {
+      data = (await tokenResponse.json()) as TokenPollResponse;
+    } catch {
       throw new Error(
         `Failed to poll for token: ${tokenResponse.status} ${tokenResponse.statusText}`,
       );
     }
-
-    const data = (await tokenResponse.json()) as TokenPollResponse;
 
     if (isTokenError(data)) {
       switch (data.error) {
