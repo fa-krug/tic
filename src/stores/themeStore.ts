@@ -91,7 +91,7 @@ const defaultDefaults: FieldDefaults = {
   priority: [
     { patterns: ['critical'], color: { bg: 'red', fg: 'white' } },
     { patterns: ['high'], color: { bg: 'yellow', fg: 'black' } },
-    { patterns: ['medium'], color: { bg: 'cyan', fg: 'black' } },
+    { patterns: ['medium'], color: { bg: 'blue', fg: 'white' } },
     { patterns: ['low'], color: { bg: 'gray', fg: 'white' } },
   ],
   type: [
@@ -123,7 +123,7 @@ const highContrastDefaults: FieldDefaults = {
   priority: [
     { patterns: ['critical'], color: { bg: 'redBright', fg: 'white' } },
     { patterns: ['high'], color: { bg: 'yellowBright', fg: 'black' } },
-    { patterns: ['medium'], color: { bg: 'cyanBright', fg: 'white' } },
+    { patterns: ['medium'], color: { bg: 'blueBright', fg: 'white' } },
     { patterns: ['low'], color: { bg: 'grayBright', fg: 'white' } },
   ],
   type: [

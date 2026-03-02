@@ -46,6 +46,13 @@ describe('themeStore resolveFieldColor', () => {
       expect(result).toEqual({ bg: 'red', fg: 'white' });
     });
 
+    it('returns blue for "medium" priority', () => {
+      const result = themeStore
+        .getState()
+        .resolveFieldColor('priority', 'medium');
+      expect(result).toEqual({ bg: 'blue', fg: 'white' });
+    });
+
     it('returns null for unmatched value', () => {
       const result = themeStore
         .getState()
