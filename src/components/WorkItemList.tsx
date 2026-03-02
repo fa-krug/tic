@@ -55,7 +55,6 @@ const EMPTY_VIEWS: SavedView[] = [];
 function buildWorkItemColumns(
   capabilities: BackendCapabilities,
   collapsedIds: Set<string>,
-  _accent: string,
   selectionFg: string,
 ): ColumnDef<TreeItem>[] {
   const columns: ColumnDef<TreeItem>[] = [];
@@ -1416,12 +1415,11 @@ export function WorkItemList() {
     const cols = buildWorkItemColumns(
       capabilities,
       collapsedIds,
-      accent,
       autoFg(selectionBg),
     );
     cols[0]!.width = maxIdLen + 2;
     return cols;
-  }, [visibleTreeItems, capabilities, collapsedIds, accent, selectionBg]);
+  }, [visibleTreeItems, capabilities, collapsedIds, selectionBg]);
 
   const positionText =
     treeItems.length > viewport.maxVisible
