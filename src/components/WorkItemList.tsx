@@ -260,6 +260,7 @@ export function WorkItemList() {
     statuses,
     assignees,
     labels: labelSuggestions,
+    iterations,
   } = useBackendDataStore(
     useShallow((s) => ({
       items: s.items,
@@ -267,11 +268,12 @@ export function WorkItemList() {
       statuses: s.statuses,
       assignees: s.assignees,
       labels: s.labels,
+      iterations: s.iterations,
     })),
   );
 
   // Changes independently (individual selectors)
-  const iteration = useBackendDataStore((s) => s.currentIteration);
+  const currentIteration = useBackendDataStore((s) => s.currentIteration);
   const loading = useBackendDataStore((s) => s.loading);
   const initError = useBackendDataStore((s) => s.error);
 
@@ -702,8 +704,23 @@ export function WorkItemList() {
       }
 
       if (matchesCommand('quit', input, key)) exit();
-      if (matchesCommand('iterations', input, key) && capabilities.iterations)
-        navigate('iteration-picker');
+      if (
+        matchesCommand('set-iteration', input, key) &&
+        capabilities.iterations &&
+        treeItems.length > 0
+      ) {
+        const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+        if (targetIds.length > 0) {
+          openOverlay({ type: 'iteration-picker', targetIds });
+        }
+      }
+
+      if (
+        matchesCommand('switch-iteration', input, key) &&
+        capabilities.iterations
+      ) {
+        openOverlay({ type: 'iteration-switch' });
+      }
       if (matchesCommand('list-pr-list', input, key)) {
         navigate('pr-list');
         return;
@@ -1277,8 +1294,16 @@ export function WorkItemList() {
             });
         }
         break;
-      case 'iterations':
-        navigate('iteration-picker');
+      case 'set-iteration':
+        if (treeItems.length > 0) {
+          const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+          if (targetIds.length > 0) {
+            openOverlay({ type: 'iteration-picker', targetIds });
+          }
+        }
+        break;
+      case 'switch-iteration':
+        openOverlay({ type: 'iteration-switch' });
         break;
       case 'settings':
         navigate('settings');
@@ -1375,7 +1400,7 @@ export function WorkItemList() {
         openOverlay({ type: 'status-picker', targetIds });
         break;
       case 'iteration':
-        navigate('iteration-picker');
+        openOverlay({ type: 'iteration-picker', targetIds });
         break;
       case 'parent':
         openOverlay({ type: 'parent-input', targetIds });
@@ -1431,7 +1456,7 @@ export function WorkItemList() {
       <Box marginBottom={1}>
         <Text wrap="truncate">
           <Text bold color={accent}>
-            {typeLabel} — {iteration}
+            {typeLabel} — {currentIteration}
           </Text>
           <Text
             dimColor={mutedDim}
@@ -1522,7 +1547,7 @@ export function WorkItemList() {
                 id: 'iteration',
                 label: 'Set iteration',
                 value: 'iteration',
-                hint: 'i',
+                hint: 'j',
               });
             }
             if (capabilities.fields.parent) {
@@ -2127,6 +2152,65 @@ export function WorkItemList() {
               }
               closeOverlay();
               setToast(`View "${item.value}" deleted`);
+            }}
+            onCancel={() => closeOverlay()}
+          />
+        ) : activeOverlay?.type === 'iteration-picker' ? (
+          <OverlayPanel
+            title="Set Iteration"
+            items={iterations.map((it) => ({ id: it, label: it, value: it }))}
+            onSelect={(item) => {
+              const targetIds = getOverlayTargetIds();
+              closeOverlay();
+              if (!backend) return;
+              void (async () => {
+                pushUpdateUndo(targetIds, 'iteration change');
+                for (const id of targetIds) {
+                  await backend.cachedUpdateWorkItem(id, {
+                    iteration: item.value,
+                  });
+                  await queueWrite('update', id);
+                }
+                for (const id of targetIds) {
+                  await backendDataStore.getState().reloadItem(id);
+                }
+                setToast(
+                  targetIds.length === 1
+                    ? 'Iteration updated — press u to undo'
+                    : `${targetIds.length} items updated — press u to undo`,
+                );
+              })().catch((err: unknown) => {
+                uiStore
+                  .getState()
+                  .setToast(
+                    err instanceof Error ? err.message : 'Update failed',
+                  );
+              });
+            }}
+            onCancel={() => closeOverlay()}
+          />
+        ) : activeOverlay?.type === 'iteration-switch' ? (
+          <OverlayPanel
+            title="Switch Iteration"
+            items={iterations.map((it) => ({
+              id: it,
+              label: it === currentIteration ? `${it} (current)` : it,
+              value: it,
+            }))}
+            onSelect={(item) => {
+              closeOverlay();
+              if (!backend) return;
+              void (async () => {
+                await backend.setCurrentIteration(item.value);
+                await backendDataStore.getState().refresh();
+                setToast(`Switched to iteration: ${item.value}`);
+              })().catch((err: unknown) => {
+                uiStore
+                  .getState()
+                  .setToast(
+                    err instanceof Error ? err.message : 'Switch failed',
+                  );
+              });
             }}
             onCancel={() => closeOverlay()}
           />
