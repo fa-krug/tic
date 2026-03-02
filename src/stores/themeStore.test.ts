@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { themeStore, autoFg } from './themeStore.js';
+import { themeStore, autoFg, themes } from './themeStore.js';
 
 describe('themeStore resolveFieldColor', () => {
   beforeEach(() => {
@@ -140,5 +140,21 @@ describe('autoFg', () => {
     expect(autoFg('blue')).toBe('white');
     expect(autoFg('green')).toBe('white');
     expect(autoFg('magenta')).toBe('white');
+  });
+});
+
+describe('selection theme colors', () => {
+  it('default theme has selectionBg', () => {
+    themeStore.setState({ themeName: 'default', colorOverrides: {} });
+    expect(themeStore.getState().colors.selectionBg).toBe('cyanBright');
+  });
+
+  it('default theme has selectedMarkedBg', () => {
+    themeStore.setState({ themeName: 'default', colorOverrides: {} });
+    expect(themeStore.getState().colors.selectedMarkedBg).toBe('magentaBright');
+  });
+
+  it('high-contrast theme has selectionBg', () => {
+    expect(themes['high-contrast']!.selectionBg).toBe('whiteBright');
   });
 });

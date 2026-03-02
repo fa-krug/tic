@@ -13,6 +13,8 @@ export interface ThemeColors {
   info: string;
   border: string;
   marked: string;
+  selectionBg: string;
+  selectedMarkedBg: string;
 }
 
 export interface ThemeDefinition {
@@ -38,6 +40,8 @@ const defaultTheme: ThemeColors = {
   info: 'cyan',
   border: 'gray',
   marked: 'magenta',
+  selectionBg: 'cyanBright',
+  selectedMarkedBg: 'magentaBright',
 };
 
 const highContrastTheme: ThemeColors = {
@@ -51,6 +55,8 @@ const highContrastTheme: ThemeColors = {
   info: 'white',
   border: 'white',
   marked: 'white',
+  selectionBg: 'whiteBright',
+  selectedMarkedBg: 'whiteBright',
 };
 
 export const themes: Record<string, ThemeColors> = {
