@@ -127,11 +127,24 @@ const commands: Command[] = [
   },
   // Navigation
   {
-    id: 'iterations',
-    label: 'Go to iterations',
+    id: 'set-iteration',
+    label: 'Set iteration',
+    category: 'Actions',
+    shortcut: 'j',
+    keys: ['j'],
+    screen: 'list',
+    helpGroup: 'Actions',
+    when: (ctx) =>
+      ctx.screen === 'list' &&
+      ctx.capabilities.iterations &&
+      (ctx.hasSelectedItem || ctx.markedCount > 0),
+  },
+  {
+    id: 'switch-iteration',
+    label: 'Switch iteration',
     category: 'Navigation',
-    shortcut: 'i',
-    keys: ['i'],
+    shortcut: 'J',
+    keys: ['J'],
     screen: 'list',
     helpGroup: 'Switching',
     when: (ctx) => ctx.screen === 'list' && ctx.capabilities.iterations,
