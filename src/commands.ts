@@ -465,14 +465,11 @@ const commands: Command[] = [
     category: 'Navigation',
     shortcut: 'esc',
     keys: [{ special: 'escape' }],
-    screen: ['pr-list', 'branch-list', 'iteration-picker'],
+    screen: ['pr-list', 'branch-list'],
     helpGroup: 'Navigation',
     footer: true,
     footerLabel: 'back',
-    when: (ctx) =>
-      ctx.screen === 'pr-list' ||
-      ctx.screen === 'branch-list' ||
-      ctx.screen === 'iteration-picker',
+    when: (ctx) => ctx.screen === 'pr-list' || ctx.screen === 'branch-list',
   },
   // Branch list actions
   {
@@ -692,25 +689,6 @@ const commands: Command[] = [
     keys: [{ special: 'escape' }],
     screen: 'form',
     helpGroup: 'Save & Exit',
-  },
-  // Iteration picker commands
-  {
-    id: 'iter-navigate',
-    label: 'Navigate iterations',
-    category: 'Navigation',
-    shortcut: '↑/↓',
-    keys: [{ special: 'upArrow' }, { special: 'downArrow' }],
-    screen: 'iteration-picker',
-    helpGroup: 'Navigation',
-  },
-  {
-    id: 'iter-select',
-    label: 'Select iteration',
-    category: 'Actions',
-    shortcut: 'enter',
-    keys: [{ special: 'return' }],
-    screen: 'iteration-picker',
-    helpGroup: 'Navigation',
   },
   // Settings commands
   {

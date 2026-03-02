@@ -92,19 +92,6 @@ describe('getShortcuts', () => {
     expect(allKeys).toContain('esc');
   });
 
-  it('returns iteration-picker shortcuts', () => {
-    const groups = getShortcuts(
-      'iteration-picker',
-      fullCapabilities,
-      false,
-      false,
-    );
-    expect(groups.length).toBeGreaterThan(0);
-    const allKeys = groups.flatMap((g) => g.shortcuts.map((s) => s.key));
-    expect(allKeys).toContain('\u2191/\u2193');
-    expect(allKeys).toContain('enter');
-  });
-
   it('returns settings shortcuts', () => {
     const groups = getShortcuts('settings', fullCapabilities, false, false);
     expect(groups.length).toBeGreaterThan(0);
