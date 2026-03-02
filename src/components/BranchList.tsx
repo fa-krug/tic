@@ -3,7 +3,7 @@ import { Box, Text, useInput } from 'ink';
 import { TableLayout } from './TableLayout.js';
 import type { ColumnDef } from './TableLayout.js';
 import type { BranchRow } from '../git.js';
-import { useThemeStore } from '../stores/themeStore.js';
+import { useThemeStore, autoFg } from '../stores/themeStore.js';
 import {
   navigationStore,
   useNavigationStore,
@@ -54,6 +54,7 @@ function buildBranchColumns(
   accent: string,
   muted: string | undefined,
   mutedDim: boolean,
+  selectionBg: string,
 ): ColumnDef<BranchRow>[] {
   return [
     {
@@ -66,7 +67,7 @@ function buildBranchColumns(
         const prefix = row.branch.current ? '* ' : '  ';
         return (
           <Text
-            color={selected ? accent : isTic ? accent : undefined}
+            color={selected ? autoFg(selectionBg) : isTic ? accent : undefined}
             bold={selected || isTic}
             wrap="truncate"
           >
@@ -134,7 +135,9 @@ function buildBranchColumns(
 }
 
 export function BranchList() {
-  const { accent, muted, mutedDim, warning } = useThemeStore((s) => s.colors);
+  const { accent, muted, mutedDim, warning, selectionBg } = useThemeStore(
+    (s) => s.colors,
+  );
   const navigate = useNavigationStore((s) => s.navigate);
   const navigateToHelp = useNavigationStore((s) => s.navigateToHelp);
   const selectedBranchName = useNavigationStore((s) => s.selectedBranchName);
@@ -144,8 +147,8 @@ export function BranchList() {
   const cwd = process.cwd();
   const termWidth = useTerminalWidth();
   const branchColumns = useMemo(
-    () => buildBranchColumns(accent, muted, mutedDim),
-    [accent, muted, mutedDim],
+    () => buildBranchColumns(accent, muted, mutedDim, selectionBg),
+    [accent, muted, mutedDim, selectionBg],
   );
 
   const [cursor, setCursor] = useState(0);

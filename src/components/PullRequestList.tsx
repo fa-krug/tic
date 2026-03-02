@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Box, Text, useInput } from 'ink';
-import { useThemeStore } from '../stores/themeStore.js';
+import { useThemeStore, autoFg } from '../stores/themeStore.js';
 import {
   navigationStore,
   useNavigationStore,
@@ -27,9 +27,9 @@ const openInBrowser = async (url: string) => {
 };
 
 function buildPrColumns(
-  accent: string,
   muted: string | undefined,
   mutedDim: boolean,
+  selectionBg: string,
 ): ColumnDef<PullRequest>[] {
   return [
     {
@@ -38,7 +38,10 @@ function buildPrColumns(
       width: 8,
       required: true,
       render: (pr, selected) => (
-        <Text color={selected ? accent : undefined} bold={selected}>
+        <Text
+          color={selected ? autoFg(selectionBg) : undefined}
+          bold={selected}
+        >
           #{pr.number}
         </Text>
       ),
@@ -50,7 +53,7 @@ function buildPrColumns(
       required: true,
       render: (pr, selected) => (
         <Text
-          color={selected ? accent : undefined}
+          color={selected ? autoFg(selectionBg) : undefined}
           bold={selected}
           wrap="truncate"
         >
@@ -86,7 +89,10 @@ function buildPrColumns(
       width: 16,
       hidePriority: 1,
       render: (pr, selected) => (
-        <Text color={selected ? accent : undefined} wrap="truncate">
+        <Text
+          color={selected ? autoFg(selectionBg) : undefined}
+          wrap="truncate"
+        >
           {pr.author}
         </Text>
       ),
@@ -106,7 +112,9 @@ function buildPrColumns(
 }
 
 export function PullRequestList() {
-  const { accent, muted, mutedDim } = useThemeStore((s) => s.colors);
+  const { accent, muted, mutedDim, selectionBg } = useThemeStore(
+    (s) => s.colors,
+  );
   const navigate = useNavigationStore((s) => s.navigate);
   const navigateToHelp = useNavigationStore((s) => s.navigateToHelp);
   const selectedPrId = useNavigationStore((s) => s.selectedPrId);
@@ -117,8 +125,8 @@ export function PullRequestList() {
   const [cursor, setCursor] = useState(0);
   const { activeOverlay, openOverlay, closeOverlay } = uiStore.getState();
   const prColumns = useMemo(
-    () => buildPrColumns(accent, muted, mutedDim),
-    [accent, muted, mutedDim],
+    () => buildPrColumns(muted, mutedDim, selectionBg),
+    [muted, mutedDim, selectionBg],
   );
 
   // Set initial cursor from navigation
