@@ -40,7 +40,7 @@ import { isSoftDeleteBackend } from '../backends/types.js';
 import type { BackendCapabilities } from '../backends/types.js';
 
 import { filterStore, useFilterStore } from '../stores/filterStore.js';
-import { useThemeStore } from '../stores/themeStore.js';
+import { useThemeStore, autoFg } from '../stores/themeStore.js';
 import {
   applyFilters,
   countActiveFilters,
@@ -55,7 +55,8 @@ const EMPTY_VIEWS: SavedView[] = [];
 function buildWorkItemColumns(
   capabilities: BackendCapabilities,
   collapsedIds: Set<string>,
-  accent: string,
+  _accent: string,
+  selectionFg: string,
 ): ColumnDef<TreeItem>[] {
   const columns: ColumnDef<TreeItem>[] = [];
 
@@ -68,7 +69,7 @@ function buildWorkItemColumns(
     sortable: true,
     render: (ti, selected) => (
       <Text
-        color={selected ? accent : undefined}
+        color={selected ? selectionFg : undefined}
         bold={selected}
         dimColor={ti.isCrossType && !selected}
       >
@@ -94,7 +95,7 @@ function buildWorkItemColumns(
       const typeLabel = isCrossType ? ` (${item.type})` : '';
       return (
         <Text
-          color={selected ? accent : undefined}
+          color={selected ? selectionFg : undefined}
           bold={selected}
           dimColor={isCrossType && !selected}
           wrap="truncate"
@@ -139,7 +140,7 @@ function buildWorkItemColumns(
       hasData: (items) => items.some(({ item }) => !!item.assignee),
       render: (ti, selected) => (
         <Text
-          color={selected ? accent : undefined}
+          color={selected ? selectionFg : undefined}
           bold={selected}
           dimColor={ti.isCrossType && !selected}
           wrap="truncate"
@@ -242,6 +243,7 @@ export function WorkItemList() {
     warning: warningColor,
     marked,
     mutedDim,
+    selectionBg,
   } = useThemeStore((s) => s.colors);
 
   // Backend data store - split by change frequency for minimal re-renders
@@ -1411,10 +1413,15 @@ export function WorkItemList() {
       (max, { item }) => Math.max(max, item.id.length),
       2,
     );
-    const cols = buildWorkItemColumns(capabilities, collapsedIds, accent);
+    const cols = buildWorkItemColumns(
+      capabilities,
+      collapsedIds,
+      accent,
+      autoFg(selectionBg),
+    );
     cols[0]!.width = maxIdLen + 2;
     return cols;
-  }, [visibleTreeItems, capabilities, collapsedIds, accent]);
+  }, [visibleTreeItems, capabilities, collapsedIds, accent, selectionBg]);
 
   const positionText =
     treeItems.length > viewport.maxVisible
