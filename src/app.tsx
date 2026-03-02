@@ -18,11 +18,6 @@ const WorkItemForm = lazy(() =>
     default: m.WorkItemForm,
   })),
 );
-const IterationPicker = lazy(() =>
-  import('./components/IterationPicker.js').then((m) => ({
-    default: m.IterationPicker,
-  })),
-);
 const Settings = lazy(() =>
   import('./components/Settings.js').then((m) => ({ default: m.Settings })),
 );
@@ -88,7 +83,6 @@ export function App() {
           {screen === 'list' && <WorkItemList />}
           <Suspense fallback={null}>
             {screen === 'form' && <WorkItemForm />}
-            {screen === 'iteration-picker' && <IterationPicker />}
             {screen === 'pr-list' && <PullRequestList />}
             {screen === 'branch-list' && <BranchList />}
             {screen === 'settings' && <Settings />}

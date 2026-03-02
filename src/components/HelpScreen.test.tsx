@@ -62,7 +62,8 @@ describe('getShortcuts', () => {
     const allKeys = groups.flatMap((g) => g.shortcuts.map((s) => s.key));
     expect(allKeys).toContain('p');
     expect(allKeys).toContain('tab');
-    expect(allKeys).toContain('i');
+    expect(allKeys).toContain('j');
+    expect(allKeys).toContain('J');
     expect(allKeys).toContain('r');
     expect(allKeys).toContain('x'); // bulk actions menu (always present)
     expect(allKeys).toContain('b'); // branch/worktree (git available)
@@ -90,19 +91,6 @@ describe('getShortcuts', () => {
     expect(allKeys).toContain('\u2191/\u2193');
     expect(allKeys).toContain('enter');
     expect(allKeys).toContain('esc');
-  });
-
-  it('returns iteration-picker shortcuts', () => {
-    const groups = getShortcuts(
-      'iteration-picker',
-      fullCapabilities,
-      false,
-      false,
-    );
-    expect(groups.length).toBeGreaterThan(0);
-    const allKeys = groups.flatMap((g) => g.shortcuts.map((s) => s.key));
-    expect(allKeys).toContain('\u2191/\u2193');
-    expect(allKeys).toContain('enter');
   });
 
   it('returns settings shortcuts', () => {

@@ -127,11 +127,24 @@ const commands: Command[] = [
   },
   // Navigation
   {
-    id: 'iterations',
-    label: 'Go to iterations',
+    id: 'set-iteration',
+    label: 'Set iteration',
+    category: 'Actions',
+    shortcut: 'j',
+    keys: ['j'],
+    screen: 'list',
+    helpGroup: 'Actions',
+    when: (ctx) =>
+      ctx.screen === 'list' &&
+      ctx.capabilities.iterations &&
+      (ctx.hasSelectedItem || ctx.markedCount > 0),
+  },
+  {
+    id: 'switch-iteration',
+    label: 'Switch iteration',
     category: 'Navigation',
-    shortcut: 'i',
-    keys: ['i'],
+    shortcut: 'J',
+    keys: ['J'],
     screen: 'list',
     helpGroup: 'Switching',
     when: (ctx) => ctx.screen === 'list' && ctx.capabilities.iterations,
@@ -452,14 +465,11 @@ const commands: Command[] = [
     category: 'Navigation',
     shortcut: 'esc',
     keys: [{ special: 'escape' }],
-    screen: ['pr-list', 'branch-list', 'iteration-picker'],
+    screen: ['pr-list', 'branch-list'],
     helpGroup: 'Navigation',
     footer: true,
     footerLabel: 'back',
-    when: (ctx) =>
-      ctx.screen === 'pr-list' ||
-      ctx.screen === 'branch-list' ||
-      ctx.screen === 'iteration-picker',
+    when: (ctx) => ctx.screen === 'pr-list' || ctx.screen === 'branch-list',
   },
   // Branch list actions
   {
@@ -679,25 +689,6 @@ const commands: Command[] = [
     keys: [{ special: 'escape' }],
     screen: 'form',
     helpGroup: 'Save & Exit',
-  },
-  // Iteration picker commands
-  {
-    id: 'iter-navigate',
-    label: 'Navigate iterations',
-    category: 'Navigation',
-    shortcut: '↑/↓',
-    keys: [{ special: 'upArrow' }, { special: 'downArrow' }],
-    screen: 'iteration-picker',
-    helpGroup: 'Navigation',
-  },
-  {
-    id: 'iter-select',
-    label: 'Select iteration',
-    category: 'Actions',
-    shortcut: 'enter',
-    keys: [{ special: 'return' }],
-    screen: 'iteration-picker',
-    helpGroup: 'Navigation',
   },
   // Settings commands
   {

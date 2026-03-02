@@ -161,7 +161,9 @@ describe('getVisibleCommands', () => {
       capabilities: { ...ALL_CAPS, customTypes: false },
     });
     const commands = getVisibleCommands(ctx);
-    const switchCmds = commands.filter((c) => c.id.startsWith('switch-'));
+    const switchCmds = commands.filter(
+      (c) => c.id.startsWith('switch-') && c.id !== 'switch-iteration',
+    );
     expect(switchCmds).toHaveLength(0);
   });
 
@@ -515,14 +517,6 @@ describe('non-list screen commands', () => {
     expect(ids).not.toContain('status-retry');
   });
 
-  it('has iteration-picker commands', () => {
-    const ctx = makeContext({ screen: 'iteration-picker' });
-    const cmds = getCommandsForScreen('iteration-picker', ctx);
-    const ids = cmds.map((c) => c.id);
-    expect(ids).toContain('iter-navigate');
-    expect(ids).toContain('iter-select');
-  });
-
   it('help command appears on all screens', () => {
     for (const screen of [
       'list',
@@ -531,7 +525,6 @@ describe('non-list screen commands', () => {
       'branch-list',
       'pr-list',
       'status',
-      'iteration-picker',
     ] as const) {
       const ctx = makeContext({ screen });
       const cmds = getCommandsForScreen(screen, ctx);
@@ -579,7 +572,6 @@ describe('registry completeness', () => {
       'branch-list',
       'pr-list',
       'status',
-      'iteration-picker',
     ] as const;
     for (const screen of allScreens) {
       const ctx = makeContext({ screen });
@@ -598,7 +590,6 @@ describe('registry completeness', () => {
       'branch-list',
       'pr-list',
       'status',
-      'iteration-picker',
     ] as const;
     for (const screen of allScreens) {
       const ctx = makeContext({ screen });

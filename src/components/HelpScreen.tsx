@@ -17,7 +17,6 @@ import {
 const SCREEN_LABELS: Record<string, string> = {
   list: 'List View',
   form: 'Form View',
-  'iteration-picker': 'Iteration Picker',
   'pr-list': 'Pull Requests',
   'branch-list': 'Branches',
   settings: 'Settings',
