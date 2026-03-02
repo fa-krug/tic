@@ -38,13 +38,16 @@ describe('configStore with SQLite backing', () => {
   it('writes config to database on update', async () => {
     configStore.getState().setDatabase(db);
     await configStore.getState().init('/fake/root');
-    await configStore.getState().update({ next_id: 42 });
+    await configStore.getState().update({ current_iteration: 'sprint-5' });
     const { config } = configStore.getState();
-    expect(config.next_id).toBe(42);
+    expect(config.current_iteration).toBe('sprint-5');
 
     // Verify persistence: read directly from DB
     const dbConfig = readConfigFromDb(db);
-    expect(dbConfig.next_id).toBe(42);
+    expect(dbConfig.current_iteration).toBe('sprint-5');
+
+    // next_id must not be clobbered by config updates
+    expect(dbConfig.next_id).toBe(1);
   });
 
   it('startWatching is no-op with database', async () => {

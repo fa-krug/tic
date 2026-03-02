@@ -252,7 +252,9 @@ export function insertConfigTx(tx: TicTransaction, config: Config): void {
       set: {
         backend: config.backend,
         currentIteration: config.current_iteration,
-        nextId: config.next_id,
+        // nextId is intentionally excluded — it is managed atomically
+        // by Storage.createWorkItem() and must not be overwritten by
+        // config updates that may hold a stale value.
         branchMode: config.branchMode,
         branchCommand: config.branchCommand ?? '',
         copyToClipboard: config.copyToClipboard ?? true,

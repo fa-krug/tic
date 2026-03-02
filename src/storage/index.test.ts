@@ -6,6 +6,7 @@ import { createDatabase, type TicDatabase } from './db.js';
 import { Storage } from './index.js';
 import { isSoftDeleteBackend } from '../backends/types.js';
 import { makeNewWorkItem, makeTemplate } from '../test-helpers.js';
+import { readConfig, updateConfig } from './config.js';
 
 describe('Storage', () => {
   let db: TicDatabase;
@@ -491,6 +492,27 @@ describe('Storage', () => {
       );
       const iterations = await backend.getIterations();
       expect(iterations).toContain('new-sprint');
+    });
+
+    it('nextId is not reset by config updates', async () => {
+      // Create items to advance nextId
+      await backend.createWorkItem(makeNewWorkItem({ title: 'Item 1' }));
+      await backend.createWorkItem(makeNewWorkItem({ title: 'Item 2' }));
+      const configBefore = readConfig(db);
+      expect(configBefore.next_id).toBe(3);
+
+      // Simulate a config update (e.g., changing statuses from Settings)
+      updateConfig(db, { statuses: ['open', 'closed', 'in progress'] });
+
+      // nextId must still be 3, not reset
+      const configAfter = readConfig(db);
+      expect(configAfter.next_id).toBe(3);
+
+      // Creating another item should get ID 3, not collide
+      const item3 = await backend.createWorkItem(
+        makeNewWorkItem({ title: 'Item 3' }),
+      );
+      expect(item3.id).toBe('3');
     });
   });
 

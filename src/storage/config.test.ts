@@ -152,16 +152,19 @@ describe('drizzle config', () => {
       copyToClipboard: false,
     });
 
-    // Now partial update only statuses and next_id
+    // Now partial update only statuses
     updateConfig(db, {
       statuses: ['new', 'done'],
-      next_id: 20,
     });
 
     const config = readConfig(db);
     // Updated fields
     expect(config.statuses).toEqual(['new', 'done']);
-    expect(config.next_id).toBe(20);
+    // next_id is NOT overwritten by config updates — it is managed
+    // atomically by Storage.createWorkItem() to prevent stale values.
+    // seedDefaults() set it to 1, and writeConfig/updateConfig preserve
+    // the DB value on conflict updates.
+    expect(config.next_id).toBe(1);
     // Unchanged fields
     expect(config.types).toEqual(['bug', 'feature']);
     expect(config.current_iteration).toBe('sprint-1');
