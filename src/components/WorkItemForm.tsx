@@ -820,12 +820,15 @@ export function WorkItemForm() {
               const prev = popWorkItem();
               if (prev === null) navigate('list');
             }
-          })().catch((err: unknown) => {
-            setSaving(false);
-            uiStore
-              .getState()
-              .setToast(err instanceof Error ? err.message : 'Save failed');
-          });
+          })()
+            .catch((err: unknown) => {
+              uiStore
+                .getState()
+                .setToast(err instanceof Error ? err.message : 'Save failed');
+            })
+            .finally(() => {
+              setSaving(false);
+            });
           return;
         }
 
