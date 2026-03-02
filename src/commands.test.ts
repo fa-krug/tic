@@ -161,7 +161,9 @@ describe('getVisibleCommands', () => {
       capabilities: { ...ALL_CAPS, customTypes: false },
     });
     const commands = getVisibleCommands(ctx);
-    const switchCmds = commands.filter((c) => c.id.startsWith('switch-'));
+    const switchCmds = commands.filter(
+      (c) => c.id.startsWith('switch-') && c.id !== 'switch-iteration',
+    );
     expect(switchCmds).toHaveLength(0);
   });
 

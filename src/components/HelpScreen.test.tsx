@@ -62,7 +62,8 @@ describe('getShortcuts', () => {
     const allKeys = groups.flatMap((g) => g.shortcuts.map((s) => s.key));
     expect(allKeys).toContain('p');
     expect(allKeys).toContain('tab');
-    expect(allKeys).toContain('i');
+    expect(allKeys).toContain('j');
+    expect(allKeys).toContain('J');
     expect(allKeys).toContain('r');
     expect(allKeys).toContain('x'); // bulk actions menu (always present)
     expect(allKeys).toContain('b'); // branch/worktree (git available)
