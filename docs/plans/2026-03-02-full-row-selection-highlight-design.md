@@ -54,13 +54,16 @@ When `selectionBg` is `cyanBright`, text needs readable foreground colors. Colum
 
 ### ColorPills
 
-No changes. Pills retain their own background colors regardless of row selection state.
+Pills retain their own background colors regardless of row selection state. However, any pill color in the cyan family would blend into the `cyanBright` selection background. The current default for "medium" priority is `{ bg: 'cyan', fg: 'black' }`, which would be indistinguishable.
+
+**Fix**: Change the "medium" priority default color from `cyan` to `blue` (and in high-contrast theme from `cyanBright` to `blueBright`) so it's visually distinct from the selection background.
 
 ## Files to Change
 
 1. `src/stores/themeStore.ts` — add `selectionBg`, `selectedMarkedBg` to `ThemeColors` interface + both theme definitions
 2. `src/components/TableLayout.tsx` — update background logic in `GenericTableRow`, pass `selectionBg` + `selectedMarkedBg` from theme
 3. `src/components/WorkItemList.tsx` — update column render functions to use readable text colors when row has selection background
+4. `src/stores/themeStore.ts` (keyword defaults) — change "medium" priority default from `cyan`/`cyanBright` to `blue`/`blueBright` to avoid blending with selection background
 
 ## Decisions
 
