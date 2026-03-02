@@ -2,7 +2,7 @@ import { memo, useMemo } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 import { Box, Text } from 'ink';
 import type { SortEntry } from '../stores/listViewStore.js';
-import { useThemeStore } from '../stores/themeStore.js';
+import { useThemeStore, autoFg } from '../stores/themeStore.js';
 
 export interface ColumnDef<T> {
   key: string;
@@ -126,12 +126,26 @@ const GenericTableRow = memo(function GenericTableRow<T>({
   computedColumns,
   showMarker,
 }: GenericTableRowProps<T>) {
-  const { accent, accentBg } = useThemeStore((s) => s.colors);
+  const { accent, accentBg, selectionBg, selectedMarkedBg } = useThemeStore(
+    (s) => s.colors,
+  );
   return (
-    <Box {...(marked && !selected ? { backgroundColor: accentBg } : {})}>
+    <Box
+      backgroundColor={
+        selected && marked
+          ? selectedMarkedBg
+          : selected
+            ? selectionBg
+            : marked
+              ? accentBg
+              : undefined
+      }
+    >
       {showMarker && (
         <Box width={MARKER_WIDTH}>
-          <Text color={accent}>{selected ? '>' : ' '}</Text>
+          <Text color={selected ? autoFg(selectionBg) : accent}>
+            {selected ? '>' : ' '}
+          </Text>
         </Box>
       )}
       {computedColumns.map((cc, i) => {
