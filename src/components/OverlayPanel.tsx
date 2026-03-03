@@ -243,15 +243,16 @@ export function OverlayPanel({
                       : '  '}
                 </Text>
                 <Box flexGrow={1} gap={1}>
-                  {fieldType && !item.value.startsWith('__') && (
+                  {fieldType && !item.value.startsWith('__') ? (
                     <ColorPill field={fieldType} value={item.value} />
+                  ) : (
+                    <Text
+                      color={isSelected ? accent : undefined}
+                      bold={isSelected}
+                    >
+                      {item.label}
+                    </Text>
                   )}
-                  <Text
-                    color={isSelected ? accent : undefined}
-                    bold={isSelected}
-                  >
-                    {item.label}
-                  </Text>
                 </Box>
                 {item.hint && <Text dimColor={mutedDim}> {item.hint}</Text>}
               </Box>

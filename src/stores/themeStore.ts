@@ -87,6 +87,9 @@ const defaultDefaults: FieldDefaults = {
     { patterns: ['blocked'], color: { bg: 'red', fg: 'white' } },
     { patterns: ['merged'], color: { bg: 'magenta', fg: 'white' } },
     { patterns: ['draft'], color: { bg: 'gray', fg: 'white' } },
+    { patterns: ['resolved'], color: { bg: 'green', fg: 'white' } },
+    { patterns: ['removed'], color: { bg: 'red', fg: 'white' } },
+    { patterns: ['design'], color: { bg: 'cyan', fg: 'black' } },
   ],
   priority: [
     { patterns: ['critical'], color: { bg: 'red', fg: 'white' } },
@@ -119,6 +122,9 @@ const highContrastDefaults: FieldDefaults = {
     { patterns: ['blocked'], color: { bg: 'redBright', fg: 'white' } },
     { patterns: ['merged'], color: { bg: 'magentaBright', fg: 'white' } },
     { patterns: ['draft'], color: { bg: 'grayBright', fg: 'white' } },
+    { patterns: ['resolved'], color: { bg: 'greenBright', fg: 'white' } },
+    { patterns: ['removed'], color: { bg: 'redBright', fg: 'white' } },
+    { patterns: ['design'], color: { bg: 'cyanBright', fg: 'black' } },
   ],
   priority: [
     { patterns: ['critical'], color: { bg: 'redBright', fg: 'white' } },
@@ -225,12 +231,8 @@ export const themeStore = createStore<ThemeStoreState>((set, get) => ({
       }
     }
 
-    // 3. Label hash (labels only)
-    if (field === 'label') {
-      return hashLabel(lower);
-    }
-
-    return null;
+    // 3. Hash fallback for all fields
+    return hashLabel(lower);
   },
 
   loadColorOverrides(

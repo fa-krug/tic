@@ -53,11 +53,34 @@ describe('themeStore resolveFieldColor', () => {
       expect(result).toEqual({ bg: 'blue', fg: 'white' });
     });
 
-    it('returns null for unmatched value', () => {
+    it('returns green for "resolved" status', () => {
+      const result = themeStore
+        .getState()
+        .resolveFieldColor('status', 'Resolved');
+      expect(result).toEqual({ bg: 'green', fg: 'white' });
+    });
+
+    it('returns red for "removed" status', () => {
+      const result = themeStore
+        .getState()
+        .resolveFieldColor('status', 'Removed');
+      expect(result).toEqual({ bg: 'red', fg: 'white' });
+    });
+
+    it('returns cyan for "design" status', () => {
+      const result = themeStore
+        .getState()
+        .resolveFieldColor('status', 'Design');
+      expect(result).toEqual({ bg: 'cyan', fg: 'black' });
+    });
+
+    it('returns a hash color for unmatched status', () => {
       const result = themeStore
         .getState()
         .resolveFieldColor('status', 'unknown-xyz');
-      expect(result).toBeNull();
+      expect(result).not.toBeNull();
+      expect(result).toHaveProperty('bg');
+      expect(result).toHaveProperty('fg');
     });
   });
 
@@ -78,6 +101,39 @@ describe('themeStore resolveFieldColor', () => {
     it('is case-insensitive', () => {
       const a = themeStore.getState().resolveFieldColor('label', 'Frontend');
       const b = themeStore.getState().resolveFieldColor('label', 'frontend');
+      expect(a).toEqual(b);
+    });
+  });
+
+  describe('field value hashing (non-label)', () => {
+    it('returns a color for any status value', () => {
+      const result = themeStore
+        .getState()
+        .resolveFieldColor('status', 'SomeCustomStatus');
+      expect(result).not.toBeNull();
+    });
+
+    it('returns a color for any type value', () => {
+      const result = themeStore
+        .getState()
+        .resolveFieldColor('type', 'SomeCustomType');
+      expect(result).not.toBeNull();
+    });
+
+    it('returns a color for any priority value', () => {
+      const result = themeStore
+        .getState()
+        .resolveFieldColor('priority', 'SomeCustomPriority');
+      expect(result).not.toBeNull();
+    });
+
+    it('is deterministic for statuses', () => {
+      const a = themeStore
+        .getState()
+        .resolveFieldColor('status', 'CustomState');
+      const b = themeStore
+        .getState()
+        .resolveFieldColor('status', 'CustomState');
       expect(a).toEqual(b);
     });
   });
