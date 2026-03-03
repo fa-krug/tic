@@ -8,6 +8,7 @@ import type {
   NewComment,
   Comment,
   Template,
+  Iteration,
 } from '../../types.js';
 import { GitLabApiClient } from './api.js';
 import type { Connection } from './api.js';
@@ -360,9 +361,13 @@ export class GitLabBackend extends BaseBackend {
     return this.getLabelsFromCache();
   }
 
-  async getIterations(): Promise<string[]> {
+  async getIterations(): Promise<Iteration[]> {
     const ms = await this.fetchMilestones();
-    return ms.map((m) => m.title);
+    return ms.map((m) => ({
+      name: m.title,
+      startDate: m.startDate || null,
+      endDate: m.dueDate || null,
+    }));
   }
 
   async getCurrentIteration(): Promise<string> {

@@ -71,7 +71,11 @@ describe('MCP handlers', () => {
         backend: string;
         statuses: string[];
         types: string[];
-        iterations: string[];
+        iterations: {
+          name: string;
+          startDate: string | null;
+          endDate: string | null;
+        }[];
         currentIteration: string;
       };
       expect(data.backend).toBe('none');
@@ -83,7 +87,9 @@ describe('MCP handlers', () => {
         'done',
       ]);
       expect(data.types).toEqual(['epic', 'issue', 'task']);
-      expect(data.iterations).toEqual(['default']);
+      expect(data.iterations).toEqual([
+        { name: 'default', startDate: null, endDate: null },
+      ]);
       expect(data.currentIteration).toBe('default');
     });
   });

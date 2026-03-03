@@ -6,7 +6,12 @@ import type {
   PrCapabilities,
 } from '../backends/types.js';
 import { isPrBackend } from '../backends/types.js';
-import type { WorkItem, PullRequest, NewPullRequest } from '../types.js';
+import type {
+  WorkItem,
+  PullRequest,
+  NewPullRequest,
+  Iteration,
+} from '../types.js';
 import type { SyncQueueAdapter, SyncStatus } from '../sync/types.js';
 import type { SyncManager } from '../sync/SyncManager.js';
 import { configStore } from './configStore.js';
@@ -20,6 +25,7 @@ import {
 } from '../git.js';
 import { fetchAll } from '../git-async.js';
 import { linkBranchToItem } from '../branch-links.js';
+import { findCurrentIteration } from '../iteration-utils.js';
 
 export const defaultCapabilities: BackendCapabilities = {
   relationships: false,
@@ -80,7 +86,7 @@ export interface BackendDataStoreState {
   branches: BranchRow[];
   branchesLoading: boolean;
   statuses: string[];
-  iterations: string[];
+  iterations: Iteration[];
   types: string[];
   assignees: string[];
   labels: string[];
@@ -213,7 +219,7 @@ export const backendDataStore = createStore<BackendDataStoreState>(
     branches: [],
     branchesLoading: false,
     statuses: [],
-    iterations: [],
+    iterations: [] as Iteration[],
     types: [],
     assignees: [],
     labels: [],
@@ -281,13 +287,15 @@ export const backendDataStore = createStore<BackendDataStoreState>(
       if (!currentBackend) return;
 
       try {
-        const iter = await currentBackend.getCurrentIteration();
-        const [statuses, iterations, types, items] = await Promise.all([
+        const [statuses, iterations, types] = await Promise.all([
           currentBackend.getStatuses(),
           currentBackend.getIterations(),
           currentBackend.getWorkItemTypes(),
-          currentBackend.listWorkItems(iter),
         ]);
+        const autoDetected = findCurrentIteration(iterations);
+        const iter =
+          autoDetected ?? (await currentBackend.getCurrentIteration());
+        const items = await currentBackend.listWorkItems(iter);
 
         // Derive assignees and labels from loaded items
         const assigneeSet = new Set<string>();
@@ -803,7 +811,7 @@ export const backendDataStore = createStore<BackendDataStoreState>(
         branches: [],
         branchesLoading: false,
         statuses: [],
-        iterations: [],
+        iterations: [] as Iteration[],
         types: [],
         assignees: [],
         labels: [],

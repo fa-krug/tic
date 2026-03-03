@@ -165,8 +165,8 @@ describe('AzureDevOpsBackend', () => {
         value: [{ path: 'WebApp\\Sprint 1' }, { path: 'WebApp\\Sprint 2' }],
       });
       expect(await backend.getIterations()).toEqual([
-        'WebApp\\Sprint 1',
-        'WebApp\\Sprint 2',
+        { name: 'WebApp\\Sprint 1', startDate: null, endDate: null },
+        { name: 'WebApp\\Sprint 2', startDate: null, endDate: null },
       ]);
     });
   });

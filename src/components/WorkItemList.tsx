@@ -48,6 +48,7 @@ import {
   type ViewFilters,
   type SavedView,
 } from '../filters.js';
+import { formatIterationDates } from '../iteration-utils.js';
 export type { TreeItem } from './buildTree.js';
 
 const EMPTY_VIEWS: SavedView[] = [];
@@ -272,6 +273,7 @@ export function WorkItemList() {
 
   // Changes independently (individual selectors)
   const iteration = useBackendDataStore((s) => s.currentIteration);
+  const iterations = useBackendDataStore((s) => s.iterations);
   const loading = useBackendDataStore((s) => s.loading);
   const initError = useBackendDataStore((s) => s.error);
 
@@ -1432,6 +1434,13 @@ export function WorkItemList() {
         <Text wrap="truncate">
           <Text bold color={accent}>
             {typeLabel} — {iteration}
+            {(() => {
+              const it = iterations.find((i) => i.name === iteration);
+              const dates = it
+                ? formatIterationDates(it.startDate, it.endDate)
+                : null;
+              return dates ? `  ${dates}` : '';
+            })()}
           </Text>
           <Text
             dimColor={mutedDim}

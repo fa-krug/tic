@@ -30,7 +30,9 @@ describe('drizzle config', () => {
     ]);
     expect(config.types).toEqual(['epic', 'issue', 'task']);
     expect(config.current_iteration).toBe('default');
-    expect(config.iterations).toEqual(['default']);
+    expect(config.iterations).toEqual([
+      { name: 'default', startDate: null, endDate: null },
+    ]);
     expect(config.next_id).toBe(1);
     expect(config.branchMode).toBe('worktree');
     expect(config.autoUpdate).toBe(true);
@@ -70,13 +72,28 @@ describe('drizzle config', () => {
   });
 
   it('reads and writes iterations with sort order', () => {
-    const customIterations = ['sprint-1', 'sprint-2', 'sprint-3'];
+    const customIterations = [
+      { name: 'sprint-1', startDate: null, endDate: null },
+      { name: 'sprint-2', startDate: null, endDate: null },
+      { name: 'sprint-3', startDate: null, endDate: null },
+    ];
     updateConfig(db, { iterations: customIterations });
 
     const config = readConfig(db);
     expect(config.iterations).toEqual(customIterations);
   });
 
+  it('reads and writes iterations with dates', () => {
+    const iterations = [
+      { name: 'sprint-1', startDate: '2026-01-06', endDate: '2026-01-20' },
+      { name: 'sprint-2', startDate: '2026-01-20', endDate: '2026-02-03' },
+      { name: 'backlog', startDate: null, endDate: null },
+    ];
+    updateConfig(db, { iterations });
+
+    const config = readConfig(db);
+    expect(config.iterations).toEqual(iterations);
+  });
   it('reads and writes saved views with filters and sort entries', () => {
     const views = [
       {
@@ -144,7 +161,10 @@ describe('drizzle config', () => {
       statuses: ['open', 'closed'],
       types: ['bug', 'feature'],
       current_iteration: 'sprint-1',
-      iterations: ['sprint-1', 'sprint-2'],
+      iterations: [
+        { name: 'sprint-1', startDate: null, endDate: null },
+        { name: 'sprint-2', startDate: null, endDate: null },
+      ],
       next_id: 10,
       branchMode: 'branch',
       autoUpdate: false,
@@ -168,7 +188,10 @@ describe('drizzle config', () => {
     // Unchanged fields
     expect(config.types).toEqual(['bug', 'feature']);
     expect(config.current_iteration).toBe('sprint-1');
-    expect(config.iterations).toEqual(['sprint-1', 'sprint-2']);
+    expect(config.iterations).toEqual([
+      { name: 'sprint-1', startDate: null, endDate: null },
+      { name: 'sprint-2', startDate: null, endDate: null },
+    ]);
     expect(config.branchMode).toBe('branch');
     expect(config.autoUpdate).toBe(false);
     expect(config.branchCommand).toBe('echo hello');

@@ -7,6 +7,10 @@ import {
   backendDataStore,
 } from '../stores/backendDataStore.js';
 import { matchesCommand } from '../commands.js';
+import {
+  formatIterationDates,
+  getIterationStatus,
+} from '../iteration-utils.js';
 
 export function IterationPicker() {
   const { mutedDim } = useThemeStore((s) => s.colors);
@@ -25,10 +29,15 @@ export function IterationPicker() {
     }
   });
 
-  const items = iterations.map((it) => ({
-    label: it === current ? `${it} (current)` : it,
-    value: it,
-  }));
+  const items = iterations.map((it) => {
+    const dates = formatIterationDates(it.startDate, it.endDate);
+    const status = getIterationStatus(it.startDate, it.endDate);
+    let label = it.name;
+    if (dates) label += '  ' + dates;
+    if (status) label += ` (${status})`;
+    if (it.name === current) label += ' *';
+    return { label, value: it.name };
+  });
 
   return (
     <Box flexDirection="column">
@@ -37,7 +46,7 @@ export function IterationPicker() {
       </Box>
       <SelectInput
         items={items}
-        initialIndex={iterations.indexOf(current)}
+        initialIndex={iterations.findIndex((it) => it.name === current)}
         onSelect={(item) => {
           void (async () => {
             if (!backend) return;

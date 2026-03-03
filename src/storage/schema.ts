@@ -158,6 +158,8 @@ export const workItemTypes = sqliteTable('work_item_types', {
 export const iterations = sqliteTable('iterations', {
   name: text('name').primaryKey(),
   sortOrder: integer('sort_order').notNull().default(0),
+  startDate: text('start_date'),
+  endDate: text('end_date'),
 });
 
 // 12. Jira Configuration (singleton, id=1)

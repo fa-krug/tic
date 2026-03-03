@@ -15,6 +15,10 @@ import type {
 } from './commands/item.js';
 import type { WorkItem, PullRequest } from '../types.js';
 import type { PrListOptions, PrCreateOptions } from './commands/pr.js';
+import {
+  formatIterationDates,
+  getIterationStatus,
+} from '../iteration-utils.js';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -718,8 +722,12 @@ export function createProgram(): Command {
             console.log(formatJson(result));
           } else {
             for (const iter of result.iterations) {
-              const marker = iter === result.current ? '*' : ' ';
-              console.log(`${marker}\t${iter}`);
+              const marker = iter.name === result.current ? '*' : ' ';
+              const dates = formatIterationDates(iter.startDate, iter.endDate);
+              const status = getIterationStatus(iter.startDate, iter.endDate);
+              const statusStr = status ? ` (${status})` : '';
+              const dateStr = dates ? `  ${dates}` : '';
+              console.log(`${marker}\t${iter.name}${dateStr}${statusStr}`);
             }
           }
         } catch (err) {

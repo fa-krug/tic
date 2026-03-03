@@ -4,6 +4,7 @@ import type {
   NewComment,
   Comment,
   Template,
+  Iteration,
   PullRequest,
   NewPullRequest,
 } from '../types.js';
@@ -47,7 +48,7 @@ export class UnsupportedOperationError extends Error {
 export interface Backend {
   getCapabilities(): BackendCapabilities;
   getStatuses(): Promise<string[]>;
-  getIterations(): Promise<string[]>;
+  getIterations(): Promise<Iteration[]>;
   getWorkItemTypes(): Promise<string[]>;
   getAssignees(): Promise<string[]>;
   getLabels(): Promise<string[]>;
@@ -117,7 +118,7 @@ export abstract class BaseBackend implements Backend {
 
   abstract getCapabilities(): BackendCapabilities;
   abstract getStatuses(): Promise<string[]>;
-  abstract getIterations(): Promise<string[]>;
+  abstract getIterations(): Promise<Iteration[]>;
   abstract getWorkItemTypes(): Promise<string[]>;
   abstract getAssignees(): Promise<string[]>;
   abstract getLabels(): Promise<string[]>;

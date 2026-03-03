@@ -22,7 +22,9 @@ describe('iteration commands', () => {
   describe('runIterationList', () => {
     it('returns default iterations', async () => {
       const result = await runIterationList(backend);
-      expect(result.iterations).toEqual(['default']);
+      expect(result.iterations).toEqual([
+        { name: 'default', startDate: null, endDate: null },
+      ]);
       expect(result.current).toBe('default');
     });
   });
@@ -35,7 +37,9 @@ describe('iteration commands', () => {
 
     it('adds new iteration if it does not exist', async () => {
       await runIterationSet(backend, 'sprint-2');
-      expect(await backend.getIterations()).toContain('sprint-2');
+      expect((await backend.getIterations()).map((i) => i.name)).toContain(
+        'sprint-2',
+      );
     });
   });
 });

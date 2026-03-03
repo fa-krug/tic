@@ -6,6 +6,7 @@ import type {
   NewComment,
   Comment,
   Template,
+  Iteration,
 } from '../../types.js';
 import { JiraApiClient } from './api.js';
 import { readJiraConfig } from './config.js';
@@ -148,10 +149,14 @@ export class JiraBackend extends BaseBackend {
     return this.getLabelsFromCache();
   }
 
-  async getIterations(): Promise<string[]> {
+  async getIterations(): Promise<Iteration[]> {
     if (!this.config.boardId) return [];
     const sprints = await this.fetchSprints();
-    return sprints.map((s) => s.name);
+    return sprints.map((s) => ({
+      name: s.name,
+      startDate: s.startDate?.split('T')[0] ?? null,
+      endDate: s.endDate?.split('T')[0] ?? null,
+    }));
   }
 
   async getCurrentIteration(): Promise<string> {

@@ -78,3 +78,9 @@ export interface NewPullRequest {
   targetBranch?: string;
   linkedItems?: string[];
 }
+
+export interface Iteration {
+  name: string;
+  startDate: string | null;
+  endDate: string | null;
+}
