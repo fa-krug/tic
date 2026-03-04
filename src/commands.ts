@@ -474,6 +474,29 @@ const commands: Command[] = [
       ctx.screen === 'branch-list' ||
       ctx.screen === 'iteration-picker',
   },
+  // Iteration picker actions
+  {
+    id: 'iteration-navigate',
+    label: 'Navigate iterations',
+    category: 'Navigation',
+    shortcut: 'j/k',
+    keys: [{ special: 'upArrow' }, { special: 'downArrow' }],
+    screen: 'iteration-picker',
+    helpGroup: 'Navigation',
+    footer: true,
+    footerLabel: 'navigate',
+  },
+  {
+    id: 'iteration-select',
+    label: 'Switch to iteration',
+    category: 'Actions',
+    shortcut: 'enter',
+    keys: [{ special: 'return' }],
+    screen: 'iteration-picker',
+    helpGroup: 'Actions',
+    footer: true,
+    footerLabel: 'switch',
+  },
   // Branch list actions
   {
     id: 'branch-navigate',
