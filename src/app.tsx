@@ -41,6 +41,11 @@ const BranchList = lazy(() =>
     default: m.BranchList,
   })),
 );
+const IterationPicker = lazy(() =>
+  import('./components/IterationPicker.js').then((m) => ({
+    default: m.IterationPicker,
+  })),
+);
 const MarkdownEditor = lazy(() =>
   import('./components/MarkdownEditor.js').then((m) => ({
     default: m.MarkdownEditor,
@@ -85,6 +90,7 @@ export function App() {
             {screen === 'form' && <WorkItemForm />}
             {screen === 'pr-list' && <PullRequestList />}
             {screen === 'branch-list' && <BranchList />}
+            {screen === 'iteration-picker' && <IterationPicker />}
             {screen === 'settings' && <Settings />}
             {screen === 'status' && <StatusScreen />}
             {screen === 'editor' && <MarkdownEditor />}
