@@ -465,11 +465,14 @@ const commands: Command[] = [
     category: 'Navigation',
     shortcut: 'esc',
     keys: [{ special: 'escape' }],
-    screen: ['pr-list', 'branch-list'],
+    screen: ['pr-list', 'branch-list', 'iteration-picker'],
     helpGroup: 'Navigation',
     footer: true,
     footerLabel: 'back',
-    when: (ctx) => ctx.screen === 'pr-list' || ctx.screen === 'branch-list',
+    when: (ctx) =>
+      ctx.screen === 'pr-list' ||
+      ctx.screen === 'branch-list' ||
+      ctx.screen === 'iteration-picker',
   },
   // Branch list actions
   {
