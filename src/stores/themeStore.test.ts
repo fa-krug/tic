@@ -214,7 +214,7 @@ describe('selection theme colors', () => {
 
   it('default theme has selectedMarkedBg', () => {
     themeStore.setState({ themeName: 'default', colorOverrides: {} });
-    expect(themeStore.getState().colors.selectedMarkedBg).toBe('magentaBright');
+    expect(themeStore.getState().colors.selectedMarkedBg).toBe('magenta');
   });
 
   it('high-contrast theme has selectionBg', () => {

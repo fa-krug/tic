@@ -14,7 +14,6 @@ export type ActiveOverlay =
   | { type: 'assignee-input'; targetIds: string[] }
   | { type: 'labels-input'; targetIds: string[] }
   | { type: 'iteration-picker'; targetIds: string[] }
-  | { type: 'iteration-switch' }
   | { type: 'sort-picker' }
   | { type: 'filter-picker' }
   | { type: 'view-picker' }
@@ -39,7 +38,9 @@ export type ActiveOverlay =
       branch: string;
       worktreePath: string | null;
     }
-  | { type: 'branch-merge-confirm'; branch: string; into: string };
+  | { type: 'branch-merge-confirm'; branch: string; into: string }
+  // Iteration switch overlay
+  | { type: 'iteration-switch' };
 
 export interface UIStoreState {
   activeOverlay: ActiveOverlay | null;

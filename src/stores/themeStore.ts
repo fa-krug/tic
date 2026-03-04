@@ -31,7 +31,7 @@ export interface FieldColor {
 
 const defaultTheme: ThemeColors = {
   accent: 'cyan',
-  accentBg: 'cyan',
+  accentBg: 'yellow',
   muted: undefined,
   mutedDim: true,
   success: 'green',
@@ -39,9 +39,9 @@ const defaultTheme: ThemeColors = {
   warning: 'yellow',
   info: 'cyan',
   border: 'gray',
-  marked: 'magenta',
+  marked: 'yellow',
   selectionBg: 'cyanBright',
-  selectedMarkedBg: 'magentaBright',
+  selectedMarkedBg: 'magenta',
 };
 
 const highContrastTheme: ThemeColors = {
