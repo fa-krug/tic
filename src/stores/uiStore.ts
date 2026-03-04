@@ -38,9 +38,7 @@ export type ActiveOverlay =
       branch: string;
       worktreePath: string | null;
     }
-  | { type: 'branch-merge-confirm'; branch: string; into: string }
-  // Iteration switch overlay
-  | { type: 'iteration-switch' };
+  | { type: 'branch-merge-confirm'; branch: string; into: string };
 
 export interface UIStoreState {
   activeOverlay: ActiveOverlay | null;
