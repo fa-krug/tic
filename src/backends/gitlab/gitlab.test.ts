@@ -890,7 +890,10 @@ describe('GitLabBackend', () => {
           ];
         })(),
       );
-      expect(await backend.getIterations()).toEqual(['Sprint 1', 'Sprint 2']);
+      expect(await backend.getIterations()).toEqual([
+        { name: 'Sprint 1', startDate: '2026-01-01', endDate: '2026-01-14' },
+        { name: 'Sprint 2', startDate: '2026-01-15', endDate: '2026-01-28' },
+      ]);
     });
   });
 

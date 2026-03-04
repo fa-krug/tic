@@ -14,6 +14,7 @@ import type {
   Template,
   PullRequest,
   NewPullRequest,
+  Iteration,
 } from '../../types.js';
 import { getGitHubToken, authenticateGitHub } from '../../auth/github.js';
 import { AuthError } from '../shared/api-client.js';
@@ -250,9 +251,13 @@ export class GitHubBackend extends BaseBackend implements PrBackend {
     return this.getLabelsFromCache();
   }
 
-  async getIterations(): Promise<string[]> {
+  async getIterations(): Promise<Iteration[]> {
     const milestones = await this.fetchMilestones();
-    return milestones.map((m) => m.title);
+    return milestones.map((m) => ({
+      name: m.title,
+      startDate: null,
+      endDate: m.due_on ? m.due_on.split('T')[0]! : null,
+    }));
   }
 
   async getCurrentIteration(): Promise<string> {

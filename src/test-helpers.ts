@@ -10,6 +10,7 @@ import type {
   Comment,
   PullRequest,
   Template,
+  Iteration,
 } from './types.js';
 import type { Backend } from './backends/types.js';
 
@@ -123,7 +124,9 @@ export function createMockRemote(items: WorkItem[] = []): Backend {
       },
     }),
     getStatuses: async () => ['backlog', 'todo', 'in-progress', 'done'],
-    getIterations: async () => ['default'],
+    getIterations: async (): Promise<Iteration[]> => [
+      { name: 'default', startDate: null, endDate: null },
+    ],
     getWorkItemTypes: async () => ['epic', 'issue', 'task'],
     getAssignees: async () => [],
     getLabels: async () => [],

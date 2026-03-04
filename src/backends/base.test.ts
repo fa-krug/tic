@@ -5,6 +5,7 @@ import type {
   NewComment,
   Comment,
   Template,
+  Iteration,
 } from '../types.js';
 import {
   BaseBackend,
@@ -92,7 +93,7 @@ class TestBackend extends BaseBackend {
   async getStatuses(): Promise<string[]> {
     return [];
   }
-  async getIterations(): Promise<string[]> {
+  async getIterations(): Promise<Iteration[]> {
     return [];
   }
   async getWorkItemTypes(): Promise<string[]> {

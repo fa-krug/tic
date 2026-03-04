@@ -786,7 +786,11 @@ export function Settings() {
       {activeOverlay?.type === 'default-iteration-picker' && (
         <OverlayPanel
           title="Default Iteration"
-          items={config.iterations.map((i) => ({ id: i, label: i, value: i }))}
+          items={config.iterations.map((i) => ({
+            id: i.name,
+            label: i.name,
+            value: i.name,
+          }))}
           onSelect={(item) => {
             void configStore
               .getState()

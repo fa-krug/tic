@@ -1,5 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
-import type { WorkItem, NewWorkItem, Comment, Template } from '../types.js';
+import type {
+  WorkItem,
+  NewWorkItem,
+  Comment,
+  Template,
+  Iteration,
+} from '../types.js';
 import { BaseBackend } from './types.js';
 import type { BackendCapabilities } from './types.js';
 import { makeWorkItem } from '../test-helpers.js';
@@ -42,7 +48,9 @@ class TestBackend extends BaseBackend {
   }
 
   getStatuses = async () => ['open', 'closed'];
-  getIterations = async () => ['sprint-1'];
+  getIterations = async (): Promise<Iteration[]> => [
+    { name: 'sprint-1', startDate: null, endDate: null },
+  ];
   getWorkItemTypes = async () => ['task'];
   getAssignees = async () => this.getAssigneesFromCache();
   getLabels = async () => this.getLabelsFromCache();

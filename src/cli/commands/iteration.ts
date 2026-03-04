@@ -1,7 +1,8 @@
 import type { Backend } from '../../backends/types.js';
+import type { Iteration } from '../../types.js';
 
 export interface IterationListResult {
-  iterations: string[];
+  iterations: Iteration[];
   current: string;
 }
 

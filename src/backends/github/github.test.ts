@@ -189,7 +189,10 @@ describe('GitHubBackend', () => {
         { number: 1, title: 'v1.0', state: 'open', due_on: null },
         { number: 2, title: 'v2.0', state: 'open', due_on: null },
       ]);
-      expect(await backend.getIterations()).toEqual(['v1.0', 'v2.0']);
+      expect(await backend.getIterations()).toEqual([
+        { name: 'v1.0', startDate: null, endDate: null },
+        { name: 'v2.0', startDate: null, endDate: null },
+      ]);
     });
 
     it('returns empty array when no milestones', async () => {

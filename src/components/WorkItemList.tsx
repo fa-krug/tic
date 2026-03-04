@@ -48,6 +48,7 @@ import {
   type ViewFilters,
   type SavedView,
 } from '../filters.js';
+import { formatIterationDates } from '../iteration-utils.js';
 export type { TreeItem } from './buildTree.js';
 
 const EMPTY_VIEWS: SavedView[] = [];
@@ -1457,6 +1458,13 @@ export function WorkItemList() {
         <Text wrap="truncate">
           <Text bold color={accent}>
             {typeLabel} — {currentIteration}
+            {(() => {
+              const it = iterations.find((i) => i.name === currentIteration);
+              const dates = it
+                ? formatIterationDates(it.startDate, it.endDate)
+                : null;
+              return dates ? `  ${dates}` : '';
+            })()}
           </Text>
           <Text
             dimColor={mutedDim}
@@ -2158,7 +2166,11 @@ export function WorkItemList() {
         ) : activeOverlay?.type === 'iteration-picker' ? (
           <OverlayPanel
             title="Set Iteration"
-            items={iterations.map((it) => ({ id: it, label: it, value: it }))}
+            items={iterations.map((it) => ({
+              id: it.name,
+              label: it.name,
+              value: it.name,
+            }))}
             onSelect={(item) => {
               const targetIds = getOverlayTargetIds();
               closeOverlay();
@@ -2192,11 +2204,13 @@ export function WorkItemList() {
         ) : activeOverlay?.type === 'iteration-switch' ? (
           <OverlayPanel
             title="Switch Iteration"
-            items={iterations.map((it) => ({
-              id: it,
-              label: it === currentIteration ? `${it} (current)` : it,
-              value: it,
-            }))}
+            items={iterations.map((it) => {
+              const dates = formatIterationDates(it.startDate, it.endDate);
+              let label = it.name;
+              if (it.name === currentIteration) label += ' (current)';
+              if (dates) label += `  ${dates}`;
+              return { id: it.name, label, value: it.name };
+            })}
             onSelect={(item) => {
               closeOverlay();
               if (!backend) return;

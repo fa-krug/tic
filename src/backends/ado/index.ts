@@ -7,6 +7,7 @@ import type {
   NewComment,
   Comment,
   Template,
+  Iteration,
 } from '../../types.js';
 import { getAdoToken, getAdoPat, authenticateAdo } from '../../auth/ado.js';
 import { AuthError } from '../shared/api-client.js';
@@ -165,14 +166,21 @@ export class AzureDevOpsBackend extends BaseBackend {
     return this.getLabelsFromCache();
   }
 
-  async getIterations(): Promise<string[]> {
+  async getIterations(): Promise<Iteration[]> {
     const result = await this.api.rest<{
-      value: { path: string }[];
+      value: {
+        path: string;
+        attributes?: { startDate?: string; finishDate?: string };
+      }[];
     }>(
       'GET',
       `/${encodeURIComponent(this.project)}/${encodeURIComponent(this.project + ' Team')}/_apis/work/teamsettings/iterations`,
     );
-    return result.value.map((i) => i.path);
+    return result.value.map((i) => ({
+      name: i.path,
+      startDate: i.attributes?.startDate?.split('T')[0] ?? null,
+      endDate: i.attributes?.finishDate?.split('T')[0] ?? null,
+    }));
   }
 
   async getCurrentIteration(): Promise<string> {

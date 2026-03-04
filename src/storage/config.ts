@@ -3,13 +3,14 @@ import path from 'node:path';
 import { eq } from 'drizzle-orm';
 import { createDatabase, type TicDatabase, type TicTransaction } from './db.js';
 import * as schema from './schema.js';
+import type { Iteration } from '../types.js';
 
 export interface Config {
   backend: string;
   types: string[];
   statuses: string[];
   current_iteration: string;
-  iterations: string[];
+  iterations: Iteration[];
   next_id: number;
   branchMode: 'worktree' | 'branch';
   autoUpdate: boolean;
@@ -42,7 +43,7 @@ export const defaultConfig: Config = {
   types: ['epic', 'issue', 'task'],
   statuses: ['backlog', 'todo', 'in-progress', 'review', 'done'],
   current_iteration: 'default',
-  iterations: ['default'],
+  iterations: [{ name: 'default', startDate: null, endDate: null }],
   next_id: 1,
   branchMode: 'worktree',
   autoUpdate: true,
@@ -124,7 +125,11 @@ export function readConfig(db: TicDatabase): Config {
     statuses: statusRows.map((r) => r.name),
     types: typeRows.map((r) => r.name),
     current_iteration: pc?.currentIteration ?? '',
-    iterations: iterationRows.map((r) => r.name),
+    iterations: iterationRows.map((r) => ({
+      name: r.name,
+      startDate: r.startDate ?? null,
+      endDate: r.endDate ?? null,
+    })),
     next_id: pc?.nextId ?? 1,
     branchMode: (pc?.branchMode as 'worktree' | 'branch') ?? 'worktree',
     autoUpdate: pc?.autoUpdate ?? true,
@@ -286,8 +291,14 @@ export function insertConfigTx(tx: TicTransaction, config: Config): void {
   // 4. Replace iterations
   tx.delete(schema.iterations).run();
   for (let i = 0; i < config.iterations.length; i++) {
+    const it = config.iterations[i]!;
     tx.insert(schema.iterations)
-      .values({ name: config.iterations[i]!, sortOrder: i })
+      .values({
+        name: it.name,
+        sortOrder: i,
+        startDate: it.startDate,
+        endDate: it.endDate,
+      })
       .run();
   }
 

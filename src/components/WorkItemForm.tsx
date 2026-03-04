@@ -965,7 +965,7 @@ export function WorkItemForm() {
       }
 
       case 'iteration': {
-        return iterations.map((i) => ({ label: i, value: i }));
+        return iterations.map((i) => ({ label: i.name, value: i.name }));
       }
 
       case 'priority': {
@@ -991,7 +991,7 @@ export function WorkItemForm() {
       }
 
       case 'iteration': {
-        const idx = iterations.indexOf(iteration);
+        const idx = iterations.findIndex((it) => it.name === iteration);
         return idx >= 0 ? idx : 0;
       }
 

@@ -8,6 +8,7 @@ import type {
   NewComment,
   Comment,
   Template,
+  Iteration,
 } from '../../types.js';
 import {
   readWorkItem,
@@ -88,7 +89,7 @@ export class FilesBackend extends BaseBackend implements SyncableBackend {
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
-  async getIterations(): Promise<string[]> {
+  async getIterations(): Promise<Iteration[]> {
     return [];
   }
 

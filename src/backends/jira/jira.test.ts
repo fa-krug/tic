@@ -613,7 +613,11 @@ describe('JiraBackend', () => {
         ],
       });
       const iterations = await backend.getIterations();
-      expect(iterations).toEqual(['Sprint 1', 'Sprint 2', 'Sprint 3']);
+      expect(iterations).toEqual([
+        { name: 'Sprint 1', startDate: null, endDate: null },
+        { name: 'Sprint 2', startDate: null, endDate: null },
+        { name: 'Sprint 3', startDate: null, endDate: null },
+      ]);
     });
 
     it('returns empty array when no boardId', async () => {

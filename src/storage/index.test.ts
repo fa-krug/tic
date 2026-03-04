@@ -69,7 +69,9 @@ describe('Storage', () => {
   describe('getIterations', () => {
     it('returns default iterations', async () => {
       const iterations = await backend.getIterations();
-      expect(iterations).toEqual(['default']);
+      expect(iterations).toEqual([
+        { name: 'default', startDate: null, endDate: null },
+      ]);
     });
   });
 
@@ -178,7 +180,7 @@ describe('Storage', () => {
       expect(current).toBe('sprint-2');
 
       const iterations = await backend.getIterations();
-      expect(iterations).toContain('sprint-2');
+      expect(iterations.map((i) => i.name)).toContain('sprint-2');
     });
   });
 
@@ -491,7 +493,7 @@ describe('Storage', () => {
         makeNewWorkItem({ iteration: 'new-sprint' }),
       );
       const iterations = await backend.getIterations();
-      expect(iterations).toContain('new-sprint');
+      expect(iterations.map((i) => i.name)).toContain('new-sprint');
     });
 
     it('nextId is not reset by config updates', async () => {

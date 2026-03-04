@@ -16,6 +16,7 @@ import type {
   NewComment,
   Comment,
   Template,
+  Iteration,
   PullRequest,
   NewPullRequest,
 } from '../types.js';
@@ -233,13 +234,17 @@ export class Storage
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
-  async getIterations(): Promise<string[]> {
+  async getIterations(): Promise<Iteration[]> {
     const rows = this.db
       .select()
       .from(schema.iterations)
       .orderBy(schema.iterations.sortOrder)
       .all();
-    return rows.map((r) => r.name);
+    return rows.map((r) => ({
+      name: r.name,
+      startDate: r.startDate ?? null,
+      endDate: r.endDate ?? null,
+    }));
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await

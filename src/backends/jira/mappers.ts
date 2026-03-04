@@ -55,6 +55,8 @@ export interface JiraSprint {
   id: number;
   name: string;
   state: string;
+  startDate?: string;
+  endDate?: string;
 }
 
 export function mapPriorityToTic(
