@@ -720,7 +720,7 @@ export function WorkItemList() {
         matchesCommand('switch-iteration', input, key) &&
         capabilities.iterations
       ) {
-        openOverlay({ type: 'iteration-switch' });
+        navigate('iteration-picker');
       }
       if (matchesCommand('list-pr-list', input, key)) {
         navigate('pr-list');
@@ -1304,7 +1304,7 @@ export function WorkItemList() {
         }
         break;
       case 'switch-iteration':
-        openOverlay({ type: 'iteration-switch' });
+        navigate('iteration-picker');
         break;
       case 'settings':
         navigate('settings');
@@ -2196,33 +2196,6 @@ export function WorkItemList() {
                   .getState()
                   .setToast(
                     err instanceof Error ? err.message : 'Update failed',
-                  );
-              });
-            }}
-            onCancel={() => closeOverlay()}
-          />
-        ) : activeOverlay?.type === 'iteration-switch' ? (
-          <OverlayPanel
-            title="Switch Iteration"
-            items={iterations.map((it) => {
-              const dates = formatIterationDates(it.startDate, it.endDate);
-              let label = it.name;
-              if (it.name === currentIteration) label += ' (current)';
-              if (dates) label += `  ${dates}`;
-              return { id: it.name, label, value: it.name };
-            })}
-            onSelect={(item) => {
-              closeOverlay();
-              if (!backend) return;
-              void (async () => {
-                await backend.setCurrentIteration(item.value);
-                await backendDataStore.getState().refresh();
-                setToast(`Switched to iteration: ${item.value}`);
-              })().catch((err: unknown) => {
-                uiStore
-                  .getState()
-                  .setToast(
-                    err instanceof Error ? err.message : 'Switch failed',
                   );
               });
             }}
