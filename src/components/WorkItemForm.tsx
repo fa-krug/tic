@@ -954,6 +954,17 @@ export function WorkItemForm() {
     },
   );
 
+  // SelectInput from ink-select-input doesn't support onCancel/escape,
+  // so handle it separately when a select field is being edited.
+  useInput(
+    (_input, key) => {
+      if (key.escape) {
+        setEditing(false);
+      }
+    },
+    { isActive: editing && isSelectField },
+  );
+
   function getSelectItems(field: FieldName) {
     switch (field) {
       case 'type': {
