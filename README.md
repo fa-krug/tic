@@ -7,13 +7,13 @@ Built with TypeScript and [Ink](https://github.com/vadimdemedes/ink).
 ## Features
 
 - **Keyboard-driven TUI** — browse, create, edit, and manage work items without leaving the terminal
-- **Multiple backends** — GitHub (REST/GraphQL API), GitLab (via `glab`), Azure DevOps (REST API), Jira (REST API)
-- **Built-in authentication** — OAuth device flow for GitHub and Azure DevOps, with PAT fallback
+- **Multiple backends** — GitHub (REST/GraphQL API), GitLab (REST/GraphQL API), Azure DevOps (REST API), Jira (REST API)
+- **Built-in authentication** — OAuth device flow for GitHub, GitLab, and Azure DevOps, with PAT fallback
 - **Automatic backend detection** — selects backend based on git remote, or configure manually
 - **SQLite storage** — all data stored locally in `.tic/tic.db` with optional sync to remote backends
 - **CLI commands** — scriptable commands for all operations (`tic item list`, `tic item create`, etc.)
 - **Work item types** — organize by epic, issue, and task (configurable)
-- **Iterations** — group work into sprints or milestones
+- **Iterations** — group work into sprints or milestones, with optional start/end dates and color-coded status (active, past, upcoming)
 - **Parent-child relationships** — build hierarchies with collapsible tree-indented views
 - **Dependencies** — track which items block others, with warnings on premature completion
 - **Priority & assignee** — track who owns what and what's most important
@@ -22,7 +22,7 @@ Built with TypeScript and [Ink](https://github.com/vadimdemedes/ink).
 - **Quick search** — fuzzy search across all work items regardless of type or iteration
 - **Detail panel** — inline preview of selected item with metadata, description, and scroll support
 - **Undo** — undo delete, create, and property changes with `u` (up to 5 actions deep)
-- **External editor** — edit descriptions in your `$EDITOR` (falls back to vi)
+- **Built-in markdown editor** — edit descriptions in-TUI with syntax highlighting, or use your `$EDITOR`
 - **Settings screen** — switch backends and configure Jira connection from within the TUI
 - **Pull requests** — view, create, merge, and close PRs from the TUI (GitHub backend); link PRs to work items
 - **Branch management** — list, switch, create, delete, merge, and push branches from the TUI; linked work items shown for `tic/` branches; worktree support
@@ -88,7 +88,8 @@ The main screen shows work items filtered by type and iteration, displayed as a 
 | `l` | Set labels (single or marked items) |
 | `t` | Set type (single or marked items) |
 | `Tab` | Cycle work item type filter (epic / issue / task) |
-| `i` | Iteration picker |
+| `i` | Set iteration (single or marked items) |
+| `I` | Switch iteration (full-screen picker) |
 | `,` | Settings |
 | `b` | Create branch / worktree for item (requires git) |
 | `r` | Sync with remote backend |
@@ -108,7 +109,7 @@ Press `Enter` on an item or `c` to create one. The form has these fields:
 - **Priority** — low, medium, high, critical (dropdown)
 - **Assignee** — who owns this (autocomplete from existing assignees)
 - **Labels** — comma-separated tags (autocomplete from existing labels)
-- **Description** — full details (opens `$EDITOR` on Enter)
+- **Description** — full details (opens built-in markdown editor on Enter, or `$EDITOR` if configured)
 - **Parent** — ID of the parent item (autocomplete from existing items)
 - **Depends On** — comma-separated IDs of items this depends on (autocomplete)
 - **Comments** — add new comments; existing comments shown as read-only
@@ -117,7 +118,7 @@ Navigate fields with `↑` `↓`, press `Enter` to edit a field, and `Esc` to sa
 
 ### Iterations
 
-Press `i` in the list view to open the iteration picker. The current iteration filters which items you see. New iterations are created automatically when you assign an item to one that doesn't exist yet.
+Press `I` in the list view to open the full-screen iteration picker, which shows all iterations with their date ranges and color-coded status (active, past, upcoming). The current iteration filters which items you see. Press `i` to set the iteration on the selected or marked items. Iterations support optional start and end dates. Changing an item's iteration cascades to its non-closed descendants. New iterations are created automatically when you assign an item to one that doesn't exist yet.
 
 ### Relationships
 
@@ -222,7 +223,7 @@ Add `--json` to any command for machine-readable output, or `--quiet` to suppres
 |---------|-------------|-----------|
 | Local only (SQLite) | — | Default fallback |
 | GitHub Issues | `tic auth login github` (OAuth) or existing `gh` token | `github.com` in git remote |
-| GitLab Issues | [`glab`](https://gitlab.com/gitlab-org/cli) CLI | `gitlab.com` in git remote |
+| GitLab Issues | `tic auth login gitlab` (OAuth) or PAT | `gitlab.com` in git remote |
 | Azure DevOps Work Items | `tic auth login ado` (Entra ID) or `--pat` | `dev.azure.com` or `visualstudio.com` in git remote |
 | Jira | REST API (configured in settings) | Configured via settings |
 
@@ -232,7 +233,7 @@ You can switch backends from within the TUI by pressing `,` to open settings. Fo
 
 ### Authentication
 
-GitHub and Azure DevOps use tic's built-in authentication with credentials stored securely in your OS keychain. If not already authenticated, the TUI will prompt you to log in when a remote backend is detected.
+GitHub, GitLab, and Azure DevOps use tic's built-in authentication with credentials stored securely in your OS keychain. If not already authenticated, the TUI will prompt you to log in when a remote backend is detected.
 
 **GitHub:**
 
@@ -241,6 +242,13 @@ tic auth login github   # Opens browser for OAuth device flow
 ```
 
 Falls back to an existing `gh` CLI token if available.
+
+**GitLab:**
+
+```bash
+tic auth login gitlab        # OAuth device code flow (recommended)
+tic auth login gitlab --pat  # Personal Access Token
+```
 
 **Azure DevOps:**
 

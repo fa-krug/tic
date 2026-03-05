@@ -92,6 +92,30 @@ Add a timestamped comment to a work item. Only available if backend supports com
 - `text` — comment content
 - `author` — optional, defaults to system
 
+## Closing Items — Always Add a Comment
+
+When closing or completing an item (setting status to a closed/done state), **always add a closing comment** via `add_comment` before or alongside the status update. The comment must include:
+
+1. **What was done** — brief summary of the changes made (e.g., "Fixed the useEffect in WorkItemForm that reset focusedField on back-navigation")
+2. **References** — include any relevant:
+   - Commit hashes (e.g., `a1b2c3d`)
+   - Files changed (e.g., `src/components/WorkItemForm.tsx`)
+   - Related item IDs (e.g., "see also #12")
+   - PR numbers if applicable
+
+**This is not optional.** Every closed item must have a comment trail explaining what was done and where to find the changes.
+
+Example closing comment:
+```
+Fixed by skipping focusedField reset when returning to an existing draft.
+
+Changes:
+- src/components/WorkItemForm.tsx: only reset focusedField when entering a new item, not on back-nav
+- src/stores/formStackStore.test.ts: added test for focusedField preservation across push/pop
+
+Commit: a1b2c3d
+```
+
 ## Example Workflow
 
 ```
@@ -100,4 +124,6 @@ Add a timestamped comment to a work item. Only available if backend supports com
 3. create_item with title, type, priority → create new item
 4. update_item with id, status: "in-progress" → update status
 5. add_comment with id, text → add progress note
+6. add_comment with id, text → closing comment with summary + references
+7. update_item with id, status: "closed" → close item
 ```

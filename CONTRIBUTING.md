@@ -54,7 +54,8 @@ The app uses screen-based routing via React Context (`AppContext` in `src/app.ts
 
 - `list` — main work item list
 - `form` — create/edit work item
-- `iteration-picker` — select current iteration
+- `editor` — in-TUI markdown editor for descriptions
+- `iteration-picker` — full-screen iteration picker with date ranges and color-coded status
 - `settings` — backend selection and Jira configuration
 - `status` — sync status and error details
 - `help` — context-sensitive keyboard shortcut reference
@@ -75,7 +76,7 @@ The app uses screen-based routing via React Context (`AppContext` in `src/app.ts
 
 - **Storage** (`src/storage/`) — SQLite-backed local persistence (always the primary backend)
 - **GitHub** (`src/backends/github/`) — reads/writes GitHub Issues via REST/GraphQL API (OAuth device flow or `gh` token)
-- **GitLab** (`src/backends/gitlab/`) — reads/writes GitLab Issues via the `glab` CLI
+- **GitLab** (`src/backends/gitlab/`) — reads/writes GitLab Issues via REST/GraphQL API (OAuth device flow or PAT)
 - **Azure DevOps** (`src/backends/ado/`) — reads/writes Azure DevOps Work Items via REST API (Entra ID OAuth or PAT)
 - **Jira** (`src/backends/jira/`) — reads/writes Jira issues via REST API
 - **Files** (`src/backends/files/`) — filesystem sync destination that replicates items from `Storage` to `.tic/items/` markdown files via `SyncManager`
@@ -87,10 +88,12 @@ The app uses screen-based routing via React Context (`AppContext` in `src/app.ts
 ### Components
 
 - **WorkItemList** (`src/components/WorkItemList.tsx`) — collapsible tree-indented table with keyboard navigation. Supports bulk operations (mark/unmark items), inline property pickers via OverlayPanel, detail panel toggle, undo, and responsive column hiding based on terminal width.
-- **WorkItemForm** (`src/components/WorkItemForm.tsx`) — multi-field form for create/edit. Supports text fields, dropdowns, autocomplete inputs (assignee, parent, depends-on), multi-autocomplete (labels), external editor for descriptions, and navigable relationship links. Also serves as the template editor via `formMode`.
+- **WorkItemForm** (`src/components/WorkItemForm.tsx`) — multi-field form for create/edit. Supports text fields, dropdowns, autocomplete inputs (assignee, parent, depends-on), multi-autocomplete (labels), built-in markdown editor (or external `$EDITOR`) for descriptions, and navigable relationship links. Also serves as the template editor via `formMode`.
 - **OverlayPanel** (`src/components/OverlayPanel.tsx`) — unified overlay for search, bulk actions, and property pickers (status, priority, type, assignee, labels). Supports single-select, multi-select, and freeform input modes with fuzzy filtering and category grouping.
 - **DetailPanel** (`src/components/DetailPanel.tsx`) — inline preview panel showing selected item metadata (status, priority, assignee, labels) and description with scroll support.
-- **IterationPicker** (`src/components/IterationPicker.tsx`) — select from configured iterations.
+- **IterationPicker** (`src/components/IterationPicker.tsx`) — full-screen iteration picker using TableLayout. Shows iteration name, date range, and color-coded status (active/past/upcoming).
+- **MarkdownEditor** (`src/components/MarkdownEditor.tsx`) — in-TUI markdown editor with syntax highlighting. State managed by `editorStore`. Supports cursor movement, undo/redo, and kill buffer.
+- **CommandBar** (`src/components/CommandBar.tsx`) — extracted command palette and search UI with recent commands, fuzzy search, and command dispatch.
 - **Settings** (`src/components/Settings.tsx`) — backend selector with Jira configuration fields.
 - **StatusScreen** (`src/components/StatusScreen.tsx`) — sync status display with error details.
 - **HelpScreen** (`src/components/HelpScreen.tsx`) — context-sensitive keyboard shortcut reference.
@@ -116,6 +119,7 @@ State is managed via Zustand vanilla stores in `src/stores/`:
 - **uiStore** — UI state (active overlay, warnings, toasts).
 - **filterStore** — saved views and active filters (status, type, priority, assignee, label filtering).
 - **recentCommandsStore** — tracks recently used command palette items (persisted to `.tic/recent-commands.json`).
+- **editorStore** — in-TUI markdown editor state (lines, cursor, undo/redo, scroll, dirty tracking).
 
 ### CLI
 
@@ -127,9 +131,10 @@ State is managed via Zustand vanilla stores in `src/stores/`:
 
 - `keychain.ts` — wrapper around `@napi-rs/keyring` for secure OS keychain storage
 - `github.ts` — GitHub OAuth device flow authentication
+- `gitlab.ts` — GitLab OAuth device flow + PAT fallback
 - `ado.ts` — Azure DevOps Entra ID device code flow + PAT fallback with token refresh
 
-`src/backends/shared/api-client.ts` defines `BaseApiClient` — an abstract base class with common fetch, retry, and error handling. `GitHubApiClient` (`src/backends/github/api.ts`) and `AdoApiClient` (`src/backends/ado/api.ts`) extend it. Both `GitHubBackend` and `AzureDevOpsBackend` use private constructors with static `create()` factory methods that resolve auth tokens before instantiation.
+`src/backends/shared/api-client.ts` defines `BaseApiClient` — an abstract base class with common fetch, retry, and error handling. `GitHubApiClient` (`src/backends/github/api.ts`), `GitLabApiClient` (`src/backends/gitlab/api.ts`), and `AdoApiClient` (`src/backends/ado/api.ts`) extend it. `GitHubBackend`, `GitLabBackend`, and `AzureDevOpsBackend` use private constructors with static `create()` factory methods that resolve auth tokens before instantiation.
 
 ### Types
 
@@ -138,7 +143,9 @@ State is managed via Zustand vanilla stores in `src/stores/`:
 - `WorkItem` — includes `parent: string | null` and `dependsOn: string[]`
 - `Comment` — author, date, body
 - `NewWorkItem` / `NewComment` — creation inputs
+- `Template` — reusable work item template (slug, name, optional field defaults)
 - `PullRequest` / `NewPullRequest` — pull request data and creation inputs
+- `Iteration` — name with optional `startDate` and `endDate` (ISO date strings)
 
 Validation (circular references, referential integrity) is enforced at the backend level. References are cleaned up on delete.
 

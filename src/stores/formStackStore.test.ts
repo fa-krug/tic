@@ -71,6 +71,19 @@ describe('formStackStore', () => {
       const popped = formStackStore.getState().pop();
       expect(popped).toBeUndefined();
     });
+
+    it('preserves focusedField of parent draft after popping child', () => {
+      const parentDraft = createDraft({ itemId: 'item-1', focusedField: 5 });
+      const childDraft = createDraft({ itemId: 'item-2', focusedField: 0 });
+      formStackStore.getState().push(parentDraft);
+      formStackStore.getState().push(childDraft);
+
+      formStackStore.getState().pop();
+
+      const restored = formStackStore.getState().currentDraft();
+      expect(restored?.focusedField).toBe(5);
+      expect(restored?.itemId).toBe('item-1');
+    });
   });
 
   describe('currentDraft', () => {

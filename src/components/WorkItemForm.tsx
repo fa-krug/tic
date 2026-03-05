@@ -486,7 +486,12 @@ export function WorkItemForm() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setFocusedField(0);
+    // Only reset focusedField when entering a new item, not when returning
+    // to an existing draft via back-navigation (which already has focusedField preserved)
+    const draft = formStackStore.getState().currentDraft();
+    if (!draft || draft.itemId !== selectedWorkItemId) {
+      setFocusedField(0);
+    }
     setEditing(false);
   }, [selectedWorkItemId]);
 
