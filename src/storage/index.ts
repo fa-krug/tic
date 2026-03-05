@@ -234,6 +234,16 @@ export class Storage
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
+  override async getClosedStatuses(): Promise<string[]> {
+    const rows = this.db
+      .select()
+      .from(schema.statuses)
+      .orderBy(schema.statuses.sortOrder)
+      .all();
+    return rows.length > 0 ? [rows[rows.length - 1]!.name] : [];
+  }
+
+  // eslint-disable-next-line @typescript-eslint/require-await
   async getIterations(): Promise<Iteration[]> {
     const rows = this.db
       .select()
@@ -868,6 +878,47 @@ export class Storage
           .values({ name: data.iteration, sortOrder: 0 })
           .onConflictDoNothing()
           .run();
+      }
+
+      // Cascade iteration change to non-closed descendants
+      if (
+        'iteration' in data &&
+        data.iteration !== undefined &&
+        data.iteration !== existingRow.iteration
+      ) {
+        const closedStatuses = new Set(
+          this.db
+            .select()
+            .from(schema.statuses)
+            .orderBy(schema.statuses.sortOrder)
+            .all()
+            .slice(-1)
+            .map((r) => r.name),
+        );
+
+        const cascadeIteration = (parentId: string) => {
+          const children = tx
+            .select()
+            .from(schema.workItems)
+            .where(
+              and(
+                eq(schema.workItems.parent, parentId),
+                isNull(schema.workItems.deletedAt),
+              ),
+            )
+            .all();
+
+          for (const child of children) {
+            if (closedStatuses.has(child.status)) continue;
+            tx.update(schema.workItems)
+              .set({ iteration: data.iteration!, updated: now })
+              .where(eq(schema.workItems.id, child.id))
+              .run();
+            cascadeIteration(child.id);
+          }
+        };
+
+        cascadeIteration(id);
       }
     });
 

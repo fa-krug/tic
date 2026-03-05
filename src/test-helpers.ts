@@ -124,6 +124,7 @@ export function createMockRemote(items: WorkItem[] = []): Backend {
       },
     }),
     getStatuses: async () => ['backlog', 'todo', 'in-progress', 'done'],
+    getClosedStatuses: async () => ['done'],
     getIterations: async (): Promise<Iteration[]> => [
       { name: 'default', startDate: null, endDate: null },
     ],

@@ -48,6 +48,7 @@ export class UnsupportedOperationError extends Error {
 export interface Backend {
   getCapabilities(): BackendCapabilities;
   getStatuses(): Promise<string[]>;
+  getClosedStatuses(): Promise<string[]>;
   getIterations(): Promise<Iteration[]>;
   getWorkItemTypes(): Promise<string[]>;
   getAssignees(): Promise<string[]>;
@@ -146,6 +147,11 @@ export abstract class BaseBackend implements Backend {
     template: Template,
   ): Promise<Template>;
   abstract deleteTemplate(slug: string): Promise<void>;
+
+  async getClosedStatuses(): Promise<string[]> {
+    const statuses = await this.getStatuses();
+    return statuses.length > 0 ? [statuses[statuses.length - 1]!] : [];
+  }
 
   async getChildren(id: string): Promise<WorkItem[]> {
     const all = await this.getCachedItems();

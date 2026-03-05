@@ -229,6 +229,11 @@ export class GitHubBackend extends BaseBackend implements PrBackend {
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
+  override async getClosedStatuses(): Promise<string[]> {
+    return ['closed'];
+  }
+
+  // eslint-disable-next-line @typescript-eslint/require-await
   async getWorkItemTypes(): Promise<string[]> {
     return ['issue'];
   }

@@ -333,6 +333,11 @@ export class GitLabBackend extends BaseBackend {
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
+  override async getClosedStatuses(): Promise<string[]> {
+    return ['closed'];
+  }
+
+  // eslint-disable-next-line @typescript-eslint/require-await
   async getWorkItemTypes(): Promise<string[]> {
     return ['epic', 'issue'];
   }

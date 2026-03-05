@@ -147,6 +147,40 @@ describe('AzureDevOpsBackend', () => {
     });
   });
 
+  describe('getClosedStatuses', () => {
+    it('returns states with Completed or Removed category', async () => {
+      mockApi.rest.mockResolvedValueOnce({
+        value: [
+          {
+            name: 'Epic',
+            states: [
+              { name: 'New', category: 'Proposed' },
+              { name: 'Active', category: 'InProgress' },
+              { name: 'Closed', category: 'Completed' },
+              { name: 'Removed', category: 'Removed' },
+            ],
+          },
+          {
+            name: 'User Story',
+            states: [
+              { name: 'New', category: 'Proposed' },
+              { name: 'Active', category: 'InProgress' },
+              { name: 'Resolved', category: 'Completed' },
+              { name: 'Closed', category: 'Completed' },
+            ],
+          },
+        ],
+      });
+      const backend = await AzureDevOpsBackend.create('/repo');
+      const closed = await backend.getClosedStatuses();
+      expect(closed).toContain('Closed');
+      expect(closed).toContain('Removed');
+      expect(closed).toContain('Resolved');
+      expect(closed).not.toContain('New');
+      expect(closed).not.toContain('Active');
+    });
+  });
+
   describe('getWorkItemTypes', () => {
     it('returns types from ADO project', async () => {
       const backend = await makeBackend();

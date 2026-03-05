@@ -761,6 +761,147 @@ describe('Storage', () => {
     });
   });
 
+  // ─── getClosedStatuses ──────────────────────────────────────────
+
+  describe('getClosedStatuses', () => {
+    it('returns the last status as closed by default', async () => {
+      const closed = await backend.getClosedStatuses();
+      expect(closed).toEqual(['done']);
+    });
+
+    it('returns last status when statuses are customized', async () => {
+      updateConfig(db, { statuses: ['open', 'wip', 'closed'] });
+      const closed = await backend.getClosedStatuses();
+      expect(closed).toEqual(['closed']);
+    });
+  });
+
+  // ─── updateWorkItem iteration cascade ─────────────────────────────
+
+  describe('updateWorkItem iteration cascade', () => {
+    it('cascades iteration change to direct children', async () => {
+      const parent = await backend.createWorkItem(
+        makeNewWorkItem({ title: 'Parent', iteration: 'sprint-1' }),
+      );
+      const child = await backend.createWorkItem(
+        makeNewWorkItem({
+          title: 'Child',
+          iteration: 'sprint-1',
+          parent: parent.id,
+        }),
+      );
+
+      await backend.updateWorkItem(parent.id, { iteration: 'sprint-2' });
+
+      const updatedChild = await backend.getWorkItem(child.id);
+      expect(updatedChild.iteration).toBe('sprint-2');
+    });
+
+    it('cascades iteration change to all descendants recursively', async () => {
+      const parent = await backend.createWorkItem(
+        makeNewWorkItem({ title: 'Parent', iteration: 'sprint-1' }),
+      );
+      const child = await backend.createWorkItem(
+        makeNewWorkItem({
+          title: 'Child',
+          iteration: 'sprint-1',
+          parent: parent.id,
+        }),
+      );
+      const grandchild = await backend.createWorkItem(
+        makeNewWorkItem({
+          title: 'Grandchild',
+          iteration: 'sprint-1',
+          parent: child.id,
+        }),
+      );
+
+      await backend.updateWorkItem(parent.id, { iteration: 'sprint-2' });
+
+      const updatedChild = await backend.getWorkItem(child.id);
+      const updatedGrandchild = await backend.getWorkItem(grandchild.id);
+      expect(updatedChild.iteration).toBe('sprint-2');
+      expect(updatedGrandchild.iteration).toBe('sprint-2');
+    });
+
+    it('does not cascade to closed descendants', async () => {
+      const parent = await backend.createWorkItem(
+        makeNewWorkItem({ title: 'Parent', iteration: 'sprint-1' }),
+      );
+      const openChild = await backend.createWorkItem(
+        makeNewWorkItem({
+          title: 'Open Child',
+          iteration: 'sprint-1',
+          status: 'todo',
+          parent: parent.id,
+        }),
+      );
+      const closedChild = await backend.createWorkItem(
+        makeNewWorkItem({
+          title: 'Closed Child',
+          iteration: 'sprint-1',
+          status: 'done',
+          parent: parent.id,
+        }),
+      );
+
+      await backend.updateWorkItem(parent.id, { iteration: 'sprint-2' });
+
+      const updatedOpen = await backend.getWorkItem(openChild.id);
+      const updatedClosed = await backend.getWorkItem(closedChild.id);
+      expect(updatedOpen.iteration).toBe('sprint-2');
+      expect(updatedClosed.iteration).toBe('sprint-1');
+    });
+
+    it('does not cascade through closed descendants', async () => {
+      const parent = await backend.createWorkItem(
+        makeNewWorkItem({ title: 'Parent', iteration: 'sprint-1' }),
+      );
+      const closedChild = await backend.createWorkItem(
+        makeNewWorkItem({
+          title: 'Closed Child',
+          iteration: 'sprint-1',
+          status: 'done',
+          parent: parent.id,
+        }),
+      );
+      const grandchild = await backend.createWorkItem(
+        makeNewWorkItem({
+          title: 'Grandchild under closed',
+          iteration: 'sprint-1',
+          status: 'todo',
+          parent: closedChild.id,
+        }),
+      );
+
+      await backend.updateWorkItem(parent.id, { iteration: 'sprint-2' });
+
+      const updatedClosed = await backend.getWorkItem(closedChild.id);
+      const updatedGrandchild = await backend.getWorkItem(grandchild.id);
+      expect(updatedClosed.iteration).toBe('sprint-1');
+      expect(updatedGrandchild.iteration).toBe('sprint-1');
+    });
+
+    it('does not cascade when iteration does not change', async () => {
+      const parent = await backend.createWorkItem(
+        makeNewWorkItem({ title: 'Parent', iteration: 'sprint-1' }),
+      );
+      const child = await backend.createWorkItem(
+        makeNewWorkItem({
+          title: 'Child',
+          iteration: 'sprint-1',
+          parent: parent.id,
+        }),
+      );
+
+      // Update title only, not iteration
+      await backend.updateWorkItem(parent.id, { title: 'New Title' });
+
+      const updatedChild = await backend.getWorkItem(child.id);
+      expect(updatedChild.iteration).toBe('sprint-1');
+    });
+  });
+
   // ─── deleteWorkItem ──────────────────────────────────────────────
 
   describe('deleteWorkItem', () => {

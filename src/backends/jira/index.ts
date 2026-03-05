@@ -107,10 +107,9 @@ export class JiraBackend extends BaseBackend {
   }
 
   async getStatuses(): Promise<string[]> {
-    const groups = await this.api.rest<{ statuses: { name: string }[] }[]>(
-      'GET',
-      `/api/3/project/${this.config.project}/statuses`,
-    );
+    const groups = await this.api.rest<
+      { statuses: { name: string; statusCategory?: { key: string } }[] }[]
+    >('GET', `/api/3/project/${this.config.project}/statuses`);
     const seen = new Set<string>();
     const result: string[] = [];
     for (const group of groups) {
@@ -119,6 +118,26 @@ export class JiraBackend extends BaseBackend {
         if (!seen.has(lower)) {
           seen.add(lower);
           result.push(lower);
+        }
+      }
+    }
+    return result;
+  }
+
+  override async getClosedStatuses(): Promise<string[]> {
+    const groups = await this.api.rest<
+      { statuses: { name: string; statusCategory?: { key: string } }[] }[]
+    >('GET', `/api/3/project/${this.config.project}/statuses`);
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const group of groups) {
+      for (const s of group.statuses) {
+        if (s.statusCategory?.key === 'done') {
+          const lower = s.name.toLowerCase();
+          if (!seen.has(lower)) {
+            seen.add(lower);
+            result.push(lower);
+          }
         }
       }
     }

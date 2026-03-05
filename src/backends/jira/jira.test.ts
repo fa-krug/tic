@@ -168,6 +168,43 @@ describe('JiraBackend', () => {
     });
   });
 
+  describe('getClosedStatuses', () => {
+    it('returns statuses with done statusCategory', async () => {
+      const backend = await JiraBackend.create('/repo');
+      mockApi.rest.mockResolvedValue([
+        {
+          statuses: [
+            {
+              name: 'To Do',
+              statusCategory: { key: 'new' },
+            },
+            {
+              name: 'In Progress',
+              statusCategory: { key: 'indeterminate' },
+            },
+          ],
+        },
+        {
+          statuses: [
+            {
+              name: 'Done',
+              statusCategory: { key: 'done' },
+            },
+            {
+              name: 'Closed',
+              statusCategory: { key: 'done' },
+            },
+          ],
+        },
+      ]);
+      const closed = await backend.getClosedStatuses();
+      expect(closed).toContain('done');
+      expect(closed).toContain('closed');
+      expect(closed).not.toContain('to do');
+      expect(closed).not.toContain('in progress');
+    });
+  });
+
   describe('getWorkItemTypes', () => {
     it('returns issue types from project config', async () => {
       const backend = await JiraBackend.create('/repo');

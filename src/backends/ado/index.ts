@@ -142,6 +142,19 @@ export class AzureDevOpsBackend extends BaseBackend {
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
+  override async getClosedStatuses(): Promise<string[]> {
+    const closed = new Set<string>();
+    for (const type of this.types) {
+      for (const state of type.states) {
+        if (state.category === 'Completed' || state.category === 'Removed') {
+          closed.add(state.name);
+        }
+      }
+    }
+    return [...closed];
+  }
+
+  // eslint-disable-next-line @typescript-eslint/require-await
   async getWorkItemTypes(): Promise<string[]> {
     return this.types.map((t) => t.name);
   }

@@ -32,7 +32,7 @@ export interface AdoIteration {
 
 export interface AdoWorkItemType {
   name: string;
-  states: { name: string }[];
+  states: { name: string; category?: string }[];
 }
 
 export function mapPriorityToTic(
