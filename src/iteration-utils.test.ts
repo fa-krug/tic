@@ -45,7 +45,7 @@ describe('findCurrentIteration', () => {
 describe('formatIterationDates', () => {
   it('formats both dates as short range', () => {
     expect(formatIterationDates('2026-01-06', '2026-01-20')).toBe(
-      'Jan 6 \u2013 Jan 20',
+      'Jan 06 \u2013 Jan 20',
     );
   });
 
@@ -54,7 +54,7 @@ describe('formatIterationDates', () => {
   });
 
   it('formats start date only', () => {
-    expect(formatIterationDates('2026-01-06', null)).toBe('from Jan 6');
+    expect(formatIterationDates('2026-01-06', null)).toBe('from Jan 06');
   });
 
   it('returns null when no dates', () => {

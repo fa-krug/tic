@@ -25,7 +25,7 @@ export function formatIterationDates(
     const [y, m, d] = iso.split('-').map(Number) as [number, number, number];
     const date = new Date(y, m - 1, d);
     const month = date.toLocaleString('en-US', { month: 'short' });
-    return `${month} ${date.getDate()}`;
+    return `${month} ${String(date.getDate()).padStart(2, '0')}`;
   };
 
   if (startDate && endDate) return `${fmt(startDate)} \u2013 ${fmt(endDate)}`;
