@@ -14,6 +14,8 @@ interface Snapshot {
 export interface VisibleLine {
   lineIndex: number;
   text: string;
+  /** Character offset into the logical line where this visual sub-line starts */
+  sliceStart: number;
 }
 
 interface EditorState {
@@ -177,20 +179,26 @@ export const editorStore = createStore<EditorState>((set, get) => ({
     let visualRow = 0;
 
     for (let i = 0; i < lines.length; i++) {
-      const h = visualHeight(lines[i]!, terminalWidth);
-      const lineStart = visualRow;
-      const lineEnd = visualRow + h; // exclusive
+      const line = lines[i]!;
+      const h = visualHeight(line, terminalWidth);
 
-      // If this line overlaps the viewport window [scrollOffset, scrollOffset+viewportHeight)
-      if (lineEnd > scrollOffset && lineStart < scrollOffset + viewportHeight) {
-        result.push({ lineIndex: i, text: lines[i]! });
+      for (let subLine = 0; subLine < h; subLine++) {
+        if (
+          visualRow >= scrollOffset &&
+          visualRow < scrollOffset + viewportHeight
+        ) {
+          const sliceStart = subLine * terminalWidth;
+          const sliceEnd = Math.min(sliceStart + terminalWidth, line.length);
+          result.push({
+            lineIndex: i,
+            text: line.slice(sliceStart, sliceEnd),
+            sliceStart,
+          });
+        }
+        visualRow++;
+        if (result.length >= viewportHeight) break;
       }
-
-      visualRow += h;
-      // Early exit if we've passed the viewport
-      if (visualRow >= scrollOffset + viewportHeight) {
-        break;
-      }
+      if (result.length >= viewportHeight) break;
     }
 
     return result;

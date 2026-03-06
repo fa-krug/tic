@@ -230,6 +230,32 @@ export function splitTokensAtCol(tokens: Token[], col: number): CursorSplit {
   };
 }
 
+export function sliceTokens(
+  tokens: Token[],
+  start: number,
+  end: number,
+): Token[] {
+  const result: Token[] = [];
+  let pos = 0;
+
+  for (const token of tokens) {
+    const tStart = pos;
+    const tEnd = pos + token.text.length;
+    if (tEnd > start && tStart < end) {
+      const sliceStart = Math.max(0, start - tStart);
+      const sliceEnd = Math.min(token.text.length, end - tStart);
+      result.push({
+        type: token.type,
+        text: token.text.slice(sliceStart, sliceEnd),
+      });
+    }
+    pos = tEnd;
+    if (pos >= end) break;
+  }
+
+  return result;
+}
+
 export function highlightLine(
   line: string,
   context: LineContext = 'normal',
@@ -271,6 +297,57 @@ export function highlightLineWithCursor(
 ): React.ReactNode {
   const tokens = tokenize(line, context);
   const { before, cursor, after } = splitTokensAtCol(tokens, cursorCol);
+  const cursorStyle = tokenStyles[cursor.type];
+
+  return React.createElement(
+    React.Fragment,
+    null,
+    ...renderTokens(before, 0),
+    React.createElement(
+      Text,
+      { key: 'cursor', ...cursorStyle, inverse: true },
+      cursor.char,
+    ),
+    ...renderTokens(after, before.length + 1),
+  );
+}
+
+export function highlightSlice(
+  fullLine: string,
+  sliceStart: number,
+  sliceEnd: number,
+  context: LineContext = 'normal',
+): React.ReactNode {
+  const tokens = tokenize(fullLine, context);
+  const sliced = sliceTokens(tokens, sliceStart, sliceEnd);
+  if (sliced.length === 0) {
+    return React.createElement(Text, null, ' ');
+  }
+  if (sliced.length === 1 && sliced[0]!.type === 'text') {
+    return React.createElement(Text, null, sliced[0]!.text);
+  }
+  return React.createElement(
+    React.Fragment,
+    null,
+    ...sliced.map((token, i) => {
+      const style = tokenStyles[token.type];
+      return React.createElement(Text, { key: i, ...style }, token.text);
+    }),
+  );
+}
+
+export function highlightSliceWithCursor(
+  fullLine: string,
+  sliceStart: number,
+  sliceEnd: number,
+  cursorCol: number,
+  context: LineContext = 'normal',
+): React.ReactNode {
+  const tokens = tokenize(fullLine, context);
+  const sliced = sliceTokens(tokens, sliceStart, sliceEnd);
+  // Adjust cursor col relative to the slice
+  const adjustedCol = cursorCol - sliceStart;
+  const { before, cursor, after } = splitTokensAtCol(sliced, adjustedCol);
   const cursorStyle = tokenStyles[cursor.type];
 
   return React.createElement(

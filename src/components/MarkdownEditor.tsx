@@ -7,6 +7,8 @@ import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import {
   highlightLine,
   highlightLineWithCursor,
+  highlightSlice,
+  highlightSliceWithCursor,
   computeLineContexts,
   type LineContext,
 } from './markdownHighlight.js';
@@ -171,15 +173,51 @@ export function MarkdownEditor() {
     .getVisibleLines(viewportHeight, width);
   const lineContexts = computeLineContexts(lines);
 
-  function renderLine(lineIndex: number, text: string, context: LineContext) {
-    if (lineIndex === cursor.row) {
+  function renderVisibleLine(
+    lineIndex: number,
+    fullLine: string,
+    sliceStart: number,
+    context: LineContext,
+    key: number,
+  ) {
+    const sliceEnd = Math.min(sliceStart + width, fullLine.length);
+    const isCursorLine = lineIndex === cursor.row;
+    const cursorInSlice =
+      isCursorLine &&
+      cursor.col >= sliceStart &&
+      (cursor.col < sliceEnd || sliceEnd === fullLine.length);
+
+    if (sliceStart === 0 && fullLine.length <= width) {
+      // Short line — no wrapping needed, use fast path
+      if (isCursorLine) {
+        return (
+          <Box key={key}>
+            {highlightLineWithCursor(fullLine, cursor.col, context)}
+          </Box>
+        );
+      }
+      return <Box key={key}>{highlightLine(fullLine, context)}</Box>;
+    }
+
+    // Wrapped sub-line
+    if (cursorInSlice) {
       return (
-        <Box key={lineIndex}>
-          {highlightLineWithCursor(text, cursor.col, context)}
+        <Box key={key}>
+          {highlightSliceWithCursor(
+            fullLine,
+            sliceStart,
+            sliceEnd,
+            cursor.col,
+            context,
+          )}
         </Box>
       );
     }
-    return <Box key={lineIndex}>{highlightLine(text, context)}</Box>;
+    return (
+      <Box key={key}>
+        {highlightSlice(fullLine, sliceStart, sliceEnd, context)}
+      </Box>
+    );
   }
 
   return (
@@ -198,8 +236,14 @@ export function MarkdownEditor() {
 
       {/* Editor area */}
       <Box flexDirection="column" height={viewportHeight}>
-        {visibleLines.map(({ lineIndex, text }) =>
-          renderLine(lineIndex, text, lineContexts[lineIndex] ?? 'normal'),
+        {visibleLines.map(({ lineIndex, sliceStart }, i) =>
+          renderVisibleLine(
+            lineIndex,
+            lines[lineIndex]!,
+            sliceStart,
+            lineContexts[lineIndex] ?? 'normal',
+            i,
+          ),
         )}
         {/* Fill remaining viewport with empty lines */}
         {Array.from({

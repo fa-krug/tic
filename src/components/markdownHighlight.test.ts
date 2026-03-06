@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   tokenize,
   splitTokensAtCol,
+  sliceTokens,
   computeLineContexts,
 } from './markdownHighlight.js';
 
@@ -223,5 +224,44 @@ describe('splitTokensAtCol', () => {
     expect(result.before).toEqual([{ type: 'text', text: 'say ' }]);
     expect(result.cursor).toEqual({ type: 'bold', char: '*' });
     expect(result.after).toEqual([{ type: 'bold', text: '*bold**' }]);
+  });
+});
+
+describe('sliceTokens', () => {
+  it('returns full tokens when slice covers everything', () => {
+    const tokens = tokenize('hello world');
+    const sliced = sliceTokens(tokens, 0, 11);
+    expect(sliced).toEqual([{ type: 'text', text: 'hello world' }]);
+  });
+
+  it('slices within a single token', () => {
+    const tokens = tokenize('hello world');
+    const sliced = sliceTokens(tokens, 3, 8);
+    expect(sliced).toEqual([{ type: 'text', text: 'lo wo' }]);
+  });
+
+  it('slices across token boundaries', () => {
+    const tokens = tokenize('say **bold** end');
+    // "say " (4) + "**bold**" (8) + " end" (4) = 16
+    // slice [2, 14) = "y **bold** e"
+    const sliced = sliceTokens(tokens, 2, 14);
+    expect(sliced).toEqual([
+      { type: 'text', text: 'y ' },
+      { type: 'bold', text: '**bold**' },
+      { type: 'text', text: ' e' },
+    ]);
+  });
+
+  it('slices within a styled token', () => {
+    const tokens = tokenize('say **bold** end');
+    // slice [6, 10) = "bold"
+    const sliced = sliceTokens(tokens, 6, 10);
+    expect(sliced).toEqual([{ type: 'bold', text: 'bold' }]);
+  });
+
+  it('returns empty array for out-of-range slice', () => {
+    const tokens = tokenize('hi');
+    const sliced = sliceTokens(tokens, 5, 10);
+    expect(sliced).toEqual([]);
   });
 });

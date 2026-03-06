@@ -476,6 +476,37 @@ describe('editorStore', () => {
       expect(visible.map((v) => v.lineIndex)).toEqual([2, 3, 4]);
       expect(visible.map((v) => v.text)).toEqual(['c', 'd', 'e']);
     });
+
+    it('getVisibleLines splits long lines into sub-lines', () => {
+      // Line of 20 chars at width 10 → 2 visual rows
+      editorStore.getState().init('abcdefghijklmnopqrst\nxy');
+      editorStore.getState().updateScroll(5, 10);
+      const visible = editorStore.getState().getVisibleLines(5, 10);
+      expect(visible).toEqual([
+        { lineIndex: 0, text: 'abcdefghij', sliceStart: 0 },
+        { lineIndex: 0, text: 'klmnopqrst', sliceStart: 10 },
+        { lineIndex: 1, text: 'xy', sliceStart: 0 },
+      ]);
+    });
+
+    it('getVisibleLines respects viewport height with wrapped lines', () => {
+      // 30-char line at width 10 → 3 visual rows, viewport of 2
+      editorStore.getState().init('abcdefghijklmnopqrstuvwxyz1234');
+      editorStore.getState().updateScroll(2, 10);
+      const visible = editorStore.getState().getVisibleLines(2, 10);
+      expect(visible.length).toBe(2);
+      expect(visible[0]!.text).toBe('abcdefghij');
+      expect(visible[1]!.text).toBe('klmnopqrst');
+    });
+
+    it('getVisibleLines includes sliceStart for sub-lines', () => {
+      editorStore.getState().init('abcdefghijklmno'); // 15 chars, width 10 → 2 rows
+      editorStore.getState().updateScroll(5, 10);
+      const visible = editorStore.getState().getVisibleLines(5, 10);
+      expect(visible[0]!.sliceStart).toBe(0);
+      expect(visible[1]!.sliceStart).toBe(10);
+      expect(visible[1]!.text).toBe('klmno');
+    });
   });
 
   describe('undo/redo', () => {
