@@ -83,52 +83,56 @@ export class GitLabApiClient extends BaseApiClient {
     data: Buffer,
     filename: string,
   ): Promise<{ url: string; markdown: string }> {
-    const encodedId = encodeURIComponent(projectId);
-    const url = `${this.baseUrl}/api/v4/projects/${encodedId}/uploads`;
+    return this.retry(async () => {
+      const encodedId = encodeURIComponent(projectId);
+      const url = `${this.baseUrl}/api/v4/projects/${encodedId}/uploads`;
 
-    const formData = new FormData();
-    formData.append('file', new Blob([new Uint8Array(data)]), filename);
+      const formData = new FormData();
+      formData.append('file', new Blob([new Uint8Array(data)]), filename);
 
-    const headers: Record<string, string> = {
-      Authorization: `Bearer ${this.token}`,
-    };
+      const headers: Record<string, string> = {
+        Authorization: `Bearer ${this.token}`,
+      };
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
 
-    let response: Response;
-    try {
-      response = await globalThis.fetch(url, {
-        method: 'POST',
-        headers,
-        body: formData,
-        signal: controller.signal,
-      });
-    } catch (error: unknown) {
-      if (error instanceof DOMException && error.name === 'AbortError') {
-        throw new Error('Request timed out');
+      let response: Response;
+      try {
+        response = await globalThis.fetch(url, {
+          method: 'POST',
+          headers,
+          body: formData,
+          signal: controller.signal,
+        });
+      } catch (error: unknown) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          throw new Error('Request timed out');
+        }
+        throw error;
+      } finally {
+        clearTimeout(timeout);
       }
-      throw error;
-    } finally {
-      clearTimeout(timeout);
-    }
 
-    if (response.status === 401) {
-      throw new AuthError();
-    }
+      this.checkRateLimit(response.headers);
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: Upload failed`);
-    }
+      if (response.status === 401) {
+        throw new AuthError();
+      }
 
-    const json = (await response.json()) as {
-      alt: string;
-      url: string;
-      full_path: string;
-      markdown: string;
-    };
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: Upload failed`);
+      }
 
-    return { url: json.full_path, markdown: json.markdown };
+      const json = (await response.json()) as {
+        alt: string;
+        url: string;
+        full_path: string;
+        markdown: string;
+      };
+
+      return { url: json.full_path, markdown: json.markdown };
+    });
   }
 
   async *paginate<T>(

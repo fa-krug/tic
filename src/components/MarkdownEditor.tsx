@@ -132,6 +132,11 @@ export function MarkdownEditor() {
         return;
       }
 
+      if (s.uploadStatus) {
+        uiStore.getState().setToast('Upload already in progress');
+        return;
+      }
+
       editorStore.setState({ uploadStatus: 'Uploading image...' });
       const hash = Date.now().toString(36);
       const filename = `paste-${hash}.png`;
