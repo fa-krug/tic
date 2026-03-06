@@ -3,6 +3,7 @@ import type { WorkItem } from '../types.js';
 import { useThemeStore } from '../stores/themeStore.js';
 import { useBackendDataStore } from '../stores/backendDataStore.js';
 import { ColorPill } from './ColorPill.js';
+import { computeLineContexts, highlightLine } from './markdownHighlight.js';
 
 export function truncateDescription(
   description: string,
@@ -40,9 +41,16 @@ export function DetailPanel({
 
   const descriptionLines =
     hasDescription && showFullDescription ? item.description.split('\n') : [];
+  const lineContexts = descriptionLines.length
+    ? computeLineContexts(descriptionLines)
+    : [];
   const scrollOffset = descriptionScrollOffset ?? 0;
   const viewportHeight = maxDescriptionHeight ?? descriptionLines.length;
   const visibleLines = descriptionLines.slice(
+    scrollOffset,
+    scrollOffset + viewportHeight,
+  );
+  const visibleContexts = lineContexts.slice(
     scrollOffset,
     scrollOffset + viewportHeight,
   );
@@ -97,9 +105,7 @@ export function DetailPanel({
       {showFullDescription && hasDescription && (
         <Box flexDirection="column" marginTop={1}>
           {visibleLines.map((line, idx) => (
-            <Box key={idx}>
-              <Text dimColor={mutedDim}>{line || ' '}</Text>
-            </Box>
+            <Box key={idx}>{highlightLine(line, visibleContexts[idx])}</Box>
           ))}
         </Box>
       )}
