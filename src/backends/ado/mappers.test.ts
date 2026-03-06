@@ -140,6 +140,43 @@ describe('mapWorkItemToWorkItem', () => {
     expect(item.comments).toEqual([]);
   });
 
+  it('preserves newlines in plain text descriptions (no HTML tags)', () => {
+    const plainMarkdown =
+      '## Overview\n\nSome text.\n\n## Details\n\n- item 1\n- item 2';
+    const item = mapWorkItemToWorkItem({
+      id: 99,
+      fields: {
+        'System.Title': 'Plain text desc',
+        'System.WorkItemType': 'Task',
+        'System.State': 'New',
+        'System.IterationPath': 'Project',
+        'System.Description': plainMarkdown,
+        'System.CreatedDate': '2026-01-01T00:00:00Z',
+        'System.ChangedDate': '2026-01-01T00:00:00Z',
+      },
+    });
+    expect(item.description).toBe(plainMarkdown);
+  });
+
+  it('converts HTML descriptions to markdown', () => {
+    const html = '<h2>Overview</h2><p>Some text.</p>';
+    const item = mapWorkItemToWorkItem({
+      id: 100,
+      fields: {
+        'System.Title': 'HTML desc',
+        'System.WorkItemType': 'Task',
+        'System.State': 'New',
+        'System.IterationPath': 'Project',
+        'System.Description': html,
+        'System.CreatedDate': '2026-01-01T00:00:00Z',
+        'System.ChangedDate': '2026-01-01T00:00:00Z',
+      },
+    });
+    expect(item.description).toContain('Overview');
+    expect(item.description).toContain('Some text.');
+    expect(item.description).toContain('\n');
+  });
+
   it('handles missing optional fields', () => {
     const minimal = {
       id: 1,

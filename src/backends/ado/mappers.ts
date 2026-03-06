@@ -108,6 +108,9 @@ export function extractPredecessors(
 
 function htmlToMarkdown(html: string | undefined): string {
   if (!html) return '';
+  // If the content has no HTML tags, it's plain text/markdown — return as-is
+  // to preserve newlines (HTML whitespace rules would collapse them)
+  if (!/<[a-z][\s\S]*?>/i.test(html)) return html;
   return turndown.turndown(html);
 }
 
