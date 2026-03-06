@@ -238,6 +238,19 @@ export function getDefaultBranch(cwd?: string): string {
     ).trim();
     return result.replace('refs/remotes/origin/', '');
   } catch {
-    return 'main';
+    // Fallback: check if 'main' or 'master' exists as remote branch
+    try {
+      execFileSync(
+        'git',
+        ['rev-parse', '--verify', 'refs/remotes/origin/main'],
+        {
+          cwd,
+          stdio: ['pipe', 'pipe', 'pipe'],
+        },
+      );
+      return 'main';
+    } catch {
+      return 'master';
+    }
   }
 }

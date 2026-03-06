@@ -2,7 +2,7 @@ import { useLayoutEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { editorStore, useEditorStore } from '../stores/editorStore.js';
 import { formStackStore, useFormStackStore } from '../stores/formStackStore.js';
-import { navigationStore } from '../stores/navigationStore.js';
+import { navigationStore, type Screen } from '../stores/navigationStore.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import {
   highlightLine,
@@ -47,12 +47,13 @@ export function MarkdownEditor() {
 
   useInput((input, key) => {
     const s = editorStore.getState();
+    const returnScreen = (s.returnScreen ?? 'form') as Screen;
 
     // Discard prompt mode — only handle d and escape
     if (showDiscardPrompt) {
       if (input === 'd') {
         s.destroy();
-        navigationStore.getState().navigate('form');
+        navigationStore.getState().navigate(returnScreen);
       }
       if (key.escape) {
         editorStore.setState({ showDiscardPrompt: false });
@@ -62,9 +63,14 @@ export function MarkdownEditor() {
 
     // Save: Ctrl+S
     if (input === 's' && key.ctrl) {
-      formStackStore.getState().updateFields({ description: s.getContent() });
+      const content = s.getContent();
+      if (s.onSave) {
+        s.onSave(content);
+      } else {
+        formStackStore.getState().updateFields({ description: content });
+      }
       s.destroy();
-      navigationStore.getState().navigate('form');
+      navigationStore.getState().navigate(returnScreen);
       return;
     }
 
@@ -74,7 +80,7 @@ export function MarkdownEditor() {
         editorStore.setState({ showDiscardPrompt: true });
       } else {
         s.destroy();
-        navigationStore.getState().navigate('form');
+        navigationStore.getState().navigate(returnScreen);
       }
       return;
     }
@@ -92,6 +98,8 @@ export function MarkdownEditor() {
 
     // Paste image: Ctrl+V
     if (input === 'v' && key.ctrl) {
+      if (editorStore.getState().uploadStatus) return; // upload already in progress
+
       const backendType = configStore.getState().config.backend;
       if (backendType !== 'github') return;
 

@@ -18,7 +18,8 @@ import type { UpdateInfo } from '../update-checker.js';
 import { VERSION } from '../version.js';
 import { requestUpdate } from '../updater.js';
 import { OverlayPanel } from './OverlayPanel.js';
-import { openInEditor } from '../editor.js';
+import { editorStore } from '../stores/editorStore.js';
+import { navigationStore } from '../stores/navigationStore.js';
 import { matchesCommand } from '../commands.js';
 import { defaultConfig } from '../storage/config.js';
 import { useTerminalWidth } from '../hooks/useTerminalWidth.js';
@@ -358,22 +359,18 @@ export function Settings() {
             .update({ autoUpdate: !(config.autoUpdate !== false) })
             .catch(() => {});
         } else if (item.kind === 'branch-command') {
-          try {
-            const current =
-              config?.branchCommand ?? defaultConfig.branchCommand ?? '';
-            process.stdin.setRawMode?.(false);
-            const edited = openInEditor(current);
-            process.stdin.setRawMode?.(true);
-            console.clear();
-            void configStore
-              .getState()
-              .update({ branchCommand: edited.trim() })
-              .catch(() => {});
-          } catch {
-            process.stdin.setRawMode?.(true);
-            console.clear();
-            // Editor failed, ignore
-          }
+          const current =
+            config?.branchCommand ?? defaultConfig.branchCommand ?? '';
+          editorStore.getState().init(current, {
+            returnScreen: 'settings',
+            onSave: (content: string) => {
+              void configStore
+                .getState()
+                .update({ branchCommand: content.trim() })
+                .catch(() => {});
+            },
+          });
+          navigationStore.getState().navigate('editor');
         } else if (item.kind === 'branch-clipboard-toggle') {
           void configStore
             .getState()
@@ -603,9 +600,7 @@ export function Settings() {
                 <Text bold={focused} color={focused ? accent : undefined}>
                   Branch command: {truncCmd || '(none)'}
                 </Text>
-                {focused && (
-                  <Text dimColor={mutedDim}> [enter opens $EDITOR]</Text>
-                )}
+                {focused && <Text dimColor={mutedDim}> [enter to edit]</Text>}
               </Box>
             );
           }

@@ -30,9 +30,14 @@ interface EditorState {
   showDiscardPrompt: boolean;
   uploadStatus: string | null;
   initialContent: string;
+  onSave: ((content: string) => void) | null;
+  returnScreen: string | null;
 
   // Lifecycle
-  init: (content: string) => void;
+  init: (
+    content: string,
+    options?: { onSave?: (content: string) => void; returnScreen?: string },
+  ) => void;
   destroy: () => void;
   getContent: () => string;
 
@@ -92,6 +97,8 @@ const initialState = {
   showDiscardPrompt: false,
   uploadStatus: null as string | null,
   initialContent: '',
+  onSave: null as ((content: string) => void) | null,
+  returnScreen: null as string | null,
 };
 
 function visualHeight(line: string, width: number): number {
@@ -133,7 +140,10 @@ function nextMarker(marker: string): string {
 export const editorStore = createStore<EditorState>((set, get) => ({
   ...initialState,
 
-  init: (content: string) => {
+  init: (
+    content: string,
+    options?: { onSave?: (content: string) => void; returnScreen?: string },
+  ) => {
     const lines = content ? content.split('\n') : [''];
     set({
       ...initialState,
@@ -143,6 +153,8 @@ export const editorStore = createStore<EditorState>((set, get) => ({
       undoStack: [],
       redoStack: [],
       initialContent: content,
+      onSave: options?.onSave ?? null,
+      returnScreen: options?.returnScreen ?? null,
     });
   },
 
