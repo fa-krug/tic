@@ -90,6 +90,7 @@ export function HelpScreen({ sourceScreen }: { sourceScreen: Screen }) {
     iterations: false,
     comments: false,
     templates: false,
+    imageUpload: false,
     fields: {
       priority: false,
       assignee: false,

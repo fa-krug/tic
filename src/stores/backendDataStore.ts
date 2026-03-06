@@ -41,6 +41,7 @@ export const defaultCapabilities: BackendCapabilities = {
     dependsOn: false,
   },
   templates: false,
+  imageUpload: false,
   templateFields: {
     type: false,
     status: false,

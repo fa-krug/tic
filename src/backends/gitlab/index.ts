@@ -323,6 +323,7 @@ export class GitLabBackend extends BaseBackend {
         dependsOn: false,
         description: true,
       },
+      imageUpload: true,
       requiredFields: ['title'],
     };
   }

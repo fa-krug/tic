@@ -127,6 +127,7 @@ export class AzureDevOpsBackend extends BaseBackend {
         dependsOn: false,
         description: false,
       },
+      imageUpload: true,
       requiredFields: ['title', 'type'],
     };
   }

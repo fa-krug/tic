@@ -33,6 +33,7 @@ class TestBackend extends BaseBackend {
         dependsOn: true,
       },
       templates: true,
+      imageUpload: true,
       templateFields: {
         type: true,
         status: true,

@@ -19,7 +19,7 @@ import {
 } from './markdownHighlight.js';
 import { useThemeStore } from '../stores/themeStore.js';
 import { readClipboardImage, ClipboardError } from '../clipboard.js';
-import { saveImage } from '../backends/github/image-upload.js';
+import { saveImageLocal } from '../storage/image-save.js';
 import { uiStore } from '../stores/uiStore.js';
 
 // Escape codes to disable terminal mouse tracking and focus reporting
@@ -127,7 +127,7 @@ export function MarkdownEditor() {
       }
 
       try {
-        const relPath = saveImage(process.cwd(), imageData);
+        const relPath = saveImageLocal(process.cwd(), imageData);
         s.insertText(`![image](${relPath})`);
         uiStore.getState().setToast('Image saved and staged');
       } catch (err: unknown) {

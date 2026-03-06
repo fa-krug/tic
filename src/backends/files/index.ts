@@ -77,6 +77,7 @@ export class FilesBackend extends BaseBackend implements SyncableBackend {
         dependsOn: true,
         description: true,
       },
+      imageUpload: false,
       requiredFields: ['title'],
     };
   }

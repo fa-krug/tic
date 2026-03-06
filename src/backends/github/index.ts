@@ -3,9 +3,11 @@ import open from 'open';
 import { BaseBackend, UnsupportedOperationError } from '../types.js';
 import type {
   BackendCapabilities,
+  ImageUploadBackend,
   PrBackend,
   PrCapabilities,
 } from '../types.js';
+import { saveImageLocal } from '../../storage/image-save.js';
 import type {
   WorkItem,
   NewWorkItem,
@@ -136,17 +138,27 @@ export interface GitHubBackendOptions {
   skipAuth?: boolean;
 }
 
-export class GitHubBackend extends BaseBackend implements PrBackend {
+export class GitHubBackend
+  extends BaseBackend
+  implements PrBackend, ImageUploadBackend
+{
   private api: GitHubApiClient;
   private owner: string;
   private repo: string;
+  private cwd: string;
   private cachedMilestones: GhMilestone[] | null = null;
 
-  private constructor(api: GitHubApiClient, owner: string, repo: string) {
+  private constructor(
+    api: GitHubApiClient,
+    owner: string,
+    repo: string,
+    cwd: string,
+  ) {
     super(60_000);
     this.api = api;
     this.owner = owner;
     this.repo = repo;
+    this.cwd = cwd;
   }
 
   static async create(
@@ -169,7 +181,7 @@ export class GitHubBackend extends BaseBackend implements PrBackend {
       });
     }
     const api = new GitHubApiClient(token);
-    return new GitHubBackend(api, owner, repo);
+    return new GitHubBackend(api, owner, repo, cwd);
   }
 
   private static detectOwnerRepo(cwd: string): {
@@ -220,6 +232,7 @@ export class GitHubBackend extends BaseBackend implements PrBackend {
         dependsOn: false,
         description: false,
       },
+      imageUpload: true,
       requiredFields: ['title'],
     };
   }
@@ -496,6 +509,13 @@ export class GitHubBackend extends BaseBackend implements PrBackend {
     throw new UnsupportedOperationError('templates', 'GitHubBackend');
   }
   /* eslint-enable @typescript-eslint/require-await, @typescript-eslint/no-unused-vars */
+
+  // --- ImageUploadBackend implementation ---
+
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async uploadImage(data: Buffer, filename: string): Promise<string> {
+    return saveImageLocal(this.cwd, data, filename);
+  }
 
   // --- PrBackend implementation ---
 
