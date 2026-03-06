@@ -1,7 +1,9 @@
+import { marked } from 'marked';
 import TurndownService from 'turndown';
 import type { WorkItem, Comment } from '../../types.js';
 
 const turndown = new TurndownService();
+turndown.escape = (str) => str;
 
 export interface AdoWorkItem {
   id: number;
@@ -107,6 +109,10 @@ export function extractPredecessors(
 function htmlToMarkdown(html: string | undefined): string {
   if (!html) return '';
   return turndown.turndown(html);
+}
+
+export function markdownToHtml(md: string): string {
+  return marked.parse(md, { async: false });
 }
 
 export function mapWorkItemToWorkItem(ado: AdoWorkItem): WorkItem {

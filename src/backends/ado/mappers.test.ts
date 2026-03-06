@@ -4,6 +4,7 @@ import {
   mapCommentToComment,
   mapPriorityToTic,
   mapPriorityToAdo,
+  markdownToHtml,
   parseTags,
   formatTags,
   extractParent,
@@ -161,6 +162,87 @@ describe('mapWorkItemToWorkItem', () => {
     expect(item.description).toBe('');
     expect(item.parent).toBeNull();
     expect(item.dependsOn).toEqual([]);
+  });
+});
+
+describe('markdownToHtml', () => {
+  it('converts bold markdown to HTML', () => {
+    expect(markdownToHtml('**bold**')).toContain('<strong>bold</strong>');
+  });
+
+  it('converts headings', () => {
+    expect(markdownToHtml('## Heading')).toContain('<h2>Heading</h2>');
+  });
+
+  it('converts code blocks', () => {
+    const result = markdownToHtml('`inline`');
+    expect(result).toContain('<code>inline</code>');
+  });
+
+  it('converts lists', () => {
+    const result = markdownToHtml('- item 1\n- item 2');
+    expect(result).toContain('<li>item 1</li>');
+    expect(result).toContain('<li>item 2</li>');
+  });
+});
+
+describe('round-trip: markdown → HTML → markdown', () => {
+  it('preserves bold text', () => {
+    const md = '**bold text**';
+    const html = markdownToHtml(md);
+    const item = mapWorkItemToWorkItem({
+      id: 1,
+      fields: {
+        'System.Title': 'Test',
+        'System.WorkItemType': 'Task',
+        'System.State': 'New',
+        'System.IterationPath': 'Project',
+        'System.Description': html,
+        'System.CreatedDate': '2026-01-01T00:00:00Z',
+        'System.ChangedDate': '2026-01-01T00:00:00Z',
+      },
+    });
+    expect(item.description).toContain('**bold text**');
+  });
+
+  it('preserves headings', () => {
+    const md = '## Overview\n\nSome text here.';
+    const html = markdownToHtml(md);
+    const item = mapWorkItemToWorkItem({
+      id: 1,
+      fields: {
+        'System.Title': 'Test',
+        'System.WorkItemType': 'Task',
+        'System.State': 'New',
+        'System.IterationPath': 'Project',
+        'System.Description': html,
+        'System.CreatedDate': '2026-01-01T00:00:00Z',
+        'System.ChangedDate': '2026-01-01T00:00:00Z',
+      },
+    });
+    expect(item.description).toContain('Overview');
+    expect(item.description).toContain('Some text here.');
+    // Turndown uses setext-style headings (underline) for h1/h2
+    expect(item.description).not.toContain('\\');
+    expect(item.description).not.toContain('&lt;');
+  });
+
+  it('preserves inline code', () => {
+    const md = 'Use `KDIN_API_TOKEN` for auth.';
+    const html = markdownToHtml(md);
+    const item = mapWorkItemToWorkItem({
+      id: 1,
+      fields: {
+        'System.Title': 'Test',
+        'System.WorkItemType': 'Task',
+        'System.State': 'New',
+        'System.IterationPath': 'Project',
+        'System.Description': html,
+        'System.CreatedDate': '2026-01-01T00:00:00Z',
+        'System.ChangedDate': '2026-01-01T00:00:00Z',
+      },
+    });
+    expect(item.description).toContain('`KDIN_API_TOKEN`');
   });
 });
 

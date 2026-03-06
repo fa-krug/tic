@@ -18,6 +18,7 @@ import {
   mapWorkItemToWorkItem,
   mapCommentToComment,
   mapPriorityToAdo,
+  markdownToHtml,
   formatTags,
   extractParent,
   extractPredecessors,
@@ -302,7 +303,7 @@ export class AzureDevOpsBackend extends BaseBackend {
       patch.push({
         op: 'add',
         path: '/fields/System.Description',
-        value: data.description,
+        value: markdownToHtml(data.description),
       });
 
     // Add parent relation in same request
@@ -384,7 +385,7 @@ export class AzureDevOpsBackend extends BaseBackend {
       patch.push({
         op: 'replace',
         path: '/fields/System.Description',
-        value: data.description,
+        value: markdownToHtml(data.description),
       });
 
     // Handle relation changes — need to fetch current relations first
@@ -475,7 +476,7 @@ export class AzureDevOpsBackend extends BaseBackend {
     await this.api.rest(
       'POST',
       `/${encodeURIComponent(this.project)}/_apis/wit/workItems/${workItemId}/comments?api-version=7.1-preview.4`,
-      { text: comment.body },
+      { text: markdownToHtml(comment.body) },
     );
 
     return {
