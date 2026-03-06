@@ -17,15 +17,22 @@ export type TokenType =
   | 'list-marker'
   | 'hr';
 
-export type LineContext = 'normal' | 'code-fence' | 'code-block';
+export type LineContext =
+  | 'normal'
+  | 'code-fence'
+  | 'code-block'
+  | 'setext-heading'
+  | 'setext-underline';
 
 const CODE_FENCE_RE = /^\s*```/;
+const SETEXT_UNDERLINE_RE = /^(?:={2,}|-{2,})\s*$/;
 
 export function computeLineContexts(lines: string[]): LineContext[] {
   const contexts: LineContext[] = [];
   let inCodeBlock = false;
 
-  for (const line of lines) {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
     const isFence = CODE_FENCE_RE.test(line);
     if (isFence && !inCodeBlock) {
       contexts.push('code-fence');
@@ -36,7 +43,18 @@ export function computeLineContexts(lines: string[]): LineContext[] {
     } else if (inCodeBlock) {
       contexts.push('code-block');
     } else {
-      contexts.push('normal');
+      // Check for setext underline: non-empty previous line + current is === or ---
+      const prevLine = i > 0 ? lines[i - 1]! : '';
+      if (
+        SETEXT_UNDERLINE_RE.test(line) &&
+        prevLine.trim().length > 0 &&
+        contexts[i - 1] === 'normal'
+      ) {
+        contexts[i - 1] = 'setext-heading';
+        contexts.push('setext-underline');
+      } else {
+        contexts.push('normal');
+      }
     }
   }
 
@@ -112,6 +130,14 @@ export function tokenize(
     return [{ type: 'code-block', text: line }];
   }
 
+  // Setext heading contexts
+  if (context === 'setext-heading') {
+    return [{ type: 'heading-text', text: line }];
+  }
+  if (context === 'setext-underline') {
+    return [{ type: 'heading-marker', text: line }];
+  }
+
   // Horizontal rule (must check before list bullet since --- starts with -)
   if (/^---+$/.test(line)) {
     return [{ type: 'hr', text: line }];
@@ -153,7 +179,7 @@ const tokenStyles: Record<
 > = {
   'heading-marker': { bold: true, dimColor: true },
   'heading-text': { bold: true, color: 'cyan' },
-  bold: { bold: true },
+  bold: { bold: true, color: 'white' },
   italic: { dimColor: true },
   code: { color: 'yellow' },
   'code-fence': { dimColor: true },

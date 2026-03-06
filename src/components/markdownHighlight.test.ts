@@ -89,6 +89,16 @@ describe('tokenize', () => {
     expect(tokens).toEqual([{ type: 'hr', text: '---' }]);
   });
 
+  it('highlights setext heading text', () => {
+    const tokens = tokenize('Overview', 'setext-heading');
+    expect(tokens).toEqual([{ type: 'heading-text', text: 'Overview' }]);
+  });
+
+  it('highlights setext underline as heading marker', () => {
+    const tokens = tokenize('--------', 'setext-underline');
+    expect(tokens).toEqual([{ type: 'heading-marker', text: '--------' }]);
+  });
+
   it('handles multiple tokens in one line', () => {
     const tokens = tokenize('hello **bold** and `code`');
     expect(tokens.length).toBe(4);
@@ -173,6 +183,35 @@ describe('computeLineContexts', () => {
     const lines = ['```', '```'];
     const contexts = computeLineContexts(lines);
     expect(contexts).toEqual(['code-fence', 'code-fence']);
+  });
+
+  it('detects setext h2 headings (--- underline)', () => {
+    const lines = ['Overview', '--------', 'body text'];
+    const contexts = computeLineContexts(lines);
+    expect(contexts).toEqual(['setext-heading', 'setext-underline', 'normal']);
+  });
+
+  it('detects setext h1 headings (=== underline)', () => {
+    const lines = ['Title', '=====', 'body text'];
+    const contexts = computeLineContexts(lines);
+    expect(contexts).toEqual(['setext-heading', 'setext-underline', 'normal']);
+  });
+
+  it('does not treat --- as setext if previous line is empty', () => {
+    const lines = ['', '---'];
+    const contexts = computeLineContexts(lines);
+    expect(contexts).toEqual(['normal', 'normal']);
+  });
+
+  it('does not treat --- inside code blocks as setext', () => {
+    const lines = ['```', 'heading', '---', '```'];
+    const contexts = computeLineContexts(lines);
+    expect(contexts).toEqual([
+      'code-fence',
+      'code-block',
+      'code-block',
+      'code-fence',
+    ]);
   });
 });
 
