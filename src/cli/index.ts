@@ -274,7 +274,7 @@ export function createProgram(): Command {
 
   item
     .command('open')
-    .description('Open a work item in an external editor or browser')
+    .description('Open a work item in the built-in editor or browser')
     .argument('<id>', 'Work item ID')
     .action(async (idStr: string) => {
       const parentOpts = program.opts<GlobalOpts>();

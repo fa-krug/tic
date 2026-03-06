@@ -315,8 +315,8 @@ export function MarkdownEditor() {
           </Text>
         ) : (
           <Text dimColor>
-            Ctrl+S save Esc cancel Ctrl+V paste image Ctrl+Z undo Ctrl+U kill
-            line Ctrl+Y yank Alt+↑↓ page Alt+←→ word
+            Ctrl+S save │ Esc cancel │ Ctrl+V paste image │ Ctrl+Z undo │ Ctrl+U
+            kill line │ Ctrl+Y yank │ Alt+↑↓ page │ Alt+←→ word
           </Text>
         )}
       </Box>

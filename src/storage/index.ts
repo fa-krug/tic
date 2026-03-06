@@ -1,4 +1,3 @@
-import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import yaml from 'yaml';
@@ -1039,16 +1038,13 @@ export class Storage
   // ─── Open item in editor ───────────────────────────────────────
 
   async openItem(id: string): Promise<void> {
-    const filePath = this.getItemUrl(id);
-    const editor = process.env['VISUAL'] || process.env['EDITOR'] || 'vi';
-    return new Promise<void>((resolve, reject) => {
-      const child = spawn(editor, [filePath], { stdio: 'inherit' });
-      child.on('close', (code) => {
-        if (code === 0) resolve();
-        else reject(new Error(`Editor exited with code ${code}`));
-      });
-      child.on('error', reject);
-    });
+    const item = await this.getWorkItem(id);
+    if (!item) throw new Error(`Work item ${id} not found`);
+    const { openCliEditor } = await import('../cli/components/CliEditor.js');
+    const edited = await openCliEditor(item.description);
+    if (edited !== item.description) {
+      await this.cachedUpdateWorkItem(id, { description: edited });
+    }
   }
 
   // ─── Templates ─────────────────────────────────────────────────

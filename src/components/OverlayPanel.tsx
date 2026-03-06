@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import { useScrollViewport } from '../hooks/useScrollViewport.js';
-import { useThemeStore } from '../stores/themeStore.js';
+import { useThemeStore, autoFg } from '../stores/themeStore.js';
 import type { FieldType } from '../stores/themeStore.js';
 import { ColorPill } from './ColorPill.js';
 
@@ -181,7 +181,7 @@ export function OverlayPanel({
     if (onQueryChange) onQueryChange(value);
   };
 
-  const { accent, mutedDim } = useThemeStore((s) => s.colors);
+  const { accent, mutedDim, selectionBg } = useThemeStore((s) => s.colors);
 
   const defaultFooter = multiSelect
     ? 'space toggle  enter confirm  esc cancel'
@@ -232,14 +232,20 @@ export function OverlayPanel({
             const isToggled = toggled.has(item.id);
 
             return (
-              <Box key={item.id}>
-                <Text color={isSelected ? accent : undefined} bold={isSelected}>
+              <Box
+                key={item.id}
+                backgroundColor={isSelected ? selectionBg : undefined}
+              >
+                <Text
+                  color={isSelected ? autoFg(selectionBg) : undefined}
+                  bold={isSelected}
+                >
                   {multiSelect
                     ? isToggled
                       ? '☑ '
                       : '☐ '
                     : isSelected
-                      ? '● '
+                      ? '> '
                       : '  '}
                 </Text>
                 <Box flexGrow={1} gap={1}>
@@ -247,14 +253,22 @@ export function OverlayPanel({
                     <ColorPill field={fieldType} value={item.value} />
                   ) : (
                     <Text
-                      color={isSelected ? accent : undefined}
+                      color={isSelected ? autoFg(selectionBg) : undefined}
                       bold={isSelected}
                     >
                       {item.label}
                     </Text>
                   )}
                 </Box>
-                {item.hint && <Text dimColor={mutedDim}> {item.hint}</Text>}
+                {item.hint && (
+                  <Text
+                    color={isSelected ? autoFg(selectionBg) : undefined}
+                    dimColor={!isSelected ? mutedDim : undefined}
+                  >
+                    {' '}
+                    {item.hint}
+                  </Text>
+                )}
               </Box>
             );
           })}

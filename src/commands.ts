@@ -50,7 +50,7 @@ const commands: Command[] = [
   // Actions
   {
     id: 'create',
-    label: 'Create item',
+    label: 'Create new item',
     category: 'Actions',
     shortcut: 'c',
     keys: ['c'],
@@ -62,7 +62,7 @@ const commands: Command[] = [
   },
   {
     id: 'edit',
-    label: 'Edit item',
+    label: 'Edit selected item',
     category: 'Actions',
     shortcut: 'enter',
     keys: [{ special: 'return' }],
@@ -74,7 +74,7 @@ const commands: Command[] = [
   },
   {
     id: 'delete',
-    label: 'Delete item',
+    label: 'Delete selected item',
     category: 'Actions',
     shortcut: 'd',
     keys: ['d'],
@@ -86,7 +86,7 @@ const commands: Command[] = [
   },
   {
     id: 'open',
-    label: 'Open in browser',
+    label: 'Open item in browser',
     category: 'Actions',
     shortcut: 'o',
     keys: ['o'],
@@ -96,7 +96,7 @@ const commands: Command[] = [
   },
   {
     id: 'branch',
-    label: 'Create branch/worktree',
+    label: 'Create branch or worktree for item',
     category: 'Actions',
     shortcut: 'b',
     keys: ['b'],
@@ -107,7 +107,7 @@ const commands: Command[] = [
   },
   {
     id: 'sync',
-    label: 'Refresh/sync',
+    label: 'Sync with remote backend',
     category: 'Actions',
     shortcut: 'r',
     keys: ['r'],
@@ -117,7 +117,7 @@ const commands: Command[] = [
   },
   {
     id: 'sort',
-    label: 'Order by...',
+    label: 'Change sort order',
     category: 'Actions',
     shortcut: 'O',
     keys: ['O'],
@@ -128,7 +128,7 @@ const commands: Command[] = [
   // Navigation
   {
     id: 'set-iteration',
-    label: 'Set iteration',
+    label: 'Assign iteration to item',
     category: 'Actions',
     shortcut: 'i',
     keys: ['i'],
@@ -141,7 +141,7 @@ const commands: Command[] = [
   },
   {
     id: 'switch-iteration',
-    label: 'Switch iteration',
+    label: 'Switch iteration view',
     category: 'Navigation',
     shortcut: 'I',
     keys: ['I'],
@@ -151,7 +151,7 @@ const commands: Command[] = [
   },
   {
     id: 'settings',
-    label: 'Go to settings',
+    label: 'Open settings',
     category: 'Navigation',
     shortcut: ',',
     keys: [','],
@@ -163,7 +163,7 @@ const commands: Command[] = [
   },
   {
     id: 'status',
-    label: 'Go to status',
+    label: 'Open sync status',
     category: 'Navigation',
     shortcut: 'S',
     keys: ['S'],
@@ -173,7 +173,7 @@ const commands: Command[] = [
   },
   {
     id: 'help',
-    label: 'Go to help',
+    label: 'Show keyboard shortcuts',
     category: 'Navigation',
     shortcut: '?',
     keys: ['?'],
@@ -184,7 +184,7 @@ const commands: Command[] = [
   // Bulk
   {
     id: 'mark',
-    label: 'Mark/unmark item',
+    label: 'Toggle mark on item',
     category: 'Bulk',
     shortcut: 'm',
     keys: ['m'],
@@ -204,7 +204,7 @@ const commands: Command[] = [
   },
   {
     id: 'set-priority',
-    label: 'Set priority',
+    label: 'Set item priority',
     category: 'Bulk',
     shortcut: 'y',
     keys: ['y'],
@@ -217,7 +217,7 @@ const commands: Command[] = [
   },
   {
     id: 'set-assignee',
-    label: 'Set assignee',
+    label: 'Set item assignee',
     category: 'Bulk',
     shortcut: 'a',
     keys: ['a'],
@@ -230,7 +230,7 @@ const commands: Command[] = [
   },
   {
     id: 'set-labels',
-    label: 'Set labels',
+    label: 'Set item labels',
     category: 'Bulk',
     shortcut: 'l',
     keys: ['l'],
@@ -243,7 +243,7 @@ const commands: Command[] = [
   },
   {
     id: 'set-type',
-    label: 'Set type',
+    label: 'Set item type',
     category: 'Bulk',
     shortcut: 't',
     keys: ['t'],
@@ -256,7 +256,7 @@ const commands: Command[] = [
   },
   {
     id: 'bulk-menu',
-    label: 'Bulk actions menu',
+    label: 'Open bulk actions menu',
     category: 'Bulk',
     shortcut: 'x',
     keys: ['x'],
@@ -265,7 +265,7 @@ const commands: Command[] = [
   },
   {
     id: 'filter',
-    label: 'Filter...',
+    label: 'Filter items by field',
     category: 'Actions',
     shortcut: 'F',
     keys: ['F'],
@@ -275,7 +275,7 @@ const commands: Command[] = [
   },
   {
     id: 'clear-filters',
-    label: 'Clear filters',
+    label: 'Clear all active filters',
     category: 'Actions',
     shortcut: 'X',
     keys: ['X'],
@@ -285,7 +285,7 @@ const commands: Command[] = [
   },
   {
     id: 'load-view',
-    label: 'Load view...',
+    label: 'Load a saved view',
     category: 'Actions',
     shortcut: 'V',
     keys: ['V'],
@@ -295,14 +295,14 @@ const commands: Command[] = [
   },
   {
     id: 'save-view',
-    label: 'Save current view...',
+    label: 'Save current filters as a view',
     category: 'Actions',
     screen: 'list',
     when: (ctx) => ctx.screen === 'list' && ctx.hasActiveFilters,
   },
   {
     id: 'delete-view',
-    label: 'Delete view...',
+    label: 'Delete a saved view',
     category: 'Actions',
     screen: 'list',
     when: (ctx) => ctx.screen === 'list' && ctx.hasSavedViews,
@@ -310,7 +310,7 @@ const commands: Command[] = [
   // List-screen navigation
   {
     id: 'list-navigate',
-    label: 'Navigate items',
+    label: 'Move cursor up/down',
     category: 'Navigation',
     shortcut: '↑/↓',
     keys: [{ special: 'upArrow' }, { special: 'downArrow' }],
@@ -321,7 +321,7 @@ const commands: Command[] = [
   },
   {
     id: 'list-page',
-    label: 'Page up / page down',
+    label: 'Scroll one page up/down',
     category: 'Navigation',
     shortcut: 'pgup/pgdn',
     keys: [{ special: 'pageUp' }, { special: 'pageDown' }],
@@ -330,7 +330,7 @@ const commands: Command[] = [
   },
   {
     id: 'list-home-end',
-    label: 'Jump to first / last item',
+    label: 'Jump to first/last item',
     category: 'Navigation',
     shortcut: 'home/end',
     keys: [{ special: 'home' }, { special: 'end' }],
@@ -339,7 +339,7 @@ const commands: Command[] = [
   },
   {
     id: 'list-collapse',
-    label: 'Collapse or jump to parent',
+    label: 'Collapse node or jump to parent',
     category: 'Navigation',
     shortcut: '←',
     keys: [{ special: 'leftArrow' }],
@@ -349,7 +349,7 @@ const commands: Command[] = [
   },
   {
     id: 'list-expand',
-    label: 'Expand children',
+    label: 'Expand child items',
     category: 'Navigation',
     shortcut: '→',
     keys: [{ special: 'rightArrow' }],
@@ -360,7 +360,7 @@ const commands: Command[] = [
   // List-screen actions missing from registry
   {
     id: 'list-undo',
-    label: 'Undo last action',
+    label: 'Undo last change',
     category: 'Actions',
     shortcut: 'u',
     keys: ['u'],
@@ -371,7 +371,7 @@ const commands: Command[] = [
   },
   {
     id: 'list-status',
-    label: 'Set status',
+    label: 'Set item status',
     category: 'Actions',
     shortcut: 's',
     keys: ['s'],
@@ -380,7 +380,7 @@ const commands: Command[] = [
   },
   {
     id: 'list-parent',
-    label: 'Set parent',
+    label: 'Set item parent',
     category: 'Actions',
     shortcut: 'g',
     keys: ['g'],
@@ -390,7 +390,7 @@ const commands: Command[] = [
   },
   {
     id: 'list-pr-create',
-    label: 'Create pull request',
+    label: 'Create pull request for item',
     category: 'Actions',
     shortcut: 'p',
     keys: ['p'],
@@ -399,7 +399,7 @@ const commands: Command[] = [
   },
   {
     id: 'list-pr-list',
-    label: 'Pull requests',
+    label: 'Open pull request list',
     category: 'Navigation',
     shortcut: 'P',
     keys: ['P'],
@@ -408,7 +408,7 @@ const commands: Command[] = [
   },
   {
     id: 'list-branch-manage',
-    label: 'Branch management',
+    label: 'Open branch manager',
     category: 'Navigation',
     shortcut: 'B',
     keys: ['B'],
@@ -418,7 +418,7 @@ const commands: Command[] = [
   },
   {
     id: 'list-range-select',
-    label: 'Range select',
+    label: 'Extend selection up/down',
     category: 'Bulk',
     shortcut: 'shift+↑↓',
     keys: [
@@ -430,7 +430,7 @@ const commands: Command[] = [
   },
   {
     id: 'list-tab',
-    label: 'Cycle work item type',
+    label: 'Cycle through work item types',
     category: 'Switching',
     shortcut: 'tab',
     keys: [{ special: 'tab' }],
@@ -440,7 +440,7 @@ const commands: Command[] = [
   },
   {
     id: 'list-toggle-description',
-    label: 'Toggle full description',
+    label: 'Toggle inline description preview',
     category: 'Other',
     shortcut: 'space',
     keys: [' '],
@@ -449,7 +449,7 @@ const commands: Command[] = [
   },
   {
     id: 'list-command-bar',
-    label: 'Command bar',
+    label: 'Open command bar / search',
     category: 'Actions',
     shortcut: '/',
     keys: ['/'],
@@ -461,7 +461,7 @@ const commands: Command[] = [
   // Navigation shared across sub-screens
   {
     id: 'nav-back',
-    label: 'Back to list',
+    label: 'Go back to item list',
     category: 'Navigation',
     shortcut: 'esc',
     keys: [{ special: 'escape' }],
@@ -477,7 +477,7 @@ const commands: Command[] = [
   // Iteration picker actions
   {
     id: 'iteration-navigate',
-    label: 'Navigate iterations',
+    label: 'Move cursor up/down',
     category: 'Navigation',
     shortcut: 'j/k',
     keys: [{ special: 'upArrow' }, { special: 'downArrow' }],
@@ -488,7 +488,7 @@ const commands: Command[] = [
   },
   {
     id: 'iteration-select',
-    label: 'Switch to iteration',
+    label: 'Select iteration',
     category: 'Actions',
     shortcut: 'enter',
     keys: [{ special: 'return' }],
@@ -500,7 +500,7 @@ const commands: Command[] = [
   // Branch list actions
   {
     id: 'branch-navigate',
-    label: 'Navigate branches',
+    label: 'Move cursor up/down',
     category: 'Navigation',
     shortcut: 'j/k',
     keys: [{ special: 'upArrow' }, { special: 'downArrow' }],
@@ -511,7 +511,7 @@ const commands: Command[] = [
   },
   {
     id: 'branch-search',
-    label: 'Search branches',
+    label: 'Search branch list',
     category: 'Actions',
     shortcut: '/',
     keys: ['/'],
@@ -564,7 +564,7 @@ const commands: Command[] = [
   },
   {
     id: 'branch-merge',
-    label: 'Merge into current',
+    label: 'Merge branch into current',
     category: 'Actions',
     shortcut: 'm',
     keys: ['m'],
@@ -579,7 +579,7 @@ const commands: Command[] = [
   },
   {
     id: 'branch-push',
-    label: 'Push to remote',
+    label: 'Push branch to remote',
     category: 'Actions',
     shortcut: 'P',
     keys: ['P'],
@@ -591,7 +591,7 @@ const commands: Command[] = [
   },
   {
     id: 'branch-create-pr',
-    label: 'Create PR for branch',
+    label: 'Create pull request for branch',
     category: 'Actions',
     shortcut: 'p',
     keys: ['p'],
@@ -617,7 +617,7 @@ const commands: Command[] = [
   },
   {
     id: 'branch-refresh',
-    label: 'Refresh branches',
+    label: 'Refresh and fetch from remote',
     category: 'Actions',
     shortcut: 'r',
     keys: ['r'],
@@ -630,7 +630,7 @@ const commands: Command[] = [
   // PR list actions
   {
     id: 'pr-navigate',
-    label: 'Navigate pull requests',
+    label: 'Move cursor up/down',
     category: 'Navigation',
     shortcut: 'j/k',
     keys: [{ special: 'upArrow' }, { special: 'downArrow' }],
@@ -653,7 +653,7 @@ const commands: Command[] = [
   },
   {
     id: 'pr-search',
-    label: 'Search pull requests',
+    label: 'Search pull request list',
     category: 'Actions',
     shortcut: '/',
     keys: ['/'],
@@ -665,7 +665,7 @@ const commands: Command[] = [
   // Form commands
   {
     id: 'form-navigate',
-    label: 'Move between fields',
+    label: 'Move between form fields',
     category: 'Navigation',
     shortcut: '↑/↓',
     keys: [{ special: 'upArrow' }, { special: 'downArrow' }],
@@ -674,7 +674,7 @@ const commands: Command[] = [
   },
   {
     id: 'form-edit',
-    label: 'Edit field / open $EDITOR (description) / navigate to related item',
+    label: 'Edit field, open editor, or follow link',
     category: 'Actions',
     shortcut: 'enter',
     keys: [{ special: 'return' }],
@@ -683,7 +683,7 @@ const commands: Command[] = [
   },
   {
     id: 'form-revert',
-    label: 'Revert field to previous value (in edit mode)',
+    label: 'Revert field to previous value',
     category: 'Actions',
     shortcut: 'esc',
     keys: [{ special: 'escape' }],
@@ -692,7 +692,7 @@ const commands: Command[] = [
   },
   {
     id: 'form-confirm',
-    label: 'Confirm field value',
+    label: 'Confirm field edit',
     category: 'Actions',
     shortcut: 'enter/select',
     screen: 'form',
@@ -700,7 +700,7 @@ const commands: Command[] = [
   },
   {
     id: 'form-save',
-    label: 'Save and go back',
+    label: 'Save changes and go back',
     category: 'Actions',
     shortcut: 's',
     keys: ['s'],
@@ -709,7 +709,7 @@ const commands: Command[] = [
   },
   {
     id: 'form-back',
-    label: 'Go back (prompts to save/discard if unsaved changes)',
+    label: 'Go back (save/discard prompt if changed)',
     category: 'Navigation',
     shortcut: 'esc',
     keys: [{ special: 'escape' }],
@@ -719,7 +719,7 @@ const commands: Command[] = [
   // Settings commands
   {
     id: 'settings-navigate',
-    label: 'Navigate options',
+    label: 'Move between options',
     category: 'Navigation',
     shortcut: '↑/↓',
     keys: [{ special: 'upArrow' }, { special: 'downArrow' }],
@@ -728,7 +728,7 @@ const commands: Command[] = [
   },
   {
     id: 'settings-select',
-    label: 'Select or edit',
+    label: 'Select or edit option',
     category: 'Actions',
     shortcut: 'enter',
     keys: [{ special: 'return' }],
@@ -746,7 +746,7 @@ const commands: Command[] = [
   },
   {
     id: 'settings-edit',
-    label: 'Edit field value',
+    label: 'Type to edit field value',
     category: 'Actions',
     shortcut: 'type',
     screen: 'settings',
@@ -759,6 +759,15 @@ const commands: Command[] = [
     shortcut: 'enter/esc',
     screen: 'settings',
     helpGroup: 'Editing',
+  },
+  {
+    id: 'settings-update',
+    label: 'Check for tic updates',
+    category: 'Actions',
+    shortcut: 'u',
+    keys: ['u'],
+    screen: 'settings',
+    helpGroup: 'Actions',
   },
   {
     id: 'settings-create-template',
@@ -793,7 +802,7 @@ const commands: Command[] = [
   // Status screen commands
   {
     id: 'status-scroll',
-    label: 'Scroll errors',
+    label: 'Scroll error details',
     category: 'Navigation',
     shortcut: '↑/↓',
     keys: [{ special: 'upArrow' }, { special: 'downArrow' }],
@@ -811,7 +820,7 @@ const commands: Command[] = [
   },
   {
     id: 'status-retry',
-    label: 'Retry failed sync operations',
+    label: 'Retry failed sync',
     category: 'Actions',
     shortcut: 'r',
     keys: ['r'],
@@ -822,7 +831,7 @@ const commands: Command[] = [
   // Other
   {
     id: 'toggle-detail-panel',
-    label: 'Toggle detail panel',
+    label: 'Toggle side detail panel',
     category: 'Other',
     shortcut: 'v',
     keys: ['v'],
@@ -880,7 +889,7 @@ const commands: Command[] = [
   // Help screen commands
   {
     id: 'help-scroll',
-    label: 'Scroll help',
+    label: 'Scroll up/down',
     category: 'Navigation',
     keys: [{ special: 'upArrow' }, { special: 'downArrow' }],
     shortcut: '↑/↓',
@@ -979,7 +988,7 @@ export function buildFooterHints(
   availableWidth: number,
 ): string {
   const footerCmds = getFooterCommands(screen, ctx);
-  const sep = '  ';
+  const sep = ' │ ';
   let result = '';
   for (const cmd of footerCmds) {
     if (!cmd.shortcut) continue;

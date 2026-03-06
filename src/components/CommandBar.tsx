@@ -7,6 +7,7 @@ import {
   navigationStore,
   useNavigationStore,
 } from '../stores/navigationStore.js';
+import { useShallow } from 'zustand/shallow';
 import {
   recentCommandsStore,
   useRecentCommandsStore,
@@ -25,9 +26,13 @@ export function CommandBar({ commands, onCommand, onCancel }: CommandBarProps) {
   const [query, setQuery] = useState('');
   const [allSearchItems, setAllSearchItems] = useState<WorkItem[]>([]);
   const recentIds = useRecentCommandsStore((s) => s.recentIds);
-  const pullRequests = useBackendDataStore((s) => s.pullRequests);
-  const branches = useBackendDataStore((s) => s.branches);
-  const navigate = useNavigationStore((s) => s.navigate);
+  const { pullRequests, branches } = useBackendDataStore(
+    useShallow((s) => ({
+      pullRequests: s.pullRequests,
+      branches: s.branches,
+    })),
+  );
+  const { navigate } = navigationStore.getState();
   const screen = useNavigationStore((s) => s.screen);
 
   // Load all work items on mount (may differ from filtered list)

@@ -190,10 +190,6 @@ export class GitHubBackend extends BaseBackend implements PrBackend {
     return { owner: match[1]!, repo: match[2]! };
   }
 
-  getImageUploadInfo(): { api: GitHubApiClient; owner: string; repo: string } {
-    return { api: this.api, owner: this.owner, repo: this.repo };
-  }
-
   protected override onCacheInvalidate(): void {
     this.cachedMilestones = null;
   }
@@ -653,14 +649,4 @@ export class GitHubBackend extends BaseBackend implements PrBackend {
         return a.due_on.localeCompare(b.due_on);
       });
   }
-}
-
-export function isImageUploadBackend(
-  backend: unknown,
-): backend is GitHubBackend {
-  return (
-    backend !== null &&
-    typeof backend === 'object' &&
-    'getImageUploadInfo' in backend
-  );
 }

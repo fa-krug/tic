@@ -293,15 +293,25 @@ export function WorkItemList() {
   const activeType = useNavigationStore((s) => s.activeType);
   const updateInfo = useNavigationStore((s) => s.updateInfo);
 
-  const defaultType = useConfigStore((s) => s.config.defaultType ?? null);
-  const branchMode = useConfigStore((s) => s.config.branchMode ?? 'worktree');
-  const branchCommand = useConfigStore((s) => s.config.branchCommand);
-  const copyToClipboard = useConfigStore((s) => s.config.copyToClipboard);
-  const showDetailPanel = useConfigStore(
-    (s) => s.config.showDetailPanel ?? true,
+  const {
+    defaultType,
+    branchMode,
+    branchCommand,
+    copyToClipboard,
+    showDetailPanel,
+    savedViews,
+    defaultView,
+  } = useConfigStore(
+    useShallow((s) => ({
+      defaultType: s.config.defaultType ?? null,
+      branchMode: s.config.branchMode ?? 'worktree',
+      branchCommand: s.config.branchCommand,
+      copyToClipboard: s.config.copyToClipboard,
+      showDetailPanel: s.config.showDetailPanel ?? true,
+      savedViews: s.config.views ?? EMPTY_VIEWS,
+      defaultView: s.config.defaultView,
+    })),
   );
-  const savedViews = useConfigStore((s) => s.config.views ?? EMPTY_VIEWS);
-  const defaultView = useConfigStore((s) => s.config.defaultView);
   const { exit } = useApp();
 
   // Store selectors for persistent list view state
@@ -807,19 +817,10 @@ export function WorkItemList() {
         });
       }
 
-      if (
-        matchesCommand('open', input, key) &&
-        treeItems.length > 0 &&
-        backend
-      ) {
-        void (async () => {
-          const itemId = treeItems[cursor]!.item.id;
-          await backend.openItem(itemId);
-          void backendDataStore
-            .getState()
-            .reloadItem(itemId)
-            .catch(() => {});
-        })().catch(() => {});
+      if (matchesCommand('open', input, key) && treeItems.length > 0) {
+        setFormMode('item');
+        selectWorkItem(treeItems[cursor]!.item.id);
+        navigate('form');
       }
 
       if (
@@ -1238,15 +1239,10 @@ export function WorkItemList() {
         }
         break;
       case 'open':
-        if (treeItems[cursor] && backend) {
-          void (async () => {
-            const itemId = treeItems[cursor]!.item.id;
-            await backend.openItem(itemId);
-            void backendDataStore
-              .getState()
-              .reloadItem(itemId)
-              .catch(() => {});
-          })().catch(() => {});
+        if (treeItems[cursor]) {
+          setFormMode('item');
+          selectWorkItem(treeItems[cursor].item.id);
+          navigate('form');
         }
         break;
       case 'branch':

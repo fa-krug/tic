@@ -7,6 +7,7 @@ import {
   useBackendDataStore,
 } from '../stores/backendDataStore.js';
 import { useThemeStore } from '../stores/themeStore.js';
+import { useShallow } from 'zustand/shallow';
 import { BACKEND_LABELS } from './Header.js';
 
 export function AuthPrompt() {
@@ -16,8 +17,12 @@ export function AuthPrompt() {
     warning: warningColor,
     mutedDim,
   } = useThemeStore((s) => s.colors);
-  const authPrompt = useBackendDataStore((s) => s.authPrompt);
-  const authFlow = useBackendDataStore((s) => s.authFlow);
+  const { authPrompt, authFlow } = useBackendDataStore(
+    useShallow((s) => ({
+      authPrompt: s.authPrompt,
+      authFlow: s.authFlow,
+    })),
+  );
   const [pat, setPat] = useState('');
   const [jiraEmail, setJiraEmail] = useState('');
   const [jiraEmailInput, setJiraEmailInput] = useState('');

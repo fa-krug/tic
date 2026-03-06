@@ -822,10 +822,6 @@ export const backendDataStore = createStore<BackendDataStoreState>(
   }),
 );
 
-export function getRemoteBackend(): Backend | null {
-  return currentRemoteBackend;
-}
-
 export function useBackendDataStore<T>(
   selector: (state: BackendDataStoreState) => T,
 ): T {

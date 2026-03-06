@@ -3,6 +3,7 @@ import Spinner from 'ink-spinner';
 import { useConfigStore } from '../stores/configStore.js';
 import { useBackendDataStore } from '../stores/backendDataStore.js';
 import { useThemeStore } from '../stores/themeStore.js';
+import { useShallow } from 'zustand/shallow';
 import os from 'node:os';
 import { VERSION } from '../version.js';
 
@@ -85,12 +86,23 @@ function getStatusDisplay(
 export function Header() {
   const { accent, error, warning, mutedDim } = useThemeStore((s) => s.colors);
   const backendType = useConfigStore((s) => s.config.backend ?? 'none');
-  const loading = useBackendDataStore((s) => s.loading);
-  const itemLoading = useBackendDataStore((s) => s.itemLoading);
-  const branchesLoading = useBackendDataStore((s) => s.branchesLoading);
-  const initError = useBackendDataStore((s) => s.error);
-  const syncStatus = useBackendDataStore((s) => s.syncStatus);
-  const authDismissed = useBackendDataStore((s) => s.authDismissed);
+  const {
+    loading,
+    itemLoading,
+    branchesLoading,
+    error: initError,
+    syncStatus,
+    authDismissed,
+  } = useBackendDataStore(
+    useShallow((s) => ({
+      loading: s.loading,
+      itemLoading: s.itemLoading,
+      branchesLoading: s.branchesLoading,
+      error: s.error,
+      syncStatus: s.syncStatus,
+      authDismissed: s.authDismissed,
+    })),
+  );
   const backendLabel = BACKEND_LABELS[backendType] ?? backendType;
   const root = process.cwd();
   const projectPath = shortenPath(root);
