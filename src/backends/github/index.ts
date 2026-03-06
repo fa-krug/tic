@@ -19,6 +19,7 @@ import type {
 import { getGitHubToken, authenticateGitHub } from '../../auth/github.js';
 import { AuthError } from '../shared/api-client.js';
 import { GitHubApiClient } from './api.js';
+export type { GitHubApiClient } from './api.js';
 import { mapIssueToWorkItem } from './mappers.js';
 import type { GhIssue, GhMilestone } from './mappers.js';
 import { mapGhPrToPullRequest } from './pr-mappers.js';
@@ -187,6 +188,10 @@ export class GitHubBackend extends BaseBackend implements PrBackend {
       throw new Error('Could not detect GitHub owner/repo from git remotes');
     }
     return { owner: match[1]!, repo: match[2]! };
+  }
+
+  getImageUploadInfo(): { api: GitHubApiClient; owner: string; repo: string } {
+    return { api: this.api, owner: this.owner, repo: this.repo };
   }
 
   protected override onCacheInvalidate(): void {
@@ -648,4 +653,14 @@ export class GitHubBackend extends BaseBackend implements PrBackend {
         return a.due_on.localeCompare(b.due_on);
       });
   }
+}
+
+export function isImageUploadBackend(
+  backend: unknown,
+): backend is GitHubBackend {
+  return (
+    backend !== null &&
+    typeof backend === 'object' &&
+    'getImageUploadInfo' in backend
+  );
 }

@@ -28,6 +28,7 @@ interface EditorState {
   killBuffer: string;
   dirty: boolean;
   showDiscardPrompt: boolean;
+  uploadStatus: string | null;
   initialContent: string;
 
   // Lifecycle
@@ -65,6 +66,9 @@ interface EditorState {
   yank: () => void;
   insertTab: () => void;
 
+  // Image paste
+  insertText: (text: string) => void;
+
   // Page navigation
   pageUp: (viewportHeight: number) => void;
   pageDown: (viewportHeight: number) => void;
@@ -86,6 +90,7 @@ const initialState = {
   killBuffer: '',
   dirty: false,
   showDiscardPrompt: false,
+  uploadStatus: null as string | null,
   initialContent: '',
 };
 
@@ -554,6 +559,25 @@ export const editorStore = createStore<EditorState>((set, get) => ({
     set({
       lines: newLines,
       cursor: { row: cursor.row, col: cursor.col + 2 },
+      undoStack: newUndo,
+      redoStack: [],
+      dirty: true,
+    });
+  },
+
+  insertText: (text: string) => {
+    const { lines, cursor, undoStack } = get();
+    const newUndo = [
+      ...undoStack.slice(-(MAX_UNDO - 1)),
+      { lines: [...lines], cursor: { ...cursor } },
+    ];
+    const line = lines[cursor.row]!;
+    const newLine = line.slice(0, cursor.col) + text + line.slice(cursor.col);
+    const newLines = [...lines];
+    newLines[cursor.row] = newLine;
+    set({
+      lines: newLines,
+      cursor: { row: cursor.row, col: cursor.col + text.length },
       undoStack: newUndo,
       redoStack: [],
       dirty: true,

@@ -228,3 +228,16 @@ export function listWorktrees(cwd: string): WorktreeInfo[] {
   }
   return worktrees;
 }
+
+export function getDefaultBranch(cwd?: string): string {
+  try {
+    const result = execFileSync(
+      'git',
+      ['symbolic-ref', 'refs/remotes/origin/HEAD'],
+      { cwd, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] },
+    ).trim();
+    return result.replace('refs/remotes/origin/', '');
+  } catch {
+    return 'main';
+  }
+}
