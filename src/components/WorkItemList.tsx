@@ -32,7 +32,7 @@ import {
   type CommandContext,
 } from '../commands.js';
 import { OverlayPanel, type OverlayItem } from './OverlayPanel.js';
-import { DetailPanel } from './DetailPanel.js';
+import { DetailPanel, countWrappedLines } from './DetailPanel.js';
 import type { WorkItem, Template } from '../types.js';
 import { undoStore } from '../stores/undoStore.js';
 import { CommandBar } from './CommandBar.js';
@@ -555,7 +555,12 @@ export function WorkItemList() {
   // Description viewport calculation
   const currentItem = treeItems[cursor]?.item;
   const descriptionLines = currentItem?.description?.split('\n') ?? [];
-  const descriptionTotalLines = descriptionLines.length;
+  // Account for word-wrapping: contentWidth = terminalWidth - 4 (border + padding)
+  const descriptionContentWidth = terminalWidth - 4;
+  const descriptionTotalLines = countWrappedLines(
+    descriptionLines,
+    descriptionContentWidth,
+  );
   const hasDescription = (currentItem?.description?.trim().length ?? 0) > 0;
 
   const minListRows = 2;

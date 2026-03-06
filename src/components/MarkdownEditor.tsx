@@ -1,6 +1,11 @@
 import { useEffect, useLayoutEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
-import { editorStore, useEditorStore } from '../stores/editorStore.js';
+import {
+  editorStore,
+  useEditorStore,
+  computeScrollOffset,
+  computeVisibleLines,
+} from '../stores/editorStore.js';
 import { formStackStore, useFormStackStore } from '../stores/formStackStore.js';
 import { navigationStore, type Screen } from '../stores/navigationStore.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
@@ -33,7 +38,7 @@ export function MarkdownEditor() {
   const showDiscardPrompt = useEditorStore((s) => s.showDiscardPrompt);
   const uploadStatus = useEditorStore((s) => s.uploadStatus);
   const draft = useFormStackStore((s) => s.currentDraft());
-  const { height, width } = useTerminalSize();
+  const { height, width: terminalWidth } = useTerminalSize();
   const accent = useThemeStore((s) => s.colors.accent);
   const viewportHeight = height - 2; // status bar + help bar
 
@@ -44,13 +49,13 @@ export function MarkdownEditor() {
 
   // Keep scroll in sync with cursor (useLayoutEffect to update before paint)
   useLayoutEffect(() => {
-    editorStore.getState().updateScroll(viewportHeight, width);
+    editorStore.getState().updateScroll(viewportHeight, terminalWidth);
   }, [
     cursor.row,
     cursor.col,
     lines.length,
     viewportHeight,
-    width,
+    terminalWidth,
     scrollOffset,
   ]);
 
@@ -218,9 +223,21 @@ export function MarkdownEditor() {
     }
   });
 
-  const visibleLines = editorStore
-    .getState()
-    .getVisibleLines(viewportHeight, width);
+  // Compute scroll offset inline using React-subscribed state to avoid
+  // stale reads from the store (which lag by one frame via useLayoutEffect).
+  const adjustedScroll = computeScrollOffset(
+    lines,
+    cursor,
+    scrollOffset,
+    viewportHeight,
+    terminalWidth,
+  );
+  const visibleLines = computeVisibleLines(
+    lines,
+    adjustedScroll,
+    viewportHeight,
+    terminalWidth,
+  );
   const lineContexts = computeLineContexts(lines);
 
   function renderVisibleLine(
@@ -230,29 +247,33 @@ export function MarkdownEditor() {
     context: LineContext,
     key: number,
   ) {
-    const sliceEnd = Math.min(sliceStart + width, fullLine.length);
+    const sliceEnd = Math.min(sliceStart + terminalWidth, fullLine.length);
     const isCursorLine = lineIndex === cursor.row;
     const cursorInSlice =
       isCursorLine &&
       cursor.col >= sliceStart &&
       (cursor.col < sliceEnd || sliceEnd === fullLine.length);
 
-    if (sliceStart === 0 && fullLine.length <= width) {
+    if (sliceStart === 0 && fullLine.length <= terminalWidth) {
       // Short line — no wrapping needed, use fast path
       if (isCursorLine) {
         return (
-          <Box key={key}>
+          <Box key={key} overflowX="hidden">
             {highlightLineWithCursor(fullLine, cursor.col, context)}
           </Box>
         );
       }
-      return <Box key={key}>{highlightLine(fullLine, context)}</Box>;
+      return (
+        <Box key={key} overflowX="hidden">
+          {highlightLine(fullLine, context)}
+        </Box>
+      );
     }
 
     // Wrapped sub-line
     if (cursorInSlice) {
       return (
-        <Box key={key}>
+        <Box key={key} overflowX="hidden">
           {highlightSliceWithCursor(
             fullLine,
             sliceStart,
@@ -264,7 +285,7 @@ export function MarkdownEditor() {
       );
     }
     return (
-      <Box key={key}>
+      <Box key={key} overflowX="hidden">
         {highlightSlice(fullLine, sliceStart, sliceEnd, context)}
       </Box>
     );
@@ -273,12 +294,12 @@ export function MarkdownEditor() {
   return (
     <Box flexDirection="column" height={height}>
       {/* Status bar */}
-      <Box justifyContent="space-between">
-        <Text bold color={accent}>
+      <Box justifyContent="space-between" overflowX="hidden">
+        <Text bold color={accent} wrap="truncate">
           Editing: {draft?.itemId ? `#${draft.itemId} ` : ''}
           {draft?.itemTitle ?? ''}
         </Text>
-        <Text dimColor>
+        <Text dimColor wrap="truncate">
           Ln {cursor.row + 1}, Col {cursor.col + 1}
           {dirty ? ' [modified]' : ''}
           {uploadStatus ? ` ${uploadStatus}` : ''}
@@ -307,14 +328,14 @@ export function MarkdownEditor() {
       </Box>
 
       {/* Help bar */}
-      <Box>
+      <Box overflowX="hidden">
         {showDiscardPrompt ? (
-          <Text>
+          <Text wrap="truncate">
             Discard changes? <Text bold>(d)</Text> discard{'  '}
             <Text bold>(esc)</Text> back
           </Text>
         ) : (
-          <Text dimColor>
+          <Text dimColor wrap="truncate">
             Ctrl+S save │ Esc cancel │ Ctrl+V paste image │ Ctrl+Z undo │ Ctrl+U
             kill line │ Ctrl+Y yank │ Alt+↑↓ page │ Alt+←→ word
           </Text>

@@ -101,10 +101,71 @@ const initialState = {
   returnScreen: null as string | null,
 };
 
-function visualHeight(line: string, width: number): number {
+export function visualHeight(line: string, width: number): number {
   if (width <= 0) return 1;
   if (line.length === 0) return 1;
   return Math.ceil(line.length / width);
+}
+
+/** Compute the scroll offset needed to keep the cursor visible. */
+export function computeScrollOffset(
+  lines: string[],
+  cursor: Cursor,
+  currentOffset: number,
+  viewportHeight: number,
+  width: number,
+): number {
+  let visualRow = 0;
+  for (let i = 0; i < cursor.row; i++) {
+    visualRow += visualHeight(lines[i]!, width);
+  }
+  if (width > 0 && lines[cursor.row]!.length > 0) {
+    visualRow += Math.floor(cursor.col / width);
+  }
+
+  let offset = currentOffset;
+  if (visualRow < offset) {
+    offset = visualRow;
+  } else if (visualRow >= offset + viewportHeight) {
+    offset = visualRow - viewportHeight + 1;
+  }
+  return offset;
+}
+
+/** Compute which lines/sub-lines are visible in the viewport (pure function). */
+export function computeVisibleLines(
+  lines: string[],
+  scrollOffset: number,
+  viewportHeight: number,
+  width: number,
+): VisibleLine[] {
+  const result: VisibleLine[] = [];
+  let visualRow = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    const h = visualHeight(line, width);
+
+    for (let subLine = 0; subLine < h; subLine++) {
+      if (
+        visualRow >= scrollOffset &&
+        visualRow < scrollOffset + viewportHeight
+      ) {
+        const sliceStart = subLine * width;
+        const sliceEnd = Math.min(sliceStart + width, line.length);
+        result.push({
+          lineIndex: i,
+          text: line.slice(sliceStart, sliceEnd),
+          sliceStart,
+        });
+      }
+      visualRow++;
+      if (result.length >= viewportHeight) break;
+    }
+    if (result.length >= viewportHeight) break;
+  }
+
+  return result;
 }
 
 // Regex for list markers: captures indent, marker, and content after marker
@@ -166,22 +227,13 @@ export const editorStore = createStore<EditorState>((set, get) => ({
 
   updateScroll: (viewportHeight: number, terminalWidth: number) => {
     const { lines, cursor, scrollOffset } = get();
-    // Calculate visual row of cursor
-    let visualRow = 0;
-    for (let i = 0; i < cursor.row; i++) {
-      visualRow += visualHeight(lines[i]!, terminalWidth);
-    }
-    // Add the visual row within the current wrapped line
-    if (terminalWidth > 0 && lines[cursor.row]!.length > 0) {
-      visualRow += Math.floor(cursor.col / terminalWidth);
-    }
-
-    let newOffset = scrollOffset;
-    if (visualRow < newOffset) {
-      newOffset = visualRow;
-    } else if (visualRow >= newOffset + viewportHeight) {
-      newOffset = visualRow - viewportHeight + 1;
-    }
+    const newOffset = computeScrollOffset(
+      lines,
+      cursor,
+      scrollOffset,
+      viewportHeight,
+      terminalWidth,
+    );
     if (newOffset !== scrollOffset) {
       set({ scrollOffset: newOffset });
     }
@@ -192,33 +244,12 @@ export const editorStore = createStore<EditorState>((set, get) => ({
     terminalWidth: number,
   ): VisibleLine[] => {
     const { lines, scrollOffset } = get();
-    const result: VisibleLine[] = [];
-    let visualRow = 0;
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i]!;
-      const h = visualHeight(line, terminalWidth);
-
-      for (let subLine = 0; subLine < h; subLine++) {
-        if (
-          visualRow >= scrollOffset &&
-          visualRow < scrollOffset + viewportHeight
-        ) {
-          const sliceStart = subLine * terminalWidth;
-          const sliceEnd = Math.min(sliceStart + terminalWidth, line.length);
-          result.push({
-            lineIndex: i,
-            text: line.slice(sliceStart, sliceEnd),
-            sliceStart,
-          });
-        }
-        visualRow++;
-        if (result.length >= viewportHeight) break;
-      }
-      if (result.length >= viewportHeight) break;
-    }
-
-    return result;
+    return computeVisibleLines(
+      lines,
+      scrollOffset,
+      viewportHeight,
+      terminalWidth,
+    );
   },
 
   moveCursorTo: (row: number, col: number) => {
