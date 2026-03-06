@@ -13,6 +13,13 @@ import {
   type LineContext,
 } from './markdownHighlight.js';
 import { useThemeStore } from '../stores/themeStore.js';
+import { readClipboardImage } from '../clipboard.js';
+import { uploadImageToGitHub } from '../backends/github/image-upload.js';
+import { isImageUploadBackend } from '../backends/github/index.js';
+import { getRemoteBackend } from '../stores/backendDataStore.js';
+import { configStore } from '../stores/configStore.js';
+import { uiStore } from '../stores/uiStore.js';
+import { getDefaultBranch } from '../git.js';
 
 export function MarkdownEditor() {
   const lines = useEditorStore((s) => s.lines);
@@ -20,6 +27,7 @@ export function MarkdownEditor() {
   const scrollOffset = useEditorStore((s) => s.scrollOffset);
   const dirty = useEditorStore((s) => s.dirty);
   const showDiscardPrompt = useEditorStore((s) => s.showDiscardPrompt);
+  const uploadStatus = useEditorStore((s) => s.uploadStatus);
   const draft = useFormStackStore((s) => s.currentDraft());
   const { height, width } = useTerminalSize();
   const accent = useThemeStore((s) => s.colors.accent);
@@ -79,6 +87,35 @@ export function MarkdownEditor() {
     // Ctrl+Shift+Z may come through as key.ctrl with input 'Z' (capital)
     if (input === 'Z' && key.ctrl) {
       s.redo();
+      return;
+    }
+
+    // Paste image: Ctrl+V
+    if (input === 'v' && key.ctrl) {
+      const backendType = configStore.getState().config.backend;
+      if (backendType !== 'github') return;
+
+      const imageData = readClipboardImage();
+      if (!imageData) return;
+
+      const remoteBackend = getRemoteBackend();
+      if (!remoteBackend || !isImageUploadBackend(remoteBackend)) return;
+
+      const { api, owner, repo } = remoteBackend.getImageUploadInfo();
+      editorStore.setState({ uploadStatus: 'Uploading image...' });
+
+      const branch = getDefaultBranch();
+
+      uploadImageToGitHub(api, owner, repo, branch, imageData)
+        .then((url) => {
+          editorStore.getState().insertText(`![image](${url})`);
+          editorStore.setState({ uploadStatus: null });
+        })
+        .catch((err: unknown) => {
+          editorStore.setState({ uploadStatus: null });
+          const msg = err instanceof Error ? err.message : 'Upload failed';
+          uiStore.getState().setToast(`Image upload failed: ${msg}`);
+        });
       return;
     }
 
@@ -231,6 +268,7 @@ export function MarkdownEditor() {
         <Text dimColor>
           Ln {cursor.row + 1}, Col {cursor.col + 1}
           {dirty ? ' [modified]' : ''}
+          {uploadStatus ? ` ${uploadStatus}` : ''}
         </Text>
       </Box>
 
@@ -264,8 +302,8 @@ export function MarkdownEditor() {
           </Text>
         ) : (
           <Text dimColor>
-            Ctrl+S save Esc cancel Ctrl+Z undo Ctrl+U kill line Ctrl+Y yank
-            Alt+↑↓ page Alt+←→ word
+            Ctrl+S save Esc cancel Ctrl+V paste image Ctrl+Z undo Ctrl+U kill
+            line Ctrl+Y yank Alt+↑↓ page Alt+←→ word
           </Text>
         )}
       </Box>
