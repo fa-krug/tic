@@ -287,31 +287,26 @@ export const backendDataStore = createStore<BackendDataStoreState>(
       if (!currentBackend) return;
 
       try {
-        const [statuses, iterations, types] = await Promise.all([
-          currentBackend.getStatuses(),
-          currentBackend.getIterations(),
-          currentBackend.getWorkItemTypes(),
-        ]);
+        const [statuses, iterations, types, assignees, labels] =
+          await Promise.all([
+            currentBackend.getStatuses(),
+            currentBackend.getIterations(),
+            currentBackend.getWorkItemTypes(),
+            currentBackend.getAssignees(),
+            currentBackend.getLabels(),
+          ]);
         const autoDetected = findCurrentIteration(iterations);
         const iter =
           autoDetected ?? (await currentBackend.getCurrentIteration());
         const items = await currentBackend.listWorkItems(iter);
-
-        // Derive assignees and labels from loaded items
-        const assigneeSet = new Set<string>();
-        const labelSet = new Set<string>();
-        for (const item of items) {
-          if (item.assignee) assigneeSet.add(item.assignee);
-          for (const label of item.labels) labelSet.add(label);
-        }
 
         set({
           capabilities: currentBackend.getCapabilities(),
           statuses,
           iterations,
           types,
-          assignees: [...assigneeSet].sort(),
-          labels: [...labelSet].sort(),
+          assignees,
+          labels,
           currentIteration: iter,
           items,
           error: null,
@@ -327,7 +322,11 @@ export const backendDataStore = createStore<BackendDataStoreState>(
     async reloadItem(id: string) {
       if (!currentBackend) return;
       try {
-        const item = await currentBackend.getWorkItem(id);
+        const [item, assignees, labels] = await Promise.all([
+          currentBackend.getWorkItem(id),
+          currentBackend.getAssignees(),
+          currentBackend.getLabels(),
+        ]);
         set((state) => {
           const idx = state.items.findIndex((i) => i.id === id);
           const items = [...state.items];
@@ -337,18 +336,10 @@ export const backendDataStore = createStore<BackendDataStoreState>(
             items.push(item);
           }
 
-          // Re-derive assignees and labels from updated items list
-          const assigneeSet = new Set<string>();
-          const labelSet = new Set<string>();
-          for (const i of items) {
-            if (i.assignee) assigneeSet.add(i.assignee);
-            for (const label of i.labels) labelSet.add(label);
-          }
-
           return {
             items,
-            assignees: [...assigneeSet].sort(),
-            labels: [...labelSet].sort(),
+            assignees,
+            labels,
           };
         });
       } catch (e) {
