@@ -154,6 +154,51 @@ export class AdoApiClient extends BaseApiClient {
     return { value: allValues } as T;
   }
 
+  async uploadAttachment(
+    project: string,
+    data: Buffer,
+    filename: string,
+  ): Promise<string> {
+    const path = `/${project}/_apis/wit/attachments?fileName=${encodeURIComponent(filename)}&api-version=${ADO_API_VERSION}`;
+    const url = this.baseUrl + path;
+
+    const headers: Record<string, string> = {
+      Authorization: this.getAuthHeader(),
+      'Content-Type': 'application/octet-stream',
+    };
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+
+    let response: Response;
+    try {
+      response = await globalThis.fetch(url, {
+        method: 'POST',
+        headers,
+        body: new Uint8Array(data),
+        signal: controller.signal,
+      });
+    } catch (error: unknown) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new Error('Request timed out');
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    if (response.status === 401) {
+      throw new AuthError();
+    }
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: Upload failed`);
+    }
+
+    const json = (await response.json()) as { url: string };
+    return json.url;
+  }
+
   async *paginate<T>(path: string): AsyncGenerator<T[]> {
     let url: string | null = this.baseUrl + this.appendApiVersion(path);
 
