@@ -1,4 +1,4 @@
-import { useLayoutEffect } from 'react';
+import { useEffect, useLayoutEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { editorStore, useEditorStore } from '../stores/editorStore.js';
 import { formStackStore, useFormStackStore } from '../stores/formStackStore.js';
@@ -13,13 +13,17 @@ import {
   type LineContext,
 } from './markdownHighlight.js';
 import { useThemeStore } from '../stores/themeStore.js';
-import { readClipboardImage } from '../clipboard.js';
-import { uploadImageToGitHub } from '../backends/github/image-upload.js';
-import { isImageUploadBackend } from '../backends/github/index.js';
-import { getRemoteBackend } from '../stores/backendDataStore.js';
-import { configStore } from '../stores/configStore.js';
+import { readClipboardImage, ClipboardError } from '../clipboard.js';
+import { saveImage } from '../backends/github/image-upload.js';
 import { uiStore } from '../stores/uiStore.js';
-import { getDefaultBranch } from '../git.js';
+
+// Escape codes to disable terminal mouse tracking and focus reporting
+// so that click/focus events don't leak through as printable characters.
+const DISABLE_MOUSE_FOCUS =
+  '\x1b[?1000l' + // disable basic mouse tracking
+  '\x1b[?1002l' + // disable button-event tracking
+  '\x1b[?1003l' + // disable any-event tracking
+  '\x1b[?1004l'; // disable focus reporting
 
 export function MarkdownEditor() {
   const lines = useEditorStore((s) => s.lines);
@@ -32,6 +36,11 @@ export function MarkdownEditor() {
   const { height, width } = useTerminalSize();
   const accent = useThemeStore((s) => s.colors.accent);
   const viewportHeight = height - 2; // status bar + help bar
+
+  // Disable mouse tracking and focus reporting so clicks don't produce [I / [O
+  useEffect(() => {
+    process.stdout.write(DISABLE_MOUSE_FOCUS);
+  }, []);
 
   // Keep scroll in sync with cursor (useLayoutEffect to update before paint)
   useLayoutEffect(() => {
@@ -98,32 +107,28 @@ export function MarkdownEditor() {
 
     // Paste image: Ctrl+V
     if (input === 'v' && key.ctrl) {
-      if (editorStore.getState().uploadStatus) return; // upload already in progress
+      let imageData: Buffer | null;
+      try {
+        imageData = readClipboardImage();
+      } catch (err) {
+        if (err instanceof ClipboardError) {
+          uiStore.getState().setToast(err.message);
+        }
+        return;
+      }
+      if (!imageData) {
+        uiStore.getState().setToast('No image found in clipboard');
+        return;
+      }
 
-      const backendType = configStore.getState().config.backend;
-      if (backendType !== 'github') return;
-
-      const imageData = readClipboardImage();
-      if (!imageData) return;
-
-      const remoteBackend = getRemoteBackend();
-      if (!remoteBackend || !isImageUploadBackend(remoteBackend)) return;
-
-      const { api, owner, repo } = remoteBackend.getImageUploadInfo();
-      editorStore.setState({ uploadStatus: 'Uploading image...' });
-
-      const branch = getDefaultBranch();
-
-      uploadImageToGitHub(api, owner, repo, branch, imageData)
-        .then((url) => {
-          editorStore.getState().insertText(`![image](${url})`);
-          editorStore.setState({ uploadStatus: null });
-        })
-        .catch((err: unknown) => {
-          editorStore.setState({ uploadStatus: null });
-          const msg = err instanceof Error ? err.message : 'Upload failed';
-          uiStore.getState().setToast(`Image upload failed: ${msg}`);
-        });
+      try {
+        const relPath = saveImage(process.cwd(), imageData);
+        s.insertText(`![image](${relPath})`);
+        uiStore.getState().setToast('Image saved and staged');
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Save failed';
+        uiStore.getState().setToast(`Image paste failed: ${msg}`);
+      }
       return;
     }
 
