@@ -1,8 +1,8 @@
-import { useLayoutEffect } from 'react';
+import { useEffect, useLayoutEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { editorStore, useEditorStore } from '../stores/editorStore.js';
 import { formStackStore, useFormStackStore } from '../stores/formStackStore.js';
-import { navigationStore } from '../stores/navigationStore.js';
+import { navigationStore, type Screen } from '../stores/navigationStore.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import {
   highlightLine,
@@ -13,6 +13,17 @@ import {
   type LineContext,
 } from './markdownHighlight.js';
 import { useThemeStore } from '../stores/themeStore.js';
+import { readClipboardImage, ClipboardError } from '../clipboard.js';
+import { saveImage } from '../backends/github/image-upload.js';
+import { uiStore } from '../stores/uiStore.js';
+
+// Escape codes to disable terminal mouse tracking and focus reporting
+// so that click/focus events don't leak through as printable characters.
+const DISABLE_MOUSE_FOCUS =
+  '\x1b[?1000l' + // disable basic mouse tracking
+  '\x1b[?1002l' + // disable button-event tracking
+  '\x1b[?1003l' + // disable any-event tracking
+  '\x1b[?1004l'; // disable focus reporting
 
 export function MarkdownEditor() {
   const lines = useEditorStore((s) => s.lines);
@@ -20,10 +31,16 @@ export function MarkdownEditor() {
   const scrollOffset = useEditorStore((s) => s.scrollOffset);
   const dirty = useEditorStore((s) => s.dirty);
   const showDiscardPrompt = useEditorStore((s) => s.showDiscardPrompt);
+  const uploadStatus = useEditorStore((s) => s.uploadStatus);
   const draft = useFormStackStore((s) => s.currentDraft());
   const { height, width } = useTerminalSize();
   const accent = useThemeStore((s) => s.colors.accent);
   const viewportHeight = height - 2; // status bar + help bar
+
+  // Disable mouse tracking and focus reporting so clicks don't produce [I / [O
+  useEffect(() => {
+    process.stdout.write(DISABLE_MOUSE_FOCUS);
+  }, []);
 
   // Keep scroll in sync with cursor (useLayoutEffect to update before paint)
   useLayoutEffect(() => {
@@ -39,12 +56,13 @@ export function MarkdownEditor() {
 
   useInput((input, key) => {
     const s = editorStore.getState();
+    const returnScreen = (s.returnScreen ?? 'form') as Screen;
 
     // Discard prompt mode — only handle d and escape
     if (showDiscardPrompt) {
       if (input === 'd') {
         s.destroy();
-        navigationStore.getState().navigate('form');
+        navigationStore.getState().navigate(returnScreen);
       }
       if (key.escape) {
         editorStore.setState({ showDiscardPrompt: false });
@@ -54,9 +72,14 @@ export function MarkdownEditor() {
 
     // Save: Ctrl+S
     if (input === 's' && key.ctrl) {
-      formStackStore.getState().updateFields({ description: s.getContent() });
+      const content = s.getContent();
+      if (s.onSave) {
+        s.onSave(content);
+      } else {
+        formStackStore.getState().updateFields({ description: content });
+      }
       s.destroy();
-      navigationStore.getState().navigate('form');
+      navigationStore.getState().navigate(returnScreen);
       return;
     }
 
@@ -66,7 +89,7 @@ export function MarkdownEditor() {
         editorStore.setState({ showDiscardPrompt: true });
       } else {
         s.destroy();
-        navigationStore.getState().navigate('form');
+        navigationStore.getState().navigate(returnScreen);
       }
       return;
     }
@@ -79,6 +102,33 @@ export function MarkdownEditor() {
     // Ctrl+Shift+Z may come through as key.ctrl with input 'Z' (capital)
     if (input === 'Z' && key.ctrl) {
       s.redo();
+      return;
+    }
+
+    // Paste image: Ctrl+V
+    if (input === 'v' && key.ctrl) {
+      let imageData: Buffer | null;
+      try {
+        imageData = readClipboardImage();
+      } catch (err) {
+        if (err instanceof ClipboardError) {
+          uiStore.getState().setToast(err.message);
+        }
+        return;
+      }
+      if (!imageData) {
+        uiStore.getState().setToast('No image found in clipboard');
+        return;
+      }
+
+      try {
+        const relPath = saveImage(process.cwd(), imageData);
+        s.insertText(`![image](${relPath})`);
+        uiStore.getState().setToast('Image saved and staged');
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Save failed';
+        uiStore.getState().setToast(`Image paste failed: ${msg}`);
+      }
       return;
     }
 
@@ -231,6 +281,7 @@ export function MarkdownEditor() {
         <Text dimColor>
           Ln {cursor.row + 1}, Col {cursor.col + 1}
           {dirty ? ' [modified]' : ''}
+          {uploadStatus ? ` ${uploadStatus}` : ''}
         </Text>
       </Box>
 
@@ -264,8 +315,8 @@ export function MarkdownEditor() {
           </Text>
         ) : (
           <Text dimColor>
-            Ctrl+S save Esc cancel Ctrl+Z undo Ctrl+U kill line Ctrl+Y yank
-            Alt+↑↓ page Alt+←→ word
+            Ctrl+S save │ Esc cancel │ Ctrl+V paste image │ Ctrl+Z undo │ Ctrl+U
+            kill line │ Ctrl+Y yank │ Alt+↑↓ page │ Alt+←→ word
           </Text>
         )}
       </Box>

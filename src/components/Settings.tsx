@@ -1,12 +1,16 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
 import TextInput from 'ink-text-input';
-import { useNavigationStore } from '../stores/navigationStore.js';
+import {
+  navigationStore,
+  useNavigationStore,
+} from '../stores/navigationStore.js';
 import {
   backendDataStore,
   useBackendDataStore,
   defaultCapabilities,
 } from '../stores/backendDataStore.js';
+import { useShallow } from 'zustand/shallow';
 import { useConfigStore, configStore } from '../stores/configStore.js';
 import { uiStore, useUIStore } from '../stores/uiStore.js';
 import { VALID_BACKENDS } from '../backends/factory.js';
@@ -18,7 +22,7 @@ import type { UpdateInfo } from '../update-checker.js';
 import { VERSION } from '../version.js';
 import { requestUpdate } from '../updater.js';
 import { OverlayPanel } from './OverlayPanel.js';
-import { openInEditor } from '../editor.js';
+import { editorStore } from '../stores/editorStore.js';
 import { matchesCommand } from '../commands.js';
 import { defaultConfig } from '../storage/config.js';
 import { useTerminalWidth } from '../hooks/useTerminalWidth.js';
@@ -55,30 +59,51 @@ type AvailabilityStatus = 'checking' | 'available' | 'unavailable';
 
 export function Settings() {
   const { exit } = useApp();
-  const backend = useBackendDataStore((s) => s.backend);
-  const syncManager = useBackendDataStore((s) => s.syncManager);
-  const navigate = useNavigationStore((s) => s.navigate);
+  const {
+    backend,
+    syncManager,
+    queue,
+    labels: storeLabels,
+  } = useBackendDataStore(
+    useShallow((s) => ({
+      backend: s.backend,
+      syncManager: s.syncManager,
+      queue: s.queue,
+      labels: s.labels,
+    })),
+  );
+
+  // Navigation store — actions via getState() (stable, never trigger re-renders)
+  const {
+    navigate,
+    navigateToHelp,
+    setFormMode,
+    setEditingTemplateSlug,
+    selectWorkItem,
+    setSettingsInitialFocus,
+  } = navigationStore.getState();
+
+  // Only reactive data via hooks
   const settingsInitialFocus = useNavigationStore(
     (s) => s.settingsInitialFocus,
   );
-  const setSettingsInitialFocus = useNavigationStore(
-    (s) => s.setSettingsInitialFocus,
-  );
-  const navigateToHelp = useNavigationStore((s) => s.navigateToHelp);
-  const setFormMode = useNavigationStore((s) => s.setFormMode);
-  const setEditingTemplateSlug = useNavigationStore(
-    (s) => s.setEditingTemplateSlug,
-  );
-  const selectWorkItem = useNavigationStore((s) => s.selectWorkItem);
   const terminalWidth = useTerminalWidth();
-  const themeName = useThemeStore((s) => s.themeName);
-  const { accent, success, mutedDim } = useThemeStore((s) => s.colors);
+  const {
+    themeName,
+    colors: { accent, success, mutedDim, selectionBg },
+  } = useThemeStore(
+    useShallow((s) => ({
+      themeName: s.themeName,
+      colors: s.colors,
+    })),
+  );
 
-  const queue = useBackendDataStore((s) => s.queue);
-  const storeLabels = useBackendDataStore((s) => s.labels);
-
-  const config = useConfigStore((s) => s.config);
-  const configLoaded = useConfigStore((s) => s.loaded);
+  const { config, loaded: configLoaded } = useConfigStore(
+    useShallow((s) => ({
+      config: s.config,
+      loaded: s.loaded,
+    })),
+  );
 
   const [cursor, setCursor] = useState(0);
   const [jiraSite, setJiraSite] = useState('');
@@ -358,22 +383,18 @@ export function Settings() {
             .update({ autoUpdate: !(config.autoUpdate !== false) })
             .catch(() => {});
         } else if (item.kind === 'branch-command') {
-          try {
-            const current =
-              config?.branchCommand ?? defaultConfig.branchCommand ?? '';
-            process.stdin.setRawMode?.(false);
-            const edited = openInEditor(current);
-            process.stdin.setRawMode?.(true);
-            console.clear();
-            void configStore
-              .getState()
-              .update({ branchCommand: edited.trim() })
-              .catch(() => {});
-          } catch {
-            process.stdin.setRawMode?.(true);
-            console.clear();
-            // Editor failed, ignore
-          }
+          const current =
+            config?.branchCommand ?? defaultConfig.branchCommand ?? '';
+          editorStore.getState().init(current, {
+            returnScreen: 'settings',
+            onSave: (content: string) => {
+              void configStore
+                .getState()
+                .update({ branchCommand: content.trim() })
+                .catch(() => {});
+            },
+          });
+          navigationStore.getState().navigate('editor');
         } else if (item.kind === 'branch-clipboard-toggle') {
           void configStore
             .getState()
@@ -408,6 +429,14 @@ export function Settings() {
         setEditingTemplateSlug(null);
         selectWorkItem(null);
         navigate('form');
+      }
+
+      if (
+        matchesCommand('settings-update', input, key) &&
+        updateInfo?.updateAvailable
+      ) {
+        requestUpdate();
+        exit();
       }
 
       if (matchesCommand('settings-delete-template', input, key)) {
@@ -456,14 +485,14 @@ export function Settings() {
           const isCurrent = b === config.backend;
           const status = availability[b];
           return (
-            <Box key={b}>
-              <Text color={focused ? accent : undefined}>
+            <Box key={b} backgroundColor={focused ? selectionBg : undefined}>
+              <Text color={focused ? autoFg(selectionBg) : undefined}>
                 {focused ? '>' : ' '}{' '}
               </Text>
               <Text
-                color={focused ? accent : undefined}
+                color={focused ? autoFg(selectionBg) : undefined}
                 bold={focused}
-                dimColor={status !== 'available'}
+                dimColor={status !== 'available' && !focused}
               >
                 {b}
                 {isCurrent ? ' (current)' : ''}
@@ -518,13 +547,17 @@ export function Settings() {
         const isEditing = focused && activeOverlay?.type === 'settings-edit';
 
         return (
-          <Box key={`jira-${field}`} marginLeft={4}>
-            <Text color={focused ? accent : undefined}>
+          <Box
+            key={`jira-${field}`}
+            marginLeft={4}
+            backgroundColor={focused ? selectionBg : undefined}
+          >
+            <Text color={focused ? autoFg(selectionBg) : undefined}>
               {focused ? '>' : ' '}{' '}
             </Text>
             {isEditing ? (
               <Box>
-                <Text bold color={accent}>
+                <Text bold color={autoFg(selectionBg)}>
                   {label}:{' '}
                 </Text>
                 <TextInput
@@ -538,10 +571,13 @@ export function Settings() {
                 />
               </Box>
             ) : (
-              <Text bold={focused} color={focused ? accent : undefined}>
+              <Text
+                bold={focused}
+                color={focused ? autoFg(selectionBg) : undefined}
+              >
                 {label}:{' '}
                 {value || (
-                  <Text dimColor={mutedDim}>
+                  <Text dimColor={!focused ? mutedDim : undefined}>
                     {required ? '(required)' : '(optional)'}
                   </Text>
                 )}
@@ -564,11 +600,18 @@ export function Settings() {
               ? (config.defaultType ?? config.types[0] ?? 'none')
               : config.current_iteration;
           return (
-            <Box key={item.kind} marginLeft={2}>
-              <Text color={focused ? accent : undefined}>
+            <Box
+              key={item.kind}
+              marginLeft={2}
+              backgroundColor={focused ? selectionBg : undefined}
+            >
+              <Text color={focused ? autoFg(selectionBg) : undefined}>
                 {focused ? '>' : ' '}{' '}
               </Text>
-              <Text bold={focused} color={focused ? accent : undefined}>
+              <Text
+                bold={focused}
+                color={focused ? autoFg(selectionBg) : undefined}
+              >
                 {label}: {value}
               </Text>
             </Box>
@@ -596,15 +639,22 @@ export function Settings() {
                 ? rawCmd.slice(0, maxLen - 1) + '\u2026'
                 : rawCmd;
             return (
-              <Box key="branch-command" marginLeft={2}>
-                <Text color={focused ? accent : undefined}>
+              <Box
+                key="branch-command"
+                marginLeft={2}
+                backgroundColor={focused ? selectionBg : undefined}
+              >
+                <Text color={focused ? autoFg(selectionBg) : undefined}>
                   {focused ? '>' : ' '}{' '}
                 </Text>
-                <Text bold={focused} color={focused ? accent : undefined}>
+                <Text
+                  bold={focused}
+                  color={focused ? autoFg(selectionBg) : undefined}
+                >
                   Branch command: {truncCmd || '(none)'}
                 </Text>
                 {focused && (
-                  <Text dimColor={mutedDim}> [enter opens $EDITOR]</Text>
+                  <Text color={autoFg(selectionBg)}> [enter to edit]</Text>
                 )}
               </Box>
             );
@@ -612,11 +662,18 @@ export function Settings() {
 
           if (item.kind === 'branch-clipboard-toggle') {
             return (
-              <Box key="branch-clipboard-toggle" marginLeft={2}>
-                <Text color={focused ? accent : undefined}>
+              <Box
+                key="branch-clipboard-toggle"
+                marginLeft={2}
+                backgroundColor={focused ? selectionBg : undefined}
+              >
+                <Text color={focused ? autoFg(selectionBg) : undefined}>
                   {focused ? '>' : ' '}{' '}
                 </Text>
-                <Text bold={focused} color={focused ? accent : undefined}>
+                <Text
+                  bold={focused}
+                  color={focused ? autoFg(selectionBg) : undefined}
+                >
                   Copy to clipboard:{' '}
                   {config?.copyToClipboard !== false ? 'on' : 'off'}
                 </Text>
@@ -634,11 +691,18 @@ export function Settings() {
           if (item.kind !== 'theme') return null;
           const focused = idx === cursor;
           return (
-            <Box key="theme" marginLeft={2}>
-              <Text color={focused ? accent : undefined}>
+            <Box
+              key="theme"
+              marginLeft={2}
+              backgroundColor={focused ? selectionBg : undefined}
+            >
+              <Text color={focused ? autoFg(selectionBg) : undefined}>
                 {focused ? '>' : ' '}{' '}
               </Text>
-              <Text bold={focused} color={focused ? accent : undefined}>
+              <Text
+                bold={focused}
+                color={focused ? autoFg(selectionBg) : undefined}
+              >
                 Theme: {themeName}
               </Text>
             </Box>
@@ -664,11 +728,18 @@ export function Settings() {
             'color-label': 'Label colors',
           };
           return (
-            <Box key={item.kind} marginLeft={2}>
-              <Text color={focused ? accent : undefined}>
+            <Box
+              key={item.kind}
+              marginLeft={2}
+              backgroundColor={focused ? selectionBg : undefined}
+            >
+              <Text color={focused ? autoFg(selectionBg) : undefined}>
                 {focused ? '>' : ' '}{' '}
               </Text>
-              <Text bold={focused} color={focused ? accent : undefined}>
+              <Text
+                bold={focused}
+                color={focused ? autoFg(selectionBg) : undefined}
+              >
                 {label[item.kind]} →
               </Text>
             </Box>
@@ -683,11 +754,18 @@ export function Settings() {
             if (item.kind !== 'template') return null;
             const focused = idx === cursor;
             return (
-              <Box key={`tmpl-${item.slug}`} marginLeft={2}>
-                <Text color={focused ? accent : undefined}>
+              <Box
+                key={`tmpl-${item.slug}`}
+                marginLeft={2}
+                backgroundColor={focused ? selectionBg : undefined}
+              >
+                <Text color={focused ? autoFg(selectionBg) : undefined}>
                   {focused ? '>' : ' '}{' '}
                 </Text>
-                <Text bold={focused} color={focused ? accent : undefined}>
+                <Text
+                  bold={focused}
+                  color={focused ? autoFg(selectionBg) : undefined}
+                >
                   {item.name}
                 </Text>
               </Box>
@@ -725,11 +803,18 @@ export function Settings() {
 
           if (item.kind === 'update-now') {
             return (
-              <Box key="update-now" marginLeft={2}>
-                <Text color={focused ? accent : undefined}>
+              <Box
+                key="update-now"
+                marginLeft={2}
+                backgroundColor={focused ? selectionBg : undefined}
+              >
+                <Text color={focused ? autoFg(selectionBg) : undefined}>
                   {focused ? '>' : ' '}{' '}
                 </Text>
-                <Text bold={focused} color={focused ? accent : success}>
+                <Text
+                  bold={focused}
+                  color={focused ? autoFg(selectionBg) : success}
+                >
                   Update to v{updateInfo?.latest}
                 </Text>
               </Box>
@@ -738,11 +823,18 @@ export function Settings() {
 
           if (item.kind === 'update-check') {
             return (
-              <Box key="update-check" marginLeft={2}>
-                <Text color={focused ? accent : undefined}>
+              <Box
+                key="update-check"
+                marginLeft={2}
+                backgroundColor={focused ? selectionBg : undefined}
+              >
+                <Text color={focused ? autoFg(selectionBg) : undefined}>
                   {focused ? '>' : ' '}{' '}
                 </Text>
-                <Text bold={focused} color={focused ? accent : undefined}>
+                <Text
+                  bold={focused}
+                  color={focused ? autoFg(selectionBg) : undefined}
+                >
                   {updateChecking ? 'Checking...' : 'Check for updates'}
                 </Text>
               </Box>
@@ -751,11 +843,18 @@ export function Settings() {
 
           if (item.kind === 'update-toggle') {
             return (
-              <Box key="update-toggle" marginLeft={2}>
-                <Text color={focused ? accent : undefined}>
+              <Box
+                key="update-toggle"
+                marginLeft={2}
+                backgroundColor={focused ? selectionBg : undefined}
+              >
+                <Text color={focused ? autoFg(selectionBg) : undefined}>
                   {focused ? '>' : ' '}{' '}
                 </Text>
-                <Text bold={focused} color={focused ? accent : undefined}>
+                <Text
+                  bold={focused}
+                  color={focused ? autoFg(selectionBg) : undefined}
+                >
                   Auto-check on launch:{' '}
                   {config?.autoUpdate !== false ? 'on' : 'off'}
                 </Text>
@@ -975,9 +1074,14 @@ export function Settings() {
 
       <Box marginTop={1}>
         <Text dimColor={mutedDim}>
-          {capabilities.templates
-            ? '↑↓ navigate  enter select  c create template  d delete template  esc back  ? help'
-            : '↑↓ navigate  enter select  esc back  ? help'}
+          {[
+            '↑↓ navigate │ enter select',
+            capabilities.templates
+              ? ' │ c create template │ d delete template'
+              : '',
+            updateInfo?.updateAvailable ? ' │ u update' : '',
+            ' │ esc back │ ? help',
+          ].join('')}
         </Text>
       </Box>
     </Box>

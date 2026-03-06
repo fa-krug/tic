@@ -1,13 +1,14 @@
 import { useState, useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { useThemeStore } from '../stores/themeStore.js';
-import { useNavigationStore } from '../stores/navigationStore.js';
+import { navigationStore } from '../stores/navigationStore.js';
 import type { BackendCapabilities } from '../backends/types.js';
 import { useScrollViewport } from '../hooks/useScrollViewport.js';
 import {
   useBackendDataStore,
   backendDataStore,
 } from '../stores/backendDataStore.js';
+import { useShallow } from 'zustand/shallow';
 import { useConfigStore } from '../stores/configStore.js';
 import { BACKEND_LABELS } from './Header.js';
 import { matchesCommand } from '../commands.js';
@@ -40,10 +41,13 @@ export function StatusScreen() {
     warning: warningColor,
     mutedDim,
   } = useThemeStore((s) => s.colors);
-  const backend = useBackendDataStore((s) => s.backend);
-  const syncManager = useBackendDataStore((s) => s.syncManager);
-  const navigate = useNavigationStore((s) => s.navigate);
-  const navigateToHelp = useNavigationStore((s) => s.navigateToHelp);
+  const { backend, syncManager } = useBackendDataStore(
+    useShallow((s) => ({
+      backend: s.backend,
+      syncManager: s.syncManager,
+    })),
+  );
+  const { navigate, navigateToHelp } = navigationStore.getState();
 
   const capabilities: BackendCapabilities = useMemo(
     () =>
@@ -79,9 +83,17 @@ export function StatusScreen() {
   const backendType = useConfigStore((s) => s.config.backend ?? 'none');
   const backendName = BACKEND_LABELS[backendType] ?? backendType;
 
-  const initError = useBackendDataStore((s) => s.error);
-  const syncStatus = useBackendDataStore((s) => s.syncStatus);
-  const authDismissed = useBackendDataStore((s) => s.authDismissed);
+  const {
+    error: initError,
+    syncStatus,
+    authDismissed,
+  } = useBackendDataStore(
+    useShallow((s) => ({
+      error: s.error,
+      syncStatus: s.syncStatus,
+      authDismissed: s.authDismissed,
+    })),
+  );
 
   const errors = syncStatus?.errors ?? [];
   const [scrollOffset, setScrollOffset] = useState(0);
@@ -336,10 +348,10 @@ export function StatusScreen() {
         <Text dimColor={mutedDim}>
           {syncManager &&
           (errors.length > 0 || (syncStatus?.pendingCount ?? 0) > 0)
-            ? '↑↓ scroll  r retry sync  esc back  ? help'
+            ? '↑↓ scroll │ r retry sync │ esc back │ ? help'
             : authDismissed && !syncManager
-              ? '↑↓ scroll  r retry auth  esc back  ? help'
-              : '↑↓ scroll  esc back  ? help'}
+              ? '↑↓ scroll │ r retry auth │ esc back │ ? help'
+              : '↑↓ scroll │ esc back │ ? help'}
         </Text>
       </Box>
     </Box>

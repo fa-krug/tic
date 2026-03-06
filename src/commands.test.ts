@@ -80,9 +80,9 @@ describe('getVisibleCommands', () => {
     const ctx = makeContext();
     const commands = getVisibleCommands(ctx);
     const labels = commands.map((c) => c.label);
-    expect(labels).toContain('Create item');
-    expect(labels).toContain('Edit item');
-    expect(labels).toContain('Delete item');
+    expect(labels).toContain('Create new item');
+    expect(labels).toContain('Edit selected item');
+    expect(labels).toContain('Delete selected item');
     expect(labels).toContain('Quit');
   });
 
@@ -90,9 +90,9 @@ describe('getVisibleCommands', () => {
     const ctx = makeContext({ hasSelectedItem: false });
     const commands = getVisibleCommands(ctx);
     const labels = commands.map((c) => c.label);
-    expect(labels).not.toContain('Edit item');
-    expect(labels).not.toContain('Delete item');
-    expect(labels).toContain('Create item');
+    expect(labels).not.toContain('Edit selected item');
+    expect(labels).not.toContain('Delete selected item');
+    expect(labels).toContain('Create new item');
   });
 
   it('hides priority when backend lacks capability', () => {
@@ -104,7 +104,7 @@ describe('getVisibleCommands', () => {
     });
     const commands = getVisibleCommands(ctx);
     const labels = commands.map((c) => c.label);
-    expect(labels).not.toContain('Set priority');
+    expect(labels).not.toContain('Set item priority');
   });
 
   it('hides iteration picker when backend lacks iterations', () => {
@@ -146,14 +146,14 @@ describe('getVisibleCommands', () => {
     const ctx = makeContext({ hasSyncManager: false });
     const commands = getVisibleCommands(ctx);
     const labels = commands.map((c) => c.label);
-    expect(labels).not.toContain('Refresh/sync');
+    expect(labels).not.toContain('Sync with remote backend');
   });
 
   it('hides branch/worktree when git not available', () => {
     const ctx = makeContext({ gitAvailable: false });
     const commands = getVisibleCommands(ctx);
     const labels = commands.map((c) => c.label);
-    expect(labels).not.toContain('Create branch/worktree');
+    expect(labels).not.toContain('Create branch or worktree for item');
   });
 
   it('hides switch commands when backend lacks customTypes', () => {
@@ -171,7 +171,7 @@ describe('getVisibleCommands', () => {
     const ctx = makeContext();
     const commands = getVisibleCommands(ctx);
     const labels = commands.map((c) => c.label);
-    expect(labels).toContain('Order by...');
+    expect(labels).toContain('Change sort order');
   });
 
   it('hides list-specific commands on non-list screens', () => {
@@ -273,7 +273,7 @@ describe('findCommand', () => {
     const cmd = findCommand('create');
     expect(cmd).toBeDefined();
     expect(cmd!.id).toBe('create');
-    expect(cmd!.label).toBe('Create item');
+    expect(cmd!.label).toBe('Create new item');
   });
 
   it('returns undefined for unknown id', () => {
@@ -640,7 +640,7 @@ describe('buildFooterHints', () => {
     const result = buildFooterHints('list', ctx, 200);
     // 'create' is the footerLabel, not 'Create item'
     expect(result).toContain('create');
-    expect(result).not.toContain('Create item');
+    expect(result).not.toContain('Create new item');
   });
 
   it('returns empty string when width is zero', () => {
@@ -651,7 +651,7 @@ describe('buildFooterHints', () => {
   it('separates entries with double space', () => {
     const ctx = makeContext({ screen: 'list' });
     const result = buildFooterHints('list', ctx, 200);
-    expect(result).toContain('navigate  ');
+    expect(result).toContain('navigate │');
   });
 });
 

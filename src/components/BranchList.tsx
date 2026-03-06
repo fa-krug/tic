@@ -12,6 +12,7 @@ import {
   backendDataStore,
   useBackendDataStore,
 } from '../stores/backendDataStore.js';
+import { useShallow } from 'zustand/shallow';
 import { uiStore, useUIStore } from '../stores/uiStore.js';
 import {
   getCurrentBranch,
@@ -138,12 +139,19 @@ export function BranchList() {
   const { accent, muted, mutedDim, warning, selectionBg } = useThemeStore(
     (s) => s.colors,
   );
-  const navigate = useNavigationStore((s) => s.navigate);
-  const navigateToHelp = useNavigationStore((s) => s.navigateToHelp);
+  const { navigate, navigateToHelp } = navigationStore.getState();
   const selectedBranchName = useNavigationStore((s) => s.selectedBranchName);
-  const rows = useBackendDataStore((s) => s.branches);
-  const prCapabilities = useBackendDataStore((s) => s.prCapabilities);
-  const capabilities = useBackendDataStore((s) => s.capabilities);
+  const {
+    branches: rows,
+    prCapabilities,
+    capabilities,
+  } = useBackendDataStore(
+    useShallow((s) => ({
+      branches: s.branches,
+      prCapabilities: s.prCapabilities,
+      capabilities: s.capabilities,
+    })),
+  );
   const cwd = process.cwd();
   const termWidth = useTerminalWidth();
   const branchColumns = useMemo(

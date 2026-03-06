@@ -5,6 +5,7 @@ import {
   backendDataStore,
 } from '../stores/backendDataStore.js';
 import { navigationStore } from '../stores/navigationStore.js';
+import { useShallow } from 'zustand/shallow';
 import { uiStore } from '../stores/uiStore.js';
 import { useThemeStore, autoFg } from '../stores/themeStore.js';
 import {
@@ -110,10 +111,15 @@ function buildIterationColumns(
 }
 
 export function IterationPicker() {
-  const iterations = useBackendDataStore((s) => s.iterations);
-  const currentIteration = useBackendDataStore((s) => s.currentIteration);
-  const backend = useBackendDataStore((s) => s.backend);
-  const capabilities = useBackendDataStore((s) => s.capabilities);
+  const { iterations, currentIteration, backend, capabilities } =
+    useBackendDataStore(
+      useShallow((s) => ({
+        iterations: s.iterations,
+        currentIteration: s.currentIteration,
+        backend: s.backend,
+        capabilities: s.capabilities,
+      })),
+    );
   const { accent, muted, mutedDim, selectionBg } = useThemeStore(
     (s) => s.colors,
   );

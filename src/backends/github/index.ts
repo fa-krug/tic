@@ -19,6 +19,7 @@ import type {
 import { getGitHubToken, authenticateGitHub } from '../../auth/github.js';
 import { AuthError } from '../shared/api-client.js';
 import { GitHubApiClient } from './api.js';
+export type { GitHubApiClient } from './api.js';
 import { mapIssueToWorkItem } from './mappers.js';
 import type { GhIssue, GhMilestone } from './mappers.js';
 import { mapGhPrToPullRequest } from './pr-mappers.js';

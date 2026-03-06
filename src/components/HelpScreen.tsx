@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { useThemeStore } from '../stores/themeStore.js';
-import { useNavigationStore, type Screen } from '../stores/navigationStore.js';
+import { navigationStore, type Screen } from '../stores/navigationStore.js';
 import { useBackendDataStore } from '../stores/backendDataStore.js';
+import { useShallow } from 'zustand/shallow';
 import { isGitRepo } from '../git.js';
 import type { BackendCapabilities } from '../backends/types.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
@@ -75,11 +76,13 @@ export function flattenGroups(groups: ShortcutGroup[]): LineEntry[] {
 
 export function HelpScreen({ sourceScreen }: { sourceScreen: Screen }) {
   const { accent, mutedDim } = useThemeStore((s) => s.colors);
-  const backend = useBackendDataStore((s) => s.backend);
-  const syncManager = useBackendDataStore((s) => s.syncManager);
-  const navigateBackFromHelp = useNavigationStore(
-    (s) => s.navigateBackFromHelp,
+  const { backend, syncManager } = useBackendDataStore(
+    useShallow((s) => ({
+      backend: s.backend,
+      syncManager: s.syncManager,
+    })),
   );
+  const { navigateBackFromHelp } = navigationStore.getState();
   const capabilities = backend?.getCapabilities() ?? {
     relationships: false,
     customTypes: false,
@@ -179,7 +182,7 @@ export function HelpScreen({ sourceScreen }: { sourceScreen: Screen }) {
       <Box marginTop={1}>
         <Text dimColor={mutedDim}>
           {needsScroll
-            ? `↑↓ scroll (${scrollOffset + 1}-${Math.min(scrollOffset + maxVisible, lines.length)} of ${lines.length})  esc: back`
+            ? `↑↓ scroll (${scrollOffset + 1}-${Math.min(scrollOffset + maxVisible, lines.length)} of ${lines.length}) │ esc: back`
             : 'esc: back'}
         </Text>
       </Box>

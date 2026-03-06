@@ -1657,10 +1657,10 @@ export function WorkItemForm() {
         ) : (
           <Text dimColor={mutedDim}>
             {editing
-              ? 'enter confirm  esc revert  ? help'
+              ? 'enter confirm │ esc revert │ ? help'
               : isDirty
-                ? '↑↓ navigate  enter edit  s save & back  esc back (unsaved changes)  ? help'
-                : '↑↓ navigate  enter edit  s save & back  esc back  ? help'}
+                ? '↑↓ navigate │ enter edit │ s save & back │ esc back (unsaved changes) │ ? help'
+                : '↑↓ navigate │ enter edit │ s save & back │ esc back │ ? help'}
           </Text>
         )}
       </Box>

@@ -228,3 +228,29 @@ export function listWorktrees(cwd: string): WorktreeInfo[] {
   }
   return worktrees;
 }
+
+export function getDefaultBranch(cwd?: string): string {
+  try {
+    const result = execFileSync(
+      'git',
+      ['symbolic-ref', 'refs/remotes/origin/HEAD'],
+      { cwd, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] },
+    ).trim();
+    return result.replace('refs/remotes/origin/', '');
+  } catch {
+    // Fallback: check if 'main' or 'master' exists as remote branch
+    try {
+      execFileSync(
+        'git',
+        ['rev-parse', '--verify', 'refs/remotes/origin/main'],
+        {
+          cwd,
+          stdio: ['pipe', 'pipe', 'pipe'],
+        },
+      );
+      return 'main';
+    } catch {
+      return 'master';
+    }
+  }
+}
