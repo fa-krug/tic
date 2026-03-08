@@ -19,7 +19,7 @@ import {
 } from './markdownHighlight.js';
 import { useThemeStore } from '../stores/themeStore.js';
 import { readClipboardImage, ClipboardError } from '../clipboard.js';
-import { saveImage } from '../backends/github/image-upload.js';
+import { getImageUploadBackend } from '../stores/backendDataStore.js';
 import { uiStore } from '../stores/uiStore.js';
 
 // Escape codes to disable terminal mouse tracking and focus reporting
@@ -126,14 +126,32 @@ export function MarkdownEditor() {
         return;
       }
 
-      try {
-        const relPath = saveImage(process.cwd(), imageData);
-        s.insertText(`![image](${relPath})`);
-        uiStore.getState().setToast('Image saved and staged');
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : 'Save failed';
-        uiStore.getState().setToast(`Image paste failed: ${msg}`);
+      const uploader = getImageUploadBackend();
+      if (!uploader) {
+        uiStore.getState().setToast('Image upload not available');
+        return;
       }
+
+      if (s.uploadStatus) {
+        uiStore.getState().setToast('Upload already in progress');
+        return;
+      }
+
+      editorStore.setState({ uploadStatus: 'Uploading image...' });
+      const hash = Date.now().toString(36);
+      const filename = `paste-${hash}.png`;
+      void uploader.uploadImage(imageData, filename).then(
+        (relPath) => {
+          s.insertText(`![image](${relPath})`);
+          editorStore.setState({ uploadStatus: null });
+          uiStore.getState().setToast('Image saved');
+        },
+        (err: unknown) => {
+          editorStore.setState({ uploadStatus: null });
+          const msg = err instanceof Error ? err.message : 'Upload failed';
+          uiStore.getState().setToast(`Image paste failed: ${msg}`);
+        },
+      );
       return;
     }
 

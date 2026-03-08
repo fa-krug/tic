@@ -16,6 +16,7 @@ const fullCapabilities: BackendCapabilities = {
     dependsOn: true,
   },
   templates: true,
+  imageUpload: true,
   templateFields: {
     type: true,
     status: true,
@@ -43,6 +44,7 @@ const minimalCapabilities: BackendCapabilities = {
     dependsOn: false,
   },
   templates: false,
+  imageUpload: false,
   templateFields: {
     type: false,
     status: false,

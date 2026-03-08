@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { BaseBackend, UnsupportedOperationError } from '../types.js';
-import type { BackendCapabilities } from '../types.js';
+import type { BackendCapabilities, ImageUploadBackend } from '../types.js';
 import type {
   WorkItem,
   NewWorkItem,
@@ -35,7 +35,10 @@ interface JsonPatchOp {
   value?: unknown;
 }
 
-export class AzureDevOpsBackend extends BaseBackend {
+export class AzureDevOpsBackend
+  extends BaseBackend
+  implements ImageUploadBackend
+{
   private api: AdoApiClient;
   private org: string;
   private project: string;
@@ -127,6 +130,7 @@ export class AzureDevOpsBackend extends BaseBackend {
         dependsOn: false,
         description: false,
       },
+      imageUpload: true,
       requiredFields: ['title', 'type'],
     };
   }
@@ -552,4 +556,8 @@ export class AzureDevOpsBackend extends BaseBackend {
     throw new UnsupportedOperationError('templates', 'AzureDevOpsBackend');
   }
   /* eslint-enable @typescript-eslint/require-await, @typescript-eslint/no-unused-vars */
+
+  async uploadImage(data: Buffer, filename: string): Promise<string> {
+    return this.api.uploadAttachment(this.project, data, filename);
+  }
 }

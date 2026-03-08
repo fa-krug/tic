@@ -5,7 +5,8 @@ import type {
   BackendCapabilities,
   PrCapabilities,
 } from '../backends/types.js';
-import { isPrBackend } from '../backends/types.js';
+import { isPrBackend, isImageUploadBackend } from '../backends/types.js';
+import type { ImageUploadBackend } from '../backends/types.js';
 import type {
   WorkItem,
   PullRequest,
@@ -41,6 +42,7 @@ export const defaultCapabilities: BackendCapabilities = {
     dependsOn: false,
   },
   templates: false,
+  imageUpload: false,
   templateFields: {
     type: false,
     status: false,
@@ -152,6 +154,18 @@ let currentRemoteBackend: Backend | null = null;
 let currentCwd: string | null = null;
 let initGeneration = 0;
 let currentSyncUnsubscribe: (() => void) | null = null;
+
+export function getImageUploadBackend(): ImageUploadBackend | null {
+  // Prefer remote backend if it supports image upload
+  if (currentRemoteBackend && isImageUploadBackend(currentRemoteBackend)) {
+    return currentRemoteBackend;
+  }
+  // Fall back to primary (Storage)
+  if (currentBackend && isImageUploadBackend(currentBackend)) {
+    return currentBackend;
+  }
+  return null;
+}
 
 async function createBackendAndSync(cwd: string): Promise<{
   backend: Backend;

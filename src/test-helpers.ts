@@ -111,6 +111,7 @@ export function createMockRemote(items: WorkItem[] = []): Backend {
         dependsOn: true,
       },
       templates: false,
+      imageUpload: false,
       templateFields: {
         type: false,
         status: false,

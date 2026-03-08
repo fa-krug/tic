@@ -24,6 +24,7 @@ export interface BackendCapabilities {
     dependsOn: boolean;
   };
   templates: boolean;
+  imageUpload: boolean;
   templateFields: {
     type: boolean;
     status: boolean;
@@ -108,6 +109,16 @@ export function isSoftDeleteBackend(
     'permanentlyDeleteWorkItem' in backend &&
     'cleanupTrash' in backend
   );
+}
+
+export interface ImageUploadBackend extends Backend {
+  uploadImage(data: Buffer, filename: string): Promise<string>;
+}
+
+export function isImageUploadBackend(
+  backend: Backend,
+): backend is Backend & ImageUploadBackend {
+  return 'uploadImage' in backend;
 }
 
 export abstract class BaseBackend implements Backend {

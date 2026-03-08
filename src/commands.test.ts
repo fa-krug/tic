@@ -29,6 +29,7 @@ const ALL_CAPS: BackendCapabilities = {
     dependsOn: true,
   },
   templates: true,
+  imageUpload: true,
   templateFields: {
     type: true,
     status: true,

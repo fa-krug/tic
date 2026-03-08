@@ -6,9 +6,11 @@ import { BaseBackend, UnsupportedOperationError } from '../backends/types.js';
 import type {
   BackendCapabilities,
   SoftDeleteBackend,
+  ImageUploadBackend,
   PrBackend,
   PrCapabilities,
 } from '../backends/types.js';
+import { saveImageLocal } from './image-save.js';
 import type {
   WorkItem,
   NewWorkItem,
@@ -51,7 +53,7 @@ export interface StorageOptions {
 
 export class Storage
   extends BaseBackend
-  implements SoftDeleteBackend, PrBackend
+  implements SoftDeleteBackend, PrBackend, ImageUploadBackend
 {
   private db: TicDatabase;
   private root: string;
@@ -216,6 +218,7 @@ export class Storage
         dependsOn: true,
         description: true,
       },
+      imageUpload: true,
       requiredFields: ['title'],
     };
   }
@@ -1045,6 +1048,13 @@ export class Storage
     if (edited !== item.description) {
       await this.cachedUpdateWorkItem(id, { description: edited });
     }
+  }
+
+  // ─── Image upload ──────────────────────────────────────────────
+
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async uploadImage(data: Buffer, filename: string): Promise<string> {
+    return saveImageLocal(this.root, data, filename);
   }
 
   // ─── Templates ─────────────────────────────────────────────────

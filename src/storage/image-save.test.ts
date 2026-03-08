@@ -4,9 +4,9 @@ import { mkdtempSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
-import { saveImage } from './image-upload.js';
+import { saveImageLocal } from './image-save.js';
 
-describe('saveImage', () => {
+describe('saveImageLocal', () => {
   let root: string;
 
   beforeEach(() => {
@@ -20,16 +20,12 @@ describe('saveImage', () => {
     .digest('hex')
     .slice(0, 12);
 
-  it('writes image to .github/tic-images/ and stages it', () => {
-    const relPath = saveImage(root, imageData);
-
-    expect(relPath).toBe(`.github/tic-images/${expectedHash}.png`);
-
+  it('writes image to .tic/images/ and stages it', () => {
+    const relPath = saveImageLocal(root, imageData);
+    expect(relPath).toBe(`.tic/images/${expectedHash}.png`);
     const absPath = join(root, relPath);
     expect(existsSync(absPath)).toBe(true);
     expect(readFileSync(absPath)).toEqual(imageData);
-
-    // Verify file is staged
     const staged = execFileSync('git', ['diff', '--cached', '--name-only'], {
       cwd: root,
       encoding: 'utf-8',
@@ -38,14 +34,19 @@ describe('saveImage', () => {
   });
 
   it('produces deterministic paths for same content', () => {
-    const path1 = saveImage(root, imageData);
-    const path2 = saveImage(root, imageData);
+    const path1 = saveImageLocal(root, imageData);
+    const path2 = saveImageLocal(root, imageData);
     expect(path1).toBe(path2);
   });
 
   it('produces different paths for different content', () => {
-    const path1 = saveImage(root, imageData);
-    const path2 = saveImage(root, Buffer.from('different-data'));
+    const path1 = saveImageLocal(root, imageData);
+    const path2 = saveImageLocal(root, Buffer.from('different-data'));
     expect(path1).not.toBe(path2);
+  });
+
+  it('uses provided filename extension', () => {
+    const relPath = saveImageLocal(root, imageData, 'screenshot.jpg');
+    expect(relPath).toMatch(/\.jpg$/);
   });
 });

@@ -34,6 +34,7 @@ export const BACKEND_CAPABILITIES: Partial<
       dependsOn: false,
     },
     templates: false,
+    imageUpload: true,
     templateFields: { ...NO_TEMPLATE_FIELDS },
   },
   gitlab: {
@@ -50,6 +51,7 @@ export const BACKEND_CAPABILITIES: Partial<
       dependsOn: false,
     },
     templates: true,
+    imageUpload: true,
     templateFields: { ...NO_TEMPLATE_FIELDS, description: true },
   },
   azure: {
@@ -66,6 +68,7 @@ export const BACKEND_CAPABILITIES: Partial<
       dependsOn: true,
     },
     templates: false,
+    imageUpload: true,
     templateFields: { ...NO_TEMPLATE_FIELDS },
   },
 };

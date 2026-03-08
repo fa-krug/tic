@@ -1,7 +1,7 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { BaseBackend } from '../types.js';
-import type { BackendCapabilities } from '../types.js';
+import type { BackendCapabilities, ImageUploadBackend } from '../types.js';
 import type {
   WorkItem,
   NewWorkItem,
@@ -247,7 +247,7 @@ export interface GitLabBackendOptions {
   skipAuth?: boolean;
 }
 
-export class GitLabBackend extends BaseBackend {
+export class GitLabBackend extends BaseBackend implements ImageUploadBackend {
   private api: GitLabApiClient;
   private remote: GitLabRemoteInfo;
   private typeIds: Map<string, string>;
@@ -323,6 +323,7 @@ export class GitLabBackend extends BaseBackend {
         dependsOn: false,
         description: true,
       },
+      imageUpload: true,
       requiredFields: ['title'],
     };
   }
@@ -799,5 +800,14 @@ export class GitLabBackend extends BaseBackend {
     }
     this.cachedMilestones = ms;
     return ms;
+  }
+
+  async uploadImage(data: Buffer, filename: string): Promise<string> {
+    const result = await this.api.uploadFile(
+      this.remote.fullPath,
+      data,
+      filename,
+    );
+    return `https://${this.remote.host}${result.url}`;
   }
 }

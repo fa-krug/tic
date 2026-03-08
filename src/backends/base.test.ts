@@ -27,6 +27,7 @@ const ALL_DISABLED: BackendCapabilities = {
     dependsOn: false,
   },
   templates: false,
+  imageUpload: false,
   templateFields: {
     type: false,
     status: false,
@@ -54,6 +55,7 @@ const ALL_ENABLED: BackendCapabilities = {
     dependsOn: true,
   },
   templates: true,
+  imageUpload: true,
   templateFields: {
     type: true,
     status: true,

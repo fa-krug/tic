@@ -58,6 +58,7 @@ export function StatusScreen() {
         iterations: false,
         comments: false,
         templates: false,
+        imageUpload: false,
         fields: {
           priority: false,
           assignee: false,
