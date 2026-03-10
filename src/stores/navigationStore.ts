@@ -36,6 +36,9 @@ interface NavigationState {
   // Update info
   updateInfo: UpdateInfo | null;
 
+  // Create child flow
+  createChildParentId: string | null;
+
   // Settings initial focus (e.g. jump to 'update-now' from update banner)
   settingsInitialFocus: string | null;
 
@@ -53,6 +56,7 @@ interface NavigationState {
   setFormMode: (mode: 'item' | 'template') => void;
   setEditingTemplateSlug: (slug: string | null) => void;
   setUpdateInfo: (info: UpdateInfo | null) => void;
+  setCreateChildParentId: (id: string | null) => void;
   setSettingsInitialFocus: (focus: string | null) => void;
   reset: () => void;
 }
@@ -68,6 +72,7 @@ const initialState = {
   activeTemplate: null,
   formMode: 'item' as const,
   editingTemplateSlug: null,
+  createChildParentId: null,
   updateInfo: null,
   settingsInitialFocus: null,
 };
@@ -153,6 +158,10 @@ const createNavigationStore = () =>
 
     setUpdateInfo: (info: UpdateInfo | null) => {
       set({ updateInfo: info });
+    },
+
+    setCreateChildParentId: (id: string | null) => {
+      set({ createChildParentId: id });
     },
 
     setSettingsInitialFocus: (focus: string | null) => {

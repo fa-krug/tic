@@ -225,6 +225,17 @@ describe('navigationStore', () => {
       navigationStore.getState().setUpdateInfo(info);
       expect(navigationStore.getState().updateInfo).toEqual(info);
     });
+
+    it('sets createChildParentId', () => {
+      navigationStore.getState().setCreateChildParentId('42');
+      expect(navigationStore.getState().createChildParentId).toBe('42');
+    });
+
+    it('clears createChildParentId', () => {
+      navigationStore.setState({ createChildParentId: '42' });
+      navigationStore.getState().setCreateChildParentId(null);
+      expect(navigationStore.getState().createChildParentId).toBeNull();
+    });
   });
 
   describe('reset', () => {
@@ -243,6 +254,7 @@ describe('navigationStore', () => {
           latest: '2.0.0',
           updateAvailable: true,
         },
+        createChildParentId: '99',
       });
 
       navigationStore.getState().reset();
@@ -256,6 +268,7 @@ describe('navigationStore', () => {
       expect(navigationStore.getState().formMode).toBe('item');
       expect(navigationStore.getState().editingTemplateSlug).toBeNull();
       expect(navigationStore.getState().updateInfo).toBeNull();
+      expect(navigationStore.getState().createChildParentId).toBeNull();
     });
   });
 });
