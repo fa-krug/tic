@@ -63,6 +63,19 @@ const commands: Command[] = [
     when: (ctx) => ctx.screen === 'list',
   },
   {
+    id: 'create-child',
+    label: 'Create child item',
+    category: 'Actions',
+    shortcut: 'C',
+    keys: ['C'],
+    screen: ['list', 'form'],
+    helpGroup: 'Actions',
+    when: (ctx) =>
+      (ctx.screen === 'list' || ctx.screen === 'form') &&
+      ctx.hasSelectedItem &&
+      ctx.capabilities.fields.parent,
+  },
+  {
     id: 'edit',
     label: 'Edit selected item',
     category: 'Actions',

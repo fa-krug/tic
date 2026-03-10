@@ -176,6 +176,32 @@ describe('getVisibleCommands', () => {
     expect(labels).toContain('Change sort order');
   });
 
+  it('shows create-child when item is selected and parent capability exists', () => {
+    const ctx = makeContext({ hasSelectedItem: true });
+    const commands = getVisibleCommands(ctx);
+    const ids = commands.map((c) => c.id);
+    expect(ids).toContain('create-child');
+  });
+
+  it('hides create-child when no item is selected', () => {
+    const ctx = makeContext({ hasSelectedItem: false });
+    const commands = getVisibleCommands(ctx);
+    const ids = commands.map((c) => c.id);
+    expect(ids).not.toContain('create-child');
+  });
+
+  it('hides create-child when parent capability is missing', () => {
+    const ctx = makeContext({
+      capabilities: {
+        ...ALL_CAPS,
+        fields: { ...ALL_CAPS.fields, parent: false },
+      },
+    });
+    const commands = getVisibleCommands(ctx);
+    const ids = commands.map((c) => c.id);
+    expect(ids).not.toContain('create-child');
+  });
+
   it('hides list-specific commands on non-list screens', () => {
     const ctx = makeContext({ screen: 'form' });
     const commands = getVisibleCommands(ctx);
@@ -719,6 +745,11 @@ describe('matchesCommand', () => {
       true,
     );
     expect(matchesCommand('pr-open', 'x', noKey)).toBe(false);
+  });
+
+  it('matches create-child on uppercase C', () => {
+    expect(matchesCommand('create-child', 'C', noKey)).toBe(true);
+    expect(matchesCommand('create-child', 'c', noKey)).toBe(false);
   });
 
   it('returns false for unknown command', () => {
