@@ -15,12 +15,13 @@ import type {
 import type { Backend } from './backends/types.js';
 
 export function makeWorkItem(
-  id: string,
+  rowId: number,
   overrides: Partial<WorkItem> = {},
 ): WorkItem {
   return {
-    id,
-    title: `Item ${id}`,
+    rowId,
+    id: String(rowId),
+    title: `Item ${rowId}`,
     type: 'task',
     status: 'todo',
     priority: 'medium',

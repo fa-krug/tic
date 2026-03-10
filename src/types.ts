@@ -5,7 +5,8 @@ export interface Comment {
 }
 
 export interface WorkItem {
-  id: string;
+  rowId: number;
+  id: string | null;
   title: string;
   type: string;
   status: string;
@@ -17,8 +18,8 @@ export interface WorkItem {
   updated: string;
   description: string;
   comments: Comment[];
-  parent: string | null;
-  dependsOn: string[];
+  parent: number | null;
+  dependsOn: number[];
 }
 
 export type NewWorkItem = Pick<
@@ -65,7 +66,7 @@ export interface PullRequest {
   sourceBranch: string;
   targetBranch: string;
   author: string;
-  linkedItems: string[];
+  linkedItems: number[];
   created: string;
   updated: string;
   url: string;
@@ -76,7 +77,7 @@ export interface NewPullRequest {
   description?: string;
   sourceBranch: string;
   targetBranch?: string;
-  linkedItems?: string[];
+  linkedItems?: number[];
 }
 
 export interface Iteration {
