@@ -709,6 +709,23 @@ export class Storage
   // eslint-disable-next-line @typescript-eslint/require-await
   async importWorkItem(item: WorkItem): Promise<WorkItem> {
     this.db.transaction((tx) => {
+      // Bump nextId past imported numeric IDs to prevent collisions
+      const numericId = Number(item.id);
+      if (!Number.isNaN(numericId) && numericId > 0) {
+        const config = tx
+          .select({ nextId: schema.projectConfig.nextId })
+          .from(schema.projectConfig)
+          .where(eq(schema.projectConfig.id, 1))
+          .get();
+        const currentNext = config?.nextId ?? 1;
+        if (numericId >= currentNext) {
+          tx.update(schema.projectConfig)
+            .set({ nextId: numericId + 1 })
+            .where(eq(schema.projectConfig.id, 1))
+            .run();
+        }
+      }
+
       // Ensure iteration exists
       if (item.iteration) {
         tx.insert(schema.iterations)
