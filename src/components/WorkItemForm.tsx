@@ -3,7 +3,7 @@ import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import SelectInput from 'ink-select-input';
 import { AutocompleteInput } from './AutocompleteInput.js';
-import { MultiAutocompleteInput } from './MultiAutocompleteInput.js';
+import { MultiSelectInput } from './MultiSelectInput.js';
 import { useNavigationStore } from '../stores/navigationStore.js';
 import {
   formStackStore,
@@ -1339,6 +1339,10 @@ export function WorkItemForm() {
 
     if (field === 'labels') {
       if (isEditing) {
+        const selectedLabels = labels
+          .split(',')
+          .map((l) => l.trim())
+          .filter((l) => l.length > 0);
         return (
           <Box key={field} flexDirection="column">
             <Box>
@@ -1349,9 +1353,9 @@ export function WorkItemForm() {
               </Text>
             </Box>
             <Box marginLeft={4}>
-              <MultiAutocompleteInput
-                value={labels}
-                onChange={setLabels}
+              <MultiSelectInput
+                selected={selectedLabels}
+                onChange={(sel) => setLabels(sel.join(', '))}
                 onSubmit={() => {
                   setEditing(false);
                 }}
