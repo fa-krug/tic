@@ -187,6 +187,7 @@ export function IterationPicker() {
     hasWorktree: false,
     hasPrCreateCapability: false,
     hasSelectedPr: false,
+    showDetailDescription: false,
   };
 
   useInput((input, key) => {

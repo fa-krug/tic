@@ -60,6 +60,7 @@ function makeContext(overrides: Partial<CommandContext> = {}): CommandContext {
     hasWorktree: false,
     hasPrCreateCapability: false,
     hasSelectedPr: false,
+    showDetailDescription: false,
     ...overrides,
   };
 }

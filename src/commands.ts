@@ -31,6 +31,8 @@ export interface CommandContext {
   hasPrCreateCapability: boolean;
   // PR list context
   hasSelectedPr: boolean;
+  // Detail panel context
+  showDetailDescription: boolean;
 }
 
 export interface Command {
@@ -446,6 +448,72 @@ const commands: Command[] = [
     keys: [' '],
     screen: 'list',
     helpGroup: 'Other',
+  },
+  {
+    id: 'desc-edit',
+    label: 'Edit description',
+    category: 'Other',
+    shortcut: 'enter',
+    screen: 'list',
+    helpGroup: 'Description Preview',
+    footer: true,
+    when: (ctx) => ctx.showDetailDescription,
+  },
+  {
+    id: 'desc-half-page-down',
+    label: 'Half page down',
+    category: 'Other',
+    shortcut: 'd',
+    screen: 'list',
+    helpGroup: 'Description Preview',
+    footer: true,
+    when: (ctx) => ctx.showDetailDescription,
+  },
+  {
+    id: 'desc-half-page-up',
+    label: 'Half page up',
+    category: 'Other',
+    shortcut: 'u',
+    screen: 'list',
+    helpGroup: 'Description Preview',
+    footer: true,
+    when: (ctx) => ctx.showDetailDescription,
+  },
+  {
+    id: 'desc-page-down',
+    label: 'Page down',
+    category: 'Other',
+    shortcut: 'shift+↓',
+    screen: 'list',
+    helpGroup: 'Description Preview',
+    when: (ctx) => ctx.showDetailDescription,
+  },
+  {
+    id: 'desc-page-up',
+    label: 'Page up',
+    category: 'Other',
+    shortcut: 'shift+↑',
+    screen: 'list',
+    helpGroup: 'Description Preview',
+    when: (ctx) => ctx.showDetailDescription,
+  },
+  {
+    id: 'desc-top',
+    label: 'Go to top',
+    category: 'Other',
+    shortcut: 'g',
+    screen: 'list',
+    helpGroup: 'Description Preview',
+    when: (ctx) => ctx.showDetailDescription,
+  },
+  {
+    id: 'desc-bottom',
+    label: 'Go to bottom',
+    category: 'Other',
+    shortcut: 'G',
+    screen: 'list',
+    helpGroup: 'Description Preview',
+    when: (ctx) => ctx.showDetailDescription,
   },
   {
     id: 'list-command-bar',

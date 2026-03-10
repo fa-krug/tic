@@ -35,6 +35,7 @@ import { OverlayPanel, type OverlayItem } from './OverlayPanel.js';
 import { DetailPanel, countWrappedLines } from './DetailPanel.js';
 import type { WorkItem, Template } from '../types.js';
 import { undoStore } from '../stores/undoStore.js';
+import { editorStore } from '../stores/editorStore.js';
 import { CommandBar } from './CommandBar.js';
 import { isSoftDeleteBackend } from '../backends/types.js';
 import type { BackendCapabilities } from '../backends/types.js';
@@ -619,15 +620,52 @@ export function WorkItemList() {
         setDescriptionScrollOffset(0);
         return;
       }
+      if (key.return) {
+        const item = treeItems[cursor]?.item;
+        if (item) {
+          editorStore.getState().init(item.description ?? '', {
+            returnScreen: 'list',
+            onSave: (content: string) => {
+              const state = backendDataStore.getState();
+              if (state.backend) {
+                void state.backend
+                  .cachedUpdateWorkItem(item.id, { description: content })
+                  .then(() => backendDataStore.getState().refresh());
+              }
+            },
+          });
+          setShowFullDescription(false);
+          setDescriptionScrollOffset(0);
+          navigate('editor');
+        }
+        return;
+      }
+      const maxScroll = Math.max(
+        0,
+        descriptionTotalLines - maxDescriptionHeight,
+      );
       if (key.upArrow) {
-        setDescriptionScrollOffset((o) => Math.max(0, o - 1));
+        const step = key.shift ? maxDescriptionHeight : 1;
+        setDescriptionScrollOffset((o) => Math.max(0, o - step));
       }
       if (key.downArrow) {
-        const maxScroll = Math.max(
-          0,
-          descriptionTotalLines - maxDescriptionHeight,
-        );
-        setDescriptionScrollOffset((o) => Math.min(maxScroll, o + 1));
+        const step = key.shift ? maxDescriptionHeight : 1;
+        setDescriptionScrollOffset((o) => Math.min(maxScroll, o + step));
+      }
+      // Vim-style: u = half page up, d = half page down
+      const halfPage = Math.max(1, Math.floor(maxDescriptionHeight / 2));
+      if (_input === 'u') {
+        setDescriptionScrollOffset((o) => Math.max(0, o - halfPage));
+      }
+      if (_input === 'd') {
+        setDescriptionScrollOffset((o) => Math.min(maxScroll, o + halfPage));
+      }
+      // g = top, G = bottom
+      if (_input === 'g') {
+        setDescriptionScrollOffset(0);
+      }
+      if (_input === 'G') {
+        setDescriptionScrollOffset(maxScroll);
       }
     },
     { isActive: showFullDescription && activeOverlay === null },
@@ -1060,6 +1098,7 @@ export function WorkItemList() {
     hasWorktree: false,
     hasPrCreateCapability: false,
     hasSelectedPr: false,
+    showDetailDescription: showFullDescription,
   };
 
   const paletteCommands = useMemo(
@@ -2277,11 +2316,14 @@ export function WorkItemList() {
         ) : (
           <Box>
             <Text dimColor={mutedDim}>
-              {buildFooterHints(
-                'list',
-                commandContext,
-                terminalWidth - (positionText ? positionText.length + 2 : 0),
-              )}
+              {showFullDescription
+                ? 'enter Edit │ ↑↓ Scroll │ shift+↑↓ Page │ u/d Half page │ g/G Top/Bottom │ esc Close'
+                : buildFooterHints(
+                    'list',
+                    commandContext,
+                    terminalWidth -
+                      (positionText ? positionText.length + 2 : 0),
+                  )}
             </Text>
             {positionText && <Text dimColor={mutedDim}> {positionText}</Text>}
           </Box>

@@ -51,6 +51,7 @@ export function getShortcuts(
     hasWorktree: true,
     hasPrCreateCapability: true,
     hasSelectedPr: true,
+    showDetailDescription: true,
   };
   return groupByHelpGroup(getCommandsForScreen(screen, ctx));
 }

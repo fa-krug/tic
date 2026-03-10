@@ -177,6 +177,7 @@ export function PullRequestList() {
     hasWorktree: false,
     hasPrCreateCapability: false,
     hasSelectedPr: currentPr !== undefined,
+    showDetailDescription: false,
   };
 
   const paletteCommands = useMemo(

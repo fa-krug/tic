@@ -343,6 +343,7 @@ export function BranchList() {
       currentRow?.worktree !== undefined && currentRow?.worktree !== null,
     hasPrCreateCapability: prCapabilities.create,
     hasSelectedPr: false,
+    showDetailDescription: false,
   };
 
   const paletteCommands = useMemo(
