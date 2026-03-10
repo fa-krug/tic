@@ -1268,6 +1268,15 @@ export function WorkItemList() {
         selectWorkItem(null);
         navigate('form');
         break;
+      case 'create-child':
+        if (treeItems[cursor]) {
+          navigationStore
+            .getState()
+            .setCreateChildParentId(treeItems[cursor].item.id);
+          selectWorkItem(null);
+          navigate('form');
+        }
+        break;
       case 'edit':
         if (treeItems[cursor]) {
           selectWorkItem(treeItems[cursor].item.id);
