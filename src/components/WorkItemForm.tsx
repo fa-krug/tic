@@ -351,6 +351,35 @@ export function WorkItemForm() {
     pushDraft(draft);
   }, []); // Only on mount
 
+  // Prefill parent for create-child (create mode only)
+  useEffect(() => {
+    if (selectedWorkItemId !== null) return;
+    const { createChildParentId, setCreateChildParentId } =
+      navigationStore.getState();
+    if (!createChildParentId) return;
+
+    const parentItem = allItems.find((i) => i.id === createChildParentId);
+    const parentDisplay = parentItem
+      ? `#${createChildParentId} - ${parentItem.title}`
+      : `#${createChildParentId}`;
+    updateFields({ parentId: parentDisplay });
+
+    // Update initialSnapshot so parent doesn't count as dirty
+    formStackStore.setState((state) => {
+      if (state.stack.length === 0) return state;
+      const updated = [...state.stack];
+      const current = updated[updated.length - 1]!;
+      updated[updated.length - 1] = {
+        ...current,
+        initialSnapshot: { ...current.fields, parentId: parentDisplay },
+      };
+      return { stack: updated };
+    });
+
+    // Clear after use
+    setCreateChildParentId(null);
+  }, [selectedWorkItemId, allItems]);
+
   // Sync form fields when the existing item finishes loading
   useEffect(() => {
     if (!existingItem) return;
@@ -834,6 +863,16 @@ export function WorkItemForm() {
             .finally(() => {
               setSaving(false);
             });
+          return;
+        }
+
+        // C: create child of current item
+        if (_input === 'C' && selectedWorkItemId !== null) {
+          navigationStore.getState().setCreateChildParentId(selectedWorkItemId);
+          // Clear form stack and navigate to fresh create form
+          formStackStore.getState().clear();
+          navigationStore.getState().selectWorkItem(null);
+          navigate('form');
           return;
         }
 
