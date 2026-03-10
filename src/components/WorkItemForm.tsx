@@ -894,6 +894,14 @@ export function WorkItemForm() {
           } else if (currentField === 'description') {
             editorStore.getState().init(description);
             navigationStore.getState().navigate('editor');
+          } else if (currentField === 'comments') {
+            editorStore.getState().init(newComment, {
+              returnScreen: 'form',
+              onSave: (content: string) => {
+                setNewComment(content);
+              },
+            });
+            navigationStore.getState().navigate('editor');
           } else {
             // Capture current value before editing for revert on Esc
             const fieldValue = (() => {
@@ -908,8 +916,6 @@ export function WorkItemForm() {
                   return parentId;
                 case 'dependsOn':
                   return dependsOn;
-                case 'comments':
-                  return newComment;
                 default:
                   return '';
               }
@@ -936,9 +942,6 @@ export function WorkItemForm() {
               break;
             case 'dependsOn':
               setDependsOn(preEditValue);
-              break;
-            case 'comments':
-              setNewComment(preEditValue);
               break;
             // Select fields (type, status, iteration, priority) already
             // require Enter to confirm, so Esc naturally discards
@@ -1087,25 +1090,11 @@ export function WorkItemForm() {
             </Box>
           ))}
           <Box marginLeft={4}>
-            {isEditing ? (
-              <Box>
-                <Text color={success}>New: </Text>
-                <TextInput
-                  value={newComment}
-                  onChange={setNewComment}
-                  focus={true}
-                  onSubmit={() => {
-                    setEditing(false);
-                  }}
-                />
-              </Box>
-            ) : (
-              <Text dimColor={mutedDim}>
-                {newComment
-                  ? `New: ${newComment}`
-                  : '(press Enter to add comment)'}
-              </Text>
-            )}
+            <Text dimColor={mutedDim}>
+              {newComment
+                ? `New: ${newComment.split('\n')[0]}${newComment.includes('\n') ? '…' : ''}`
+                : '(press Enter to add comment)'}
+            </Text>
           </Box>
         </Box>
       );
