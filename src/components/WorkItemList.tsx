@@ -36,6 +36,7 @@ import { DetailPanel, countWrappedLines } from './DetailPanel.js';
 import type { WorkItem, Template } from '../types.js';
 import { undoStore } from '../stores/undoStore.js';
 import { editorStore } from '../stores/editorStore.js';
+import { formStackStore } from '../stores/formStackStore.js';
 import { CommandBar } from './CommandBar.js';
 import { isSoftDeleteBackend } from '../backends/types.js';
 import type { BackendCapabilities } from '../backends/types.js';
@@ -806,6 +807,7 @@ export function WorkItemList() {
         treeItems[cursor] &&
         capabilities.fields.parent
       ) {
+        formStackStore.getState().clear();
         navigationStore
           .getState()
           .setCreateChildParentId(treeItems[cursor].item.id);

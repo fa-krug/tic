@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
-import TextInput from 'ink-text-input';
+import TextInput from './TextInput.js';
 import SelectInput from 'ink-select-input';
 import { AutocompleteInput } from './AutocompleteInput.js';
 import { MultiSelectInput } from './MultiSelectInput.js';
@@ -326,6 +326,18 @@ export function WorkItemForm() {
   useEffect(() => {
     if (formStackStore.getState().stack.length > 0) return; // Already has a draft
 
+    // Check for create-child prefill
+    const { createChildParentId, setCreateChildParentId } =
+      navigationStore.getState();
+    let parentId = '';
+    if (selectedWorkItemId === null && createChildParentId) {
+      const parent = allItems.find((i) => i.id === createChildParentId);
+      parentId = parent
+        ? `#${createChildParentId} - ${parent.title}`
+        : `#${createChildParentId}`;
+      setCreateChildParentId(null);
+    }
+
     const initialFields: FormFields = {
       title: '',
       type: activeType ?? types[0] ?? '',
@@ -335,7 +347,7 @@ export function WorkItemForm() {
       assignee: '',
       labels: '',
       description: '',
-      parentId: '',
+      parentId,
       dependsOn: '',
       newComment: '',
     };
@@ -350,35 +362,6 @@ export function WorkItemForm() {
 
     pushDraft(draft);
   }, []); // Only on mount
-
-  // Prefill parent for create-child (create mode only)
-  useEffect(() => {
-    if (selectedWorkItemId !== null) return;
-    const { createChildParentId, setCreateChildParentId } =
-      navigationStore.getState();
-    if (!createChildParentId) return;
-
-    const parentItem = allItems.find((i) => i.id === createChildParentId);
-    const parentDisplay = parentItem
-      ? `#${createChildParentId} - ${parentItem.title}`
-      : `#${createChildParentId}`;
-    updateFields({ parentId: parentDisplay });
-
-    // Update initialSnapshot so parent doesn't count as dirty
-    formStackStore.setState((state) => {
-      if (state.stack.length === 0) return state;
-      const updated = [...state.stack];
-      const current = updated[updated.length - 1]!;
-      updated[updated.length - 1] = {
-        ...current,
-        initialSnapshot: { ...current.fields, parentId: parentDisplay },
-      };
-      return { stack: updated };
-    });
-
-    // Clear after use
-    setCreateChildParentId(null);
-  }, [selectedWorkItemId, allItems]);
 
   // Sync form fields when the existing item finishes loading
   useEffect(() => {
