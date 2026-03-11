@@ -801,6 +801,20 @@ export function WorkItemList() {
         }
       }
 
+      if (
+        matchesCommand('create-child', input, key) &&
+        treeItems[cursor] &&
+        capabilities.fields.parent
+      ) {
+        navigationStore
+          .getState()
+          .setCreateChildParentId(treeItems[cursor].item.id);
+        setFormMode('item');
+        setActiveTemplate(null);
+        selectWorkItem(null);
+        navigate('form');
+      }
+
       if (matchesCommand('delete', input, key) && treeItems.length > 0) {
         const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
         if (targetIds.length > 0) {
