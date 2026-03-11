@@ -388,6 +388,21 @@ export class Storage
   }
 
   /**
+   * Get the display ID for a rowId, including soft-deleted items.
+   * Used by SyncManager to resolve display IDs for delete pushes.
+   */
+  getDisplayIdByRowId(rowId: number): string | null {
+    const row = this.db
+      .select({ id: schema.workItems.id })
+      .from(schema.workItems)
+      .where(eq(schema.workItems.rowId, rowId))
+      .get();
+
+    if (!row) return null;
+    return row.id;
+  }
+
+  /**
    * Assemble a single work item from its row, loading labels/deps/comments by rowId.
    */
   private assembleWorkItemByRowId(row: WorkItemRow): WorkItem {
