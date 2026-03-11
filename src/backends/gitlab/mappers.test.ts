@@ -51,6 +51,7 @@ describe('mapWorkItemToWorkItem', () => {
 
     const item = mapWorkItemToWorkItem(gl);
 
+    expect(item.rowId).toBe(42);
     expect(item.id).toBe('issue-42');
     expect(item.title).toBe('Fix login bug');
     expect(item.description).toBe('The login form breaks on mobile.');
@@ -62,7 +63,7 @@ describe('mapWorkItemToWorkItem', () => {
     expect(item.priority).toBe('medium');
     expect(item.created).toBe('2026-01-15T10:00:00Z');
     expect(item.updated).toBe('2026-01-20T14:30:00Z');
-    expect(item.parent).toBe('epic-5');
+    expect(item.parent).toBe(5);
     expect(item.dependsOn).toEqual([]);
     expect(item.comments).toEqual([]);
   });
@@ -108,7 +109,7 @@ describe('mapWorkItemToWorkItem', () => {
       ],
     });
 
-    expect(mapWorkItemToWorkItem(gl).parent).toBe('epic-7');
+    expect(mapWorkItemToWorkItem(gl).parent).toBe(7);
   });
 
   it('handles null milestone', () => {

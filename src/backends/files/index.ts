@@ -186,6 +186,42 @@ export class FilesBackend extends BaseBackend implements SyncableBackend {
 
   // --- Item URL ---
 
+  /**
+   * Override: FilesBackend items have rowId=0 (sentinel), so we match
+   * parent/dependsOn by display ID string instead of rowId.
+   */
+  override async getChildren(id: string): Promise<WorkItem[]> {
+    const all = await this.getCachedItems();
+    // In files backend, parent is stored as the numeric value from Storage.
+    // Since we don't have real rowIds, fall back to matching by display id.
+    const target = all.find((i) => i.id === id);
+    if (!target) return [];
+    // If target has a real rowId (non-zero), use it; otherwise match by id string
+    if (target.rowId !== 0) {
+      return all.filter((item) => item.parent === target.rowId);
+    }
+    // Fallback: match by parsing id as number
+    const numId = Number(id);
+    if (!isNaN(numId)) {
+      return all.filter((item) => item.parent === numId);
+    }
+    return [];
+  }
+
+  override async getDependents(id: string): Promise<WorkItem[]> {
+    const all = await this.getCachedItems();
+    const target = all.find((i) => i.id === id);
+    if (!target) return [];
+    if (target.rowId !== 0) {
+      return all.filter((item) => item.dependsOn.includes(target.rowId));
+    }
+    const numId = Number(id);
+    if (!isNaN(numId)) {
+      return all.filter((item) => item.dependsOn.includes(numId));
+    }
+    return [];
+  }
+
   getItemUrl(id: string): string {
     return path.resolve(this.root, '.tic', 'items', `${id}.md`);
   }

@@ -458,7 +458,7 @@ describe('MCP handlers', () => {
         assignee: '',
         labels: [],
         iteration: 'default',
-        parent: '1',
+        parent: 1,
         dependsOn: [],
         description: '',
       });
@@ -471,7 +471,7 @@ describe('MCP handlers', () => {
         labels: [],
         iteration: 'default',
         parent: null,
-        dependsOn: ['1'],
+        dependsOn: [1],
         description: '',
       });
       const result = await handleDeleteItem(
@@ -757,7 +757,7 @@ describe('MCP handlers', () => {
         assignee: '',
         labels: [],
         iteration: 'default',
-        parent: '1',
+        parent: 1,
         dependsOn: [],
         description: '',
       });
@@ -769,7 +769,7 @@ describe('MCP handlers', () => {
         assignee: '',
         labels: [],
         iteration: 'default',
-        parent: '1',
+        parent: 1,
         dependsOn: [],
         description: '',
       });
@@ -810,7 +810,7 @@ describe('MCP handlers', () => {
         labels: [],
         iteration: 'default',
         parent: null,
-        dependsOn: ['1'],
+        dependsOn: [1],
         description: '',
       });
       const result = await handleGetDependents(backend, { id: '1' });
@@ -858,7 +858,7 @@ describe('MCP handlers', () => {
         assignee: '',
         labels: [],
         iteration: 'default',
-        parent: '1',
+        parent: 1,
         dependsOn: [],
         description: '',
       });
@@ -906,7 +906,7 @@ describe('MCP handlers', () => {
         assignee: '',
         labels: [],
         iteration: 'default',
-        parent: '1',
+        parent: 1,
         dependsOn: [],
         description: '',
       });
@@ -918,7 +918,7 @@ describe('MCP handlers', () => {
         assignee: '',
         labels: [],
         iteration: 'default',
-        parent: '2',
+        parent: 2,
         dependsOn: [],
         description: '',
       });

@@ -67,7 +67,8 @@ class TestBackend extends BaseBackend {
   }
 
   async createWorkItem(data: NewWorkItem): Promise<WorkItem> {
-    const item = makeWorkItem(String(this.items.length + 1), {
+    const rowId = this.items.length + 1;
+    const item = makeWorkItem(rowId, {
       title: data.title,
       parent: data.parent,
       dependsOn: data.dependsOn,
@@ -109,10 +110,10 @@ describe('BaseBackend cache integration', () => {
   it('getChildren uses cached items', async () => {
     const b = new TestBackend();
     b.items = [
-      makeWorkItem('1'),
-      makeWorkItem('2', { parent: '1' }),
-      makeWorkItem('3', { parent: '1' }),
-      makeWorkItem('4'),
+      makeWorkItem(1),
+      makeWorkItem(2, { parent: 1 }),
+      makeWorkItem(3, { parent: 1 }),
+      makeWorkItem(4),
     ];
     const listSpy = vi.spyOn(b, 'listWorkItems');
     const children1 = await b.getChildren('1');
@@ -126,9 +127,9 @@ describe('BaseBackend cache integration', () => {
   it('getDependents uses cached items', async () => {
     const b = new TestBackend();
     b.items = [
-      makeWorkItem('1'),
-      makeWorkItem('2', { dependsOn: ['1'] }),
-      makeWorkItem('3', { dependsOn: ['1'] }),
+      makeWorkItem(1),
+      makeWorkItem(2, { dependsOn: [1] }),
+      makeWorkItem(3, { dependsOn: [1] }),
     ];
     const listSpy = vi.spyOn(b, 'listWorkItems');
     const deps = await b.getDependents('1');
@@ -140,9 +141,9 @@ describe('BaseBackend cache integration', () => {
   it('getAssigneesFromCache uses cached items', async () => {
     const b = new TestBackend();
     b.items = [
-      makeWorkItem('1', { assignee: 'alice' }),
-      makeWorkItem('2', { assignee: 'bob' }),
-      makeWorkItem('3', { assignee: 'alice' }),
+      makeWorkItem(1, { assignee: 'alice' }),
+      makeWorkItem(2, { assignee: 'bob' }),
+      makeWorkItem(3, { assignee: 'alice' }),
     ];
     const assignees = await b.getAssignees();
     expect(assignees).toEqual(['alice', 'bob']);
@@ -150,7 +151,7 @@ describe('BaseBackend cache integration', () => {
 
   it('cache invalidates after mutation', async () => {
     const b = new TestBackend();
-    b.items = [makeWorkItem('1'), makeWorkItem('2', { parent: '1' })];
+    b.items = [makeWorkItem(1), makeWorkItem(2, { parent: 1 })];
     const children1 = await b.getChildren('1');
     expect(children1).toHaveLength(1);
 

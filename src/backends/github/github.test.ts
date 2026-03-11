@@ -306,7 +306,7 @@ describe('GitHubBackend', () => {
       );
 
       const items = await backend.listWorkItems();
-      expect(items.find((i) => i.id === '2')!.parent).toBe('1');
+      expect(items.find((i) => i.id === '2')!.parent).toBe(1);
       expect(items.find((i) => i.id === '1')!.parent).toBeNull();
     });
   });
@@ -349,7 +349,7 @@ describe('GitHubBackend', () => {
       );
 
       const item = await backend.getWorkItem('5');
-      expect(item.parent).toBe('3');
+      expect(item.parent).toBe(3);
     });
   });
 
@@ -458,11 +458,11 @@ describe('GitHubBackend', () => {
         assignee: '',
         labels: [],
         description: '',
-        parent: '5',
+        parent: 5,
         dependsOn: [],
       });
 
-      expect(item.parent).toBe('5');
+      expect(item.parent).toBe(5);
       expect(mockGraphql).toHaveBeenCalledTimes(4);
     });
 
@@ -558,7 +558,7 @@ describe('GitHubBackend', () => {
           assignee: '',
           labels: [],
           description: '',
-          parent: '5',
+          parent: 5,
           dependsOn: [],
         }),
       ).rejects.toThrow('issue was rolled back');
@@ -683,8 +683,8 @@ describe('GitHubBackend', () => {
           makeGetResponse(makeGhIssue({ number: 5, parent: { number: 3 } })),
         );
 
-      const item = await backend.updateWorkItem('5', { parent: '3' });
-      expect(item.parent).toBe('3');
+      const item = await backend.updateWorkItem('5', { parent: 3 });
+      expect(item.parent).toBe(3);
     });
 
     it('removes parent via removeSubIssue when parent is cleared', async () => {
@@ -756,8 +756,8 @@ describe('GitHubBackend', () => {
           makeGetResponse(makeGhIssue({ number: 5, parent: { number: 7 } })),
         );
 
-      const item = await backend.updateWorkItem('5', { parent: '7' });
-      expect(item.parent).toBe('7');
+      const item = await backend.updateWorkItem('5', { parent: 7 });
+      expect(item.parent).toBe(7);
     });
 
     it('ensures labels exist before updating', async () => {

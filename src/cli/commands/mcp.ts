@@ -393,10 +393,10 @@ export async function handleGetItemTree(
     if (args.all) opts.all = args.all;
     const items = await runItemList(backend, opts);
 
-    const nodeMap = new Map<string, TreeNode>();
+    const nodeMap = new Map<number, TreeNode>();
     for (const item of items) {
-      nodeMap.set(item.id, {
-        id: item.id,
+      nodeMap.set(item.rowId, {
+        id: item.id ?? String(item.rowId),
         title: item.title,
         type: item.type,
         status: item.status,
@@ -408,7 +408,7 @@ export async function handleGetItemTree(
 
     const roots: TreeNode[] = [];
     for (const item of items) {
-      const node = nodeMap.get(item.id)!;
+      const node = nodeMap.get(item.rowId)!;
       if (item.parent !== null && nodeMap.has(item.parent)) {
         nodeMap.get(item.parent)!.children.push(node);
       } else {

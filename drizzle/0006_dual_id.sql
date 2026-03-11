@@ -129,6 +129,7 @@ CREATE TABLE `undo_stack` (
 DROP TABLE `file_sync_state`;--> statement-breakpoint
 CREATE TABLE `file_sync_state` (
   `item_row_id` integer PRIMARY KEY NOT NULL,
+  `display_id` text NOT NULL,
   `hash` text NOT NULL,
   `synced_at` text NOT NULL
 );--> statement-breakpoint

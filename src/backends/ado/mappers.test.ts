@@ -97,7 +97,7 @@ describe('formatTags', () => {
 
 describe('extractParent', () => {
   it('extracts parent ID from Hierarchy-Reverse relation', () => {
-    expect(extractParent(sampleAdoWorkItem.relations)).toBe('10');
+    expect(extractParent(sampleAdoWorkItem.relations)).toBe(10);
   });
 
   it('returns null when no parent relation exists', () => {
@@ -108,10 +108,7 @@ describe('extractParent', () => {
 
 describe('extractPredecessors', () => {
   it('extracts predecessor IDs from Dependency-Reverse relations', () => {
-    expect(extractPredecessors(sampleAdoWorkItem.relations)).toEqual([
-      '20',
-      '21',
-    ]);
+    expect(extractPredecessors(sampleAdoWorkItem.relations)).toEqual([20, 21]);
   });
 
   it('returns empty array when no predecessor relations', () => {
@@ -124,6 +121,7 @@ describe('mapWorkItemToWorkItem', () => {
   it('maps a full ADO work item to a tic WorkItem', () => {
     const item = mapWorkItemToWorkItem(sampleAdoWorkItem);
 
+    expect(item.rowId).toBe(42);
     expect(item.id).toBe('42');
     expect(item.title).toBe('Fix login bug');
     expect(item.type).toBe('User Story');
@@ -135,8 +133,8 @@ describe('mapWorkItemToWorkItem', () => {
     expect(item.description).toBe('The login form breaks.');
     expect(item.created).toBe('2026-01-15T10:00:00Z');
     expect(item.updated).toBe('2026-01-20T14:30:00Z');
-    expect(item.parent).toBe('10');
-    expect(item.dependsOn).toEqual(['20', '21']);
+    expect(item.parent).toBe(10);
+    expect(item.dependsOn).toEqual([20, 21]);
     expect(item.comments).toEqual([]);
   });
 
@@ -192,6 +190,7 @@ describe('mapWorkItemToWorkItem', () => {
 
     const item = mapWorkItemToWorkItem(minimal);
 
+    expect(item.rowId).toBe(1);
     expect(item.id).toBe('1');
     expect(item.priority).toBe('medium');
     expect(item.assignee).toBe('');

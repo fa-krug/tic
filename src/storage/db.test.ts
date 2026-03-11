@@ -70,13 +70,10 @@ describe('createDatabase', () => {
     expect(tableNames).toContain('saved_view_sort_entries');
     expect(tableNames).toContain('sync_queue');
     expect(tableNames).toContain('undo_stack');
-    expect(tableNames).toContain('undo_item_snapshot');
-    expect(tableNames).toContain('undo_item_snapshot_labels');
-    expect(tableNames).toContain('undo_item_snapshot_deps');
     expect(tableNames).toContain('file_sync_state');
     expect(tableNames).toContain('color_mappings');
     expect(tableNames).toContain('pull_requests');
     expect(tableNames).toContain('pr_item_links');
-    expect(tableNames).toHaveLength(24);
+    expect(tableNames).toHaveLength(21);
   });
 });

@@ -229,6 +229,7 @@ export const undoStack = sqliteTable('undo_stack', {
 // 18. File Sync State
 export const fileSyncState = sqliteTable('file_sync_state', {
   itemRowId: integer('item_row_id').primaryKey(),
+  displayId: text('display_id').notNull(),
   hash: text('hash').notNull(),
   syncedAt: text('synced_at').notNull(),
 });

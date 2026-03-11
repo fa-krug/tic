@@ -90,7 +90,7 @@ export function mapWorkItemToWorkItem(workItem: GlWorkItem): WorkItem {
   const notesWidget = findWidget(workItem.widgets, 'WorkItemWidgetNotes');
 
   const parent = hierarchyWidget?.parent
-    ? `${hierarchyWidget.parent.workItemType.name.toLowerCase()}-${hierarchyWidget.parent.iid}`
+    ? Number(hierarchyWidget.parent.iid)
     : null;
 
   const comments: Comment[] = notesWidget
@@ -100,6 +100,7 @@ export function mapWorkItemToWorkItem(workItem: GlWorkItem): WorkItem {
     : [];
 
   return {
+    rowId: Number(workItem.iid),
     id: `${type}-${workItem.iid}`,
     title: workItem.title,
     description: descWidget?.description ?? '',

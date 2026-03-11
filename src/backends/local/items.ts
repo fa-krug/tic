@@ -83,7 +83,11 @@ export function parseWorkItemFile(raw: string): WorkItem {
   const data = parsed.data;
   const { description, comments } = parseComments(parsed.content);
 
+  const rawParent = data['parent'];
+  const parent = rawParent != null ? Number(rawParent) || 0 : null;
+
   return {
+    rowId: 0, // sentinel — Storage assigns real rowId on import
     id: String(data['id']),
     title: data['title'] as string,
     type: (data['type'] as string) || 'issue',
@@ -94,10 +98,9 @@ export function parseWorkItemFile(raw: string): WorkItem {
     labels: (data['labels'] as string[]) || [],
     created: data['created'] as string,
     updated: data['updated'] as string,
-    parent:
-      data['parent'] != null ? String(data['parent'] as string | number) : null,
+    parent,
     dependsOn: Array.isArray(data['depends_on'])
-      ? (data['depends_on'] as unknown[]).map(String)
+      ? (data['depends_on'] as unknown[]).map((v) => Number(v) || 0)
       : [],
     description,
     comments,
@@ -108,6 +111,10 @@ export async function writeWorkItem(
   root: string,
   item: WorkItem,
 ): Promise<void> {
+  if (!item.id) {
+    // Items with no display ID cannot be written to files
+    return;
+  }
   const dir = itemsDir(root);
   await fs.mkdir(dir, { recursive: true });
 

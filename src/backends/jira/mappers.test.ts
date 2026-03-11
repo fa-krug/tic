@@ -90,7 +90,7 @@ describe('extractDependsOn', () => {
         outwardIssue: { key: 'TEAM-10' },
       },
     ];
-    expect(extractDependsOn(links)).toEqual(['TEAM-5']);
+    expect(extractDependsOn(links)).toEqual([0]);
   });
 
   it('skips links with null/undefined inwardIssue', () => {
@@ -104,7 +104,7 @@ describe('extractDependsOn', () => {
         inwardIssue: { key: 'TEAM-7' },
       },
     ];
-    expect(extractDependsOn(links)).toEqual(['TEAM-7']);
+    expect(extractDependsOn(links)).toEqual([0]);
   });
 
   it('returns empty array for no links', () => {
@@ -157,6 +157,7 @@ describe('mapIssueToWorkItem', () => {
 
     const item = mapIssueToWorkItem(jiraIssue);
 
+    expect(item.rowId).toBe(0);
     expect(item.id).toBe('TEAM-42');
     expect(item.title).toBe('Fix login bug');
     expect(item.description).toBe('The login form breaks on mobile.');
@@ -168,8 +169,8 @@ describe('mapIssueToWorkItem', () => {
     expect(item.iteration).toBe('Sprint 5');
     expect(item.created).toBe('2026-01-15T10:00:00.000+0000');
     expect(item.updated).toBe('2026-01-20T14:30:00.000+0000');
-    expect(item.parent).toBe('TEAM-10');
-    expect(item.dependsOn).toEqual(['TEAM-5']);
+    expect(item.parent).toBe(0);
+    expect(item.dependsOn).toEqual([0]);
     expect(item.comments).toEqual([]);
   });
 

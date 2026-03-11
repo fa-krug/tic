@@ -488,8 +488,8 @@ export class SyncManager {
 
       // Delete local templates not on remote (unless pending in queue)
       const pendingTemplateSlugs = new Set(
-        (await this.queue.read())
-          .pending.filter((e) => e.action.startsWith('template-'))
+        (await this.queue.read()).pending
+          .filter((e) => e.action.startsWith('template-'))
           .map((e) => e.templateSlug)
           .filter(Boolean),
       );

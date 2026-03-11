@@ -131,13 +131,13 @@ describe('pr commands', () => {
         description: '',
       });
 
-      await runPrLink(storage, 'pr-1', item.id);
+      await runPrLink(storage, 'pr-1', item.id!);
       const pr = await runPrShow(storage, 'pr-1');
-      expect(pr.linkedItems).toContain(item.id);
+      expect(pr.linkedItems).toContain(item.rowId);
 
-      await runPrUnlink(storage, 'pr-1', item.id);
+      await runPrUnlink(storage, 'pr-1', item.id!);
       const pr2 = await runPrShow(storage, 'pr-1');
-      expect(pr2.linkedItems).not.toContain(item.id);
+      expect(pr2.linkedItems).not.toContain(item.rowId);
     });
   });
 

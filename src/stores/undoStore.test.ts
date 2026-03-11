@@ -176,6 +176,7 @@ describe('undoStore with SQLite backing', () => {
       label: 'Delete complex',
       itemSnapshots: [
         {
+          rowId: 42,
           id: '42',
           title: 'Complex',
           type: 'bug',
@@ -185,21 +186,21 @@ describe('undoStore with SQLite backing', () => {
           priority: 'high',
           assignee: 'alice',
           labels: ['bug', 'ux'],
-          parent: '10',
-          dependsOn: ['5', '6'],
+          parent: 10,
+          dependsOn: [5, 6],
           comments: [],
           created: '2025-01-01T00:00:00Z',
           updated: '2025-06-15T00:00:00Z',
         },
       ],
-      syncItemIds: ['42'],
+      syncItemRowIds: [42],
       syncAction: 'delete',
-      createdIds: ['42'],
+      createdRowIds: [42],
     };
     undoStore.getState().pushUndo(entry);
     const popped = undoStore.getState().popUndo();
     expect(popped!.itemSnapshots[0]!.labels).toEqual(['bug', 'ux']);
-    expect(popped!.itemSnapshots[0]!.dependsOn).toEqual(['5', '6']);
-    expect(popped!.createdIds).toEqual(['42']);
+    expect(popped!.itemSnapshots[0]!.dependsOn).toEqual([5, 6]);
+    expect(popped!.createdRowIds).toEqual([42]);
   });
 });

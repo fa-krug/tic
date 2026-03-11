@@ -85,14 +85,14 @@ describe('PR Storage Methods', () => {
       dependsOn: [],
     });
 
-    const pr = makePr({ linkedItems: [item1.id, item2.id] });
+    const pr = makePr({ linkedItems: [item1.rowId, item2.rowId] });
     await storage.importPullRequest(pr);
 
     const result = await storage.getPullRequest('pr-1');
     expect(result).not.toBeNull();
     expect(result!.linkedItems).toHaveLength(2);
-    expect(result!.linkedItems).toContain(item1.id);
-    expect(result!.linkedItems).toContain(item2.id);
+    expect(result!.linkedItems).toContain(item1.rowId);
+    expect(result!.linkedItems).toContain(item2.rowId);
   });
 
   it('getLinkedPullRequests returns PRs linked to a work item', async () => {
@@ -109,23 +109,23 @@ describe('PR Storage Methods', () => {
       dependsOn: [],
     });
 
-    const pr1 = makePr({ id: 'pr-1', linkedItems: [item.id] });
+    const pr1 = makePr({ id: 'pr-1', linkedItems: [item.rowId] });
     const pr2 = makePr({
       id: 'pr-2',
       number: 2,
       title: 'Second PR',
-      linkedItems: [item.id],
+      linkedItems: [item.rowId],
     });
     await storage.importPullRequest(pr1);
     await storage.importPullRequest(pr2);
 
-    const linked = await storage.getLinkedPullRequests(item.id);
+    const linked = await storage.getLinkedPullRequests(item.id!);
     expect(linked).toHaveLength(2);
     const ids = linked.map((p) => p.id).sort();
     expect(ids).toEqual(['pr-1', 'pr-2']);
   });
 
-  it('getLinkedItems returns item IDs linked to a PR', async () => {
+  it('getLinkedItems returns item rowIds linked to a PR', async () => {
     const item1 = await storage.createWorkItem({
       title: 'Item 1',
       type: 'issue',
@@ -151,13 +151,13 @@ describe('PR Storage Methods', () => {
       dependsOn: [],
     });
 
-    const pr = makePr({ linkedItems: [item1.id, item2.id] });
+    const pr = makePr({ linkedItems: [item1.rowId, item2.rowId] });
     await storage.importPullRequest(pr);
 
     const linkedItems = await storage.getLinkedItems('pr-1');
     expect(linkedItems).toHaveLength(2);
-    expect(linkedItems).toContain(item1.id);
-    expect(linkedItems).toContain(item2.id);
+    expect(linkedItems).toContain(item1.rowId);
+    expect(linkedItems).toContain(item2.rowId);
   });
 
   it('linkItem adds a link and unlinkItem removes it', async () => {
@@ -178,12 +178,12 @@ describe('PR Storage Methods', () => {
     await storage.importPullRequest(pr);
 
     // Link
-    await storage.linkItem('pr-1', item.id);
+    await storage.linkItem('pr-1', item.id!);
     let linkedItems = await storage.getLinkedItems('pr-1');
-    expect(linkedItems).toContain(item.id);
+    expect(linkedItems).toContain(item.rowId);
 
     // Unlink
-    await storage.unlinkItem('pr-1', item.id);
+    await storage.unlinkItem('pr-1', item.id!);
     linkedItems = await storage.getLinkedItems('pr-1');
     expect(linkedItems).toEqual([]);
   });
@@ -211,15 +211,15 @@ describe('PR Storage Methods', () => {
       dependsOn: [],
     });
 
-    const pr = makePr({ linkedItems: [item.id] });
+    const pr = makePr({ linkedItems: [item.rowId] });
     await storage.importPullRequest(pr);
 
     // Verify link exists
     let linkedItems = await storage.getLinkedItems('pr-1');
-    expect(linkedItems).toContain(item.id);
+    expect(linkedItems).toContain(item.rowId);
 
     // Delete the work item
-    await storage.deleteWorkItem(item.id);
+    await storage.deleteWorkItem(item.id!);
 
     // Link should be gone (cascade)
     linkedItems = await storage.getLinkedItems('pr-1');
@@ -279,8 +279,8 @@ describe('PR Storage Methods', () => {
     const pr = makePr();
     await storage.importPullRequest(pr);
 
-    await storage.linkItem('pr-1', item.id);
-    await storage.linkItem('pr-1', item.id); // duplicate — should not throw
+    await storage.linkItem('pr-1', item.id!);
+    await storage.linkItem('pr-1', item.id!); // duplicate — should not throw
 
     const linkedItems = await storage.getLinkedItems('pr-1');
     expect(linkedItems).toHaveLength(1);

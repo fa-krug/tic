@@ -42,7 +42,7 @@ export async function detectChanges(
   const rows = db.select().from(s.fileSyncState).all();
   const storedHashes = new Map<string, string>();
   for (const row of rows) {
-    storedHashes.set(row.itemId, row.hash);
+    storedHashes.set(row.displayId, row.hash);
   }
 
   const changed: string[] = [];
@@ -72,20 +72,23 @@ export async function detectChanges(
 /** Update the stored hash for an item (upsert). */
 export function updateSyncState(
   db: TicDatabase,
-  itemId: string,
+  itemRowId: number,
+  displayId: string,
   hash: string,
 ): void {
   const now = new Date().toISOString();
   db.insert(s.fileSyncState)
-    .values({ itemId, hash, syncedAt: now })
+    .values({ itemRowId, displayId, hash, syncedAt: now })
     .onConflictDoUpdate({
-      target: s.fileSyncState.itemId,
-      set: { hash, syncedAt: now },
+      target: s.fileSyncState.itemRowId,
+      set: { displayId, hash, syncedAt: now },
     })
     .run();
 }
 
 /** Remove the stored hash for an item. */
-export function removeSyncState(db: TicDatabase, itemId: string): void {
-  db.delete(s.fileSyncState).where(eq(s.fileSyncState.itemId, itemId)).run();
+export function removeSyncState(db: TicDatabase, itemRowId: number): void {
+  db.delete(s.fileSyncState)
+    .where(eq(s.fileSyncState.itemRowId, itemRowId))
+    .run();
 }
