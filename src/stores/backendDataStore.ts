@@ -309,9 +309,11 @@ export const backendDataStore = createStore<BackendDataStoreState>(
             currentBackend.getAssignees(),
             currentBackend.getLabels(),
           ]);
-        const autoDetected = findCurrentIteration(iterations);
+        const persisted = await currentBackend.getCurrentIteration();
         const iter =
-          autoDetected ?? (await currentBackend.getCurrentIteration());
+          persisted && persisted !== 'default'
+            ? persisted
+            : (findCurrentIteration(iterations) ?? persisted);
         const items = await currentBackend.listWorkItems(iter);
 
         set({
