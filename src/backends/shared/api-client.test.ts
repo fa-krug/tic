@@ -126,7 +126,7 @@ describe('BaseApiClient', () => {
       fetchMock.mockResolvedValue(mockResponse(500, 'Internal Server Error'));
 
       await expect(client.testFetch('GET', '/items')).rejects.toThrow(
-        'HTTP 500: Request failed',
+        'HTTP 500: Internal Server Error',
       );
     });
 

@@ -76,7 +76,14 @@ export abstract class BaseApiClient {
     }
 
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: Request failed`);
+      let detail = '';
+      try {
+        const body = await response.text();
+        detail = body.length > 500 ? body.slice(0, 500) + '…' : body;
+      } catch {
+        // ignore
+      }
+      throw new Error(`HTTP ${response.status}: ${detail || 'Request failed'}`);
     }
 
     return (await response.json()) as T;
