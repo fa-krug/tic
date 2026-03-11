@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import type { WorkItem } from '../types.js';
 import { validateFormFields } from './useFormValidation.js';
 
-function makeItem(overrides: Partial<WorkItem> & { id: string }): WorkItem {
+function makeItem(
+  overrides: Partial<WorkItem> & { rowId: number; id: string },
+): WorkItem {
   return {
     title: `Item ${overrides.id}`,
     type: 'task',
@@ -22,10 +24,10 @@ function makeItem(overrides: Partial<WorkItem> & { id: string }): WorkItem {
 }
 
 const items: WorkItem[] = [
-  makeItem({ id: '1' }),
-  makeItem({ id: '2', parent: '1' }),
-  makeItem({ id: '3', parent: '2' }),
-  makeItem({ id: '4', dependsOn: ['1'] }),
+  makeItem({ rowId: 1, id: '1' }),
+  makeItem({ rowId: 2, id: '2', parent: 1 }),
+  makeItem({ rowId: 3, id: '3', parent: 2 }),
+  makeItem({ rowId: 4, id: '4', dependsOn: [1] }),
 ];
 
 describe('validateFormFields', () => {

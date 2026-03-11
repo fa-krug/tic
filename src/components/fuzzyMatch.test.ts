@@ -3,8 +3,10 @@ import { fuzzyMatch, groupResults } from './fuzzyMatch.js';
 import type { WorkItem } from '../types.js';
 import type { FuzzyResult } from './fuzzyMatch.js';
 
+let nextRowId = 1;
 function makeItem(overrides: Partial<WorkItem> & { id: string }): WorkItem {
   return {
+    rowId: nextRowId++,
     title: `Item ${overrides.id}`,
     type: 'task',
     status: 'open',

@@ -920,7 +920,7 @@ export function Settings() {
                     if (queue) {
                       await queue.append({
                         action: 'template-delete',
-                        itemId: slug,
+                        itemRowId: 0,
                         timestamp: new Date().toISOString(),
                         templateSlug: slug,
                       });
