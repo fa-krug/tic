@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
-import TextInput from 'ink-text-input';
+import TextInput from './TextInput.js';
 import {
   navigationStore,
   useNavigationStore,

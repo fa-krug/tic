@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
-import TextInput from 'ink-text-input';
+import TextInput from './TextInput.js';
 import { ColorPill } from './ColorPill.js';
 import { useThemeStore, autoFg } from '../stores/themeStore.js';
 

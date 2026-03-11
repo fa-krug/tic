@@ -21,6 +21,7 @@ import { useThemeStore } from '../stores/themeStore.js';
 import { readClipboardImage, ClipboardError } from '../clipboard.js';
 import { getImageUploadBackend } from '../stores/backendDataStore.js';
 import { uiStore } from '../stores/uiStore.js';
+import { useForwardDelete } from '../hooks/useForwardDelete.js';
 
 // Escape codes to disable terminal mouse tracking and focus reporting
 // so that click/focus events don't leak through as printable characters.
@@ -41,6 +42,7 @@ export function MarkdownEditor() {
   const { height, width: terminalWidth } = useTerminalSize();
   const accent = useThemeStore((s) => s.colors.accent);
   const viewportHeight = height - 2; // status bar + help bar
+  const isForwardDeleteRef = useForwardDelete();
 
   // Disable mouse tracking and focus reporting so clicks don't produce [I / [O
   useEffect(() => {
@@ -214,12 +216,13 @@ export function MarkdownEditor() {
     }
 
     // Backspace & Delete
-    // Ink 6 maps the physical Backspace key (\x7f) to key.delete, not
-    // key.backspace (\x08/ctrl+h). Both the physical Backspace and Delete
-    // keys report key.delete, so we treat key.delete as backspace (the
-    // common case) and use Ctrl+D for forward-delete.
     if (key.backspace || key.delete) {
-      s.deleteBefore();
+      if (isForwardDeleteRef.current) {
+        isForwardDeleteRef.current = false;
+        s.deleteAt();
+      } else {
+        s.deleteBefore();
+      }
       return;
     }
 

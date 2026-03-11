@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
-import TextInput from 'ink-text-input';
+import TextInput from './TextInput.js';
 import { useScrollViewport } from '../hooks/useScrollViewport.js';
 import { useThemeStore, autoFg } from '../stores/themeStore.js';
 import type { FieldType } from '../stores/themeStore.js';
