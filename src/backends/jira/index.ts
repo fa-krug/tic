@@ -268,7 +268,7 @@ export class JiraBackend extends BaseBackend {
       fields['labels'] = data.labels;
     }
     if (data.parent) {
-      fields['parent'] = { key: data.parent };
+      fields['parent'] = { key: String(data.parent) };
     }
 
     const result = await this.api.rest<{ key: string }>(
@@ -287,7 +287,7 @@ export class JiraBackend extends BaseBackend {
           await this.api.rest('POST', '/api/3/issueLink', {
             type: { name: 'Blocks' },
             inwardIssue: { key },
-            outwardIssue: { key: dep },
+            outwardIssue: { key: String(dep) },
           });
         }
       } catch (err) {

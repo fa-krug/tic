@@ -22,10 +22,10 @@ interface NavigationState {
   previousScreen: Screen;
 
   // Work item selection
-  selectedWorkItemId: string | null;
+  selectedWorkItemId: number | null;
   selectedPrId: string | null;
   selectedBranchName: string | null;
-  navigationStack: string[];
+  navigationStack: number[];
 
   // Form context
   activeType: string | null;
@@ -37,7 +37,7 @@ interface NavigationState {
   updateInfo: UpdateInfo | null;
 
   // Create child flow
-  createChildParentId: string | null;
+  createChildParentId: number | null;
 
   // Settings initial focus (e.g. jump to 'update-now' from update banner)
   settingsInitialFocus: string | null;
@@ -46,17 +46,17 @@ interface NavigationState {
   navigate: (screen: Screen) => void;
   navigateToHelp: () => void;
   navigateBackFromHelp: () => void;
-  selectWorkItem: (id: string | null) => void;
+  selectWorkItem: (id: number | null) => void;
   selectPr: (id: string | null) => void;
   selectBranch: (name: string | null) => void;
-  pushWorkItem: (id: string) => void;
-  popWorkItem: () => string | null;
+  pushWorkItem: (id: number) => void;
+  popWorkItem: () => number | null;
   setActiveType: (type: string | null) => void;
   setActiveTemplate: (template: Template | null) => void;
   setFormMode: (mode: 'item' | 'template') => void;
   setEditingTemplateSlug: (slug: string | null) => void;
   setUpdateInfo: (info: UpdateInfo | null) => void;
-  setCreateChildParentId: (id: string | null) => void;
+  setCreateChildParentId: (id: number | null) => void;
   setSettingsInitialFocus: (focus: string | null) => void;
   reset: () => void;
 }
@@ -108,7 +108,7 @@ const createNavigationStore = () =>
       }));
     },
 
-    selectWorkItem: (id: string | null) => {
+    selectWorkItem: (id: number | null) => {
       set({ selectedWorkItemId: id });
     },
 
@@ -120,7 +120,7 @@ const createNavigationStore = () =>
       set({ selectedBranchName: name });
     },
 
-    pushWorkItem: (id: string) => {
+    pushWorkItem: (id: number) => {
       set((state) => ({
         navigationStack: state.selectedWorkItemId
           ? [...state.navigationStack, state.selectedWorkItemId]
@@ -160,7 +160,7 @@ const createNavigationStore = () =>
       set({ updateInfo: info });
     },
 
-    setCreateChildParentId: (id: string | null) => {
+    setCreateChildParentId: (id: number | null) => {
       set({ createChildParentId: id });
     },
 

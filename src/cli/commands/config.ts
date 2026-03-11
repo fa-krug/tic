@@ -11,7 +11,6 @@ const READABLE_KEYS = [
   'types',
   'statuses',
   'iterations',
-  'next_id',
 ] as const;
 
 type ConfigKey = (typeof READABLE_KEYS)[number];

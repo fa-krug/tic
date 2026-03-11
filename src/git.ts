@@ -160,7 +160,7 @@ export interface WorktreeInfo {
 
 export interface BranchRow {
   branch: BranchInfo;
-  linkedItem: { id: string; title: string } | null;
+  linkedItem: { rowId: number; id: string | null; title: string } | null;
   worktree: WorktreeInfo | null;
 }
 

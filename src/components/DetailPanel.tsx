@@ -79,7 +79,7 @@ export function DetailPanel({
   const { border, mutedDim } = useThemeStore((s) => s.colors);
   const pullRequests = useBackendDataStore((s) => s.pullRequests);
   const linkedPrs = pullRequests.filter((pr) =>
-    pr.linkedItems.includes(item.id),
+    pr.linkedItems.includes(item.rowId),
   );
 
   const hasBottom = item.priority || item.labels.length > 0;
@@ -132,7 +132,7 @@ export function DetailPanel({
         {item.title}
       </Text>
       <Box gap={1}>
-        <Text dimColor={mutedDim}>#{item.id}</Text>
+        <Text dimColor={mutedDim}>#{item.id ?? '\u00B7'}</Text>
         <ColorPill field="status" value={item.status} />
         <ColorPill field="type" value={item.type} />
         {item.assignee && <Text dimColor={mutedDim}>@{item.assignee}</Text>}

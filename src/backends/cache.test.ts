@@ -17,7 +17,7 @@ describe('BackendCache', () => {
 
   it('returns cached items after set', () => {
     const cache = new BackendCache(0);
-    const items = [makeWorkItem('1'), makeWorkItem('2')];
+    const items = [makeWorkItem(1), makeWorkItem(2)];
     cache.set(items);
     expect(cache.get()).toEqual(items);
   });
@@ -25,10 +25,10 @@ describe('BackendCache', () => {
   it('caches by iteration key', () => {
     const cache = new BackendCache(0);
     const all = [
-      makeWorkItem('1', { iteration: 'sprint-1' }),
-      makeWorkItem('2', { iteration: 'sprint-2' }),
+      makeWorkItem(1, { iteration: 'sprint-1' }),
+      makeWorkItem(2, { iteration: 'sprint-2' }),
     ];
-    const sprint1 = [makeWorkItem('1', { iteration: 'sprint-1' })];
+    const sprint1 = [makeWorkItem(1, { iteration: 'sprint-1' })];
     cache.set(all);
     cache.set(sprint1, 'sprint-1');
     expect(cache.get()).toEqual(all);
@@ -37,8 +37,8 @@ describe('BackendCache', () => {
 
   it('invalidate clears all cached data', () => {
     const cache = new BackendCache(0);
-    cache.set([makeWorkItem('1')]);
-    cache.set([makeWorkItem('1')], 'sprint-1');
+    cache.set([makeWorkItem(1)]);
+    cache.set([makeWorkItem(1)], 'sprint-1');
     cache.invalidate();
     expect(cache.get()).toBeNull();
     expect(cache.get('sprint-1')).toBeNull();
@@ -46,14 +46,14 @@ describe('BackendCache', () => {
 
   it('ttl=0 means cache never expires', () => {
     const cache = new BackendCache(0);
-    cache.set([makeWorkItem('1')]);
+    cache.set([makeWorkItem(1)]);
     vi.advanceTimersByTime(999999);
     expect(cache.get()).not.toBeNull();
   });
 
   it('ttl > 0 expires after duration', () => {
     const cache = new BackendCache(60000);
-    cache.set([makeWorkItem('1')]);
+    cache.set([makeWorkItem(1)]);
     expect(cache.get()).not.toBeNull();
     vi.advanceTimersByTime(60001);
     expect(cache.get()).toBeNull();
@@ -61,7 +61,7 @@ describe('BackendCache', () => {
 
   it('iteration-keyed cache also expires with ttl', () => {
     const cache = new BackendCache(60000);
-    cache.set([makeWorkItem('1', { iteration: 's1' })], 's1');
+    cache.set([makeWorkItem(1, { iteration: 's1' })], 's1');
     vi.advanceTimersByTime(60001);
     expect(cache.get('s1')).toBeNull();
   });

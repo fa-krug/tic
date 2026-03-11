@@ -27,6 +27,7 @@ describe('mapIssueToWorkItem', () => {
 
     const item = mapIssueToWorkItem(ghIssue);
 
+    expect(item.rowId).toBe(42);
     expect(item.id).toBe('42');
     expect(item.title).toBe('Fix login bug');
     expect(item.description).toBe('The login form breaks on mobile.');

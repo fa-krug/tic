@@ -57,6 +57,7 @@ export function rowToWorkItem(
   itemComments: CommentRow[],
 ): WorkItem {
   return {
+    rowId: row.rowId,
     id: row.id,
     title: row.title,
     type: row.type,
@@ -70,7 +71,7 @@ export function rowToWorkItem(
     description: row.description,
     comments: itemComments.map(rowToComment),
     parent: row.parent,
-    dependsOn: deps.map((d) => d.dependsOnId),
+    dependsOn: deps.map((d) => d.dependsOnRowId),
   };
 }
 
@@ -80,6 +81,7 @@ export function rowToWorkItem(
  */
 export function workItemToRow(item: WorkItem): WorkItemInsert {
   return {
+    rowId: item.rowId,
     id: item.id,
     title: item.title,
     type: item.type,
@@ -134,7 +136,7 @@ export function rowToTemplate(
  */
 export function rowToPullRequest(
   row: PullRequestRow,
-  linkedItemIds: string[],
+  linkedItemRowIds: number[],
 ): PullRequest {
   return {
     id: row.id,
@@ -145,7 +147,7 @@ export function rowToPullRequest(
     sourceBranch: row.sourceBranch,
     targetBranch: row.targetBranch,
     author: row.author,
-    linkedItems: linkedItemIds,
+    linkedItems: linkedItemRowIds,
     created: row.created,
     updated: row.updated,
     url: row.url,

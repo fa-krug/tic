@@ -88,22 +88,25 @@ function extractIdFromUrl(url: string): string {
 
 export function extractParent(
   relations: AdoRelation[] | undefined,
-): string | null {
+): number | null {
   if (!relations) return null;
   const parent = relations.find(
     (r) => r.rel === 'System.LinkTypes.Hierarchy-Reverse',
   );
-  return parent ? extractIdFromUrl(parent.url) || null : null;
+  if (!parent) return null;
+  const id = extractIdFromUrl(parent.url);
+  return id ? Number(id) : null;
 }
 
 export function extractPredecessors(
   relations: AdoRelation[] | undefined,
-): string[] {
+): number[] {
   if (!relations) return [];
   return relations
     .filter((r) => r.rel === 'System.LinkTypes.Dependency-Reverse')
     .map((r) => extractIdFromUrl(r.url))
-    .filter((id) => id !== '');
+    .filter((id) => id !== '')
+    .map(Number);
 }
 
 function htmlToMarkdown(html: string | undefined): string {
@@ -125,6 +128,7 @@ export function mapWorkItemToWorkItem(ado: AdoWorkItem): WorkItem {
     | undefined;
 
   return {
+    rowId: ado.id,
     id: String(ado.id),
     title: (fields['System.Title'] as string) ?? '',
     type: (fields['System.WorkItemType'] as string) ?? '',

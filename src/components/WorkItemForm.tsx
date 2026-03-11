@@ -117,9 +117,21 @@ export function WorkItemForm() {
 
   const queue = useBackendDataStore((s) => s.queue);
 
+  /** Look up the rowId for a display ID. Returns -1 if not found. */
+  const rowIdOf = (displayId: string): number => {
+    const item = allItems.find((i) => i.id === displayId);
+    return item?.rowId ?? -1;
+  };
+
+  /** Look up the display ID for a rowId. Returns null if not found. */
+  const displayIdOf = (rowId: number): string | null => {
+    const item = allItems.find((i) => i.rowId === rowId);
+    return item?.id ?? null;
+  };
+
   const queueWrite = async (
     action: QueueAction,
-    itemId: string,
+    itemRowId: number,
     extra?: {
       commentData?: { author: string; body: string };
       templateSlug?: string;
@@ -128,7 +140,7 @@ export function WorkItemForm() {
     if (queue) {
       await queue.append({
         action,
-        itemId,
+        itemRowId,
         timestamp: new Date().toISOString(),
         ...(extra?.commentData ? { commentData: extra.commentData } : {}),
         ...(extra?.templateSlug ? { templateSlug: extra.templateSlug } : {}),
@@ -176,16 +188,25 @@ export function WorkItemForm() {
     }
     let cancelled = false;
     setItemLoading(true);
+    const displayId = displayIdOf(selectedWorkItemId);
+    if (!displayId) {
+      setItemLoading(false);
+      return;
+    }
     void (async () => {
       try {
-        const item = await backend.getWorkItem(selectedWorkItemId);
+        const item = await backend.getWorkItem(displayId);
         const [ch, dep] = capabilities.relationships
           ? await Promise.all([
-              backend.getChildren(selectedWorkItemId),
-              backend.getDependents(selectedWorkItemId),
+              backend.getChildren(displayId),
+              backend.getDependents(displayId),
             ])
           : [[], []];
-        const pi = item.parent ? await backend.getWorkItem(item.parent) : null;
+        const parentDisplayId =
+          item.parent !== null ? displayIdOf(item.parent) : null;
+        const pi = parentDisplayId
+          ? await backend.getWorkItem(parentDisplayId)
+          : null;
         if (cancelled) return;
         setExistingItem(item);
         setChildren(ch);
@@ -240,10 +261,10 @@ export function WorkItemForm() {
         all.push('rel-parent');
       }
       for (const child of children) {
-        all.push(`rel-child-${child.id}`);
+        all.push(`rel-child-${child.rowId}`);
       }
       for (const dep of dependents) {
-        all.push(`rel-dependent-${dep.id}`);
+        all.push(`rel-dependent-${dep.rowId}`);
       }
     }
 
@@ -271,11 +292,15 @@ export function WorkItemForm() {
     [capabilities.requiredFields, requiredFields],
   );
 
+  // Convert selectedWorkItemId (rowId) to display ID for validation
+  const selectedDisplayId =
+    selectedWorkItemId !== null ? displayIdOf(selectedWorkItemId) : null;
+
   const {
     errors: validationErrors,
     validate,
     clearError,
-  } = useFormValidation(allItems, selectedWorkItemId, requiredFieldsList);
+  } = useFormValidation(allItems, selectedDisplayId, requiredFieldsList);
 
   const [comments, setComments] = useState<Comment[]>([]);
 
@@ -331,10 +356,9 @@ export function WorkItemForm() {
       navigationStore.getState();
     let parentId = '';
     if (selectedWorkItemId === null && createChildParentId) {
-      const parent = allItems.find((i) => i.id === createChildParentId);
-      parentId = parent
-        ? `#${createChildParentId} - ${parent.title}`
-        : `#${createChildParentId}`;
+      const parent = allItems.find((i) => i.rowId === createChildParentId);
+      const displayId = parent?.id ?? String(createChildParentId);
+      parentId = parent ? `#${displayId} - ${parent.title}` : `#${displayId}`;
       setCreateChildParentId(null);
     }
 
@@ -354,7 +378,9 @@ export function WorkItemForm() {
 
     const draft: FormDraft = {
       itemId: selectedWorkItemId,
-      itemTitle: selectedWorkItemId ? `#${selectedWorkItemId}` : '(new)',
+      itemTitle: selectedWorkItemId
+        ? `#${selectedDisplayId ?? selectedWorkItemId}`
+        : '(new)',
       fields: initialFields,
       initialSnapshot: { ...initialFields },
       focusedField: 0,
@@ -375,17 +401,21 @@ export function WorkItemForm() {
     const parentIdValue =
       existingItem.parent !== null && existingItem.parent !== undefined
         ? (() => {
-            const pi = allItems.find((i) => i.id === existingItem.parent);
+            const pi = allItems.find((i) => i.rowId === existingItem.parent);
+            const parentDisplayId = pi?.id ?? String(existingItem.parent);
             return pi
-              ? `#${existingItem.parent} - ${pi.title}`
+              ? `#${parentDisplayId} - ${pi.title}`
               : String(existingItem.parent);
           })()
         : '';
     const dependsOnValue =
       existingItem.dependsOn
-        ?.map((depId) => {
-          const depItem = allItems.find((i) => i.id === depId);
-          return depItem ? `#${depId} - ${depItem.title}` : depId;
+        ?.map((depRowId) => {
+          const depItem = allItems.find((i) => i.rowId === depRowId);
+          const depDisplayId = depItem?.id ?? String(depRowId);
+          return depItem
+            ? `#${depDisplayId} - ${depItem.title}`
+            : String(depRowId);
         })
         .join(', ') ?? '';
 
@@ -488,13 +518,13 @@ export function WorkItemForm() {
 
   const parentSuggestions = useMemo(() => {
     return allItems
-      .filter((item) => item.id !== selectedWorkItemId)
+      .filter((item) => item.rowId !== selectedWorkItemId && item.id !== null)
       .map((item) => `#${item.id} - ${item.title}`);
   }, [allItems, selectedWorkItemId]);
 
   const [editing, setEditing] = useState(false);
   const [preEditValue, setPreEditValue] = useState<string>('');
-  const [pendingRelNav, setPendingRelNav] = useState<string | null>(null);
+  const [pendingRelNav, setPendingRelNav] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -522,21 +552,24 @@ export function WorkItemForm() {
       .map((l) => l.trim())
       .filter((l) => l.length > 0);
 
-    const parsedParent = (() => {
+    // Parse display IDs from form fields and resolve to rowIds
+    const parsedParent: number | null = (() => {
       const trimmed = parentId.trim();
       if (!trimmed) return null;
       const match = trimmed.match(/^#(\S+)\s*-\s/);
-      return match ? match[1]! : trimmed;
+      const displayId = match ? match[1]! : trimmed;
+      return rowIdOf(displayId);
     })();
-    const parsedDependsOn = dependsOn
+    const parsedDependsOn: number[] = dependsOn
       .split(',')
       .map((s) => {
         const trimmed = s.trim();
-        if (!trimmed) return '';
+        if (!trimmed) return -1;
         const match = trimmed.match(/^#(\S+)\s*-\s/);
-        return match ? match[1]! : trimmed;
+        const displayId = match ? match[1]! : trimmed;
+        return rowIdOf(displayId);
       })
-      .filter((s) => s.length > 0);
+      .filter((rowId) => rowId !== -1);
 
     if (formMode === 'template') {
       const template: Template = {
@@ -550,17 +583,23 @@ export function WorkItemForm() {
       if (parsedLabels.length > 0) template.labels = parsedLabels;
       if (iteration) template.iteration = iteration;
       if (description) template.description = description;
-      if (parsedParent) template.parent = parsedParent;
-      if (parsedDependsOn.length > 0) template.dependsOn = parsedDependsOn;
+      if (parsedParent !== null) {
+        template.parent = displayIdOf(parsedParent);
+      }
+      if (parsedDependsOn.length > 0) {
+        template.dependsOn = parsedDependsOn
+          .map((rid) => displayIdOf(rid))
+          .filter((id): id is string => id !== null);
+      }
 
       if (editingTemplateSlug) {
         await backend.updateTemplate(editingTemplateSlug, template);
-        await queueWrite('template-update', template.slug, {
+        await queueWrite('template-update', 0, {
           templateSlug: template.slug,
         });
       } else {
         await backend.createTemplate(template);
-        await queueWrite('template-create', template.slug, {
+        await queueWrite('template-create', 0, {
           templateSlug: template.slug,
         });
       }
@@ -570,9 +609,9 @@ export function WorkItemForm() {
       return;
     }
 
-    if (selectedWorkItemId !== null) {
-      const snapshot = await backend.getWorkItem(selectedWorkItemId);
-      await backend.cachedUpdateWorkItem(selectedWorkItemId, {
+    if (selectedWorkItemId !== null && selectedDisplayId) {
+      const snapshot = await backend.getWorkItem(selectedDisplayId);
+      await backend.cachedUpdateWorkItem(selectedDisplayId, {
         title,
         type,
         status,
@@ -587,14 +626,14 @@ export function WorkItemForm() {
       await queueWrite('update', selectedWorkItemId);
       undoStore.getState().pushUndo({
         type: 'update',
-        label: `edited #${selectedWorkItemId}`,
+        label: `edited #${selectedDisplayId}`,
         itemSnapshots: [snapshot],
-        syncItemIds: [selectedWorkItemId],
+        syncItemRowIds: [selectedWorkItemId],
         syncAction: 'update',
       });
 
       if (capabilities.comments && newComment.trim().length > 0) {
-        const added = await backend.addComment(selectedWorkItemId, {
+        const added = await backend.addComment(selectedDisplayId, {
           author: 'me',
           body: newComment.trim(),
         });
@@ -604,10 +643,10 @@ export function WorkItemForm() {
         setComments((prev) => [...prev, added]);
         setNewComment('');
       }
-      await backendDataStore.getState().reloadItem(selectedWorkItemId);
+      await backendDataStore.getState().reloadItem(selectedDisplayId);
       uiStore
         .getState()
-        .setToast(`Item #${selectedWorkItemId} updated — press u to undo`);
+        .setToast(`Item #${selectedDisplayId} updated — press u to undo`);
     } else {
       const created = await backend.cachedCreateWorkItem({
         title: title || 'Untitled',
@@ -621,29 +660,33 @@ export function WorkItemForm() {
         parent: parsedParent,
         dependsOn: parsedDependsOn,
       });
-      await queueWrite('create', created.id);
+      await queueWrite('create', created.rowId);
       undoStore.getState().pushUndo({
         type: 'create',
-        label: `created #${created.id}`,
+        label: `created #${created.id ?? created.rowId}`,
         itemSnapshots: [],
-        syncItemIds: [created.id],
+        syncItemRowIds: [created.rowId],
         syncAction: 'create',
-        createdIds: [created.id],
+        createdRowIds: [created.rowId],
       });
 
-      if (capabilities.comments && newComment.trim().length > 0) {
+      if (capabilities.comments && newComment.trim().length > 0 && created.id) {
         await backend.addComment(created.id, {
           author: 'me',
           body: newComment.trim(),
         });
-        await queueWrite('comment', created.id, {
+        await queueWrite('comment', created.rowId, {
           commentData: { author: 'me', body: newComment.trim() },
         });
       }
-      await backendDataStore.getState().reloadItem(created.id);
+      if (created.id) {
+        await backendDataStore.getState().reloadItem(created.id);
+      }
       uiStore
         .getState()
-        .setToast(`Item #${created.id} created — press u to undo`);
+        .setToast(
+          `Item #${created.id ?? created.rowId} created — press u to undo`,
+        );
       setActiveTemplate(null);
     }
 
@@ -679,7 +722,9 @@ export function WorkItemForm() {
             await save();
             if (pendingRelNav) {
               // Push a new draft for the target item
-              const targetItem = allItems.find((i) => i.id === pendingRelNav);
+              const targetItem = allItems.find(
+                (i) => i.rowId === pendingRelNav,
+              );
               const defaultFields: FormFields = {
                 title: '',
                 type: activeType ?? types[0] ?? '',
@@ -695,7 +740,8 @@ export function WorkItemForm() {
               };
               const newDraft: FormDraft = {
                 itemId: pendingRelNav,
-                itemTitle: targetItem?.title ?? `#${pendingRelNav}`,
+                itemTitle:
+                  targetItem?.title ?? `#${targetItem?.id ?? pendingRelNav}`,
                 fields: defaultFields,
                 initialSnapshot: { ...defaultFields },
                 focusedField: 0,
@@ -726,7 +772,7 @@ export function WorkItemForm() {
           if (pendingRelNav) {
             // Push a new draft for the target item (discarding current)
             formStackStore.getState().pop();
-            const targetItem = allItems.find((i) => i.id === pendingRelNav);
+            const targetItem = allItems.find((i) => i.rowId === pendingRelNav);
             const defaultFields: FormFields = {
               title: '',
               type: activeType ?? types[0] ?? '',
@@ -742,7 +788,8 @@ export function WorkItemForm() {
             };
             const newDraft: FormDraft = {
               itemId: pendingRelNav,
-              itemTitle: targetItem?.title ?? `#${pendingRelNav}`,
+              itemTitle:
+                targetItem?.title ?? `#${targetItem?.id ?? pendingRelNav}`,
               fields: defaultFields,
               initialSnapshot: { ...defaultFields },
               focusedField: 0,
@@ -874,21 +921,23 @@ export function WorkItemForm() {
 
         if (matchesCommand('form-edit', _input, key)) {
           if (isRelationshipField) {
-            let targetId: string | null = null;
+            let targetRowId: number | null = null;
             if (currentField === 'rel-parent' && existingItem?.parent) {
-              targetId = existingItem.parent;
+              targetRowId = existingItem.parent;
             } else if (currentField.startsWith('rel-child-')) {
-              targetId = currentField.slice('rel-child-'.length);
+              targetRowId = Number(currentField.slice('rel-child-'.length));
             } else if (currentField.startsWith('rel-dependent-')) {
-              targetId = currentField.slice('rel-dependent-'.length);
+              targetRowId = Number(currentField.slice('rel-dependent-'.length));
             }
-            if (targetId) {
+            if (targetRowId) {
               if (isDirty) {
-                setPendingRelNav(targetId);
+                setPendingRelNav(targetRowId);
                 setShowDirtyPrompt(true);
               } else {
                 // Create new draft for target item before navigating
-                const targetItem = allItems.find((i) => i.id === targetId);
+                const targetItem = allItems.find(
+                  (i) => i.rowId === targetRowId,
+                );
                 const defaultFields: FormFields = {
                   title: '',
                   type: activeType ?? types[0] ?? '',
@@ -903,14 +952,15 @@ export function WorkItemForm() {
                   newComment: '',
                 };
                 const newDraft: FormDraft = {
-                  itemId: targetId,
-                  itemTitle: targetItem?.title ?? `#${targetId}`,
+                  itemId: targetRowId,
+                  itemTitle:
+                    targetItem?.title ?? `#${targetItem?.id ?? targetRowId}`,
                   fields: defaultFields,
                   initialSnapshot: { ...defaultFields },
                   focusedField: 0,
                 };
                 pushDraft(newDraft);
-                pushWorkItem(targetId);
+                pushWorkItem(targetRowId);
               }
             }
           } else if (currentField === 'description') {
@@ -1473,29 +1523,29 @@ export function WorkItemForm() {
   function renderRelationshipField(field: FieldName, index: number) {
     const focused = index === focusedField;
     const cursor = focused ? '>' : ' ';
-    const id = field.startsWith('rel-child-')
-      ? field.slice('rel-child-'.length)
+    const rowId = field.startsWith('rel-child-')
+      ? Number(field.slice('rel-child-'.length))
       : field.startsWith('rel-dependent-')
-        ? field.slice('rel-dependent-'.length)
+        ? Number(field.slice('rel-dependent-'.length))
         : null;
 
-    let item: { id: string; title: string } | null = null;
+    let relItem: WorkItem | null = null;
     if (field === 'rel-parent' && parentItem) {
-      item = { id: parentItem.id, title: parentItem.title };
-    } else if (id) {
-      const child = children.find((c) => c.id === id);
-      const dep = dependents.find((d) => d.id === id);
-      const relItem = child ?? dep;
-      item = relItem ? { id: relItem.id, title: relItem.title } : null;
+      relItem = parentItem;
+    } else if (rowId !== null) {
+      relItem =
+        children.find((c) => c.rowId === rowId) ??
+        dependents.find((d) => d.rowId === rowId) ??
+        null;
     }
 
-    if (!item) return null;
+    if (!relItem) return null;
 
     return (
       <Box key={field}>
         <Text color={focused ? accent : undefined}>{cursor} </Text>
         <Text bold={focused} color={focused ? accent : undefined}>
-          #{item.id} ({item.title})
+          #{relItem.id ?? relItem.rowId} ({relItem.title})
         </Text>
       </Box>
     );
@@ -1554,7 +1604,7 @@ export function WorkItemForm() {
           {mode}
           {typeLabel ? ` ${typeLabel}` : ''}
           {formMode !== 'template' && selectedWorkItemId !== null
-            ? ` #${selectedWorkItemId}`
+            ? ` #${selectedDisplayId ?? selectedWorkItemId}`
             : ''}
         </Text>
       </Box>

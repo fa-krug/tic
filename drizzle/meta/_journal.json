@@ -43,6 +43,13 @@
       "when": 1772578000000,
       "tag": "0005_iteration_dates",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1773360000000,
+      "tag": "0006_dual_id",
+      "breakpoints": true
     }
   ]
 }

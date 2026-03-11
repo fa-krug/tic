@@ -41,15 +41,10 @@ const DEFAULT_STATUSES = ['backlog', 'todo', 'in-progress', 'review', 'done'];
 const DEFAULT_TYPES = ['epic', 'issue', 'task'];
 const DEFAULT_ITERATIONS = ['default'];
 const DEFAULT_CURRENT_ITERATION = 'default';
-const DEFAULT_NEXT_ID = 1;
 const DEFAULT_BRANCH_MODE = 'worktree';
 const DEFAULT_AUTO_UPDATE = true;
 const DEFAULT_BRANCH_COMMAND = `claude "Brainstorm the implementation of issue #$TIC_ITEM_ID: $TIC_ITEM_TITLE. $TIC_ITEM_DESCRIPTION"`;
 const DEFAULT_COPY_TO_CLIPBOARD = true;
-
-export interface StorageOptions {
-  tempIds?: boolean;
-}
 
 export class Storage
   extends BaseBackend
@@ -57,21 +52,28 @@ export class Storage
 {
   private db: TicDatabase;
   private root: string;
-  private tempIds: boolean;
+  private _hasRemoteBackend = false;
 
-  private constructor(db: TicDatabase, root: string, options?: StorageOptions) {
+  private constructor(db: TicDatabase, root: string) {
     super(0); // No TTL — DB is always fresh
     this.db = db;
     this.root = root;
-    this.tempIds = options?.tempIds ?? false;
+  }
+
+  get hasRemoteBackend(): boolean {
+    return this._hasRemoteBackend;
+  }
+
+  setHasRemoteBackend(value: boolean): void {
+    this._hasRemoteBackend = value;
   }
 
   /**
    * Create a Storage instance, initializing the database and seeding defaults.
    */
-  static create(root: string, options?: StorageOptions): Storage {
+  static create(root: string): Storage {
     const db = createDatabase(root);
-    const backend = new Storage(db, root, options);
+    const backend = new Storage(db, root);
     backend.seedDefaults();
     backend.migrateFromYaml();
     return backend;
@@ -80,8 +82,8 @@ export class Storage
   /**
    * Create a Storage instance from an existing database instance (for testing).
    */
-  static createFromDb(db: TicDatabase, options?: StorageOptions): Storage {
-    const backend = new Storage(db, ':memory:', options);
+  static createFromDb(db: TicDatabase): Storage {
+    const backend = new Storage(db, ':memory:');
     backend.seedDefaults();
     return backend;
   }
@@ -105,7 +107,6 @@ export class Storage
         id: 1,
         backend: 'drizzle',
         currentIteration: DEFAULT_CURRENT_ITERATION,
-        nextId: DEFAULT_NEXT_ID,
         branchMode: DEFAULT_BRANCH_MODE,
         branchCommand: DEFAULT_BRANCH_COMMAND,
         copyToClipboard: DEFAULT_COPY_TO_CLIPBOARD,
@@ -162,16 +163,6 @@ export class Storage
     try {
       const raw = fs.readFileSync(yamlPath, 'utf-8');
       const config = yaml.parse(raw) as Config;
-
-      // Recalculate nextId from actual max item ID to prevent collisions
-      // (the YAML next_id may be stale if items were synced from a remote)
-      const maxRow = this.db.raw
-        .prepare('SELECT MAX(CAST(id AS INTEGER)) AS maxId FROM work_items')
-        .get() as { maxId: number | null } | undefined;
-      const maxId = maxRow?.maxId ?? 0;
-      if (maxId >= config.next_id) {
-        config.next_id = maxId + 1;
-      }
 
       this.db.transaction((tx) => {
         insertConfigTx(tx, config);
@@ -294,7 +285,7 @@ export class Storage
       .from(schema.workItemLabels)
       .innerJoin(
         schema.workItems,
-        eq(schema.workItemLabels.workItemId, schema.workItems.id),
+        eq(schema.workItemLabels.workItemRowId, schema.workItems.rowId),
       )
       .where(isNull(schema.workItems.deletedAt))
       .all();
@@ -367,22 +358,64 @@ export class Storage
       throw new Error(`Work item #${id} not found`);
     }
 
+    return this.assembleWorkItemByRowId(row);
+  }
+
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async getWorkItemByRowId(rowId: number): Promise<WorkItem> {
+    const row = this.db
+      .select()
+      .from(schema.workItems)
+      .where(
+        and(
+          eq(schema.workItems.rowId, rowId),
+          isNull(schema.workItems.deletedAt),
+        ),
+      )
+      .get();
+
+    if (!row) {
+      throw new Error(`Work item with rowId ${rowId} not found`);
+    }
+
+    return this.assembleWorkItemByRowId(row);
+  }
+
+  /**
+   * Get the display ID for a rowId, including soft-deleted items.
+   * Used by SyncManager to resolve display IDs for delete pushes.
+   */
+  getDisplayIdByRowId(rowId: number): string | null {
+    const row = this.db
+      .select({ id: schema.workItems.id })
+      .from(schema.workItems)
+      .where(eq(schema.workItems.rowId, rowId))
+      .get();
+
+    if (!row) return null;
+    return row.id;
+  }
+
+  /**
+   * Assemble a single work item from its row, loading labels/deps/comments by rowId.
+   */
+  private assembleWorkItemByRowId(row: WorkItemRow): WorkItem {
     const labels = this.db
       .select()
       .from(schema.workItemLabels)
-      .where(eq(schema.workItemLabels.workItemId, id))
+      .where(eq(schema.workItemLabels.workItemRowId, row.rowId))
       .all();
 
     const deps = this.db
       .select()
       .from(schema.workItemDeps)
-      .where(eq(schema.workItemDeps.workItemId, id))
+      .where(eq(schema.workItemDeps.workItemRowId, row.rowId))
       .all();
 
     const itemComments = this.db
       .select()
       .from(schema.comments)
-      .where(eq(schema.comments.workItemId, id))
+      .where(eq(schema.comments.workItemRowId, row.rowId))
       .all();
 
     return rowToWorkItem(row, labels, deps, itemComments);
@@ -392,12 +425,13 @@ export class Storage
 
   // eslint-disable-next-line @typescript-eslint/require-await
   override async getChildren(id: string): Promise<WorkItem[]> {
+    const parentRowId = this.resolveRowId(id);
     const childRows = this.db
       .select()
       .from(schema.workItems)
       .where(
         and(
-          eq(schema.workItems.parent, id),
+          eq(schema.workItems.parent, parentRowId),
           isNull(schema.workItems.deletedAt),
         ),
       )
@@ -410,22 +444,23 @@ export class Storage
 
   // eslint-disable-next-line @typescript-eslint/require-await
   override async getDependents(id: string): Promise<WorkItem[]> {
-    // Find items that depend on `id`
+    const targetRowId = this.resolveRowId(id);
+    // Find items that depend on `targetRowId`
     const depRows = this.db
-      .select({ workItemId: schema.workItemDeps.workItemId })
+      .select({ workItemRowId: schema.workItemDeps.workItemRowId })
       .from(schema.workItemDeps)
-      .where(eq(schema.workItemDeps.dependsOnId, id))
+      .where(eq(schema.workItemDeps.dependsOnRowId, targetRowId))
       .all();
 
     if (depRows.length === 0) return [];
 
-    const dependentIds = depRows.map((r) => r.workItemId);
+    const dependentRowIds = depRows.map((r) => r.workItemRowId);
     const itemRows = this.db
       .select()
       .from(schema.workItems)
       .where(
         and(
-          inArray(schema.workItems.id, dependentIds),
+          inArray(schema.workItems.rowId, dependentRowIds),
           isNull(schema.workItems.deletedAt),
         ),
       )
@@ -443,55 +478,55 @@ export class Storage
     itemRows: WorkItemRow[],
     options?: { includeComments?: boolean },
   ): WorkItem[] {
-    const itemIds = itemRows.map((r) => r.id);
+    const rowIds = itemRows.map((r) => r.rowId);
 
     const labelRows = this.db
       .select()
       .from(schema.workItemLabels)
-      .where(inArray(schema.workItemLabels.workItemId, itemIds))
+      .where(inArray(schema.workItemLabels.workItemRowId, rowIds))
       .all();
 
     const depRows = this.db
       .select()
       .from(schema.workItemDeps)
-      .where(inArray(schema.workItemDeps.workItemId, itemIds))
+      .where(inArray(schema.workItemDeps.workItemRowId, rowIds))
       .all();
 
     const commentRows = options?.includeComments
       ? this.db
           .select()
           .from(schema.comments)
-          .where(inArray(schema.comments.workItemId, itemIds))
+          .where(inArray(schema.comments.workItemRowId, rowIds))
           .all()
       : [];
 
-    const labelsByItem = new Map<string, WorkItemLabelRow[]>();
+    const labelsByItem = new Map<number, WorkItemLabelRow[]>();
     for (const l of labelRows) {
-      const arr = labelsByItem.get(l.workItemId);
+      const arr = labelsByItem.get(l.workItemRowId);
       if (arr) arr.push(l);
-      else labelsByItem.set(l.workItemId, [l]);
+      else labelsByItem.set(l.workItemRowId, [l]);
     }
 
-    const depsByItem = new Map<string, WorkItemDepRow[]>();
+    const depsByItem = new Map<number, WorkItemDepRow[]>();
     for (const d of depRows) {
-      const arr = depsByItem.get(d.workItemId);
+      const arr = depsByItem.get(d.workItemRowId);
       if (arr) arr.push(d);
-      else depsByItem.set(d.workItemId, [d]);
+      else depsByItem.set(d.workItemRowId, [d]);
     }
 
-    const commentsByItem = new Map<string, CommentRow[]>();
+    const commentsByItem = new Map<number, CommentRow[]>();
     for (const c of commentRows) {
-      const arr = commentsByItem.get(c.workItemId);
+      const arr = commentsByItem.get(c.workItemRowId);
       if (arr) arr.push(c);
-      else commentsByItem.set(c.workItemId, [c]);
+      else commentsByItem.set(c.workItemRowId, [c]);
     }
 
     return itemRows.map((row) =>
       rowToWorkItem(
         row,
-        labelsByItem.get(row.id) ?? [],
-        depsByItem.get(row.id) ?? [],
-        commentsByItem.get(row.id) ?? [],
+        labelsByItem.get(row.rowId) ?? [],
+        depsByItem.get(row.rowId) ?? [],
+        commentsByItem.get(row.rowId) ?? [],
       ),
     );
   }
@@ -502,39 +537,65 @@ export class Storage
     return `${this.root}/.tic/items/${id}.md`;
   }
 
+  // ─── Row ID resolution ─────────────────────────────────────────
+
+  /**
+   * Resolve a display ID to a rowId. Throws if not found.
+   */
+  private resolveRowId(displayId: string): number {
+    const row = this.db
+      .select({ rowId: schema.workItems.rowId })
+      .from(schema.workItems)
+      .where(
+        and(
+          eq(schema.workItems.id, displayId),
+          isNull(schema.workItems.deletedAt),
+        ),
+      )
+      .get();
+    if (!row) throw new Error(`Work item "${displayId}" not found`);
+    return row.rowId;
+  }
+
   // ─── Relationship validation ─────────────────────────────────────
 
   private validateRelationships(
-    id: string,
-    parent: string | null | undefined,
-    dependsOn: string[] | undefined,
+    itemRowId: number | null,
+    parent: number | null | undefined,
+    dependsOn: number[] | undefined,
   ): void {
     // Validate parent
     if (parent !== null && parent !== undefined) {
-      if (parent === id) {
-        throw new Error(`Work item #${id} cannot be its own parent`);
+      if (parent === itemRowId) {
+        throw new Error(
+          `Work item #${this.displayIdForRowId(itemRowId)} cannot be its own parent`,
+        );
       }
 
       const parentRow = this.db
-        .select({ id: schema.workItems.id })
+        .select({ rowId: schema.workItems.rowId })
         .from(schema.workItems)
         .where(
           and(
-            eq(schema.workItems.id, parent),
+            eq(schema.workItems.rowId, parent),
             isNull(schema.workItems.deletedAt),
           ),
         )
         .get();
       if (!parentRow) {
-        throw new Error(`Parent #${parent} does not exist`);
+        throw new Error(
+          `Parent #${this.displayIdForRowId(parent)} does not exist`,
+        );
       }
 
       // Walk up the parent chain to detect circular references
-      let current: string | null = parent;
-      const visited = new Set<string>();
+      let current: number | null = parent;
+      const visited = new Set<number>();
       while (current !== null) {
-        if (current === id) {
-          throw new Error(`Circular parent chain detected for #${id}`);
+        if (current === itemRowId) {
+          throw new Error(
+            `Circular parent chain detected for #${this.displayIdForRowId(itemRowId)}`,
+          );
         }
         if (visited.has(current)) break;
         visited.add(current);
@@ -543,7 +604,7 @@ export class Storage
           .from(schema.workItems)
           .where(
             and(
-              eq(schema.workItems.id, current),
+              eq(schema.workItems.rowId, current),
               isNull(schema.workItems.deletedAt),
             ),
           )
@@ -554,56 +615,78 @@ export class Storage
 
     // Validate dependencies
     if (dependsOn !== undefined && dependsOn.length > 0) {
-      for (const depId of dependsOn) {
-        if (depId === id) {
-          throw new Error(`Work item #${id} cannot depend on itself`);
+      for (const depRowId of dependsOn) {
+        if (depRowId === itemRowId) {
+          throw new Error(
+            `Work item #${this.displayIdForRowId(itemRowId)} cannot depend on itself`,
+          );
         }
       }
 
       // Check all deps exist in one query
       const existingRows = this.db
-        .select({ id: schema.workItems.id })
+        .select({ rowId: schema.workItems.rowId })
         .from(schema.workItems)
         .where(
           and(
-            inArray(schema.workItems.id, dependsOn),
+            inArray(schema.workItems.rowId, dependsOn),
             isNull(schema.workItems.deletedAt),
           ),
         )
         .all();
-      const existingIds = new Set(existingRows.map((r) => r.id));
-      for (const depId of dependsOn) {
-        if (!existingIds.has(depId)) {
-          throw new Error(`Dependency #${depId} does not exist`);
+      const existingRowIds = new Set(existingRows.map((r) => r.rowId));
+      for (const depRowId of dependsOn) {
+        if (!existingRowIds.has(depRowId)) {
+          throw new Error(
+            `Dependency #${this.displayIdForRowId(depRowId)} does not exist`,
+          );
         }
       }
 
       // Check for circular dependency chains
-      const hasCycle = (startId: string, targetId: string): boolean => {
-        const visited = new Set<string>();
-        const stack = [startId];
+      const hasCycle = (startRowId: number, targetRowId: number): boolean => {
+        const visited = new Set<number>();
+        const stack = [startRowId];
         while (stack.length > 0) {
           const current = stack.pop()!;
-          if (current === targetId) return true;
+          if (current === targetRowId) return true;
           if (visited.has(current)) continue;
           visited.add(current);
           const deps = this.db
-            .select({ dependsOnId: schema.workItemDeps.dependsOnId })
+            .select({
+              dependsOnRowId: schema.workItemDeps.dependsOnRowId,
+            })
             .from(schema.workItemDeps)
-            .where(eq(schema.workItemDeps.workItemId, current))
+            .where(eq(schema.workItemDeps.workItemRowId, current))
             .all();
           for (const dep of deps) {
-            stack.push(dep.dependsOnId);
+            stack.push(dep.dependsOnRowId);
           }
         }
         return false;
       };
-      for (const depId of dependsOn) {
-        if (hasCycle(depId, id)) {
-          throw new Error(`Circular dependency chain detected for #${id}`);
+      for (const depRowId of dependsOn) {
+        if (hasCycle(depRowId, itemRowId!)) {
+          throw new Error(
+            `Circular dependency chain detected for #${this.displayIdForRowId(itemRowId)}`,
+          );
         }
       }
     }
+  }
+
+  /**
+   * Get the display id for a rowId, for error messages.
+   * Returns the display id if set, otherwise the rowId as string.
+   */
+  private displayIdForRowId(rowId: number | null): string {
+    if (rowId === null) return 'null';
+    const row = this.db
+      .select({ id: schema.workItems.id })
+      .from(schema.workItems)
+      .where(eq(schema.workItems.rowId, rowId))
+      .get();
+    return row?.id ?? String(rowId);
   }
 
   // ─── Write: createWorkItem ────────────────────────────────────────
@@ -613,27 +696,13 @@ export class Storage
     this.validateFields(data);
     const now = new Date().toISOString();
 
-    // Single IMMEDIATE transaction: allocate ID + validate + insert atomically.
-    // IMMEDIATE acquires a write lock upfront, preventing the race condition where
-    // two processes (e.g., parallel MCP calls) read the same nextId before either
-    // commits (#37).
-    const id = this.db.transaction(
+    // Single IMMEDIATE transaction: validate + insert atomically.
+    // IMMEDIATE acquires a write lock upfront, preventing race conditions
+    // with parallel MCP calls (#37).
+    const result = this.db.transaction(
       (tx) => {
-        // Allocate ID
-        const config = tx
-          .select()
-          .from(schema.projectConfig)
-          .where(eq(schema.projectConfig.id, 1))
-          .get();
-        const nid = config?.nextId ?? 1;
-        const itemId = this.tempIds ? `local-${nid}` : String(nid);
-        tx.update(schema.projectConfig)
-          .set({ nextId: nid + 1 })
-          .where(eq(schema.projectConfig.id, 1))
-          .run();
-
-        // Validate relationships
-        this.validateRelationships(itemId, data.parent, data.dependsOn);
+        // Validate relationships (these are rowIds now)
+        this.validateRelationships(null, data.parent, data.dependsOn);
 
         // Ensure iteration exists
         if (data.iteration) {
@@ -643,10 +712,10 @@ export class Storage
             .run();
         }
 
-        // Insert work item
-        tx.insert(schema.workItems)
+        // Insert work item — let SQLite assign rowId via AUTOINCREMENT
+        const insertResult = tx
+          .insert(schema.workItems)
           .values({
-            id: itemId,
             title: data.title,
             type: data.type,
             status: data.status,
@@ -660,10 +729,23 @@ export class Storage
           })
           .run();
 
+        const rowId = Number(insertResult.lastInsertRowid);
+
+        // Assign display ID: if no remote backend, use rowId as display ID
+        const displayId = this._hasRemoteBackend ? null : String(rowId);
+        if (displayId !== null) {
+          tx.update(schema.workItems)
+            .set({ id: displayId })
+            .where(eq(schema.workItems.rowId, rowId))
+            .run();
+        }
+
         // Insert labels
         if (data.labels.length > 0) {
           tx.insert(schema.workItemLabels)
-            .values(data.labels.map((label) => ({ workItemId: itemId, label })))
+            .values(
+              data.labels.map((label) => ({ workItemRowId: rowId, label })),
+            )
             .run();
         }
 
@@ -671,15 +753,15 @@ export class Storage
         if (data.dependsOn.length > 0) {
           tx.insert(schema.workItemDeps)
             .values(
-              data.dependsOn.map((dependsOnId) => ({
-                workItemId: itemId,
-                dependsOnId,
+              data.dependsOn.map((dependsOnRowId) => ({
+                workItemRowId: rowId,
+                dependsOnRowId,
               })),
             )
             .run();
         }
 
-        return itemId;
+        return { rowId, displayId };
       },
       { behavior: 'immediate' },
     );
@@ -687,7 +769,8 @@ export class Storage
     this.invalidateCache();
 
     return {
-      id,
+      rowId: result.rowId,
+      id: result.displayId,
       title: data.title,
       type: data.type,
       status: data.status,
@@ -708,24 +791,7 @@ export class Storage
 
   // eslint-disable-next-line @typescript-eslint/require-await
   async importWorkItem(item: WorkItem): Promise<WorkItem> {
-    this.db.transaction((tx) => {
-      // Bump nextId past imported numeric IDs to prevent collisions
-      const numericId = Number(item.id);
-      if (!Number.isNaN(numericId) && numericId > 0) {
-        const config = tx
-          .select({ nextId: schema.projectConfig.nextId })
-          .from(schema.projectConfig)
-          .where(eq(schema.projectConfig.id, 1))
-          .get();
-        const currentNext = config?.nextId ?? 1;
-        if (numericId >= currentNext) {
-          tx.update(schema.projectConfig)
-            .set({ nextId: numericId + 1 })
-            .where(eq(schema.projectConfig.id, 1))
-            .run();
-        }
-      }
-
+    const resultRowId = this.db.transaction((tx) => {
       // Ensure iteration exists
       if (item.iteration) {
         tx.insert(schema.iterations)
@@ -734,24 +800,47 @@ export class Storage
           .run();
       }
 
-      // Upsert work item
-      tx.insert(schema.workItems)
-        .values({
-          id: item.id,
-          title: item.title,
-          type: item.type,
-          status: item.status,
-          iteration: item.iteration,
-          priority: item.priority,
-          assignee: item.assignee,
-          description: item.description,
-          parent: item.parent,
-          created: item.created,
-          updated: item.updated,
-        })
-        .onConflictDoUpdate({
-          target: schema.workItems.id,
-          set: {
+      // Resolve parent: incoming item.parent is a remote numeric ID (as number).
+      // Look up the local rowId by display ID.
+      let parentRowId: number | null = null;
+      if (item.parent !== null) {
+        const parentRow = tx
+          .select({ rowId: schema.workItems.rowId })
+          .from(schema.workItems)
+          .where(eq(schema.workItems.id, String(item.parent)))
+          .get();
+        parentRowId = parentRow?.rowId ?? null;
+      }
+
+      // Resolve dependsOn: same logic
+      const depRowIds: number[] = [];
+      for (const depId of item.dependsOn) {
+        const depRow = tx
+          .select({ rowId: schema.workItems.rowId })
+          .from(schema.workItems)
+          .where(eq(schema.workItems.id, String(depId)))
+          .get();
+        if (depRow) {
+          depRowIds.push(depRow.rowId);
+        }
+      }
+
+      // Look up existing row by display id
+      const existing = item.id
+        ? tx
+            .select({ rowId: schema.workItems.rowId })
+            .from(schema.workItems)
+            .where(eq(schema.workItems.id, item.id))
+            .get()
+        : null;
+
+      let rowId: number;
+
+      if (existing) {
+        // Update existing row
+        rowId = existing.rowId;
+        tx.update(schema.workItems)
+          .set({
             title: item.title,
             type: item.type,
             status: item.status,
@@ -759,33 +848,53 @@ export class Storage
             priority: item.priority,
             assignee: item.assignee,
             description: item.description,
-            parent: item.parent,
+            parent: parentRowId,
             created: item.created,
             updated: item.updated,
-          },
-        })
-        .run();
+          })
+          .where(eq(schema.workItems.rowId, rowId))
+          .run();
+      } else {
+        // Insert new row
+        const insertResult = tx
+          .insert(schema.workItems)
+          .values({
+            id: item.id,
+            title: item.title,
+            type: item.type,
+            status: item.status,
+            iteration: item.iteration,
+            priority: item.priority,
+            assignee: item.assignee,
+            description: item.description,
+            parent: parentRowId,
+            created: item.created,
+            updated: item.updated,
+          })
+          .run();
+        rowId = Number(insertResult.lastInsertRowid);
+      }
 
       // Replace labels
       tx.delete(schema.workItemLabels)
-        .where(eq(schema.workItemLabels.workItemId, item.id))
+        .where(eq(schema.workItemLabels.workItemRowId, rowId))
         .run();
       if (item.labels.length > 0) {
         tx.insert(schema.workItemLabels)
-          .values(item.labels.map((label) => ({ workItemId: item.id, label })))
+          .values(item.labels.map((label) => ({ workItemRowId: rowId, label })))
           .run();
       }
 
       // Replace deps
       tx.delete(schema.workItemDeps)
-        .where(eq(schema.workItemDeps.workItemId, item.id))
+        .where(eq(schema.workItemDeps.workItemRowId, rowId))
         .run();
-      if (item.dependsOn.length > 0) {
+      if (depRowIds.length > 0) {
         tx.insert(schema.workItemDeps)
           .values(
-            item.dependsOn.map((dependsOnId) => ({
-              workItemId: item.id,
-              dependsOnId,
+            depRowIds.map((dependsOnRowId) => ({
+              workItemRowId: rowId,
+              dependsOnRowId,
             })),
           )
           .run();
@@ -793,13 +902,13 @@ export class Storage
 
       // Replace comments
       tx.delete(schema.comments)
-        .where(eq(schema.comments.workItemId, item.id))
+        .where(eq(schema.comments.workItemRowId, rowId))
         .run();
       if (item.comments.length > 0) {
         for (const c of item.comments) {
           tx.insert(schema.comments)
             .values({
-              workItemId: item.id,
+              workItemRowId: rowId,
               author: c.author,
               body: c.body,
               created: c.date,
@@ -807,10 +916,23 @@ export class Storage
             .run();
         }
       }
+
+      return rowId;
     });
 
     this.invalidateCache();
-    return item;
+    return { ...item, rowId: resultRowId };
+  }
+
+  // ─── Write: setDisplayId ───────────────────────────────────────────
+
+  setDisplayId(rowId: number, displayId: string): void {
+    this.db
+      .update(schema.workItems)
+      .set({ id: displayId })
+      .where(eq(schema.workItems.rowId, rowId))
+      .run();
+    this.invalidateCache();
   }
 
   // ─── Write: updateWorkItem ────────────────────────────────────────
@@ -831,12 +953,14 @@ export class Storage
       throw new Error(`Work item #${id} not found`);
     }
 
+    const rowId = existingRow.rowId;
+
     // 2. Validate relationships if parent/dependsOn changed
     const newParent = 'parent' in data ? data.parent : undefined;
     const newDepsOn = 'dependsOn' in data ? data.dependsOn : undefined;
     if (newParent !== undefined || newDepsOn !== undefined) {
       this.validateRelationships(
-        id,
+        rowId,
         newParent !== undefined ? (newParent ?? null) : undefined,
         newDepsOn,
       );
@@ -859,17 +983,19 @@ export class Storage
 
       tx.update(schema.workItems)
         .set(updateSet)
-        .where(eq(schema.workItems.id, id))
+        .where(eq(schema.workItems.rowId, rowId))
         .run();
 
       // Replace labels if changed
       if ('labels' in data && data.labels !== undefined) {
         tx.delete(schema.workItemLabels)
-          .where(eq(schema.workItemLabels.workItemId, id))
+          .where(eq(schema.workItemLabels.workItemRowId, rowId))
           .run();
         if (data.labels.length > 0) {
           tx.insert(schema.workItemLabels)
-            .values(data.labels.map((label) => ({ workItemId: id, label })))
+            .values(
+              data.labels.map((label) => ({ workItemRowId: rowId, label })),
+            )
             .run();
         }
       }
@@ -877,14 +1003,14 @@ export class Storage
       // Replace deps if changed
       if ('dependsOn' in data && data.dependsOn !== undefined) {
         tx.delete(schema.workItemDeps)
-          .where(eq(schema.workItemDeps.workItemId, id))
+          .where(eq(schema.workItemDeps.workItemRowId, rowId))
           .run();
         if (data.dependsOn.length > 0) {
           tx.insert(schema.workItemDeps)
             .values(
-              data.dependsOn.map((dependsOnId) => ({
-                workItemId: id,
-                dependsOnId,
+              data.dependsOn.map((dependsOnRowId) => ({
+                workItemRowId: rowId,
+                dependsOnRowId,
               })),
             )
             .run();
@@ -915,13 +1041,13 @@ export class Storage
             .map((r) => r.name),
         );
 
-        const cascadeIteration = (parentId: string) => {
+        const cascadeIteration = (parentRowId: number) => {
           const children = tx
             .select()
             .from(schema.workItems)
             .where(
               and(
-                eq(schema.workItems.parent, parentId),
+                eq(schema.workItems.parent, parentRowId),
                 isNull(schema.workItems.deletedAt),
               ),
             )
@@ -931,13 +1057,13 @@ export class Storage
             if (closedStatuses.has(child.status)) continue;
             tx.update(schema.workItems)
               .set({ iteration: data.iteration!, updated: now })
-              .where(eq(schema.workItems.id, child.id))
+              .where(eq(schema.workItems.rowId, child.rowId))
               .run();
-            cascadeIteration(child.id);
+            cascadeIteration(child.rowId);
           }
         };
 
-        cascadeIteration(id);
+        cascadeIteration(rowId);
       }
     });
 
@@ -951,20 +1077,23 @@ export class Storage
 
   // eslint-disable-next-line @typescript-eslint/require-await
   async deleteWorkItem(id: string): Promise<void> {
+    const rowId = this.resolveRowId(id);
     this.db.transaction((tx) => {
       // 1. Null out parent on children
       tx.update(schema.workItems)
         .set({ parent: null })
-        .where(eq(schema.workItems.parent, id))
+        .where(eq(schema.workItems.parent, rowId))
         .run();
 
       // 2. Remove deps referencing this item (other items depending on this one)
       tx.delete(schema.workItemDeps)
-        .where(eq(schema.workItemDeps.dependsOnId, id))
+        .where(eq(schema.workItemDeps.dependsOnRowId, rowId))
         .run();
 
       // 3. Delete the item (cascade handles labels, deps, comments of this item)
-      tx.delete(schema.workItems).where(eq(schema.workItems.id, id)).run();
+      tx.delete(schema.workItems)
+        .where(eq(schema.workItems.rowId, rowId))
+        .run();
     });
 
     this.invalidateCache();
@@ -975,10 +1104,17 @@ export class Storage
   // eslint-disable-next-line @typescript-eslint/require-await
   async softDeleteWorkItem(id: string): Promise<void> {
     const now = new Date().toISOString();
+    // Resolve without the deletedAt filter since this method may be called on any item
+    const row = this.db
+      .select({ rowId: schema.workItems.rowId })
+      .from(schema.workItems)
+      .where(eq(schema.workItems.id, id))
+      .get();
+    if (!row) return;
     this.db
       .update(schema.workItems)
       .set({ deletedAt: now })
-      .where(eq(schema.workItems.id, id))
+      .where(eq(schema.workItems.rowId, row.rowId))
       .run();
     this.invalidateCache();
   }
@@ -987,28 +1123,15 @@ export class Storage
 
   // eslint-disable-next-line @typescript-eslint/require-await
   async addComment(workItemId: string, comment: NewComment): Promise<Comment> {
-    // 1. Verify item exists
-    const row = this.db
-      .select({ id: schema.workItems.id })
-      .from(schema.workItems)
-      .where(
-        and(
-          eq(schema.workItems.id, workItemId),
-          isNull(schema.workItems.deletedAt),
-        ),
-      )
-      .get();
-
-    if (!row) {
-      throw new Error(`Work item #${workItemId} not found`);
-    }
+    // 1. Verify item exists and resolve rowId
+    const rowId = this.resolveRowId(workItemId);
 
     // 2. Insert comment (do NOT update work item's updated timestamp)
     const now = new Date().toISOString();
     this.db
       .insert(schema.comments)
       .values({
-        workItemId,
+        workItemRowId: rowId,
         author: comment.author,
         body: comment.body,
         created: now,
@@ -1028,10 +1151,17 @@ export class Storage
 
   // eslint-disable-next-line @typescript-eslint/require-await
   async restoreWorkItem(id: string): Promise<void> {
+    // Look up by display id without deletedAt filter (item is soft-deleted)
+    const row = this.db
+      .select({ rowId: schema.workItems.rowId })
+      .from(schema.workItems)
+      .where(eq(schema.workItems.id, id))
+      .get();
+    if (!row) return;
     this.db
       .update(schema.workItems)
       .set({ deletedAt: null })
-      .where(eq(schema.workItems.id, id))
+      .where(eq(schema.workItems.rowId, row.rowId))
       .run();
     this.invalidateCache();
   }
@@ -1040,7 +1170,16 @@ export class Storage
 
   // eslint-disable-next-line @typescript-eslint/require-await
   async permanentlyDeleteWorkItem(id: string): Promise<void> {
-    this.db.delete(schema.workItems).where(eq(schema.workItems.id, id)).run();
+    const row = this.db
+      .select({ rowId: schema.workItems.rowId })
+      .from(schema.workItems)
+      .where(eq(schema.workItems.id, id))
+      .get();
+    if (!row) return;
+    this.db
+      .delete(schema.workItems)
+      .where(eq(schema.workItems.rowId, row.rowId))
+      .run();
     this.invalidateCache();
   }
 
@@ -1355,11 +1494,11 @@ export class Storage
       .where(inArray(schema.prItemLinks.prId, prIds))
       .all();
 
-    const linksByPr = new Map<string, string[]>();
+    const linksByPr = new Map<string, number[]>();
     for (const link of linkRows) {
       const arr = linksByPr.get(link.prId);
-      if (arr) arr.push(link.itemId);
-      else linksByPr.set(link.prId, [link.itemId]);
+      if (arr) arr.push(link.itemRowId);
+      else linksByPr.set(link.prId, [link.itemRowId]);
     }
 
     return prRows.map((row) =>
@@ -1385,7 +1524,7 @@ export class Storage
 
     return rowToPullRequest(
       row,
-      linkRows.map((l) => l.itemId),
+      linkRows.map((l) => l.itemRowId),
     );
   }
 
@@ -1431,7 +1570,9 @@ export class Storage
 
       if (pr.linkedItems.length > 0) {
         tx.insert(schema.prItemLinks)
-          .values(pr.linkedItems.map((itemId) => ({ prId: pr.id, itemId })))
+          .values(
+            pr.linkedItems.map((itemRowId) => ({ prId: pr.id, itemRowId })),
+          )
           .run();
       }
     });
@@ -1439,10 +1580,11 @@ export class Storage
 
   // eslint-disable-next-line @typescript-eslint/require-await
   async getLinkedPullRequests(itemId: string): Promise<PullRequest[]> {
+    const itemRowId = this.resolveRowId(itemId);
     const linkRows = this.db
       .select({ prId: schema.prItemLinks.prId })
       .from(schema.prItemLinks)
-      .where(eq(schema.prItemLinks.itemId, itemId))
+      .where(eq(schema.prItemLinks.itemRowId, itemRowId))
       .all();
 
     if (linkRows.length === 0) return [];
@@ -1463,11 +1605,11 @@ export class Storage
       .where(inArray(schema.prItemLinks.prId, prIds))
       .all();
 
-    const linksByPr = new Map<string, string[]>();
+    const linksByPr = new Map<string, number[]>();
     for (const link of allLinks) {
       const arr = linksByPr.get(link.prId);
-      if (arr) arr.push(link.itemId);
-      else linksByPr.set(link.prId, [link.itemId]);
+      if (arr) arr.push(link.itemRowId);
+      else linksByPr.set(link.prId, [link.itemRowId]);
     }
 
     return prRows.map((row) =>
@@ -1478,31 +1620,42 @@ export class Storage
   // eslint-disable-next-line @typescript-eslint/require-await
   async getLinkedItems(prId: string): Promise<string[]> {
     const rows = this.db
-      .select({ itemId: schema.prItemLinks.itemId })
+      .select({
+        itemRowId: schema.prItemLinks.itemRowId,
+        itemId: schema.workItems.id,
+      })
       .from(schema.prItemLinks)
+      .innerJoin(
+        schema.workItems,
+        eq(schema.prItemLinks.itemRowId, schema.workItems.rowId),
+      )
       .where(eq(schema.prItemLinks.prId, prId))
       .all();
 
-    return rows.map((r) => r.itemId);
+    return rows
+      .map((r) => r.itemId ?? String(r.itemRowId))
+      .filter((id) => id.length > 0);
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
   async linkItem(prId: string, itemId: string): Promise<void> {
+    const itemRowId = this.resolveRowId(itemId);
     this.db
       .insert(schema.prItemLinks)
-      .values({ prId, itemId })
+      .values({ prId, itemRowId })
       .onConflictDoNothing()
       .run();
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
   async unlinkItem(prId: string, itemId: string): Promise<void> {
+    const itemRowId = this.resolveRowId(itemId);
     this.db
       .delete(schema.prItemLinks)
       .where(
         and(
           eq(schema.prItemLinks.prId, prId),
-          eq(schema.prItemLinks.itemId, itemId),
+          eq(schema.prItemLinks.itemRowId, itemRowId),
         ),
       )
       .run();

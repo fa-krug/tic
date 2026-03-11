@@ -22,7 +22,8 @@ describe('end-to-end sync', () => {
   });
 
   it('full cycle: create locally, push, pull, verify', async () => {
-    local = Storage.create(tmpDir, { tempIds: true });
+    local = Storage.create(tmpDir);
+    local.setHasRemoteBackend(true);
     const remote = createMockRemote([]);
     const queue = new SyncQueue(local.getDatabase());
     const manager = new SyncManager(local, remote, queue);
@@ -39,11 +40,12 @@ describe('end-to-end sync', () => {
       parent: null,
       dependsOn: [],
     });
-    expect(item.id.startsWith('local-')).toBe(true);
+    // With remote backend, display ID is null until synced
+    expect(item.id).toBeNull();
 
     queue.append({
       action: 'create',
-      itemId: item.id,
+      itemRowId: item.rowId,
       timestamp: new Date().toISOString(),
     });
 
@@ -53,7 +55,8 @@ describe('end-to-end sync', () => {
 
     const localItems = await local.listWorkItems();
     expect(localItems).toHaveLength(1);
-    expect(localItems[0]!.id.startsWith('local-')).toBe(false);
+    // After sync, display ID should be assigned from remote
+    expect(localItems[0]!.id).not.toBeNull();
     expect(localItems[0]!.title).toBe('E2E Test');
     expect(localItems[0]!.description).toBe('Testing full cycle');
   });
@@ -76,6 +79,7 @@ describe('end-to-end sync', () => {
     });
 
     const remoteItem: WorkItem = {
+      rowId: 1,
       id: '1',
       title: 'Remote Version',
       type: 'task',

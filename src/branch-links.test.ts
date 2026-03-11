@@ -1,41 +1,16 @@
 import { describe, it, expect } from 'vitest';
 import { linkBranchToItem } from './branch-links.js';
-import type { WorkItem } from './types.js';
+import { makeWorkItem } from './test-helpers.js';
 
 describe('linkBranchToItem', () => {
-  const items: WorkItem[] = [
-    {
-      id: '42',
-      title: 'Add login page',
-      type: 'task',
-      status: 'open',
-      iteration: '',
-      priority: 'medium',
-      assignee: '',
-      labels: [],
-      created: '',
-      updated: '',
-      description: '',
-      comments: [],
-      parent: null,
-      dependsOn: [],
-    },
-    {
+  const items = [
+    makeWorkItem(1, { id: '42', title: 'Add login page', status: 'open' }),
+    makeWorkItem(2, {
       id: '100',
       title: 'Fix bug',
       type: 'bug',
       status: 'open',
-      iteration: '',
-      priority: 'medium',
-      assignee: '',
-      labels: [],
-      created: '',
-      updated: '',
-      description: '',
-      comments: [],
-      parent: null,
-      dependsOn: [],
-    },
+    }),
   ];
 
   it('matches tic/{id}-{slug} pattern', () => {

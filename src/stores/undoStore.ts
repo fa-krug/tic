@@ -16,9 +16,9 @@ export interface UndoEntry {
   type: UndoActionType;
   label: string;
   itemSnapshots: WorkItem[];
-  syncItemIds: string[];
+  syncItemRowIds: number[];
   syncAction: QueueAction;
-  createdIds?: string[];
+  createdRowIds?: number[];
 }
 
 const MAX_DEPTH = 5;

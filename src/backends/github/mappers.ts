@@ -37,6 +37,7 @@ export function mapCommentToComment(ghComment: GhComment): Comment {
 
 export function mapIssueToWorkItem(ghIssue: GhIssue): WorkItem {
   return {
+    rowId: ghIssue.number,
     id: String(ghIssue.number),
     title: ghIssue.title,
     description: ghIssue.body ?? '',
@@ -48,7 +49,7 @@ export function mapIssueToWorkItem(ghIssue: GhIssue): WorkItem {
     priority: 'medium',
     created: ghIssue.createdAt,
     updated: ghIssue.updatedAt,
-    parent: ghIssue.parent ? String(ghIssue.parent.number) : null,
+    parent: ghIssue.parent ? ghIssue.parent.number : null,
     dependsOn: [],
     comments: ghIssue.comments.nodes.map(mapCommentToComment),
   };

@@ -26,13 +26,13 @@ function ghStateToPrStatus(gh: GhPullRequest): PullRequestStatus {
  * Extract linked issue numbers from PR body.
  * Matches: closes #N, fixes #N, resolves #N (case-insensitive)
  */
-export function extractLinkedIssues(body: string | null): string[] {
+export function extractLinkedIssues(body: string | null): number[] {
   if (!body) return [];
   const regex = /(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#(\d+)/gi;
-  const ids = new Set<string>();
+  const ids = new Set<number>();
   let match;
   while ((match = regex.exec(body)) !== null) {
-    ids.add(match[1]!);
+    ids.add(Number(match[1]!));
   }
   return [...ids];
 }

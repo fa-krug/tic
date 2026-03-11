@@ -24,7 +24,7 @@ export class SyncQueue implements SyncQueueAdapter {
     return {
       pending: rows.map((row) => ({
         action: row.action as QueueAction,
-        itemId: row.itemId,
+        itemRowId: row.itemRowId,
         timestamp: row.timestamp,
         ...(row.commentData
           ? {
@@ -40,12 +40,12 @@ export class SyncQueue implements SyncQueueAdapter {
   }
 
   append(entry: QueueEntry): void {
-    // Deduplicate: delete existing with same itemId + action, then insert
+    // Deduplicate: delete existing with same itemRowId + action, then insert
     this.db
       .delete(s.syncQueue)
       .where(
         and(
-          eq(s.syncQueue.itemId, entry.itemId),
+          eq(s.syncQueue.itemRowId, entry.itemRowId),
           eq(s.syncQueue.action, entry.action),
         ),
       )
@@ -55,7 +55,7 @@ export class SyncQueue implements SyncQueueAdapter {
       .insert(s.syncQueue)
       .values({
         action: entry.action,
-        itemId: entry.itemId,
+        itemRowId: entry.itemRowId,
         timestamp: entry.timestamp,
         commentData: entry.commentData
           ? JSON.stringify(entry.commentData)
@@ -65,22 +65,25 @@ export class SyncQueue implements SyncQueueAdapter {
       .run();
   }
 
-  remove(itemId: string, action: QueueAction): void {
-    this.db
-      .delete(s.syncQueue)
-      .where(
-        and(eq(s.syncQueue.itemId, itemId), eq(s.syncQueue.action, action)),
-      )
-      .run();
-  }
-
-  removeByIds(itemIds: string[], action: QueueAction): void {
-    if (itemIds.length === 0) return;
+  remove(itemRowId: number, action: QueueAction): void {
     this.db
       .delete(s.syncQueue)
       .where(
         and(
-          inArray(s.syncQueue.itemId, itemIds),
+          eq(s.syncQueue.itemRowId, itemRowId),
+          eq(s.syncQueue.action, action),
+        ),
+      )
+      .run();
+  }
+
+  removeByRowIds(itemRowIds: number[], action: QueueAction): void {
+    if (itemRowIds.length === 0) return;
+    this.db
+      .delete(s.syncQueue)
+      .where(
+        and(
+          inArray(s.syncQueue.itemRowId, itemRowIds),
           eq(s.syncQueue.action, action),
         ),
       )
@@ -89,14 +92,6 @@ export class SyncQueue implements SyncQueueAdapter {
 
   clear(): void {
     this.db.delete(s.syncQueue).run();
-  }
-
-  renameItem(oldId: string, newId: string): void {
-    this.db
-      .update(s.syncQueue)
-      .set({ itemId: newId })
-      .where(eq(s.syncQueue.itemId, oldId))
-      .run();
   }
 
   claimNext(): QueueEntry | null {
@@ -113,7 +108,7 @@ export class SyncQueue implements SyncQueueAdapter {
       tx.delete(s.syncQueue).where(eq(s.syncQueue.id, row.id)).run();
       return {
         action: row.action as QueueAction,
-        itemId: row.itemId,
+        itemRowId: row.itemRowId,
         timestamp: row.timestamp,
         ...(row.commentData
           ? {

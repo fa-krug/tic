@@ -1,6 +1,6 @@
 export function getMarkedDistribution(
-  markedIds: Set<string>,
-  treeItems: { id: string }[],
+  markedIds: Set<number>,
+  treeItems: { rowId: number }[],
   viewportStart: number,
   viewportEnd: number,
 ): { above: number; below: number } {
@@ -11,7 +11,7 @@ export function getMarkedDistribution(
 
   for (let i = 0; i < treeItems.length; i++) {
     const item = treeItems[i];
-    if (!item || !markedIds.has(item.id)) continue;
+    if (!item || !markedIds.has(item.rowId)) continue;
     if (i < viewportStart) above++;
     else if (i >= viewportEnd) below++;
   }

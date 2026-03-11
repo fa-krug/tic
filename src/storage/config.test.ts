@@ -33,7 +33,6 @@ describe('drizzle config', () => {
     expect(config.iterations).toEqual([
       { name: 'default', startDate: null, endDate: null },
     ]);
-    expect(config.next_id).toBe(1);
     expect(config.branchMode).toBe('worktree');
     expect(config.autoUpdate).toBe(true);
     expect(config.copyToClipboard).toBe(true);
@@ -165,7 +164,6 @@ describe('drizzle config', () => {
         { name: 'sprint-1', startDate: null, endDate: null },
         { name: 'sprint-2', startDate: null, endDate: null },
       ],
-      next_id: 10,
       branchMode: 'branch',
       autoUpdate: false,
       branchCommand: 'echo hello',
@@ -180,11 +178,6 @@ describe('drizzle config', () => {
     const config = readConfig(db);
     // Updated fields
     expect(config.statuses).toEqual(['new', 'done']);
-    // next_id is NOT overwritten by config updates — it is managed
-    // atomically by Storage.createWorkItem() to prevent stale values.
-    // seedDefaults() set it to 1, and writeConfig/updateConfig preserve
-    // the DB value on conflict updates.
-    expect(config.next_id).toBe(1);
     // Unchanged fields
     expect(config.types).toEqual(['bug', 'feature']);
     expect(config.current_iteration).toBe('sprint-1');

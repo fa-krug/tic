@@ -371,7 +371,7 @@ export class GitHubBackend
 
     if (data.parent) {
       try {
-        await this.addSubIssue(data.parent, id);
+        await this.addSubIssue(String(data.parent), id);
       } catch (err) {
         try {
           await this.deleteWorkItem(id);
@@ -398,10 +398,10 @@ export class GitHubBackend
       const current = await this.getWorkItem(id);
       try {
         if (current.parent && current.parent !== data.parent) {
-          await this.removeSubIssue(current.parent, id);
+          await this.removeSubIssue(String(current.parent), id);
         }
         if (data.parent && data.parent !== current.parent) {
-          await this.addSubIssue(data.parent, id);
+          await this.addSubIssue(String(data.parent), id);
         }
       } catch (err) {
         throw new Error(

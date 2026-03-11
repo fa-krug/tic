@@ -4,7 +4,7 @@ import { Breadcrumbs } from './Breadcrumbs.js';
 import { formStackStore } from '../stores/formStackStore.js';
 import type { FormDraft } from '../stores/formStackStore.js';
 
-const createDraft = (itemId: string | null, itemTitle: string): FormDraft => ({
+const createDraft = (itemId: number | null, itemTitle: string): FormDraft => ({
   itemId,
   itemTitle,
   fields: {
@@ -47,8 +47,8 @@ describe('Breadcrumbs', () => {
   });
 
   it('renders breadcrumb trail when stack has multiple items', () => {
-    formStackStore.getState().push(createDraft('item-1', 'First Item'));
-    formStackStore.getState().push(createDraft('item-2', 'Second Item'));
+    formStackStore.getState().push(createDraft(1, 'First Item'));
+    formStackStore.getState().push(createDraft(2, 'Second Item'));
 
     const { lastFrame } = render(<Breadcrumbs />);
     expect(lastFrame()).toContain('First Item');
@@ -57,7 +57,7 @@ describe('Breadcrumbs', () => {
   });
 
   it('shows (new) for items without id', () => {
-    formStackStore.getState().push(createDraft('item-1', 'First Item'));
+    formStackStore.getState().push(createDraft(1, 'First Item'));
     formStackStore.getState().push(createDraft(null, '(new)'));
 
     const { lastFrame } = render(<Breadcrumbs />);
@@ -68,12 +68,9 @@ describe('Breadcrumbs', () => {
     formStackStore
       .getState()
       .push(
-        createDraft(
-          'item-1',
-          'This is a very long title that should be truncated',
-        ),
+        createDraft(1, 'This is a very long title that should be truncated'),
       );
-    formStackStore.getState().push(createDraft('item-2', 'Short'));
+    formStackStore.getState().push(createDraft(2, 'Short'));
 
     const { lastFrame } = render(<Breadcrumbs maxTitleLength={20} />);
     expect(lastFrame()).toContain('...');

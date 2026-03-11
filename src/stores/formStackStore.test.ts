@@ -42,23 +42,23 @@ beforeEach(() => {
 describe('formStackStore', () => {
   describe('push', () => {
     it('adds draft to stack', () => {
-      const draft = createDraft({ itemId: 'item-1', itemTitle: 'Test' });
+      const draft = createDraft({ itemId: 1, itemTitle: 'Test' });
       formStackStore.getState().push(draft);
       expect(formStackStore.getState().stack).toHaveLength(1);
       expect(formStackStore.getState().stack[0]).toEqual(draft);
     });
 
     it('builds up stack with multiple pushes', () => {
-      formStackStore.getState().push(createDraft({ itemId: 'item-1' }));
-      formStackStore.getState().push(createDraft({ itemId: 'item-2' }));
+      formStackStore.getState().push(createDraft({ itemId: 1 }));
+      formStackStore.getState().push(createDraft({ itemId: 2 }));
       expect(formStackStore.getState().stack).toHaveLength(2);
     });
   });
 
   describe('pop', () => {
     it('removes and returns top draft', () => {
-      const draft1 = createDraft({ itemId: 'item-1' });
-      const draft2 = createDraft({ itemId: 'item-2' });
+      const draft1 = createDraft({ itemId: 1 });
+      const draft2 = createDraft({ itemId: 2 });
       formStackStore.getState().push(draft1);
       formStackStore.getState().push(draft2);
 
@@ -73,8 +73,8 @@ describe('formStackStore', () => {
     });
 
     it('preserves focusedField of parent draft after popping child', () => {
-      const parentDraft = createDraft({ itemId: 'item-1', focusedField: 5 });
-      const childDraft = createDraft({ itemId: 'item-2', focusedField: 0 });
+      const parentDraft = createDraft({ itemId: 1, focusedField: 5 });
+      const childDraft = createDraft({ itemId: 2, focusedField: 0 });
       formStackStore.getState().push(parentDraft);
       formStackStore.getState().push(childDraft);
 
@@ -82,13 +82,13 @@ describe('formStackStore', () => {
 
       const restored = formStackStore.getState().currentDraft();
       expect(restored?.focusedField).toBe(5);
-      expect(restored?.itemId).toBe('item-1');
+      expect(restored?.itemId).toBe(1);
     });
   });
 
   describe('currentDraft', () => {
     it('returns top of stack', () => {
-      const draft = createDraft({ itemId: 'item-1' });
+      const draft = createDraft({ itemId: 1 });
       formStackStore.getState().push(draft);
       expect(formStackStore.getState().currentDraft()).toEqual(draft);
     });

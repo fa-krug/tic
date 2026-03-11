@@ -128,7 +128,7 @@ describe('SyncManager PR pull', () => {
 
     queueStore.append({
       action: 'pr-create',
-      itemId: 'pr-1',
+      itemRowId: 0,
       timestamp: new Date().toISOString(),
     });
 

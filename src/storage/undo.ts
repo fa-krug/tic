@@ -8,21 +8,22 @@ import * as s from './schema.js';
 const MAX_DEPTH = 5;
 
 /**
- * Metadata stored as JSON in the undoStack.itemId column.
+ * Metadata stored as JSON in the undoStack.metadata column.
  * The undoItemSnapshot tables are NOT used — all snapshots are
  * serialized into this JSON blob so we can handle bulk operations
  * (multiple snapshots per undo entry) without schema changes.
  */
 interface UndoMetadata {
   label: string;
-  syncItemIds: string[];
+  syncItemRowIds: number[];
   syncAction: QueueAction;
-  createdIds?: string[];
+  createdRowIds?: number[];
   itemSnapshots: SerializedSnapshot[];
 }
 
 interface SerializedSnapshot {
-  id: string;
+  rowId: number;
+  id: string | null;
   title: string;
   type: string;
   status: string;
@@ -31,14 +32,15 @@ interface SerializedSnapshot {
   priority: string;
   assignee: string;
   labels: string[];
-  parent: string | null;
-  dependsOn: string[];
+  parent: number | null;
+  dependsOn: number[];
   created: string;
   updated: string;
 }
 
 function serializeSnapshots(items: WorkItem[]): SerializedSnapshot[] {
   return items.map((snap) => ({
+    rowId: snap.rowId,
     id: snap.id,
     title: snap.title,
     type: snap.type,
@@ -64,14 +66,17 @@ function deserializeSnapshots(snapshots: SerializedSnapshot[]): WorkItem[] {
   }));
 }
 
-function reconstructEntry(row: { action: string; itemId: string }): UndoEntry {
-  const meta = JSON.parse(row.itemId) as UndoMetadata;
+function reconstructEntry(row: {
+  action: string;
+  metadata: string;
+}): UndoEntry {
+  const meta = JSON.parse(row.metadata) as UndoMetadata;
   return {
     type: row.action as UndoActionType,
     label: meta.label,
-    syncItemIds: meta.syncItemIds,
+    syncItemRowIds: meta.syncItemRowIds,
     syncAction: meta.syncAction,
-    createdIds: meta.createdIds,
+    createdRowIds: meta.createdRowIds,
     itemSnapshots: deserializeSnapshots(meta.itemSnapshots),
   };
 }
@@ -86,9 +91,9 @@ export function pushUndoEntry(
 ): UndoEntry | undefined {
   const metadata: UndoMetadata = {
     label: entry.label,
-    syncItemIds: entry.syncItemIds,
+    syncItemRowIds: entry.syncItemRowIds,
     syncAction: entry.syncAction,
-    createdIds: entry.createdIds,
+    createdRowIds: entry.createdRowIds,
     itemSnapshots: serializeSnapshots(entry.itemSnapshots),
   };
 
@@ -98,7 +103,7 @@ export function pushUndoEntry(
     tx.insert(s.undoStack)
       .values({
         action: entry.type,
-        itemId: JSON.stringify(metadata),
+        metadata: JSON.stringify(metadata),
         createdAt: new Date().toISOString(),
       })
       .run();

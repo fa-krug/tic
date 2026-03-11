@@ -21,7 +21,7 @@ export function formatItemForClipboard(
   const lines: string[] = [];
 
   // Title
-  lines.push(`# #${item.id}: ${item.title}`);
+  lines.push(`# #${item.id ?? item.rowId}: ${item.title}`);
   lines.push('');
 
   // Metadata - always include type and status
@@ -134,7 +134,7 @@ export function beginImplementation(
   clipboardOk: boolean;
   commandFailed: boolean;
 } {
-  const slug = slugify(item.id, item.title);
+  const slug = slugify(item.id ?? String(item.rowId), item.title);
   const branch = `tic/${slug}`;
   const resumed = branchExists(branch, repoRoot);
 
@@ -177,7 +177,7 @@ export function beginImplementation(
     // inherit debugger settings that conflict with their own startup.
     const env: Record<string, string | undefined> = {
       ...process.env,
-      TIC_ITEM_ID: item.id,
+      TIC_ITEM_ID: item.id ?? '',
       TIC_ITEM_TITLE: item.title,
       TIC_ITEM_DESCRIPTION: item.description,
       TIC_ITEM_STATUS: item.status,

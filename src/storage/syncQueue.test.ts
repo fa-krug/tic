@@ -7,7 +7,7 @@ import type { QueueEntry } from '../sync/types.js';
 function makeEntry(overrides?: Partial<QueueEntry>): QueueEntry {
   return {
     action: 'create',
-    itemId: '1',
+    itemRowId: 1,
     timestamp: '2025-01-01T00:00:00Z',
     ...overrides,
   };
@@ -38,11 +38,11 @@ describe('SyncQueue', () => {
     const result = queue.read();
     expect(result.pending).toHaveLength(1);
     expect(result.pending[0]!.action).toBe('create');
-    expect(result.pending[0]!.itemId).toBe('1');
+    expect(result.pending[0]!.itemRowId).toBe(1);
     expect(result.pending[0]!.timestamp).toBe('2025-01-01T00:00:00Z');
   });
 
-  it('deduplicates by itemId and action', () => {
+  it('deduplicates by itemRowId and action', () => {
     queue.append(makeEntry({ timestamp: 'old' }));
     queue.append(makeEntry({ timestamp: 'new' }));
     const result = queue.read();
@@ -83,49 +83,40 @@ describe('SyncQueue', () => {
   });
 
   it('remove deletes matching entry', () => {
-    queue.append(makeEntry({ itemId: '1', action: 'create' }));
-    queue.append(makeEntry({ itemId: '2', action: 'update' }));
-    queue.remove('1', 'create');
+    queue.append(makeEntry({ itemRowId: 1, action: 'create' }));
+    queue.append(makeEntry({ itemRowId: 2, action: 'update' }));
+    queue.remove(1, 'create');
     const result = queue.read();
     expect(result.pending).toHaveLength(1);
-    expect(result.pending[0]!.itemId).toBe('2');
+    expect(result.pending[0]!.itemRowId).toBe(2);
   });
 
-  it('removeByIds batch deletes', () => {
-    queue.append(makeEntry({ itemId: '1', action: 'delete' }));
-    queue.append(makeEntry({ itemId: '2', action: 'delete' }));
-    queue.append(makeEntry({ itemId: '3', action: 'delete' }));
-    queue.removeByIds(['1', '3'], 'delete');
+  it('removeByRowIds batch deletes', () => {
+    queue.append(makeEntry({ itemRowId: 1, action: 'delete' }));
+    queue.append(makeEntry({ itemRowId: 2, action: 'delete' }));
+    queue.append(makeEntry({ itemRowId: 3, action: 'delete' }));
+    queue.removeByRowIds([1, 3], 'delete');
     const result = queue.read();
     expect(result.pending).toHaveLength(1);
-    expect(result.pending[0]!.itemId).toBe('2');
+    expect(result.pending[0]!.itemRowId).toBe(2);
   });
 
-  it('removeByIds with empty array is no-op', () => {
+  it('removeByRowIds with empty array is no-op', () => {
     queue.append(makeEntry());
-    queue.removeByIds([], 'create');
+    queue.removeByRowIds([], 'create');
     const result = queue.read();
     expect(result.pending).toHaveLength(1);
-  });
-
-  it('renameItem updates itemId', () => {
-    queue.append(makeEntry({ itemId: 'local-1', action: 'create' }));
-    queue.append(makeEntry({ itemId: 'local-1', action: 'update' }));
-    queue.renameItem('local-1', '42');
-    const result = queue.read();
-    expect(result.pending).toHaveLength(2);
-    expect(result.pending.every((e) => e.itemId === '42')).toBe(true);
   });
 
   it('claimNext atomically removes entry', () => {
-    queue.append(makeEntry({ itemId: '1' }));
-    queue.append(makeEntry({ itemId: '2', action: 'update' }));
+    queue.append(makeEntry({ itemRowId: 1 }));
+    queue.append(makeEntry({ itemRowId: 2, action: 'update' }));
     const claimed = queue.claimNext();
     expect(claimed).toBeDefined();
-    expect(claimed!.itemId).toBe('1');
+    expect(claimed!.itemRowId).toBe(1);
     const result = queue.read();
     expect(result.pending).toHaveLength(1);
-    expect(result.pending[0]!.itemId).toBe('2');
+    expect(result.pending[0]!.itemRowId).toBe(2);
   });
 
   it('claimNext returns null when empty', () => {
@@ -134,18 +125,18 @@ describe('SyncQueue', () => {
   });
 
   it('clear removes all entries', () => {
-    queue.append(makeEntry({ itemId: '1' }));
-    queue.append(makeEntry({ itemId: '2', action: 'update' }));
+    queue.append(makeEntry({ itemRowId: 1 }));
+    queue.append(makeEntry({ itemRowId: 2, action: 'update' }));
     queue.clear();
     const result = queue.read();
     expect(result.pending).toEqual([]);
   });
 
   it('preserves insertion order', () => {
-    queue.append(makeEntry({ itemId: '3', action: 'create' }));
-    queue.append(makeEntry({ itemId: '1', action: 'update' }));
-    queue.append(makeEntry({ itemId: '2', action: 'delete' }));
+    queue.append(makeEntry({ itemRowId: 3, action: 'create' }));
+    queue.append(makeEntry({ itemRowId: 1, action: 'update' }));
+    queue.append(makeEntry({ itemRowId: 2, action: 'delete' }));
     const result = queue.read();
-    expect(result.pending.map((e) => e.itemId)).toEqual(['3', '1', '2']);
+    expect(result.pending.map((e) => e.itemRowId)).toEqual([3, 1, 2]);
   });
 });

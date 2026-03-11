@@ -19,11 +19,11 @@ export function buildTree(
   allItems: WorkItem[],
   activeType: string,
 ): TreeItem[] {
-  // Build a map of ALL items for parent lookups
-  const allItemMap = new Map(allItems.map((i) => [i.id, i]));
+  // Build a map of ALL items for parent lookups (keyed by rowId)
+  const allItemMap = new Map(allItems.map((i) => [i.rowId, i]));
 
-  // Build children map from ALL items (children grouped by parent ID)
-  const childrenMap = new Map<string | null, WorkItem[]>();
+  // Build children map from ALL items (children grouped by parent rowId)
+  const childrenMap = new Map<number | null, WorkItem[]>();
   for (const item of allItems) {
     const parentId =
       item.parent !== null && allItemMap.has(item.parent) ? item.parent : null;
@@ -31,11 +31,11 @@ export function buildTree(
     childrenMap.get(parentId)!.push(item);
   }
 
-  // Set of IDs in the filtered (same-type) set — used to identify roots
-  const filteredIds = new Set(filteredItems.map((i) => i.id));
+  // Set of rowIds in the filtered (same-type) set — used to identify roots
+  const filteredIds = new Set(filteredItems.map((i) => i.rowId));
 
-  // Determine which IDs have children (in allItems)
-  const idsWithChildren = new Set<string>();
+  // Determine which rowIds have children (in allItems)
+  const idsWithChildren = new Set<number>();
   for (const item of allItems) {
     if (item.parent !== null && allItemMap.has(item.parent)) {
       idsWithChildren.add(item.parent);
@@ -44,11 +44,11 @@ export function buildTree(
 
   const result: TreeItem[] = [];
 
-  function walk(parentId: string | null, depth: number, parentPrefix: string) {
+  function walk(parentId: number | null, depth: number, parentPrefix: string) {
     const children = childrenMap.get(parentId) ?? [];
     children.forEach((child, idx) => {
       // At depth 0, only include items from the filtered set (same type)
-      if (depth === 0 && !filteredIds.has(child.id)) return;
+      if (depth === 0 && !filteredIds.has(child.rowId)) return;
 
       const isLast = idx === children.length - 1;
       let prefix = '';
@@ -61,12 +61,12 @@ export function buildTree(
         depth,
         prefix,
         isCrossType: child.type !== activeType,
-        hasChildren: idsWithChildren.has(child.id),
+        hasChildren: idsWithChildren.has(child.rowId),
       });
 
       const nextParentPrefix =
         depth > 0 ? parentPrefix + (isLast ? '  ' : '│ ') : '';
-      walk(child.id, depth + 1, nextParentPrefix);
+      walk(child.rowId, depth + 1, nextParentPrefix);
     });
   }
 
@@ -87,12 +87,14 @@ function compareValues(a: WorkItem, b: WorkItem, entry: SortEntry): number {
 
   switch (column) {
     case 'id': {
-      const aNum = Number(a.id);
-      const bNum = Number(b.id);
+      const aId = a.id ?? '';
+      const bId = b.id ?? '';
+      const aNum = Number(aId);
+      const bNum = Number(bId);
       if (!isNaN(aNum) && !isNaN(bNum)) {
         result = aNum - bNum;
       } else {
-        result = a.id.localeCompare(b.id);
+        result = aId.localeCompare(bId);
       }
       break;
     }
@@ -135,7 +137,7 @@ export function sortTree(
   if (sortStack.length === 0) return treeItems;
 
   // Group items by parent (depth 0 items have parent null)
-  const groups = new Map<string | null, { index: number; item: TreeItem }[]>();
+  const groups = new Map<number | null, { index: number; item: TreeItem }[]>();
   for (let i = 0; i < treeItems.length; i++) {
     const t = treeItems[i]!;
     const key = t.depth === 0 ? null : t.item.parent;
@@ -156,7 +158,7 @@ export function sortTree(
 
   // Reconstruct the flat list in tree order (DFS)
   const result: TreeItem[] = [];
-  const childMap = new Map<string | null, TreeItem[]>();
+  const childMap = new Map<number | null, TreeItem[]>();
   for (const [key, siblings] of groups) {
     childMap.set(
       key,
@@ -164,12 +166,12 @@ export function sortTree(
     );
   }
 
-  function walk(parentId: string | null) {
+  function walk(parentId: number | null) {
     const children = childMap.get(parentId);
     if (!children) return;
     for (const child of children) {
       result.push(child);
-      walk(child.item.id);
+      walk(child.item.rowId);
     }
   }
 

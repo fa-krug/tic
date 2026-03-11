@@ -320,11 +320,11 @@ export function createProgram(): Command {
       if (queue && syncManager) {
         await queue.append({
           action: 'create',
-          itemId: wi.id,
+          itemRowId: wi.rowId,
           timestamp: new Date().toISOString(),
         });
         const pushResult = await syncManager.pushPending();
-        const resolvedId = pushResult.idMappings.get(wi.id);
+        const resolvedId = pushResult.idMappings.get(wi.rowId);
         if (resolvedId) {
           wi = await backend.getWorkItem(resolvedId);
         }
@@ -370,7 +370,7 @@ export function createProgram(): Command {
       if (queue && syncManager) {
         await queue.append({
           action: 'update',
-          itemId: wi.id,
+          itemRowId: wi.rowId,
           timestamp: new Date().toISOString(),
         });
         await syncManager.pushPending();
@@ -389,12 +389,18 @@ export function createProgram(): Command {
       const parentOpts = program.opts<GlobalOpts>();
       try {
         const { backend, syncManager, queue } = await createBackendAndSync();
+        // Resolve rowId before delete
+        let itemRowId: number | undefined;
+        if (queue && syncManager) {
+          const item = await backend.getWorkItem(idStr);
+          itemRowId = item.rowId;
+        }
         const { runItemDelete } = await import('./commands/item.js');
         await runItemDelete(backend, idStr);
-        if (queue && syncManager) {
+        if (queue && syncManager && itemRowId !== undefined) {
           await queue.append({
             action: 'delete',
-            itemId: idStr,
+            itemRowId,
             timestamp: new Date().toISOString(),
           });
           await syncManager.pushPending();
@@ -425,9 +431,10 @@ export function createProgram(): Command {
           const { runItemComment } = await import('./commands/item.js');
           const comment = await runItemComment(backend, idStr, text, opts);
           if (queue && syncManager) {
+            const item = await backend.getWorkItem(idStr);
             await queue.append({
               action: 'comment',
-              itemId: idStr,
+              itemRowId: item.rowId,
               timestamp: new Date().toISOString(),
               commentData: { author: comment.author, body: comment.body },
             });

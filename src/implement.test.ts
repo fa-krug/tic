@@ -9,6 +9,7 @@ import { branchExists, worktreeExists } from './git.js';
 
 function makeItem(overrides: Partial<WorkItem> = {}): WorkItem {
   return {
+    rowId: 42,
     id: '42',
     title: 'Add user authentication',
     type: 'feature',
@@ -30,8 +31,8 @@ function makeItem(overrides: Partial<WorkItem> = {}): WorkItem {
 describe('formatItemForClipboard', () => {
   it('formats a full item with all fields', () => {
     const item = makeItem({
-      parent: '10',
-      dependsOn: ['38', '41'],
+      parent: 10,
+      dependsOn: [38, 41],
     });
     const comments: Comment[] = [
       { author: 'skrug', date: '2026-01-30', body: 'Use bcrypt.' },

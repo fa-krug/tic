@@ -57,7 +57,7 @@ const EMPTY_VIEWS: SavedView[] = [];
 
 function buildWorkItemColumns(
   capabilities: BackendCapabilities,
-  collapsedIds: Set<string>,
+  collapsedIds: Set<number>,
   selectionFg: string,
 ): ColumnDef<TreeItem>[] {
   const columns: ColumnDef<TreeItem>[] = [];
@@ -75,7 +75,7 @@ function buildWorkItemColumns(
         bold={selected}
         dimColor={ti.isCrossType && !selected}
       >
-        {ti.item.id}
+        {ti.item.id ?? '\u00B7'}
       </Text>
     ),
   });
@@ -90,7 +90,7 @@ function buildWorkItemColumns(
     render: (ti, selected) => {
       const { item, prefix, isCrossType, hasChildren } = ti;
       const collapseIndicator = hasChildren
-        ? collapsedIds.has(item.id)
+        ? collapsedIds.has(item.rowId)
           ? '\u25B6 '
           : '\u25BC '
         : '  ';
@@ -227,14 +227,33 @@ type BulkAction =
   | 'labels'
   | 'delete';
 
+/** Get display IDs (strings) for target items. Used for backend API calls. */
 export function getTargetIds(
-  markedIds: Set<string>,
-  cursorItem: { id: string } | undefined,
+  markedIds: Set<number>,
+  cursorItem: WorkItem | undefined,
+  allItems: WorkItem[],
 ): string[] {
+  if (markedIds.size > 0) {
+    // Look up display IDs from rowIds
+    const ids: string[] = [];
+    for (const rowId of markedIds) {
+      const item = allItems.find((i) => i.rowId === rowId);
+      if (item?.id) ids.push(item.id);
+    }
+    return ids;
+  }
+  return cursorItem?.id ? [cursorItem.id] : [];
+}
+
+/** Get rowIds for target items. Used for undo entries and store operations. */
+export function getTargetRowIds(
+  markedIds: Set<number>,
+  cursorItem: WorkItem | undefined,
+): number[] {
   if (markedIds.size > 0) {
     return [...markedIds];
   }
-  return cursorItem ? [cursorItem.id] : [];
+  return cursorItem ? [cursorItem.rowId] : [];
 }
 
 export function WorkItemList() {
@@ -433,11 +452,17 @@ export function WorkItemList() {
 
   const queue = useBackendDataStore((s) => s.queue);
 
-  const queueWrite = async (action: QueueAction, itemId: string) => {
+  /** Look up the rowId for a display ID. Returns -1 if not found. */
+  const rowIdOf = (displayId: string): number => {
+    const item = allItems.find((i) => i.id === displayId);
+    return item?.rowId ?? -1;
+  };
+
+  const queueWrite = async (action: QueueAction, itemRowId: number) => {
     if (queue) {
       await queue.append({
         action,
-        itemId,
+        itemRowId,
         timestamp: new Date().toISOString(),
       });
       syncManager?.pushPending().catch((err: unknown) => {
@@ -456,7 +481,7 @@ export function WorkItemList() {
       type: 'update',
       label,
       itemSnapshots: snapshots,
-      syncItemIds: [...targetIds],
+      syncItemRowIds: snapshots.map((s) => s.rowId),
       syncAction: 'update',
     });
   };
@@ -506,7 +531,10 @@ export function WorkItemList() {
   ]);
 
   const parentSuggestions = useMemo(
-    () => allItems.map((item) => `${item.id} - ${item.title}`),
+    () =>
+      allItems
+        .filter((item) => item.id !== null)
+        .map((item) => `${item.id} - ${item.title}`),
     [allItems],
   );
 
@@ -518,9 +546,9 @@ export function WorkItemList() {
   // Derive collapsedIds: all parents minus explicitly expanded ones
   const collapsedIds = useMemo(() => {
     const parentIds = new Set(
-      fullTree.filter((t) => t.hasChildren).map((t) => t.item.id),
+      fullTree.filter((t) => t.hasChildren).map((t) => t.item.rowId),
     );
-    const collapsed = new Set<string>();
+    const collapsed = new Set<number>();
     for (const id of parentIds) {
       if (!expandedIds.has(id)) {
         collapsed.add(id);
@@ -537,7 +565,7 @@ export function WorkItemList() {
       if (skipDepth !== null && t.depth > skipDepth) continue;
       skipDepth = null;
       result.push(t);
-      if (collapsedIds.has(t.item.id)) {
+      if (collapsedIds.has(t.item.rowId)) {
         skipDepth = t.depth;
       }
     }
@@ -623,14 +651,15 @@ export function WorkItemList() {
       }
       if (key.return) {
         const item = treeItems[cursor]?.item;
-        if (item) {
+        if (item && item.id) {
+          const displayId = item.id;
           editorStore.getState().init(item.description ?? '', {
             returnScreen: 'list',
             onSave: (content: string) => {
               const state = backendDataStore.getState();
               if (state.backend) {
                 void state.backend
-                  .cachedUpdateWorkItem(item.id, { description: content })
+                  .cachedUpdateWorkItem(displayId, { description: content })
                   .then(() => backendDataStore.getState().refresh());
               }
             },
@@ -695,7 +724,7 @@ export function WorkItemList() {
         const start = Math.min(anchor, newCursor);
         const end = Math.max(anchor, newCursor);
         setMarkedIds(
-          new Set(treeItems.slice(start, end + 1).map((t) => t.item.id)),
+          new Set(treeItems.slice(start, end + 1).map((t) => t.item.rowId)),
         );
         clearWarning();
       }
@@ -732,20 +761,20 @@ export function WorkItemList() {
         if (
           current &&
           current.hasChildren &&
-          collapsedIds.has(current.item.id)
+          collapsedIds.has(current.item.rowId)
         ) {
-          toggleExpanded(current.item.id);
+          toggleExpanded(current.item.rowId);
         }
       }
 
       if (matchesCommand('list-collapse', input, key) && treeItems.length > 0) {
         const current = treeItems[cursor];
         if (current) {
-          if (current.hasChildren && !collapsedIds.has(current.item.id)) {
-            toggleExpanded(current.item.id);
+          if (current.hasChildren && !collapsedIds.has(current.item.rowId)) {
+            toggleExpanded(current.item.rowId);
           } else if (current.depth > 0 && current.item.parent) {
             const parentIdx = treeItems.findIndex(
-              (t) => t.item.id === current.item.parent,
+              (t) => t.item.rowId === current.item.parent,
             );
             if (parentIdx >= 0) setCursor(parentIdx);
           }
@@ -754,7 +783,7 @@ export function WorkItemList() {
 
       if (matchesCommand('edit', input, key) && treeItems.length > 0) {
         setFormMode('item');
-        selectWorkItem(treeItems[cursor]!.item.id);
+        selectWorkItem(treeItems[cursor]!.item.rowId);
         navigate('form');
       }
 
@@ -764,7 +793,11 @@ export function WorkItemList() {
         capabilities.iterations &&
         treeItems.length > 0
       ) {
-        const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+        const targetIds = getTargetIds(
+          markedIds,
+          treeItems[cursor]?.item,
+          allItems,
+        );
         if (targetIds.length > 0) {
           openOverlay({ type: 'iteration-picker', targetIds });
         }
@@ -810,7 +843,7 @@ export function WorkItemList() {
         formStackStore.getState().clear();
         navigationStore
           .getState()
-          .setCreateChildParentId(treeItems[cursor].item.id);
+          .setCreateChildParentId(treeItems[cursor].item.rowId);
         setFormMode('item');
         setActiveTemplate(null);
         selectWorkItem(null);
@@ -818,7 +851,11 @@ export function WorkItemList() {
       }
 
       if (matchesCommand('delete', input, key) && treeItems.length > 0) {
-        const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+        const targetIds = getTargetIds(
+          markedIds,
+          treeItems[cursor]?.item,
+          allItems,
+        );
         if (targetIds.length > 0) {
           openOverlay({ type: 'delete-confirm', targetIds });
         }
@@ -831,40 +868,41 @@ export function WorkItemList() {
           if (entry.type === 'delete') {
             if (isSoftDeleteBackend(backend)) {
               for (const snap of entry.itemSnapshots) {
-                await backend.restoreWorkItem(snap.id);
+                if (snap.id) await backend.restoreWorkItem(snap.id);
               }
             }
             if (queue) {
-              await queue.removeByIds(entry.syncItemIds, 'delete');
+              await queue.removeByRowIds(entry.syncItemRowIds, 'delete');
             }
             refreshData();
             setToast(
               entry.itemSnapshots.length === 1
-                ? `Restored #${entry.itemSnapshots[0]!.id}`
+                ? `Restored #${entry.itemSnapshots[0]!.id ?? entry.itemSnapshots[0]!.rowId}`
                 : `Restored ${entry.itemSnapshots.length} items`,
             );
           } else if (entry.type === 'create') {
-            for (const id of entry.createdIds ?? []) {
-              await backend.cachedDeleteWorkItem(id);
+            for (const rowId of entry.createdRowIds ?? []) {
+              const item = allItems.find((i) => i.rowId === rowId);
+              if (item?.id) await backend.cachedDeleteWorkItem(item.id);
             }
             if (queue) {
-              await queue.removeByIds(entry.syncItemIds, 'create');
+              await queue.removeByRowIds(entry.syncItemRowIds, 'create');
             }
             refreshData();
             setToast(
-              (entry.createdIds?.length ?? 0) === 1
-                ? `Undid create #${entry.createdIds?.[0]}`
-                : `Undid create of ${entry.createdIds?.length} items`,
+              (entry.createdRowIds?.length ?? 0) === 1
+                ? `Undid create #${entry.createdRowIds?.[0]}`
+                : `Undid create of ${entry.createdRowIds?.length} items`,
             );
           } else if (entry.type === 'update') {
             for (const snap of entry.itemSnapshots) {
-              await backend.cachedUpdateWorkItem(snap.id, snap);
+              if (snap.id) await backend.cachedUpdateWorkItem(snap.id, snap);
             }
             if (queue) {
-              await queue.removeByIds(entry.syncItemIds, 'update');
+              await queue.removeByRowIds(entry.syncItemRowIds, 'update');
             }
             for (const snap of entry.itemSnapshots) {
-              await queueWrite('update', snap.id);
+              await queueWrite('update', snap.rowId);
             }
             refreshData();
             setToast(`Undid ${entry.label}`);
@@ -878,7 +916,7 @@ export function WorkItemList() {
 
       if (matchesCommand('open', input, key) && treeItems.length > 0) {
         setFormMode('item');
-        selectWorkItem(treeItems[cursor]!.item.id);
+        selectWorkItem(treeItems[cursor]!.item.rowId);
         navigate('form');
       }
 
@@ -888,39 +926,43 @@ export function WorkItemList() {
         treeItems.length > 0
       ) {
         const item = treeItems[cursor]!.item;
-        const comments = item.comments;
-        try {
-          const itemUrl = backend?.getItemUrl(item.id) || '';
-          // Suspend terminal for interactive child process
-          process.stdin.setRawMode?.(false);
-          const result = beginImplementation(
-            item,
-            comments,
-            { branchMode, branchCommand, copyToClipboard },
-            process.cwd(),
-            { itemUrl },
-          );
-          // Restore terminal after interactive shell
-          process.stdin.setRawMode?.(true);
-          console.clear();
-          let msg = result.resumed
-            ? `Resumed work on #${item.id}`
-            : `Started work on #${item.id}`;
-          if (result.commandFailed) {
-            msg += ' (branch command failed, fell back to shell)';
+        if (!item.id) {
+          setWarning('Cannot create branch for item without display ID');
+        } else {
+          const comments = item.comments;
+          try {
+            const itemUrl = backend?.getItemUrl(item.id) || '';
+            // Suspend terminal for interactive child process
+            process.stdin.setRawMode?.(false);
+            const result = beginImplementation(
+              item,
+              comments,
+              { branchMode, branchCommand, copyToClipboard },
+              process.cwd(),
+              { itemUrl },
+            );
+            // Restore terminal after interactive shell
+            process.stdin.setRawMode?.(true);
+            console.clear();
+            let msg = result.resumed
+              ? `Resumed work on #${item.id}`
+              : `Started work on #${item.id}`;
+            if (result.commandFailed) {
+              msg += ' (branch command failed, fell back to shell)';
+            }
+            setWarning(msg);
+          } catch (e) {
+            process.stdin.setRawMode?.(true);
+            console.clear();
+            setWarning(
+              e instanceof Error ? e.message : 'Failed to start implementation',
+            );
           }
-          setWarning(msg);
-        } catch (e) {
-          process.stdin.setRawMode?.(true);
-          console.clear();
-          setWarning(
-            e instanceof Error ? e.message : 'Failed to start implementation',
-          );
+          void backendDataStore
+            .getState()
+            .reloadItem(item.id)
+            .catch(() => {});
         }
-        void backendDataStore
-          .getState()
-          .reloadItem(item.id)
-          .catch(() => {});
       }
 
       if (matchesCommand('status', input, key)) {
@@ -945,7 +987,11 @@ export function WorkItemList() {
       }
 
       if (matchesCommand('list-status', input, key) && treeItems.length > 0) {
-        const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+        const targetIds = getTargetIds(
+          markedIds,
+          treeItems[cursor]?.item,
+          allItems,
+        );
         if (targetIds.length > 0) {
           openOverlay({ type: 'status-picker', targetIds });
         }
@@ -973,7 +1019,7 @@ export function WorkItemList() {
         treeItems.length > 0
       ) {
         const item = treeItems[cursor]?.item;
-        if (item) {
+        if (item && item.id) {
           const cwd = process.cwd();
           const currentBranch = getCurrentBranch(cwd);
           const expectedBranch = `tic/${slugify(item.id, item.title)}`;
@@ -983,7 +1029,7 @@ export function WorkItemList() {
             .createPullRequest({
               title: item.title,
               sourceBranch,
-              linkedItems: [item.id],
+              linkedItems: [item.rowId],
             })
             .then((pr) => {
               setToast(`PR #${String(pr.number)} created`);
@@ -1021,13 +1067,13 @@ export function WorkItemList() {
 
       if (matchesCommand('mark', input, key) && treeItems.length > 0) {
         setRangeAnchor(null);
-        const itemId = treeItems[cursor]!.item.id;
-        toggleMarked(itemId);
+        const itemRowId = treeItems[cursor]!.item.rowId;
+        toggleMarked(itemRowId);
       }
 
       if (matchesCommand('clear-marks', input, key) && treeItems.length > 0) {
         setRangeAnchor(null);
-        const visibleIds = treeItems.map((t) => t.item.id);
+        const visibleIds = treeItems.map((t) => t.item.rowId);
         const allMarked = visibleIds.every((id) => markedIds.has(id));
         if (allMarked) {
           clearMarked();
@@ -1045,7 +1091,11 @@ export function WorkItemList() {
         capabilities.fields.priority &&
         treeItems.length > 0
       ) {
-        const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+        const targetIds = getTargetIds(
+          markedIds,
+          treeItems[cursor]?.item,
+          allItems,
+        );
         if (targetIds.length > 0) {
           openOverlay({ type: 'priority-picker', targetIds });
         }
@@ -1056,7 +1106,11 @@ export function WorkItemList() {
         capabilities.fields.parent &&
         treeItems.length > 0
       ) {
-        const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+        const targetIds = getTargetIds(
+          markedIds,
+          treeItems[cursor]?.item,
+          allItems,
+        );
         if (targetIds.length > 0) {
           openOverlay({ type: 'parent-input', targetIds });
         }
@@ -1067,7 +1121,11 @@ export function WorkItemList() {
         capabilities.fields.assignee &&
         treeItems.length > 0
       ) {
-        const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+        const targetIds = getTargetIds(
+          markedIds,
+          treeItems[cursor]?.item,
+          allItems,
+        );
         if (targetIds.length > 0) {
           openOverlay({ type: 'assignee-input', targetIds });
         }
@@ -1078,7 +1136,11 @@ export function WorkItemList() {
         capabilities.fields.labels &&
         treeItems.length > 0
       ) {
-        const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+        const targetIds = getTargetIds(
+          markedIds,
+          treeItems[cursor]?.item,
+          allItems,
+        );
         if (targetIds.length > 0) {
           openOverlay({ type: 'labels-input', targetIds });
         }
@@ -1089,7 +1151,11 @@ export function WorkItemList() {
         capabilities.customTypes &&
         treeItems.length > 0
       ) {
-        const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+        const targetIds = getTargetIds(
+          markedIds,
+          treeItems[cursor]?.item,
+          allItems,
+        );
         if (targetIds.length > 0) {
           openOverlay({ type: 'type-picker', targetIds });
         }
@@ -1288,20 +1354,24 @@ export function WorkItemList() {
         if (treeItems[cursor]) {
           navigationStore
             .getState()
-            .setCreateChildParentId(treeItems[cursor].item.id);
+            .setCreateChildParentId(treeItems[cursor].item.rowId);
           selectWorkItem(null);
           navigate('form');
         }
         break;
       case 'edit':
         if (treeItems[cursor]) {
-          selectWorkItem(treeItems[cursor].item.id);
+          selectWorkItem(treeItems[cursor].item.rowId);
           navigate('form');
         }
         break;
       case 'delete':
         if (treeItems.length > 0) {
-          const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+          const targetIds = getTargetIds(
+            markedIds,
+            treeItems[cursor]?.item,
+            allItems,
+          );
           if (targetIds.length > 0) {
             openOverlay({ type: 'delete-confirm', targetIds });
           }
@@ -1310,44 +1380,50 @@ export function WorkItemList() {
       case 'open':
         if (treeItems[cursor]) {
           setFormMode('item');
-          selectWorkItem(treeItems[cursor].item.id);
+          selectWorkItem(treeItems[cursor].item.rowId);
           navigate('form');
         }
         break;
       case 'branch':
         if (treeItems[cursor]) {
           const item = treeItems[cursor].item;
-          const comments = item.comments;
-          try {
-            const itemUrl = backend?.getItemUrl(item.id) || '';
-            process.stdin.setRawMode?.(false);
-            const result = beginImplementation(
-              item,
-              comments,
-              { branchMode, branchCommand, copyToClipboard },
-              process.cwd(),
-              { itemUrl },
-            );
-            process.stdin.setRawMode?.(true);
-            console.clear();
-            let msg = result.resumed
-              ? `Resumed work on #${item.id}`
-              : `Started work on #${item.id}`;
-            if (result.commandFailed) {
-              msg += ' (branch command failed, fell back to shell)';
+          if (!item.id) {
+            setWarning('Cannot create branch for item without display ID');
+          } else {
+            const comments = item.comments;
+            try {
+              const itemUrl = backend?.getItemUrl(item.id) || '';
+              process.stdin.setRawMode?.(false);
+              const result = beginImplementation(
+                item,
+                comments,
+                { branchMode, branchCommand, copyToClipboard },
+                process.cwd(),
+                { itemUrl },
+              );
+              process.stdin.setRawMode?.(true);
+              console.clear();
+              let msg = result.resumed
+                ? `Resumed work on #${item.id}`
+                : `Started work on #${item.id}`;
+              if (result.commandFailed) {
+                msg += ' (branch command failed, fell back to shell)';
+              }
+              setWarning(msg);
+            } catch (e) {
+              process.stdin.setRawMode?.(true);
+              console.clear();
+              setWarning(
+                e instanceof Error
+                  ? e.message
+                  : 'Failed to start implementation',
+              );
             }
-            setWarning(msg);
-          } catch (e) {
-            process.stdin.setRawMode?.(true);
-            console.clear();
-            setWarning(
-              e instanceof Error ? e.message : 'Failed to start implementation',
-            );
+            void backendDataStore
+              .getState()
+              .reloadItem(item.id)
+              .catch(() => {});
           }
-          void backendDataStore
-            .getState()
-            .reloadItem(item.id)
-            .catch(() => {});
         }
         break;
       case 'sync':
@@ -1362,7 +1438,11 @@ export function WorkItemList() {
         break;
       case 'set-iteration':
         if (treeItems.length > 0) {
-          const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+          const targetIds = getTargetIds(
+            markedIds,
+            treeItems[cursor]?.item,
+            allItems,
+          );
           if (targetIds.length > 0) {
             openOverlay({ type: 'iteration-picker', targetIds });
           }
@@ -1382,8 +1462,8 @@ export function WorkItemList() {
         break;
       case 'mark':
         if (treeItems[cursor]) {
-          const itemId = treeItems[cursor].item.id;
-          toggleMarked(itemId);
+          const itemRowId = treeItems[cursor].item.rowId;
+          toggleMarked(itemRowId);
         }
         break;
       case 'clear-marks':
@@ -1391,7 +1471,11 @@ export function WorkItemList() {
         break;
       case 'set-priority':
         {
-          const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+          const targetIds = getTargetIds(
+            markedIds,
+            treeItems[cursor]?.item,
+            allItems,
+          );
           if (targetIds.length > 0) {
             openOverlay({ type: 'priority-picker', targetIds });
           }
@@ -1399,7 +1483,11 @@ export function WorkItemList() {
         break;
       case 'set-assignee':
         {
-          const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+          const targetIds = getTargetIds(
+            markedIds,
+            treeItems[cursor]?.item,
+            allItems,
+          );
           if (targetIds.length > 0) {
             openOverlay({ type: 'assignee-input', targetIds });
           }
@@ -1407,7 +1495,11 @@ export function WorkItemList() {
         break;
       case 'set-labels':
         {
-          const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+          const targetIds = getTargetIds(
+            markedIds,
+            treeItems[cursor]?.item,
+            allItems,
+          );
           if (targetIds.length > 0) {
             openOverlay({ type: 'labels-input', targetIds });
           }
@@ -1415,7 +1507,11 @@ export function WorkItemList() {
         break;
       case 'set-type':
         {
-          const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+          const targetIds = getTargetIds(
+            markedIds,
+            treeItems[cursor]?.item,
+            allItems,
+          );
           if (targetIds.length > 0) {
             openOverlay({ type: 'type-picker', targetIds });
           }
@@ -1458,7 +1554,11 @@ export function WorkItemList() {
     }
   };
   const handleBulkAction = (action: BulkAction) => {
-    const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item);
+    const targetIds = getTargetIds(
+      markedIds,
+      treeItems[cursor]?.item,
+      allItems,
+    );
     if (targetIds.length === 0) return;
 
     switch (action) {
@@ -1500,7 +1600,7 @@ export function WorkItemList() {
 
   const workItemColumns = useMemo(() => {
     const maxIdLen = visibleTreeItems.reduce(
-      (max, { item }) => Math.max(max, item.id.length),
+      (max, { item }) => Math.max(max, (item.id ?? '\u00B7').length),
       2,
     );
     const cols = buildWorkItemColumns(
@@ -1554,8 +1654,8 @@ export function WorkItemList() {
         columns={workItemColumns}
         cursor={viewport.visibleCursor}
         terminalWidth={terminalWidth}
-        getKey={(ti) => `${ti.item.id}-${ti.item.type}`}
-        isMarked={(ti) => markedIds.has(ti.item.id)}
+        getKey={(ti) => `${ti.item.rowId}-${ti.item.type}`}
+        isMarked={(ti) => markedIds.has(ti.item.rowId)}
         sortStack={sortStack}
       />
 
@@ -1697,7 +1797,7 @@ export function WorkItemList() {
                   await backend.cachedUpdateWorkItem(id, {
                     status: item.value,
                   });
-                  await queueWrite('update', id);
+                  await queueWrite('update', rowIdOf(id));
                 }
                 for (const id of targetIds) {
                   await backendDataStore.getState().reloadItem(id);
@@ -1736,7 +1836,7 @@ export function WorkItemList() {
                   await backend.cachedUpdateWorkItem(id, {
                     type: item.value,
                   });
-                  await queueWrite('update', id);
+                  await queueWrite('update', rowIdOf(id));
                 }
                 for (const id of targetIds) {
                   await backendDataStore.getState().reloadItem(id);
@@ -1779,7 +1879,7 @@ export function WorkItemList() {
                 pushUpdateUndo(targetIds, 'priority change');
                 for (const id of targetIds) {
                   await backend.cachedUpdateWorkItem(id, { priority });
-                  await queueWrite('update', id);
+                  await queueWrite('update', rowIdOf(id));
                 }
                 for (const id of targetIds) {
                   await backendDataStore.getState().reloadItem(id);
@@ -1838,16 +1938,21 @@ export function WorkItemList() {
               if (!backend) return;
               void (async () => {
                 const raw = item.value.trim();
-                const newParent = raw.includes(' - ')
+                const parentDisplayId = raw.includes(' - ')
                   ? raw.split(' - ')[0]!.trim()
                   : raw;
+                const newParent = rowIdOf(parentDisplayId);
+                if (newParent === -1) {
+                  setWarning(`Parent "${parentDisplayId}" not found`);
+                  return;
+                }
                 try {
                   pushUpdateUndo(targetIds, 'parent change');
                   for (const id of targetIds) {
                     await backend.cachedUpdateWorkItem(id, {
                       parent: newParent,
                     });
-                    await queueWrite('update', id);
+                    await queueWrite('update', rowIdOf(id));
                   }
                   clearWarning();
                 } catch (e) {
@@ -1869,19 +1974,24 @@ export function WorkItemList() {
               if (!backend) return;
               void (async () => {
                 const raw = text.trim();
-                const newParent =
-                  raw === ''
-                    ? null
-                    : raw.includes(' - ')
-                      ? raw.split(' - ')[0]!.trim()
-                      : raw;
+                let newParent: number | null = null;
+                if (raw !== '') {
+                  const parentDisplayId = raw.includes(' - ')
+                    ? raw.split(' - ')[0]!.trim()
+                    : raw;
+                  newParent = rowIdOf(parentDisplayId);
+                  if (newParent === -1) {
+                    setWarning(`Parent "${parentDisplayId}" not found`);
+                    return;
+                  }
+                }
                 try {
                   pushUpdateUndo(targetIds, 'parent change');
                   for (const id of targetIds) {
                     await backend.cachedUpdateWorkItem(id, {
                       parent: newParent,
                     });
-                    await queueWrite('update', id);
+                    await queueWrite('update', rowIdOf(id));
                   }
                   clearWarning();
                 } catch (e) {
@@ -1917,7 +2027,7 @@ export function WorkItemList() {
                   await backend.cachedUpdateWorkItem(id, {
                     assignee: item.value.trim(),
                   });
-                  await queueWrite('update', id);
+                  await queueWrite('update', rowIdOf(id));
                 }
                 for (const id of targetIds) {
                   await backendDataStore.getState().reloadItem(id);
@@ -1945,7 +2055,7 @@ export function WorkItemList() {
                   await backend.cachedUpdateWorkItem(id, {
                     assignee: text.trim(),
                   });
-                  await queueWrite('update', id);
+                  await queueWrite('update', rowIdOf(id));
                 }
                 for (const id of targetIds) {
                   await backendDataStore.getState().reloadItem(id);
@@ -1987,7 +2097,7 @@ export function WorkItemList() {
                 const labels = selected.map((i) => i.value);
                 for (const id of targetIds) {
                   await backend.cachedUpdateWorkItem(id, { labels });
-                  await queueWrite('update', id);
+                  await queueWrite('update', rowIdOf(id));
                 }
                 for (const id of targetIds) {
                   await backendDataStore.getState().reloadItem(id);
@@ -2017,7 +2127,7 @@ export function WorkItemList() {
                   .filter(Boolean);
                 for (const id of targetIds) {
                   await backend.cachedUpdateWorkItem(id, { labels });
-                  await queueWrite('update', id);
+                  await queueWrite('update', rowIdOf(id));
                 }
                 for (const id of targetIds) {
                   await backendDataStore.getState().reloadItem(id);
@@ -2246,7 +2356,7 @@ export function WorkItemList() {
                   await backend.cachedUpdateWorkItem(id, {
                     iteration: item.value,
                   });
-                  await queueWrite('update', id);
+                  await queueWrite('update', rowIdOf(id));
                 }
                 for (const id of targetIds) {
                   await backendDataStore.getState().reloadItem(id);
@@ -2288,7 +2398,7 @@ export function WorkItemList() {
                     } else {
                       await backend.cachedDeleteWorkItem(id);
                     }
-                    await queueWrite('delete', id);
+                    await queueWrite('delete', rowIdOf(id));
                   }
                   if (softDelete) {
                     const evicted = undoStore.getState().pushUndo({
@@ -2298,18 +2408,19 @@ export function WorkItemList() {
                           ? `deleted #${targetIds[0]}`
                           : `deleted ${targetIds.length} items`,
                       itemSnapshots: snapshots,
-                      syncItemIds: [...targetIds],
+                      syncItemRowIds: snapshots.map((s) => s.rowId),
                       syncAction: 'delete',
                     });
                     if (evicted?.type === 'delete') {
                       for (const snap of evicted.itemSnapshots) {
-                        await backend.permanentlyDeleteWorkItem(snap.id);
+                        if (snap.id)
+                          await backend.permanentlyDeleteWorkItem(snap.id);
                       }
                     }
                   }
                   closeOverlay();
                   for (const id of targetIds) {
-                    removeDeletedItem(id);
+                    removeDeletedItem(rowIdOf(id));
                   }
                   setCursor(Math.max(0, cursor - 1));
                   for (const id of targetIds) {

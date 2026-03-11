@@ -435,7 +435,7 @@ export class AzureDevOpsBackend
         current.relations?.forEach((r, i) => {
           if (r.rel === 'System.LinkTypes.Dependency-Reverse') {
             const depId = r.url.match(/\/workitems\/(\d+)$/i)?.[1];
-            if (depId && !newDeps.has(depId)) {
+            if (depId && !newDeps.has(Number(depId))) {
               removeIndices.push(i);
             }
           }

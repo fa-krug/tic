@@ -88,13 +88,13 @@ export function CommandBar({ commands, onCommand, onCancel }: CommandBarProps) {
         .filter(
           (item) =>
             item.title.toLowerCase().includes(q) ||
-            item.id.toLowerCase().includes(q),
+            (item.id !== null && item.id.toLowerCase().includes(q)),
         )
         .slice(0, 5)
         .map((item) => ({
-          id: `issue-${item.id}`,
-          label: `#${item.id} ${item.title}`,
-          value: item.id,
+          id: `issue-${item.rowId}`,
+          label: `#${item.id ?? item.rowId} ${item.title}`,
+          value: String(item.rowId),
           hint: item.type,
           category: 'Issues',
           kind: 'issue' as const,
@@ -129,7 +129,7 @@ export function CommandBar({ commands, onCommand, onCancel }: CommandBarProps) {
           label: r.branch.name,
           value: r.branch.name,
           hint: r.linkedItem
-            ? `#${r.linkedItem.id} ${r.linkedItem.title}`
+            ? `#${r.linkedItem.id ?? r.linkedItem.rowId} ${r.linkedItem.title}`
             : undefined,
           category: 'Branches',
           kind: 'branch' as const,
@@ -145,9 +145,10 @@ export function CommandBar({ commands, onCommand, onCancel }: CommandBarProps) {
     (item: OverlayItem) => {
       setQuery('');
       if (item.kind === 'issue') {
-        const workItem = allSearchItems.find((i) => i.id === item.value);
+        const rowId = Number(item.value);
+        const workItem = allSearchItems.find((i) => i.rowId === rowId);
         if (workItem) {
-          navigationStore.getState().selectWorkItem(workItem.id);
+          navigationStore.getState().selectWorkItem(workItem.rowId);
           if (screen !== 'list') navigate('list');
           navigate('form');
         }

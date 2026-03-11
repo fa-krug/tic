@@ -16,6 +16,7 @@ import type { WorkItem } from '../../types.js';
 
 function makeItem(overrides: Partial<WorkItem> = {}): WorkItem {
   return {
+    rowId: 0,
     id: '1',
     title: 'Test item',
     type: 'issue',
@@ -73,7 +74,7 @@ describe('file sync detection', () => {
     const filePath = path.join(tmpDir, '.tic', 'items', '1.md');
     const raw = fs.readFileSync(filePath, 'utf-8');
     const hash = contentHash(raw);
-    updateSyncState(db, '1', hash);
+    updateSyncState(db, 1, '1', hash);
 
     const result = await detectChanges(db, tmpDir);
     expect(result.changed).toEqual([]);
@@ -85,7 +86,7 @@ describe('file sync detection', () => {
     await writeWorkItem(tmpDir, makeItem({ id: '1' }));
 
     // Store an outdated hash
-    updateSyncState(db, '1', 'old-hash-that-does-not-match');
+    updateSyncState(db, 1, '1', 'old-hash-that-does-not-match');
 
     const result = await detectChanges(db, tmpDir);
     expect(result.changed).toEqual(['1']);
@@ -105,7 +106,7 @@ describe('file sync detection', () => {
 
   it('detects deleted file (hash entry but no file)', async () => {
     // Store a hash for an item that does not exist on disk
-    updateSyncState(db, '99', 'some-hash');
+    updateSyncState(db, 99, '99', 'some-hash');
 
     const result = await detectChanges(db, tmpDir);
     expect(result.deleted).toEqual(['99']);
@@ -118,17 +119,17 @@ describe('file sync detection', () => {
     await writeWorkItem(tmpDir, makeItem({ id: '1' }));
     const file1 = path.join(tmpDir, '.tic', 'items', '1.md');
     const raw1 = fs.readFileSync(file1, 'utf-8');
-    updateSyncState(db, '1', contentHash(raw1));
+    updateSyncState(db, 1, '1', contentHash(raw1));
 
     // Item 2: on disk, stale hash (changed)
     await writeWorkItem(tmpDir, makeItem({ id: '2', title: 'Changed' }));
-    updateSyncState(db, '2', 'stale-hash');
+    updateSyncState(db, 2, '2', 'stale-hash');
 
     // Item 3: on disk, no hash entry (added)
     await writeWorkItem(tmpDir, makeItem({ id: '3', title: 'New' }));
 
     // Item 4: hash entry, no file (deleted)
-    updateSyncState(db, '4', 'orphan-hash');
+    updateSyncState(db, 4, '4', 'orphan-hash');
 
     const result = await detectChanges(db, tmpDir);
     expect(result.changed).toEqual(['2']);
@@ -137,48 +138,64 @@ describe('file sync detection', () => {
   });
 
   it('updateSyncState upserts correctly', () => {
-    updateSyncState(db, 'x', 'hash-v1');
+    updateSyncState(db, 1, 'x', 'hash-v1');
 
     // Verify it was inserted
     const raw1 = db.raw
-      .prepare('SELECT * FROM file_sync_state WHERE item_id = ?')
-      .get('x') as { item_id: string; hash: string; synced_at: string };
+      .prepare('SELECT * FROM file_sync_state WHERE item_row_id = ?')
+      .get(1) as {
+      item_row_id: number;
+      display_id: string;
+      hash: string;
+      synced_at: string;
+    };
     expect(raw1.hash).toBe('hash-v1');
 
     // Update it
-    updateSyncState(db, 'x', 'hash-v2');
+    updateSyncState(db, 1, 'x', 'hash-v2');
     const raw2 = db.raw
-      .prepare('SELECT * FROM file_sync_state WHERE item_id = ?')
-      .get('x') as { item_id: string; hash: string; synced_at: string };
+      .prepare('SELECT * FROM file_sync_state WHERE item_row_id = ?')
+      .get(1) as {
+      item_row_id: number;
+      display_id: string;
+      hash: string;
+      synced_at: string;
+    };
     expect(raw2.hash).toBe('hash-v2');
 
     // Should still be only one row
     const count = db.raw
-      .prepare('SELECT COUNT(*) as cnt FROM file_sync_state WHERE item_id = ?')
-      .get('x') as { cnt: number };
+      .prepare(
+        'SELECT COUNT(*) as cnt FROM file_sync_state WHERE item_row_id = ?',
+      )
+      .get(1) as { cnt: number };
     expect(count.cnt).toBe(1);
   });
 
   it('removeSyncState deletes the entry', () => {
-    updateSyncState(db, 'y', 'some-hash');
+    updateSyncState(db, 1, 'y', 'some-hash');
 
     // Verify exists
     const before = db.raw
-      .prepare('SELECT COUNT(*) as cnt FROM file_sync_state WHERE item_id = ?')
-      .get('y') as { cnt: number };
+      .prepare(
+        'SELECT COUNT(*) as cnt FROM file_sync_state WHERE item_row_id = ?',
+      )
+      .get(1) as { cnt: number };
     expect(before.cnt).toBe(1);
 
-    removeSyncState(db, 'y');
+    removeSyncState(db, 1);
 
     const after = db.raw
-      .prepare('SELECT COUNT(*) as cnt FROM file_sync_state WHERE item_id = ?')
-      .get('y') as { cnt: number };
+      .prepare(
+        'SELECT COUNT(*) as cnt FROM file_sync_state WHERE item_row_id = ?',
+      )
+      .get(1) as { cnt: number };
     expect(after.cnt).toBe(0);
   });
 
   it('removeSyncState is a no-op for non-existent entries', () => {
     // Should not throw
-    removeSyncState(db, 'nonexistent');
+    removeSyncState(db, 999);
   });
 
   it('returns empty results when no files and no stored hashes', async () => {
@@ -194,8 +211,8 @@ describe('file sync detection', () => {
       id: '42',
       title: 'Round-trip test',
       labels: ['bug', 'urgent'],
-      parent: '1',
-      dependsOn: ['2', '3'],
+      parent: 1,
+      dependsOn: [2, 3],
       description: 'A description\nwith multiple lines',
     });
 

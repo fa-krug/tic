@@ -16,7 +16,7 @@ export interface FormFields {
 }
 
 export interface FormDraft {
-  itemId: string | null;
+  itemId: number | null;
   itemTitle: string;
   fields: FormFields;
   initialSnapshot: FormFields;

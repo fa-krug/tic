@@ -77,10 +77,9 @@ export interface Backend {
 }
 
 /**
- * Backend that supports importing work items with a specific ID.
+ * Backend that supports importing work items with a specific display ID.
  * Used by SyncManager to write remote items to the primary backend
- * preserving their original IDs, and to rename local items when
- * the remote assigns a different ID during push.
+ * via upsert-by-display-id, and to update display IDs after push.
  */
 export interface SyncableBackend extends Backend {
   /** Write a complete WorkItem preserving its existing id. */
@@ -166,12 +165,16 @@ export abstract class BaseBackend implements Backend {
 
   async getChildren(id: string): Promise<WorkItem[]> {
     const all = await this.getCachedItems();
-    return all.filter((item) => item.parent === id);
+    const target = all.find((i) => i.id === id);
+    if (!target) return [];
+    return all.filter((item) => item.parent === target.rowId);
   }
 
   async getDependents(id: string): Promise<WorkItem[]> {
     const all = await this.getCachedItems();
-    return all.filter((item) => item.dependsOn.includes(id));
+    const target = all.find((i) => i.id === id);
+    if (!target) return [];
+    return all.filter((item) => item.dependsOn.includes(target.rowId));
   }
 
   protected async getCachedItems(iteration?: string): Promise<WorkItem[]> {

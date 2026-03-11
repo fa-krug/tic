@@ -32,7 +32,7 @@ export function fuzzyMatch(items: WorkItem[], query: string): FuzzyResult[] {
 
   for (const item of items) {
     const titleScore = scoreField(item.title, q);
-    const idScore = scoreField(item.id, q);
+    const idScore = item.id ? scoreField(item.id, q) : 0;
     const labelScore = Math.max(0, ...item.labels.map((l) => scoreField(l, q)));
     const bestScore = Math.max(titleScore, idScore, labelScore);
 

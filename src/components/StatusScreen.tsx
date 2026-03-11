@@ -266,7 +266,7 @@ export function StatusScreen() {
                     {' '}
                     {entry.phase === 'pull'
                       ? `pulled ${entry.message ?? ''}`
-                      : `${entry.action} #${entry.itemId}`}
+                      : `${entry.action} #${entry.itemRowId}`}
                     {entry.result === 'error' && entry.message
                       ? ` — ${entry.message}`
                       : ''}
@@ -303,7 +303,7 @@ export function StatusScreen() {
                   flexDirection="column"
                 >
                   <Text color={errorColor}>
-                    [{err.entry.action}] #{err.entry.itemId}: {err.message}
+                    [{err.entry.action}] #{err.entry.itemRowId}: {err.message}
                   </Text>
                   <Text dimColor={mutedDim}> {err.timestamp}</Text>
                 </Box>

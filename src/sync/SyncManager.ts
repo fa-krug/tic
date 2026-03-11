@@ -9,7 +9,25 @@ import type {
   SyncError,
   SyncLogEntry,
 } from './types.js';
-import type { NewWorkItem, WorkItem } from '../types.js';
+import type { Storage } from '../storage/index.js';
+
+/**
+ * Data shape sent to remote backends for create/update.
+ * Uses string-based parent/dependsOn (display IDs) since remote backends
+ * don't know about local rowIds.
+ */
+interface RemoteWorkItemData {
+  title: string;
+  type: string;
+  status: string;
+  priority: string;
+  assignee: string;
+  labels: string[];
+  iteration: string;
+  description: string;
+  parent: string | null;
+  dependsOn: string[];
+}
 
 type StatusListener = (status: SyncStatus) => void;
 
@@ -61,13 +79,17 @@ export class SyncManager {
     }
   }
 
+  private get storage(): Storage {
+    return this.primary as Storage;
+  }
+
   async pushPending(): Promise<PushResult> {
     this.updateStatus({ state: 'syncing' });
     const total = (await this.queue.read()).pending.length;
     let current = 0;
     let pushed = 0;
     const errors: SyncError[] = [];
-    const idMappings = new Map<string, string>();
+    const idMappings = new Map<number, string>();
     const failedEntries: QueueEntry[] = [];
 
     while (true) {
@@ -82,15 +104,15 @@ export class SyncManager {
       });
 
       try {
-        const resolvedId = await this.pushEntry(entry);
-        if (resolvedId !== entry.itemId) {
-          idMappings.set(entry.itemId, resolvedId);
+        const mapping = await this.pushEntry(entry);
+        if (mapping) {
+          idMappings.set(mapping.rowId, mapping.displayId);
         }
         pushed++;
         this.appendLog({
           phase: 'push',
           action: entry.action,
-          itemId: entry.itemId,
+          itemRowId: entry.itemRowId,
           result: 'success',
           timestamp: new Date().toISOString(),
         });
@@ -108,7 +130,7 @@ export class SyncManager {
           this.appendLog({
             phase: 'push',
             action: entry.action,
-            itemId: entry.itemId,
+            itemRowId: entry.itemRowId,
             result: 'success',
             message: 'skipped (local item missing)',
             timestamp: new Date().toISOString(),
@@ -122,7 +144,7 @@ export class SyncManager {
           this.appendLog({
             phase: 'push',
             action: entry.action,
-            itemId: entry.itemId,
+            itemRowId: entry.itemRowId,
             result: 'error',
             message: e instanceof Error ? e.message : String(e),
             timestamp: new Date().toISOString(),
@@ -150,8 +172,8 @@ export class SyncManager {
   }
 
   /** Strip fields the remote backend doesn't support to avoid UnsupportedOperationError. */
-  private stripUnsupportedFields(data: NewWorkItem): {
-    data: NewWorkItem;
+  private stripUnsupportedFields(data: RemoteWorkItemData): {
+    data: RemoteWorkItemData;
     strippedFields: string[];
   } {
     const caps = this.remote.getCapabilities();
@@ -180,23 +202,59 @@ export class SyncManager {
     return { data: result, strippedFields };
   }
 
-  private async pushEntry(entry: QueueEntry): Promise<string> {
+  /**
+   * Resolve a local item's parent/dependsOn rowIds to display ID strings
+   * for sending to a remote backend.
+   */
+  private async resolveRelationshipsToDisplayIds(localItem: {
+    parent: number | null;
+    dependsOn: number[];
+  }): Promise<{ parent: string | null; dependsOn: string[] }> {
+    let parentDisplayId: string | null = null;
+    if (localItem.parent !== null) {
+      const parentItem = await this.storage.getWorkItemByRowId(
+        localItem.parent,
+      );
+      parentDisplayId = parentItem.id;
+    }
+
+    const dependsOnDisplayIds: string[] = [];
+    for (const depRowId of localItem.dependsOn) {
+      const dep = await this.storage.getWorkItemByRowId(depRowId);
+      if (dep.id) {
+        dependsOnDisplayIds.push(dep.id);
+      }
+    }
+
+    return { parent: parentDisplayId, dependsOn: dependsOnDisplayIds };
+  }
+
+  private async pushEntry(
+    entry: QueueEntry,
+  ): Promise<{ rowId: number; displayId: string } | null> {
     switch (entry.action) {
       case 'create': {
-        const localItem = await this.primary.getWorkItem(entry.itemId);
+        const localItem = await this.storage.getWorkItemByRowId(
+          entry.itemRowId,
+        );
+        const { parent, dependsOn } =
+          await this.resolveRelationshipsToDisplayIds(localItem);
+
+        const remoteData: RemoteWorkItemData = {
+          title: localItem.title,
+          type: localItem.type,
+          status: localItem.status,
+          priority: localItem.priority,
+          assignee: localItem.assignee,
+          labels: localItem.labels,
+          iteration: localItem.iteration,
+          description: localItem.description,
+          parent,
+          dependsOn,
+        };
+
         const { data: strippedCreate, strippedFields: strippedCreateFields } =
-          this.stripUnsupportedFields({
-            title: localItem.title,
-            type: localItem.type,
-            status: localItem.status,
-            priority: localItem.priority,
-            assignee: localItem.assignee,
-            labels: localItem.labels,
-            iteration: localItem.iteration,
-            description: localItem.description,
-            parent: localItem.parent,
-            dependsOn: localItem.dependsOn,
-          });
+          this.stripUnsupportedFields(remoteData);
         if (strippedCreateFields.length > 0) {
           const { uiStore } = await import('../stores/uiStore.js');
           uiStore
@@ -207,35 +265,44 @@ export class SyncManager {
           this.appendLog({
             phase: 'push',
             action: 'create',
-            itemId: entry.itemId,
+            itemRowId: entry.itemRowId,
             result: 'success',
             message: `stripped fields: ${strippedCreateFields.join(', ')}`,
             timestamp: new Date().toISOString(),
           });
         }
-        const remoteItem = await this.remote.createWorkItem(strippedCreate);
-        if (remoteItem.id !== entry.itemId) {
-          await this.renameLocalItem(entry.itemId, remoteItem.id);
-          await this.queue.renameItem(entry.itemId, remoteItem.id);
-          return remoteItem.id;
-        }
-        return entry.itemId;
+        // Cast to NewWorkItem — remote backends expect string parent/dependsOn
+        const remoteItem = await this.remote.createWorkItem(
+          strippedCreate as unknown as import('../types.js').NewWorkItem,
+        );
+
+        // Set display ID on local item — no rename cascade needed!
+        this.storage.setDisplayId(entry.itemRowId, remoteItem.id!);
+        return { rowId: entry.itemRowId, displayId: remoteItem.id! };
       }
       case 'update': {
-        const localItem = await this.primary.getWorkItem(entry.itemId);
+        const localItem = await this.storage.getWorkItemByRowId(
+          entry.itemRowId,
+        );
+        const displayId = localItem.id!;
+        const { parent, dependsOn } =
+          await this.resolveRelationshipsToDisplayIds(localItem);
+
+        const remoteData: RemoteWorkItemData = {
+          title: localItem.title,
+          type: localItem.type,
+          status: localItem.status,
+          priority: localItem.priority,
+          assignee: localItem.assignee,
+          labels: localItem.labels,
+          iteration: localItem.iteration,
+          description: localItem.description,
+          parent,
+          dependsOn,
+        };
+
         const { data: strippedUpdate, strippedFields: strippedUpdateFields } =
-          this.stripUnsupportedFields({
-            title: localItem.title,
-            type: localItem.type,
-            status: localItem.status,
-            priority: localItem.priority,
-            assignee: localItem.assignee,
-            labels: localItem.labels,
-            iteration: localItem.iteration,
-            description: localItem.description,
-            parent: localItem.parent,
-            dependsOn: localItem.dependsOn,
-          });
+          this.stripUnsupportedFields(remoteData);
         if (strippedUpdateFields.length > 0) {
           const { uiStore } = await import('../stores/uiStore.js');
           uiStore
@@ -246,21 +313,26 @@ export class SyncManager {
           this.appendLog({
             phase: 'push',
             action: 'update',
-            itemId: entry.itemId,
+            itemRowId: entry.itemRowId,
             result: 'success',
             message: `stripped fields: ${strippedUpdateFields.join(', ')}`,
             timestamp: new Date().toISOString(),
           });
         }
-        await this.remote.updateWorkItem(entry.itemId, strippedUpdate);
-        return entry.itemId;
+        await this.remote.updateWorkItem(
+          displayId,
+          strippedUpdate as unknown as Partial<import('../types.js').WorkItem>,
+        );
+        return null;
       }
       case 'delete': {
-        // Items with local- prefix were never synced to remote, nothing to delete.
-        // Return successfully so the entry is removed from the queue.
-        if (!entry.itemId.startsWith('local-')) {
+        // Look up display ID (item may be soft-deleted)
+        const displayId = this.storage.getDisplayIdByRowId(entry.itemRowId);
+
+        // Items with no display ID were never synced to remote, nothing to delete
+        if (displayId) {
           try {
-            await this.remote.deleteWorkItem(entry.itemId);
+            await this.remote.deleteWorkItem(displayId);
           } catch (e) {
             // If the item is already gone from remote, treat as success (idempotent delete).
             if (!this.isNotFoundError(e)) {
@@ -268,33 +340,37 @@ export class SyncManager {
             }
           }
         }
-        return entry.itemId;
+        return null;
       }
       case 'comment': {
         if (entry.commentData) {
-          await this.remote.addComment(entry.itemId, {
+          const localItem = await this.storage.getWorkItemByRowId(
+            entry.itemRowId,
+          );
+          const displayId = localItem.id!;
+          await this.remote.addComment(displayId, {
             author: entry.commentData.author,
             body: entry.commentData.body,
           });
         }
-        return entry.itemId;
+        return null;
       }
       case 'template-create': {
         const template = await this.primary.getTemplate(entry.templateSlug!);
         await this.remote.createTemplate(template);
-        return entry.itemId;
+        return null;
       }
       case 'template-update': {
         const template = await this.primary.getTemplate(entry.templateSlug!);
         await this.remote.updateTemplate(entry.templateSlug!, template);
-        return entry.itemId;
+        return null;
       }
       case 'template-delete': {
         await this.remote.deleteTemplate(entry.templateSlug!);
-        return entry.itemId;
+        return null;
       }
       default:
-        return entry.itemId;
+        return null;
     }
   }
 
@@ -308,38 +384,6 @@ export class SyncManager {
       msg.includes('does not exist') ||
       msg.includes('404')
     );
-  }
-
-  private async renameLocalItem(oldId: string, newId: string): Promise<void> {
-    const item = await this.primary.getWorkItem(oldId);
-    const renamedItem = { ...item, id: newId };
-
-    if (isSyncableBackend(this.primary)) {
-      await this.primary.importWorkItem(renamedItem);
-    } else {
-      await this.primary.createWorkItem(renamedItem as unknown as NewWorkItem);
-    }
-    await this.primary.deleteWorkItem(oldId);
-
-    // Fix references from other items
-    const allItems = await this.primary.listWorkItems();
-    for (const other of allItems) {
-      const changes: Partial<WorkItem> = {};
-      let changed = false;
-      if (other.parent === oldId) {
-        changes.parent = newId;
-        changed = true;
-      }
-      if (other.dependsOn.includes(oldId)) {
-        changes.dependsOn = other.dependsOn.map((d) =>
-          d === oldId ? newId : d,
-        );
-        changed = true;
-      }
-      if (changed) {
-        await this.primary.updateWorkItem(other.id, changes);
-      }
-    }
   }
 
   async sync(): Promise<SyncResult> {
@@ -382,13 +426,19 @@ export class SyncManager {
     });
 
     const remoteItems = await this.remote.listWorkItems();
-    const pendingIds = new Set(
-      (await this.queue.read()).pending.map((e) => e.itemId),
+    // pendingRowIds: rowIds that are pending in the queue
+    const pendingRowIds = new Set(
+      (await this.queue.read()).pending.map((e) => e.itemRowId),
     );
 
     const localItems = await this.primary.listWorkItems();
-    const localIds = new Set(localItems.map((i) => i.id));
-    const remoteIds = new Set(remoteItems.map((i) => i.id));
+    // Compare by display IDs (strings) for local vs remote reconciliation
+    const localDisplayIds = new Set(
+      localItems.map((i) => i.id).filter(Boolean) as string[],
+    );
+    const remoteDisplayIds = new Set(
+      remoteItems.map((i) => i.id).filter(Boolean) as string[],
+    );
 
     // Upsert remote items locally
     if (isSyncableBackend(this.primary)) {
@@ -397,18 +447,25 @@ export class SyncManager {
       }
     } else {
       for (const item of remoteItems) {
-        if (localIds.has(item.id)) {
-          await this.primary.updateWorkItem(item.id, item);
+        if (localDisplayIds.has(item.id!)) {
+          await this.primary.updateWorkItem(item.id!, item);
         } else {
-          await this.primary.createWorkItem(item as unknown as NewWorkItem);
+          await this.primary.createWorkItem(
+            item as unknown as import('../types.js').NewWorkItem,
+          );
         }
       }
     }
 
-    // Delete local items not on remote (unless pending)
-    for (const localId of localIds) {
-      if (!remoteIds.has(localId) && !pendingIds.has(localId)) {
-        await this.primary.deleteWorkItem(localId);
+    // Delete local items not on remote (unless pending in queue)
+    // Only delete items that have a display ID (synced items)
+    for (const localItem of localItems) {
+      if (
+        localItem.id &&
+        !remoteDisplayIds.has(localItem.id) &&
+        !pendingRowIds.has(localItem.rowId)
+      ) {
+        await this.primary.deleteWorkItem(localItem.id);
       }
     }
 
@@ -446,8 +503,7 @@ export class SyncManager {
     // Pull PRs if supported by remote
     if (isPrBackend(this.remote)) {
       const remotePrs = await this.remote.listPullRequests();
-      const primaryStorage = this
-        .primary as import('../storage/index.js').Storage;
+      const primaryStorage = this.storage;
       if ('importPullRequest' in primaryStorage) {
         for (const pr of remotePrs) {
           await primaryStorage.importPullRequest(pr);
@@ -458,7 +514,7 @@ export class SyncManager {
     this.appendLog({
       phase: 'pull',
       action: 'update',
-      itemId: '',
+      itemRowId: 0,
       result: 'success',
       message: `${remoteItems.length} item${remoteItems.length === 1 ? '' : 's'}`,
       timestamp: new Date().toISOString(),

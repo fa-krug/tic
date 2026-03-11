@@ -93,17 +93,18 @@ export function mapPriorityToJira(priority: string): string {
   }
 }
 
-export function extractDependsOn(links: JiraIssueLink[] | undefined): string[] {
+export function extractDependsOn(links: JiraIssueLink[] | undefined): number[] {
   if (!links) return [];
+  // Jira uses string keys (e.g., PROJ-42) — store 0 as sentinel.
+  // Storage assigns real rowIds on import.
   return links.flatMap((link) =>
-    link.type.inward === 'is blocked by' && link.inwardIssue != null
-      ? [link.inwardIssue.key]
-      : [],
+    link.type.inward === 'is blocked by' && link.inwardIssue != null ? [0] : [],
   );
 }
 
 export function mapIssueToWorkItem(issue: JiraIssue): WorkItem {
   return {
+    rowId: 0, // Jira uses string keys — Storage assigns real rowId on import
     id: issue.key,
     title: issue.fields.summary,
     description: adfToText(issue.fields.description as AdfNode | string | null),
@@ -115,7 +116,7 @@ export function mapIssueToWorkItem(issue: JiraIssue): WorkItem {
     iteration: issue.fields.sprint?.name ?? '',
     created: issue.fields.created,
     updated: issue.fields.updated,
-    parent: issue.fields.parent?.key ?? null,
+    parent: issue.fields.parent ? 0 : null, // sentinel — resolved during import
     dependsOn: extractDependsOn(issue.fields.issuelinks),
     comments: [],
   };

@@ -344,7 +344,9 @@ describe('JiraBackend', () => {
         assignee: '',
         labels: [],
         description: '',
-        parent: 'TEAM-5',
+        // SyncManager resolves rowIds to display IDs before calling remote backends,
+        // so at runtime parent/dependsOn are actually string display IDs cast to number
+        parent: 'TEAM-5' as unknown as number,
         dependsOn: [],
       });
 
@@ -391,7 +393,7 @@ describe('JiraBackend', () => {
         labels: [],
         description: '',
         parent: null,
-        dependsOn: ['TEAM-3'],
+        dependsOn: ['TEAM-3' as unknown as number],
       });
 
       expect(mockApi.rest).toHaveBeenCalledWith('POST', '/api/3/issueLink', {
@@ -419,7 +421,7 @@ describe('JiraBackend', () => {
           labels: [],
           description: '',
           parent: null,
-          dependsOn: ['TEAM-1'],
+          dependsOn: ['TEAM-1' as unknown as number],
         }),
       ).rejects.toThrow('Failed to create dependency links');
 

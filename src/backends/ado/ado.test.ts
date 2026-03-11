@@ -365,8 +365,8 @@ describe('AzureDevOpsBackend', () => {
         assignee: '',
         labels: [],
         description: '',
-        parent: '10',
-        dependsOn: ['20', '21'],
+        parent: 10,
+        dependsOn: [20, 21],
       });
 
       const createCall = mockApi.rest.mock.calls[1]!;
@@ -458,7 +458,7 @@ describe('AzureDevOpsBackend', () => {
       mockApi.rest.mockResolvedValueOnce(sampleWorkItem);
       mockApi.rest.mockResolvedValueOnce({ comments: [] });
 
-      await backend.updateWorkItem('42', { parent: '20' });
+      await backend.updateWorkItem('42', { parent: 20 });
 
       // Find the PATCH call
       const patchCall = mockApi.rest.mock.calls.find(
@@ -558,7 +558,7 @@ describe('AzureDevOpsBackend', () => {
       mockApi.rest.mockResolvedValueOnce({ comments: [] });
 
       // Change deps to [21, 30] — remove 20, keep 21, add 30
-      await backend.updateWorkItem('42', { dependsOn: ['21', '30'] });
+      await backend.updateWorkItem('42', { dependsOn: [21, 30] });
 
       const patchCall = mockApi.rest.mock.calls.find(
         (c) =>

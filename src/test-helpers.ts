@@ -15,12 +15,13 @@ import type {
 import type { Backend } from './backends/types.js';
 
 export function makeWorkItem(
-  id: string,
+  rowId: number,
   overrides: Partial<WorkItem> = {},
 ): WorkItem {
   return {
-    id,
-    title: `Item ${id}`,
+    rowId,
+    id: String(rowId),
+    title: `Item ${rowId}`,
     type: 'task',
     status: 'todo',
     priority: 'medium',
@@ -94,7 +95,7 @@ export function makeTemplate(overrides: Partial<Template> = {}): Template {
 
 export function createMockRemote(items: WorkItem[] = []): Backend {
   const store = new Map(items.map((i) => [i.id, i]));
-  let nextId = 100;
+  let nextRowId = 100;
   /* eslint-disable @typescript-eslint/require-await */
   return {
     getCapabilities: () => ({
@@ -141,10 +142,11 @@ export function createMockRemote(items: WorkItem[] = []): Backend {
       return item;
     },
     createWorkItem: async (data: NewWorkItem) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-      const id: string = (data as any).id ?? String(nextId++);
+      const rowId = nextRowId++;
+      const id = String(rowId);
       const item: WorkItem = {
         ...data,
+        rowId,
         id,
         created: new Date().toISOString(),
         updated: new Date().toISOString(),
@@ -182,10 +184,11 @@ export function createMockRemote(items: WorkItem[] = []): Backend {
     getChildren: async () => [],
     getDependents: async () => [],
     cachedCreateWorkItem: async (data: NewWorkItem) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-      const id: string = (data as any).id ?? String(nextId++);
+      const rowId = nextRowId++;
+      const id = String(rowId);
       const item: WorkItem = {
         ...data,
+        rowId,
         id,
         created: new Date().toISOString(),
         updated: new Date().toISOString(),

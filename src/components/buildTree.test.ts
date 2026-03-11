@@ -2,9 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { buildTree, sortTree } from './buildTree.js';
 import type { WorkItem } from '../types.js';
 
-function makeItem(overrides: Partial<WorkItem> & { id: string }): WorkItem {
+function makeItem(overrides: Partial<WorkItem> & { rowId: number }): WorkItem {
   return {
-    title: `Item ${overrides.id}`,
+    id: String(overrides.rowId),
+    title: `Item ${overrides.rowId}`,
     type: 'task',
     status: 'open',
     iteration: 'sprint-1',
@@ -23,18 +24,18 @@ function makeItem(overrides: Partial<WorkItem> & { id: string }): WorkItem {
 
 describe('buildTree', () => {
   it('returns flat list when no parent relationships', () => {
-    const items = [makeItem({ id: '1' }), makeItem({ id: '2' })];
+    const items = [makeItem({ rowId: 1 }), makeItem({ rowId: 2 })];
     const result = buildTree(items, items, 'task');
-    expect(result.map((t) => t.item.id)).toEqual(['1', '2']);
+    expect(result.map((t) => t.item.rowId)).toEqual([1, 2]);
     expect(result.every((t) => t.depth === 0)).toBe(true);
     expect(result.every((t) => !t.isCrossType)).toBe(true);
     expect(result.every((t) => !t.hasChildren)).toBe(true);
   });
 
   it('nests same-type children under parent', () => {
-    const items = [makeItem({ id: '1' }), makeItem({ id: '2', parent: '1' })];
+    const items = [makeItem({ rowId: 1 }), makeItem({ rowId: 2, parent: 1 })];
     const result = buildTree(items, items, 'task');
-    expect(result.map((t) => t.item.id)).toEqual(['1', '2']);
+    expect(result.map((t) => t.item.rowId)).toEqual([1, 2]);
     expect(result[0]!.depth).toBe(0);
     expect(result[0]!.hasChildren).toBe(true);
     expect(result[1]!.depth).toBe(1);
@@ -43,42 +44,42 @@ describe('buildTree', () => {
   });
 
   it('pulls in cross-type children from allItems', () => {
-    const task = makeItem({ id: '1', type: 'task' });
-    const bug = makeItem({ id: '2', type: 'bug', parent: '1' });
+    const task = makeItem({ rowId: 1, type: 'task' });
+    const bug = makeItem({ rowId: 2, type: 'bug', parent: 1 });
     const filteredItems = [task]; // only tasks
     const allItems = [task, bug];
     const result = buildTree(filteredItems, allItems, 'task');
-    expect(result.map((t) => t.item.id)).toEqual(['1', '2']);
+    expect(result.map((t) => t.item.rowId)).toEqual([1, 2]);
     expect(result[1]!.isCrossType).toBe(true);
     expect(result[1]!.depth).toBe(1);
     expect(result[0]!.hasChildren).toBe(true);
   });
 
   it('does not show cross-type items as roots', () => {
-    const task = makeItem({ id: '1', type: 'task' });
-    const bug = makeItem({ id: '2', type: 'bug' }); // no parent, different type
+    const task = makeItem({ rowId: 1, type: 'task' });
+    const bug = makeItem({ rowId: 2, type: 'bug' }); // no parent, different type
     const filteredItems = [task];
     const allItems = [task, bug];
     const result = buildTree(filteredItems, allItems, 'task');
-    expect(result.map((t) => t.item.id)).toEqual(['1']);
+    expect(result.map((t) => t.item.rowId)).toEqual([1]);
   });
 
   it('recursively includes cross-type grandchildren', () => {
-    const task = makeItem({ id: '1', type: 'task' });
-    const bug = makeItem({ id: '2', type: 'bug', parent: '1' });
-    const subtask = makeItem({ id: '3', type: 'task', parent: '2' });
+    const task = makeItem({ rowId: 1, type: 'task' });
+    const bug = makeItem({ rowId: 2, type: 'bug', parent: 1 });
+    const subtask = makeItem({ rowId: 3, type: 'task', parent: 2 });
     const filteredItems = [task, subtask]; // subtask is same type but child of bug
     const allItems = [task, bug, subtask];
     const result = buildTree(filteredItems, allItems, 'task');
-    expect(result.map((t) => t.item.id)).toEqual(['1', '2', '3']);
+    expect(result.map((t) => t.item.rowId)).toEqual([1, 2, 3]);
     expect(result[1]!.isCrossType).toBe(true);
     expect(result[2]!.isCrossType).toBe(false);
     expect(result[2]!.depth).toBe(2);
   });
 
   it('marks hasChildren correctly for items whose children are all cross-type', () => {
-    const task = makeItem({ id: '1', type: 'task' });
-    const bug = makeItem({ id: '2', type: 'bug', parent: '1' });
+    const task = makeItem({ rowId: 1, type: 'task' });
+    const bug = makeItem({ rowId: 2, type: 'bug', parent: 1 });
     const filteredItems = [task];
     const allItems = [task, bug];
     const result = buildTree(filteredItems, allItems, 'task');
@@ -89,7 +90,7 @@ describe('buildTree', () => {
 
 describe('sortTree', () => {
   it('returns items unchanged when sort stack is empty', () => {
-    const items = [makeItem({ id: '2' }), makeItem({ id: '1' })];
+    const items = [makeItem({ rowId: 2 }), makeItem({ rowId: 1 })];
     const tree = buildTree(items, items, 'task');
     const sorted = sortTree(tree, []);
     expect(sorted.map((t) => t.item.id)).toEqual(['2', '1']);
@@ -97,9 +98,9 @@ describe('sortTree', () => {
 
   it('sorts by ID ascending', () => {
     const items = [
-      makeItem({ id: '3' }),
-      makeItem({ id: '1' }),
-      makeItem({ id: '2' }),
+      makeItem({ rowId: 3 }),
+      makeItem({ rowId: 1 }),
+      makeItem({ rowId: 2 }),
     ];
     const tree = buildTree(items, items, 'task');
     const sorted = sortTree(tree, [{ column: 'id', direction: 'asc' }]);
@@ -108,9 +109,9 @@ describe('sortTree', () => {
 
   it('sorts by ID descending', () => {
     const items = [
-      makeItem({ id: '1' }),
-      makeItem({ id: '3' }),
-      makeItem({ id: '2' }),
+      makeItem({ rowId: 1 }),
+      makeItem({ rowId: 3 }),
+      makeItem({ rowId: 2 }),
     ];
     const tree = buildTree(items, items, 'task');
     const sorted = sortTree(tree, [{ column: 'id', direction: 'desc' }]);
@@ -119,9 +120,9 @@ describe('sortTree', () => {
 
   it('sorts by title case-insensitive', () => {
     const items = [
-      makeItem({ id: '1', title: 'Banana' }),
-      makeItem({ id: '2', title: 'apple' }),
-      makeItem({ id: '3', title: 'Cherry' }),
+      makeItem({ rowId: 1, title: 'Banana' }),
+      makeItem({ rowId: 2, title: 'apple' }),
+      makeItem({ rowId: 3, title: 'Cherry' }),
     ];
     const tree = buildTree(items, items, 'task');
     const sorted = sortTree(tree, [{ column: 'title', direction: 'asc' }]);
@@ -134,10 +135,10 @@ describe('sortTree', () => {
 
   it('sorts by priority using ordinal ranking', () => {
     const items = [
-      makeItem({ id: '1', priority: 'low' }),
-      makeItem({ id: '2', priority: 'critical' }),
-      makeItem({ id: '3', priority: 'high' }),
-      makeItem({ id: '4', priority: 'medium' }),
+      makeItem({ rowId: 1, priority: 'low' }),
+      makeItem({ rowId: 2, priority: 'critical' }),
+      makeItem({ rowId: 3, priority: 'high' }),
+      makeItem({ rowId: 4, priority: 'medium' }),
     ];
     const tree = buildTree(items, items, 'task');
     const sorted = sortTree(tree, [{ column: 'priority', direction: 'asc' }]);
@@ -151,9 +152,9 @@ describe('sortTree', () => {
 
   it('sorts by priority descending (low first)', () => {
     const items = [
-      makeItem({ id: '1', priority: 'critical' }),
-      makeItem({ id: '2', priority: 'low' }),
-      makeItem({ id: '3', priority: 'high' }),
+      makeItem({ rowId: 1, priority: 'critical' }),
+      makeItem({ rowId: 2, priority: 'low' }),
+      makeItem({ rowId: 3, priority: 'high' }),
     ];
     const tree = buildTree(items, items, 'task');
     const sorted = sortTree(tree, [{ column: 'priority', direction: 'desc' }]);
@@ -167,8 +168,8 @@ describe('sortTree', () => {
   it('empty priority sorts last in ascending', () => {
     const items = [
       // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
-      makeItem({ id: '1', priority: '' as any }),
-      makeItem({ id: '2', priority: 'high' }),
+      makeItem({ rowId: 1, priority: '' as any }),
+      makeItem({ rowId: 2, priority: 'high' }),
     ];
     const tree = buildTree(items, items, 'task');
     const sorted = sortTree(tree, [{ column: 'priority', direction: 'asc' }]);
@@ -177,9 +178,9 @@ describe('sortTree', () => {
 
   it('multi-level sort: priority then status', () => {
     const items = [
-      makeItem({ id: '1', priority: 'high', status: 'closed' }),
-      makeItem({ id: '2', priority: 'high', status: 'open' }),
-      makeItem({ id: '3', priority: 'low', status: 'open' }),
+      makeItem({ rowId: 1, priority: 'high', status: 'closed' }),
+      makeItem({ rowId: 2, priority: 'high', status: 'open' }),
+      makeItem({ rowId: 3, priority: 'low', status: 'open' }),
     ];
     const tree = buildTree(items, items, 'task');
     const sorted = sortTree(tree, [
@@ -190,10 +191,10 @@ describe('sortTree', () => {
   });
 
   it('sorts within each tree level preserving hierarchy', () => {
-    const parent1 = makeItem({ id: '2', title: 'B' });
-    const parent2 = makeItem({ id: '1', title: 'A' });
-    const child1 = makeItem({ id: '4', title: 'D', parent: '2' });
-    const child2 = makeItem({ id: '3', title: 'C', parent: '2' });
+    const parent1 = makeItem({ rowId: 2, title: 'B' });
+    const parent2 = makeItem({ rowId: 1, title: 'A' });
+    const child1 = makeItem({ rowId: 4, title: 'D', parent: 2 });
+    const child2 = makeItem({ rowId: 3, title: 'C', parent: 2 });
     const items = [parent1, parent2, child1, child2];
     const tree = buildTree(items, items, 'task');
     const sorted = sortTree(tree, [{ column: 'title', direction: 'asc' }]);
@@ -203,9 +204,9 @@ describe('sortTree', () => {
 
   it('sorts by created date', () => {
     const items = [
-      makeItem({ id: '1', created: '2026-02-03T00:00:00Z' }),
-      makeItem({ id: '2', created: '2026-02-01T00:00:00Z' }),
-      makeItem({ id: '3', created: '2026-02-02T00:00:00Z' }),
+      makeItem({ rowId: 1, created: '2026-02-03T00:00:00Z' }),
+      makeItem({ rowId: 2, created: '2026-02-01T00:00:00Z' }),
+      makeItem({ rowId: 3, created: '2026-02-02T00:00:00Z' }),
     ];
     const tree = buildTree(items, items, 'task');
     const sorted = sortTree(tree, [{ column: 'created', direction: 'asc' }]);
@@ -214,9 +215,9 @@ describe('sortTree', () => {
 
   it('sorts by updated date descending', () => {
     const items = [
-      makeItem({ id: '1', updated: '2026-02-01T00:00:00Z' }),
-      makeItem({ id: '2', updated: '2026-02-03T00:00:00Z' }),
-      makeItem({ id: '3', updated: '2026-02-02T00:00:00Z' }),
+      makeItem({ rowId: 1, updated: '2026-02-01T00:00:00Z' }),
+      makeItem({ rowId: 2, updated: '2026-02-03T00:00:00Z' }),
+      makeItem({ rowId: 3, updated: '2026-02-02T00:00:00Z' }),
     ];
     const tree = buildTree(items, items, 'task');
     const sorted = sortTree(tree, [{ column: 'updated', direction: 'desc' }]);
@@ -225,9 +226,9 @@ describe('sortTree', () => {
 
   it('handles non-numeric IDs with string fallback', () => {
     const items = [
-      makeItem({ id: 'ABC-10' }),
-      makeItem({ id: 'ABC-2' }),
-      makeItem({ id: 'ABC-1' }),
+      makeItem({ rowId: 1, id: 'ABC-10' }),
+      makeItem({ rowId: 2, id: 'ABC-2' }),
+      makeItem({ rowId: 3, id: 'ABC-1' }),
     ];
     const tree = buildTree(items, items, 'task');
     const sorted = sortTree(tree, [{ column: 'id', direction: 'asc' }]);

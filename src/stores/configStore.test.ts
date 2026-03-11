@@ -45,9 +45,6 @@ describe('configStore with SQLite backing', () => {
     // Verify persistence: read directly from DB
     const dbConfig = readConfigFromDb(db);
     expect(dbConfig.current_iteration).toBe('sprint-5');
-
-    // next_id must not be clobbered by config updates
-    expect(dbConfig.next_id).toBe(1);
   });
 
   it('startWatching is no-op with database', async () => {

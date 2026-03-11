@@ -85,7 +85,7 @@ function buildBranchColumns(
       hidePriority: 3,
       render: (row, selected) => {
         const display = row.linkedItem
-          ? `#${row.linkedItem.id} ${row.linkedItem.title}`
+          ? `#${row.linkedItem.id ?? '\u00B7'} ${row.linkedItem.title}`
           : '';
         return (
           <Text
@@ -297,7 +297,9 @@ export function BranchList() {
     const title = currentRow.linkedItem
       ? currentRow.linkedItem.title
       : currentRow.branch.name;
-    const linkedItems = currentRow.linkedItem ? [currentRow.linkedItem.id] : [];
+    const linkedItems = currentRow.linkedItem
+      ? [currentRow.linkedItem.rowId]
+      : [];
     void createPullRequest({
       title,
       sourceBranch: currentRow.branch.name,

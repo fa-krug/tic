@@ -72,18 +72,18 @@ describe('mapGhPrToPullRequest', () => {
     const gh = makeGhPr({ body: 'This closes #5 and fixes #10' });
     const pr = mapGhPrToPullRequest(gh);
 
-    expect(pr.linkedItems).toEqual(['5', '10']);
+    expect(pr.linkedItems).toEqual([5, 10]);
   });
 });
 
 describe('extractLinkedIssues', () => {
   it('parses "closes #5"', () => {
-    expect(extractLinkedIssues('closes #5')).toEqual(['5']);
+    expect(extractLinkedIssues('closes #5')).toEqual([5]);
   });
 
   it('parses "fixes #3, resolves #7"', () => {
     const result = extractLinkedIssues('fixes #3, resolves #7');
-    expect(result).toEqual(['3', '7']);
+    expect(result).toEqual([3, 7]);
   });
 
   it('returns [] for null body', () => {
@@ -91,19 +91,19 @@ describe('extractLinkedIssues', () => {
   });
 
   it('is case-insensitive ("Closes #5" works)', () => {
-    expect(extractLinkedIssues('Closes #5')).toEqual(['5']);
+    expect(extractLinkedIssues('Closes #5')).toEqual([5]);
   });
 
   it('handles multiple keyword forms', () => {
     const body =
       'Closed #1, Fixed #2, Resolved #3, Close #4, Fix #5, Resolve #6';
     const result = extractLinkedIssues(body);
-    expect(result).toEqual(['1', '2', '3', '4', '5', '6']);
+    expect(result).toEqual([1, 2, 3, 4, 5, 6]);
   });
 
   it('deduplicates issue numbers', () => {
     const body = 'closes #5 and also fixes #5';
-    expect(extractLinkedIssues(body)).toEqual(['5']);
+    expect(extractLinkedIssues(body)).toEqual([5]);
   });
 
   it('returns [] for body with no linked issues', () => {

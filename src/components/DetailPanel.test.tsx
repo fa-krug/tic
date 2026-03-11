@@ -10,6 +10,7 @@ import type { WorkItem } from '../types.js';
 
 function makeItem(overrides: Partial<WorkItem> = {}): WorkItem {
   return {
+    rowId: 42,
     id: '42',
     title: 'Fix the login bug',
     type: 'task',

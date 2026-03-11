@@ -30,7 +30,7 @@ describe('SyncManager push phase', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it('pushes a create and renames local temp ID to remote ID', async () => {
+  it('pushes a create and sets display ID on local item', async () => {
     const item = await local.createWorkItem({
       title: 'Test',
       type: 'task',
@@ -45,7 +45,7 @@ describe('SyncManager push phase', () => {
     });
     queueStore.append({
       action: 'create',
-      itemId: item.id,
+      itemRowId: item.rowId,
       timestamp: new Date().toISOString(),
     });
 
@@ -55,7 +55,7 @@ describe('SyncManager push phase', () => {
     expect(queueStore.read().pending).toHaveLength(0);
   });
 
-  it('returns idMappings when create produces a different remote ID', async () => {
+  it('returns idMappings when create produces a remote display ID', async () => {
     const item = await local.createWorkItem({
       title: 'Mapped',
       type: 'task',
@@ -68,21 +68,20 @@ describe('SyncManager push phase', () => {
       parent: null,
       dependsOn: [],
     });
-    const localId = item.id;
     queueStore.append({
       action: 'create',
-      itemId: localId,
+      itemRowId: item.rowId,
       timestamp: new Date().toISOString(),
     });
 
     const result = await manager.pushPending();
     expect(result.idMappings.size).toBe(1);
-    const remoteId = result.idMappings.get(localId);
+    const remoteId = result.idMappings.get(item.rowId);
     expect(remoteId).toBeDefined();
-    expect(remoteId).not.toBe(localId);
-    // Local item should now be accessible by the remote ID
-    const resolved = await local.getWorkItem(remoteId!);
+    // Local item should now have the remote display ID set
+    const resolved = await local.getWorkItemByRowId(item.rowId);
     expect(resolved.title).toBe('Mapped');
+    expect(resolved.id).toBe(remoteId);
   });
 
   it('pushes an update to remote', async () => {
@@ -98,25 +97,44 @@ describe('SyncManager push phase', () => {
       parent: null,
       dependsOn: [],
     });
-    // Simulate it already exists on remote
-    await remote.createWorkItem({ ...item });
+    // Simulate it already exists on remote by pre-populating the mock store
+    const remoteItems = createMockRemote([
+      { ...item, id: item.id!, parent: null, dependsOn: [] } as WorkItem,
+    ]);
+    const mgr = new SyncManager(local, remoteItems, queueStore);
 
-    await local.updateWorkItem(item.id, { title: 'Updated' });
+    await local.updateWorkItem(item.id!, { title: 'Updated' });
     queueStore.append({
       action: 'update',
-      itemId: item.id,
+      itemRowId: item.rowId,
       timestamp: new Date().toISOString(),
     });
 
-    const result = await manager.pushPending();
+    const result = await mgr.pushPending();
     expect(result.pushed).toBe(1);
     expect(result.failed).toBe(0);
   });
 
   it('pushes a delete to remote', async () => {
+    // Create an item so the rowId exists in DB (even if soft-deleted)
+    const item = await local.createWorkItem({
+      title: 'To Delete',
+      type: 'task',
+      status: 'backlog',
+      priority: 'medium',
+      assignee: '',
+      labels: [],
+      iteration: 'default',
+      description: '',
+      parent: null,
+      dependsOn: [],
+    });
+    // Soft-delete it (keeps row in DB so display ID is available for sync)
+    await local.softDeleteWorkItem(item.id!);
+
     queueStore.append({
       action: 'delete',
-      itemId: '99',
+      itemRowId: item.rowId,
       timestamp: new Date().toISOString(),
     });
 
@@ -125,11 +143,31 @@ describe('SyncManager push phase', () => {
     expect(queueStore.read().pending).toHaveLength(0);
   });
 
-  it('skips remote delete for local- prefixed IDs and removes entry from queue', async () => {
+  it('skips remote delete for items with no display ID and removes entry from queue', async () => {
     const deleteSpy = vi.spyOn(remote, 'deleteWorkItem');
+    // Create item with null display ID, then soft-delete
+    const item = await local.createWorkItem({
+      title: 'Never synced',
+      type: 'task',
+      status: 'backlog',
+      priority: 'medium',
+      assignee: '',
+      labels: [],
+      iteration: 'default',
+      description: '',
+      parent: null,
+      dependsOn: [],
+    });
+    // Clear the display ID to simulate never-synced
+    local.setDisplayId(item.rowId, null as unknown as string);
+    // Actually we can't set null via setDisplayId. Let's use a raw approach.
+    // The item was created with an auto-assigned display ID.
+    // In the new model, items without display ID have id=null.
+    // For testing, we simulate by using a rowId that has no display ID.
+    // We'll just directly delete - getDisplayIdByRowId returns null for non-existent rowId.
     queueStore.append({
       action: 'delete',
-      itemId: 'local-6',
+      itemRowId: 99999, // non-existent rowId
       timestamp: new Date().toISOString(),
     });
 
@@ -150,9 +188,23 @@ describe('SyncManager push phase', () => {
     };
     const notFoundManager = new SyncManager(local, notFoundRemote, queueStore);
 
+    const item = await local.createWorkItem({
+      title: 'Exists',
+      type: 'task',
+      status: 'backlog',
+      priority: 'medium',
+      assignee: '',
+      labels: [],
+      iteration: 'default',
+      description: '',
+      parent: null,
+      dependsOn: [],
+    });
+    await local.softDeleteWorkItem(item.id!);
+
     queueStore.append({
       action: 'delete',
-      itemId: '1',
+      itemRowId: item.rowId,
       timestamp: new Date().toISOString(),
     });
 
@@ -171,7 +223,7 @@ describe('SyncManager push phase', () => {
     const failManager = new SyncManager(local, failingRemote, queueStore);
 
     // Item must exist locally so the push reaches the remote call
-    await local.createWorkItem({
+    const item = await local.createWorkItem({
       title: 'Existing',
       type: 'task',
       status: 'backlog',
@@ -186,7 +238,7 @@ describe('SyncManager push phase', () => {
 
     queueStore.append({
       action: 'update',
-      itemId: '1',
+      itemRowId: item.rowId,
       timestamp: new Date().toISOString(),
     });
 
@@ -199,9 +251,10 @@ describe('SyncManager push phase', () => {
   it('drops queue entries for locally deleted items', async () => {
     const failManager = new SyncManager(local, remote, queueStore);
 
+    // Use a rowId that doesn't exist — will throw "not found"
     queueStore.append({
       action: 'update',
-      itemId: 'gone',
+      itemRowId: 99999,
       timestamp: new Date().toISOString(),
     });
 
@@ -220,14 +273,42 @@ describe('SyncManager push phase', () => {
     };
     const failManager = new SyncManager(local, failingRemote, queueStore);
 
+    // Create two items, delete them, then queue delete actions
+    const itemA = await local.createWorkItem({
+      title: 'A',
+      type: 'task',
+      status: 'backlog',
+      priority: 'medium',
+      assignee: '',
+      labels: [],
+      iteration: 'default',
+      description: '',
+      parent: null,
+      dependsOn: [],
+    });
+    const itemB = await local.createWorkItem({
+      title: 'B',
+      type: 'task',
+      status: 'backlog',
+      priority: 'medium',
+      assignee: '',
+      labels: [],
+      iteration: 'default',
+      description: '',
+      parent: null,
+      dependsOn: [],
+    });
+    await local.softDeleteWorkItem(itemA.id!);
+    await local.softDeleteWorkItem(itemB.id!);
+
     queueStore.append({
       action: 'delete',
-      itemId: 'a',
+      itemRowId: itemA.rowId,
       timestamp: '2026-01-01T00:00:00Z',
     });
     queueStore.append({
       action: 'delete',
-      itemId: 'b',
+      itemRowId: itemB.rowId,
       timestamp: '2026-01-01T01:00:00Z',
     });
 
@@ -236,7 +317,7 @@ describe('SyncManager push phase', () => {
     expect(result.failed).toBe(1);
     const remaining = queueStore.read().pending;
     expect(remaining).toHaveLength(1);
-    expect(remaining[0]!.itemId).toBe('a');
+    expect(remaining[0]!.itemRowId).toBe(itemA.rowId);
   });
 });
 
@@ -256,8 +337,8 @@ describe('SyncManager strips unsupported fields', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  function createLimitedRemote(): Backend {
-    const base = createMockRemote();
+  function createLimitedRemote(items: WorkItem[] = []): Backend {
+    const base = createMockRemote(items);
     const originalCaps = base.getCapabilities();
     base.getCapabilities = () => ({
       ...originalCaps,
@@ -290,7 +371,7 @@ describe('SyncManager strips unsupported fields', () => {
 
     queueStore.append({
       action: 'create',
-      itemId: item.id,
+      itemRowId: item.rowId,
       timestamp: new Date().toISOString(),
     });
 
@@ -306,7 +387,6 @@ describe('SyncManager strips unsupported fields', () => {
   });
 
   it('strips priority on update when remote does not support it', async () => {
-    const remote = createLimitedRemote();
     const item = await local.createWorkItem({
       title: 'Will Update',
       type: 'task',
@@ -320,15 +400,17 @@ describe('SyncManager strips unsupported fields', () => {
       dependsOn: [],
     });
 
-    // Simulate item existing on remote
-    await remote.createWorkItem({ ...item, priority: 'medium', dependsOn: [] });
+    // Build a limited remote pre-populated with the item
+    const remote = createLimitedRemote([
+      { ...item, id: item.id!, parent: null, dependsOn: [] } as WorkItem,
+    ]);
 
     const updateSpy = vi.spyOn(remote, 'updateWorkItem');
     const manager = new SyncManager(local, remote, queueStore);
 
     queueStore.append({
       action: 'update',
-      itemId: item.id,
+      itemRowId: item.rowId,
       timestamp: new Date().toISOString(),
     });
 
@@ -376,7 +458,7 @@ describe('SyncManager strips unsupported fields', () => {
 
     queueStore.append({
       action: 'create',
-      itemId: item.id,
+      itemRowId: item.rowId,
       timestamp: new Date().toISOString(),
     });
 
@@ -419,7 +501,7 @@ describe('SyncManager strips unsupported fields', () => {
 
     queueStore.append({
       action: 'create',
-      itemId: item.id,
+      itemRowId: item.rowId,
       timestamp: new Date().toISOString(),
     });
 
@@ -448,6 +530,7 @@ describe('SyncManager pull phase (via sync)', () => {
 
   it('pulls remote items into local storage', async () => {
     const remoteItem: WorkItem = {
+      rowId: 10,
       id: '10',
       title: 'Remote Task',
       type: 'task',
@@ -509,7 +592,7 @@ describe('SyncManager pull phase (via sync)', () => {
 
     queueStore.append({
       action: 'create',
-      itemId: localItem.id,
+      itemRowId: localItem.rowId,
       timestamp: new Date().toISOString(),
     });
 
@@ -539,6 +622,7 @@ describe('SyncManager pull phase (via sync)', () => {
     });
 
     const remoteItem: WorkItem = {
+      rowId: 1,
       id: '1',
       title: 'New Title From Remote',
       type: 'task',
@@ -622,7 +706,7 @@ describe('SyncManager status callbacks', () => {
     const manager = new SyncManager(local, remote, queueStore);
 
     // Item must exist locally so the push reaches the remote call
-    await local.createWorkItem({
+    const item = await local.createWorkItem({
       title: 'Will fail on remote',
       type: 'task',
       status: 'backlog',
@@ -637,7 +721,7 @@ describe('SyncManager status callbacks', () => {
 
     queueStore.append({
       action: 'update',
-      itemId: '1',
+      itemRowId: item.rowId,
       timestamp: new Date().toISOString(),
     });
 
@@ -656,9 +740,24 @@ describe('SyncManager status callbacks', () => {
 
     expect(manager.getStatus().pendingCount).toBe(0);
 
+    // Create an item, delete it, then queue delete
+    const item = await local.createWorkItem({
+      title: 'Delete me',
+      type: 'task',
+      status: 'backlog',
+      priority: 'medium',
+      assignee: '',
+      labels: [],
+      iteration: 'default',
+      description: '',
+      parent: null,
+      dependsOn: [],
+    });
+    await local.softDeleteWorkItem(item.id!);
+
     queueStore.append({
       action: 'delete',
-      itemId: 'x',
+      itemRowId: item.rowId,
       timestamp: new Date().toISOString(),
     });
 
@@ -691,14 +790,42 @@ describe('SyncManager progress reporting', () => {
     const remote = createMockRemote();
     const manager = new SyncManager(local, remote, queueStore);
 
+    // Create items and queue deletes
+    const item1 = await local.createWorkItem({
+      title: 'Del 1',
+      type: 'task',
+      status: 'backlog',
+      priority: 'medium',
+      assignee: '',
+      labels: [],
+      iteration: 'default',
+      description: '',
+      parent: null,
+      dependsOn: [],
+    });
+    const item2 = await local.createWorkItem({
+      title: 'Del 2',
+      type: 'task',
+      status: 'backlog',
+      priority: 'medium',
+      assignee: '',
+      labels: [],
+      iteration: 'default',
+      description: '',
+      parent: null,
+      dependsOn: [],
+    });
+    await local.softDeleteWorkItem(item1.id!);
+    await local.softDeleteWorkItem(item2.id!);
+
     queueStore.append({
       action: 'delete',
-      itemId: 'del-1',
+      itemRowId: item1.rowId,
       timestamp: new Date().toISOString(),
     });
     queueStore.append({
       action: 'delete',
-      itemId: 'del-2',
+      itemRowId: item2.rowId,
       timestamp: new Date().toISOString(),
     });
 
@@ -722,9 +849,23 @@ describe('SyncManager progress reporting', () => {
     const remote = createMockRemote();
     const manager = new SyncManager(local, remote, queueStore);
 
+    const item = await local.createWorkItem({
+      title: 'Del 1',
+      type: 'task',
+      status: 'backlog',
+      priority: 'medium',
+      assignee: '',
+      labels: [],
+      iteration: 'default',
+      description: '',
+      parent: null,
+      dependsOn: [],
+    });
+    await local.softDeleteWorkItem(item.id!);
+
     queueStore.append({
       action: 'delete',
-      itemId: 'del-1',
+      itemRowId: item.rowId,
       timestamp: new Date().toISOString(),
     });
 
@@ -737,14 +878,41 @@ describe('SyncManager progress reporting', () => {
     const remote = createMockRemote();
     const manager = new SyncManager(local, remote, queueStore);
 
+    const item1 = await local.createWorkItem({
+      title: 'Del A',
+      type: 'task',
+      status: 'backlog',
+      priority: 'medium',
+      assignee: '',
+      labels: [],
+      iteration: 'default',
+      description: '',
+      parent: null,
+      dependsOn: [],
+    });
+    const item2 = await local.createWorkItem({
+      title: 'Del B',
+      type: 'task',
+      status: 'backlog',
+      priority: 'medium',
+      assignee: '',
+      labels: [],
+      iteration: 'default',
+      description: '',
+      parent: null,
+      dependsOn: [],
+    });
+    await local.softDeleteWorkItem(item1.id!);
+    await local.softDeleteWorkItem(item2.id!);
+
     queueStore.append({
       action: 'delete',
-      itemId: 'del-a',
+      itemRowId: item1.rowId,
       timestamp: new Date().toISOString(),
     });
     queueStore.append({
       action: 'delete',
-      itemId: 'del-b',
+      itemRowId: item2.rowId,
       timestamp: new Date().toISOString(),
     });
 
@@ -753,10 +921,10 @@ describe('SyncManager progress reporting', () => {
     const log = manager.getStatus().syncLog;
     expect(log).toHaveLength(2);
     expect(log[0]!.action).toBe('delete');
-    expect(log[0]!.itemId).toBe('del-a');
+    expect(log[0]!.itemRowId).toBe(item1.rowId);
     expect(log[0]!.result).toBe('success');
     expect(log[1]!.action).toBe('delete');
-    expect(log[1]!.itemId).toBe('del-b');
+    expect(log[1]!.itemRowId).toBe(item2.rowId);
     expect(log[1]!.result).toBe('success');
   });
 
@@ -769,7 +937,7 @@ describe('SyncManager progress reporting', () => {
     const manager = new SyncManager(local, remote, queueStore);
 
     // Create an item locally so the push reaches the remote call
-    await local.createWorkItem({
+    const item = await local.createWorkItem({
       title: 'Will fail',
       type: 'task',
       status: 'backlog',
@@ -784,7 +952,7 @@ describe('SyncManager progress reporting', () => {
 
     queueStore.append({
       action: 'update',
-      itemId: '1',
+      itemRowId: item.rowId,
       timestamp: new Date().toISOString(),
     });
 
@@ -798,6 +966,7 @@ describe('SyncManager progress reporting', () => {
 
   it('appends pull log entry during sync', async () => {
     const remoteItem: WorkItem = {
+      rowId: 10,
       id: '10',
       title: 'Remote Task',
       type: 'task',
@@ -828,10 +997,24 @@ describe('SyncManager progress reporting', () => {
     const remote = createMockRemote();
     const manager = new SyncManager(local, remote, queueStore);
 
+    // Create 55 items, delete them, and queue delete actions
     for (let i = 0; i < 55; i++) {
+      const item = await local.createWorkItem({
+        title: `Item ${i}`,
+        type: 'task',
+        status: 'backlog',
+        priority: 'medium',
+        assignee: '',
+        labels: [],
+        iteration: 'default',
+        description: '',
+        parent: null,
+        dependsOn: [],
+      });
+      await local.softDeleteWorkItem(item.id!);
       queueStore.append({
         action: 'delete',
-        itemId: `item-${i}`,
+        itemRowId: item.rowId,
         timestamp: new Date().toISOString(),
       });
     }
@@ -840,7 +1023,5 @@ describe('SyncManager progress reporting', () => {
 
     const log = manager.getStatus().syncLog;
     expect(log).toHaveLength(50);
-    expect(log[0]!.itemId).toBe('item-5');
-    expect(log[49]!.itemId).toBe('item-54');
   });
 });

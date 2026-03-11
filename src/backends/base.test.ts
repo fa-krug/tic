@@ -180,20 +180,20 @@ describe('BaseBackend', () => {
       });
 
       it('throws for unsupported parent with non-null value', () => {
-        expect(() => backend.testValidateFields({ parent: '1' })).toThrow(
+        expect(() => backend.testValidateFields({ parent: 1 })).toThrow(
           UnsupportedOperationError,
         );
-        expect(() => backend.testValidateFields({ parent: '42' })).toThrow(
+        expect(() => backend.testValidateFields({ parent: 42 })).toThrow(
           UnsupportedOperationError,
         );
       });
 
       it('throws for unsupported dependsOn with non-empty array', () => {
-        expect(() => backend.testValidateFields({ dependsOn: ['1'] })).toThrow(
+        expect(() => backend.testValidateFields({ dependsOn: [1] })).toThrow(
           UnsupportedOperationError,
         );
         expect(() =>
-          backend.testValidateFields({ dependsOn: ['1', '2', '3'] }),
+          backend.testValidateFields({ dependsOn: [1, 2, 3] }),
         ).toThrow(UnsupportedOperationError);
       });
 
@@ -245,8 +245,8 @@ describe('BaseBackend', () => {
             priority: 'critical',
             assignee: 'alice',
             labels: ['bug', 'feature'],
-            parent: '5',
-            dependsOn: ['1', '2'],
+            parent: 5,
+            dependsOn: [1, 2],
           }),
         ).not.toThrow();
       });

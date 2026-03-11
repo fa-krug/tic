@@ -31,6 +31,7 @@ describe('items', () => {
 
   it('writes and reads a work item', async () => {
     const item: WorkItem = {
+      rowId: 1,
       id: '1',
       title: 'Test item',
       type: 'task',
@@ -56,6 +57,7 @@ describe('items', () => {
 
   it('writes and reads a work item with comments', async () => {
     const item: WorkItem = {
+      rowId: 2,
       id: '2',
       title: 'With comments',
       type: 'epic',
@@ -86,6 +88,7 @@ describe('items', () => {
 
   it('deletes a work item file', async () => {
     const item: WorkItem = {
+      rowId: 3,
       id: '3',
       title: 'To delete',
       type: 'issue',
@@ -109,6 +112,7 @@ describe('items', () => {
 
   it('lists all item files', async () => {
     await writeWorkItem(tmpDir, {
+      rowId: 1,
       id: '1',
       title: 'A',
       type: 'task',
@@ -125,6 +129,7 @@ describe('items', () => {
       dependsOn: [],
     });
     await writeWorkItem(tmpDir, {
+      rowId: 2,
       id: '2',
       title: 'B',
       type: 'epic',
@@ -146,6 +151,7 @@ describe('items', () => {
 
   it('writes and reads a work item with parent and dependsOn', async () => {
     const item: WorkItem = {
+      rowId: 1,
       id: '1',
       title: 'Child item',
       type: 'task',
@@ -158,17 +164,18 @@ describe('items', () => {
       updated: '2026-01-31T00:00:00Z',
       description: 'A child.',
       comments: [],
-      parent: '5',
-      dependsOn: ['3', '4'],
+      parent: 5,
+      dependsOn: [3, 4],
     };
     await writeWorkItem(tmpDir, item);
     const read = await readWorkItem(tmpDir, '1');
-    expect(read.parent).toBe('5');
-    expect(read.dependsOn).toEqual(['3', '4']);
+    expect(read.parent).toBe(5);
+    expect(read.dependsOn).toEqual([3, 4]);
   });
 
   it('reads items without parent/dependsOn as defaults', async () => {
     const item: WorkItem = {
+      rowId: 2,
       id: '2',
       title: 'Legacy item',
       type: 'issue',
@@ -191,7 +198,7 @@ describe('items', () => {
   });
 
   describe('soft-delete and restore', () => {
-    const makeItem = (id: string): WorkItem =>
+    const makeItem = (id: number): WorkItem =>
       makeWorkItem(id, {
         iteration: 'v1',
         description: 'Test item.',
@@ -200,7 +207,7 @@ describe('items', () => {
       });
 
     it('softDeleteWorkItem moves item to trash so readWorkItem fails', async () => {
-      await writeWorkItem(tmpDir, makeItem('10'));
+      await writeWorkItem(tmpDir, makeItem(10));
       await softDeleteWorkItem(tmpDir, '10');
 
       // readWorkItem should fail because file is gone from items/
@@ -212,7 +219,7 @@ describe('items', () => {
     });
 
     it('restoreWorkItem moves item back so readWorkItem works', async () => {
-      await writeWorkItem(tmpDir, makeItem('11'));
+      await writeWorkItem(tmpDir, makeItem(11));
       await softDeleteWorkItem(tmpDir, '11');
       await restoreWorkItem(tmpDir, '11');
 
@@ -226,7 +233,7 @@ describe('items', () => {
     });
 
     it('permanentlyDeleteWorkItem removes from trash', async () => {
-      await writeWorkItem(tmpDir, makeItem('12'));
+      await writeWorkItem(tmpDir, makeItem(12));
       await softDeleteWorkItem(tmpDir, '12');
 
       const trashFile = path.join(tmpDir, '.tic', 'trash', '12.md');
@@ -247,8 +254,8 @@ describe('items', () => {
     });
 
     it('cleanupTrash removes all trashed items', async () => {
-      await writeWorkItem(tmpDir, makeItem('20'));
-      await writeWorkItem(tmpDir, makeItem('21'));
+      await writeWorkItem(tmpDir, makeItem(20));
+      await writeWorkItem(tmpDir, makeItem(21));
       await softDeleteWorkItem(tmpDir, '20');
       await softDeleteWorkItem(tmpDir, '21');
 

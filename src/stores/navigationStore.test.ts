@@ -25,21 +25,21 @@ describe('navigationStore', () => {
     it('clears navigation stack when leaving form', () => {
       navigationStore.setState({
         screen: 'form',
-        navigationStack: ['item-1', 'item-2'],
+        navigationStack: [1, 2],
       });
       navigationStore.getState().navigate('list');
       expect(navigationStore.getState().navigationStack).toEqual([]);
     });
 
     it('preserves navigation stack when navigating to form', () => {
-      navigationStore.setState({ navigationStack: ['item-1'] });
+      navigationStore.setState({ navigationStack: [1] });
       navigationStore.getState().navigate('form');
-      expect(navigationStore.getState().navigationStack).toEqual(['item-1']);
+      expect(navigationStore.getState().navigationStack).toEqual([1]);
     });
 
     it('clears form stack when navigating away from form', () => {
       formStackStore.getState().push({
-        itemId: 'item-1',
+        itemId: 1,
         itemTitle: 'Test',
         fields: {
           title: 'Test',
@@ -76,7 +76,7 @@ describe('navigationStore', () => {
 
     it('preserves form stack when navigating to form', () => {
       formStackStore.getState().push({
-        itemId: 'item-1',
+        itemId: 1,
         itemTitle: 'Test',
         fields: {
           title: 'Test',
@@ -128,12 +128,12 @@ describe('navigationStore', () => {
 
   describe('selectWorkItem', () => {
     it('sets selected work item id', () => {
-      navigationStore.getState().selectWorkItem('item-123');
-      expect(navigationStore.getState().selectedWorkItemId).toBe('item-123');
+      navigationStore.getState().selectWorkItem(123);
+      expect(navigationStore.getState().selectedWorkItemId).toBe(123);
     });
 
     it('clears selected work item id', () => {
-      navigationStore.setState({ selectedWorkItemId: 'item-123' });
+      navigationStore.setState({ selectedWorkItemId: 123 });
       navigationStore.getState().selectWorkItem(null);
       expect(navigationStore.getState().selectedWorkItemId).toBeNull();
     });
@@ -141,58 +141,55 @@ describe('navigationStore', () => {
 
   describe('pushWorkItem', () => {
     it('pushes current item to stack and selects new', () => {
-      navigationStore.setState({ selectedWorkItemId: 'item-1' });
-      navigationStore.getState().pushWorkItem('item-2');
+      navigationStore.setState({ selectedWorkItemId: 1 });
+      navigationStore.getState().pushWorkItem(2);
 
-      expect(navigationStore.getState().selectedWorkItemId).toBe('item-2');
-      expect(navigationStore.getState().navigationStack).toEqual(['item-1']);
+      expect(navigationStore.getState().selectedWorkItemId).toBe(2);
+      expect(navigationStore.getState().navigationStack).toEqual([1]);
     });
 
     it('does not push null to stack', () => {
       navigationStore.setState({ selectedWorkItemId: null });
-      navigationStore.getState().pushWorkItem('item-1');
+      navigationStore.getState().pushWorkItem(1);
 
-      expect(navigationStore.getState().selectedWorkItemId).toBe('item-1');
+      expect(navigationStore.getState().selectedWorkItemId).toBe(1);
       expect(navigationStore.getState().navigationStack).toEqual([]);
     });
 
     it('builds up navigation stack', () => {
-      navigationStore.getState().pushWorkItem('item-1');
-      navigationStore.getState().pushWorkItem('item-2');
-      navigationStore.getState().pushWorkItem('item-3');
+      navigationStore.getState().pushWorkItem(1);
+      navigationStore.getState().pushWorkItem(2);
+      navigationStore.getState().pushWorkItem(3);
 
-      expect(navigationStore.getState().selectedWorkItemId).toBe('item-3');
-      expect(navigationStore.getState().navigationStack).toEqual([
-        'item-1',
-        'item-2',
-      ]);
+      expect(navigationStore.getState().selectedWorkItemId).toBe(3);
+      expect(navigationStore.getState().navigationStack).toEqual([1, 2]);
     });
   });
 
   describe('popWorkItem', () => {
     it('pops from stack and returns previous item', () => {
       navigationStore.setState({
-        selectedWorkItemId: 'item-2',
-        navigationStack: ['item-1'],
+        selectedWorkItemId: 2,
+        navigationStack: [1],
       });
 
       const prev = navigationStore.getState().popWorkItem();
 
-      expect(prev).toBe('item-1');
-      expect(navigationStore.getState().selectedWorkItemId).toBe('item-1');
+      expect(prev).toBe(1);
+      expect(navigationStore.getState().selectedWorkItemId).toBe(1);
       expect(navigationStore.getState().navigationStack).toEqual([]);
     });
 
     it('returns null when stack is empty', () => {
       navigationStore.setState({
-        selectedWorkItemId: 'item-1',
+        selectedWorkItemId: 1,
         navigationStack: [],
       });
 
       const prev = navigationStore.getState().popWorkItem();
 
       expect(prev).toBeNull();
-      expect(navigationStore.getState().selectedWorkItemId).toBe('item-1');
+      expect(navigationStore.getState().selectedWorkItemId).toBe(1);
     });
   });
 
@@ -227,12 +224,12 @@ describe('navigationStore', () => {
     });
 
     it('sets createChildParentId', () => {
-      navigationStore.getState().setCreateChildParentId('42');
-      expect(navigationStore.getState().createChildParentId).toBe('42');
+      navigationStore.getState().setCreateChildParentId(42);
+      expect(navigationStore.getState().createChildParentId).toBe(42);
     });
 
     it('clears createChildParentId', () => {
-      navigationStore.setState({ createChildParentId: '42' });
+      navigationStore.setState({ createChildParentId: 42 });
       navigationStore.getState().setCreateChildParentId(null);
       expect(navigationStore.getState().createChildParentId).toBeNull();
     });
@@ -243,8 +240,8 @@ describe('navigationStore', () => {
       navigationStore.setState({
         screen: 'settings',
         previousScreen: 'form',
-        selectedWorkItemId: 'item-1',
-        navigationStack: ['item-0'],
+        selectedWorkItemId: 1,
+        navigationStack: [0],
         activeType: 'bug',
         activeTemplate: { slug: 'test', name: 'Test', description: '' },
         formMode: 'template',
@@ -254,7 +251,7 @@ describe('navigationStore', () => {
           latest: '2.0.0',
           updateAvailable: true,
         },
-        createChildParentId: '99',
+        createChildParentId: 99,
       });
 
       navigationStore.getState().reset();

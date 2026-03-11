@@ -17,49 +17,64 @@ function parseItemId(raw: string): string {
 }
 
 /**
- * Detect circular parent chain: starting from parentId, walk parent pointers.
+ * Detect circular parent chain: starting from parentId (display ID), walk parent pointers.
  * If we reach currentItemId, it's circular.
+ * Note: item.parent is a rowId (number), so we use a rowId-keyed map to walk.
  */
 function hasCircularParent(
   parentId: string,
   currentItemId: string,
   items: WorkItem[],
 ): boolean {
-  const itemMap = new Map(items.map((item) => [item.id, item]));
-  let cursor: string | null = parentId;
-  const visited = new Set<string>();
-  while (cursor) {
-    if (cursor === currentItemId) return true;
-    if (visited.has(cursor)) return false; // cycle not involving current item
-    visited.add(cursor);
-    const item = itemMap.get(cursor);
-    cursor = item?.parent ?? null;
+  const itemByDisplayId = new Map(
+    items.filter((item) => item.id !== null).map((item) => [item.id!, item]),
+  );
+  const itemByRowId = new Map(items.map((item) => [item.rowId, item]));
+
+  // Start with display ID lookup
+  let currentItem = itemByDisplayId.get(parentId);
+  const visited = new Set<number>();
+
+  while (currentItem) {
+    if (currentItem.id === currentItemId) return true;
+    if (visited.has(currentItem.rowId)) return false; // cycle not involving current item
+    visited.add(currentItem.rowId);
+    if (currentItem.parent === null) break;
+    currentItem = itemByRowId.get(currentItem.parent);
   }
   return false;
 }
 
 /**
- * Detect circular dependency: DFS from depId following dependsOn edges.
+ * Detect circular dependency: DFS from depId (display ID) following dependsOn edges.
  * If we reach currentItemId, it's circular.
+ * Note: item.dependsOn contains rowIds (numbers), so we use a rowId-keyed map.
  */
 function hasCircularDependency(
   depId: string,
   currentItemId: string,
   items: WorkItem[],
 ): boolean {
-  const itemMap = new Map(items.map((item) => [item.id, item]));
-  const visited = new Set<string>();
-  const stack = [depId];
+  const itemByDisplayId = new Map(
+    items.filter((item) => item.id !== null).map((item) => [item.id!, item]),
+  );
+  const itemByRowId = new Map(items.map((item) => [item.rowId, item]));
+  const visited = new Set<number>();
+
+  // Start by resolving the display ID
+  const startItem = itemByDisplayId.get(depId);
+  if (!startItem) return false;
+  const stack = [startItem.rowId];
+
   while (stack.length > 0) {
-    const id = stack.pop()!;
-    if (id === currentItemId) return true;
-    if (visited.has(id)) continue;
-    visited.add(id);
-    const item = itemMap.get(id);
-    if (item) {
-      for (const dep of item.dependsOn) {
-        stack.push(dep);
-      }
+    const rowId = stack.pop()!;
+    const item = itemByRowId.get(rowId);
+    if (!item) continue;
+    if (item.id === currentItemId) return true;
+    if (visited.has(rowId)) continue;
+    visited.add(rowId);
+    for (const dep of item.dependsOn) {
+      stack.push(dep);
     }
   }
   return false;

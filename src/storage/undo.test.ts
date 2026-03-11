@@ -15,6 +15,7 @@ function makeEntry(overrides?: Partial<UndoEntry>): UndoEntry {
     label: 'Delete item #1',
     itemSnapshots: [
       {
+        rowId: 1,
         id: '1',
         title: 'Test',
         type: 'issue',
@@ -25,13 +26,13 @@ function makeEntry(overrides?: Partial<UndoEntry>): UndoEntry {
         assignee: '',
         labels: ['bug'],
         parent: null,
-        dependsOn: ['2'],
+        dependsOn: [2],
         comments: [],
         created: '2025-01-01T00:00:00Z',
         updated: '2025-01-01T00:00:00Z',
       },
     ],
-    syncItemIds: ['1'],
+    syncItemRowIds: [1],
     syncAction: 'delete',
     ...overrides,
   };
@@ -59,8 +60,8 @@ describe('undo persistence', () => {
     expect(popped!.itemSnapshots).toHaveLength(1);
     expect(popped!.itemSnapshots[0]!.title).toBe('Test');
     expect(popped!.itemSnapshots[0]!.labels).toEqual(['bug']);
-    expect(popped!.itemSnapshots[0]!.dependsOn).toEqual(['2']);
-    expect(popped!.syncItemIds).toEqual(['1']);
+    expect(popped!.itemSnapshots[0]!.dependsOn).toEqual([2]);
+    expect(popped!.syncItemRowIds).toEqual([1]);
     expect(popped!.syncAction).toBe('delete');
   });
 
@@ -103,6 +104,7 @@ describe('undo persistence', () => {
     const entry = makeEntry({
       itemSnapshots: [
         {
+          rowId: 42,
           id: '42',
           title: 'Complex item',
           type: 'bug',
@@ -112,8 +114,8 @@ describe('undo persistence', () => {
           priority: 'high',
           assignee: 'alice',
           labels: ['bug', 'ux', 'critical'],
-          parent: '10',
-          dependsOn: ['5', '6', '7'],
+          parent: 10,
+          dependsOn: [5, 6, 7],
           comments: [],
           created: '2025-06-01T00:00:00Z',
           updated: '2025-06-15T00:00:00Z',
@@ -125,8 +127,8 @@ describe('undo persistence', () => {
     const snap = popped!.itemSnapshots[0]!;
     expect(snap.id).toBe('42');
     expect(snap.labels).toEqual(['bug', 'ux', 'critical']);
-    expect(snap.dependsOn).toEqual(['5', '6', '7']);
-    expect(snap.parent).toBe('10');
+    expect(snap.dependsOn).toEqual([5, 6, 7]);
+    expect(snap.parent).toBe(10);
     expect(snap.priority).toBe('high');
     expect(snap.assignee).toBe('alice');
   });
@@ -136,6 +138,7 @@ describe('undo persistence', () => {
       label: 'Delete 3 items',
       itemSnapshots: [
         {
+          rowId: 1,
           id: '1',
           title: 'Item 1',
           type: 'issue',
@@ -152,6 +155,7 @@ describe('undo persistence', () => {
           updated: '2025-01-01T00:00:00Z',
         },
         {
+          rowId: 2,
           id: '2',
           title: 'Item 2',
           type: 'bug',
@@ -168,6 +172,7 @@ describe('undo persistence', () => {
           updated: '2025-01-01T00:00:00Z',
         },
         {
+          rowId: 3,
           id: '3',
           title: 'Item 3',
           type: 'task',
@@ -177,31 +182,31 @@ describe('undo persistence', () => {
           priority: '' as 'low' | 'medium' | 'high' | 'critical',
           assignee: '',
           labels: [],
-          parent: '1',
-          dependsOn: ['2'],
+          parent: 1,
+          dependsOn: [2],
           comments: [],
           created: '2025-01-01T00:00:00Z',
           updated: '2025-01-01T00:00:00Z',
         },
       ],
-      syncItemIds: ['1', '2', '3'],
+      syncItemRowIds: [1, 2, 3],
     });
     pushUndoEntry(db, entry);
     const popped = popUndoEntry(db);
     expect(popped!.itemSnapshots).toHaveLength(3);
     expect(popped!.itemSnapshots[0]!.title).toBe('Item 1');
-    expect(popped!.itemSnapshots[2]!.parent).toBe('1');
-    expect(popped!.itemSnapshots[2]!.dependsOn).toEqual(['2']);
+    expect(popped!.itemSnapshots[2]!.parent).toBe(1);
+    expect(popped!.itemSnapshots[2]!.dependsOn).toEqual([2]);
   });
 
-  it('handles createdIds field', () => {
+  it('handles createdRowIds field', () => {
     const entry = makeEntry({
       type: 'create',
       syncAction: 'create',
-      createdIds: ['1', '2'],
+      createdRowIds: [1, 2],
     });
     pushUndoEntry(db, entry);
     const popped = popUndoEntry(db);
-    expect(popped!.createdIds).toEqual(['1', '2']);
+    expect(popped!.createdRowIds).toEqual([1, 2]);
   });
 });

@@ -4,13 +4,15 @@ import {
   integer,
   index,
   primaryKey,
+  uniqueIndex,
 } from 'drizzle-orm/sqlite-core';
 
 // 1. Work Items
 export const workItems = sqliteTable(
   'work_items',
   {
-    id: text('id').primaryKey(),
+    rowId: integer('row_id').primaryKey({ autoIncrement: true }),
+    id: text('id'),
     title: text('title').notNull(),
     type: text('type').notNull(),
     status: text('status').notNull(),
@@ -18,12 +20,13 @@ export const workItems = sqliteTable(
     priority: text('priority').notNull().default(''),
     assignee: text('assignee').notNull().default(''),
     description: text('description').notNull().default(''),
-    parent: text('parent'),
+    parent: integer('parent'),
     created: text('created').notNull(),
     updated: text('updated').notNull(),
     deletedAt: text('deleted_at'),
   },
   (t) => [
+    uniqueIndex('idx_display_id').on(t.id),
     index('idx_status').on(t.status),
     index('idx_type').on(t.type),
     index('idx_assignee').on(t.assignee),
@@ -40,13 +43,13 @@ export const workItems = sqliteTable(
 export const workItemLabels = sqliteTable(
   'work_item_labels',
   {
-    workItemId: text('work_item_id')
+    workItemRowId: integer('work_item_row_id')
       .notNull()
-      .references(() => workItems.id, { onDelete: 'cascade' }),
+      .references(() => workItems.rowId, { onDelete: 'cascade' }),
     label: text('label').notNull(),
   },
   (t) => [
-    primaryKey({ columns: [t.workItemId, t.label] }),
+    primaryKey({ columns: [t.workItemRowId, t.label] }),
     index('idx_label').on(t.label),
   ],
 );
@@ -55,16 +58,16 @@ export const workItemLabels = sqliteTable(
 export const workItemDeps = sqliteTable(
   'work_item_deps',
   {
-    workItemId: text('work_item_id')
+    workItemRowId: integer('work_item_row_id')
       .notNull()
-      .references(() => workItems.id, { onDelete: 'cascade' }),
-    dependsOnId: text('depends_on_id')
+      .references(() => workItems.rowId, { onDelete: 'cascade' }),
+    dependsOnRowId: integer('depends_on_row_id')
       .notNull()
-      .references(() => workItems.id, { onDelete: 'cascade' }),
+      .references(() => workItems.rowId, { onDelete: 'cascade' }),
   },
   (t) => [
-    primaryKey({ columns: [t.workItemId, t.dependsOnId] }),
-    index('idx_dep_target').on(t.dependsOnId),
+    primaryKey({ columns: [t.workItemRowId, t.dependsOnRowId] }),
+    index('idx_dep_target').on(t.dependsOnRowId),
   ],
 );
 
@@ -73,14 +76,14 @@ export const comments = sqliteTable(
   'comments',
   {
     id: integer('id').primaryKey({ autoIncrement: true }),
-    workItemId: text('work_item_id')
+    workItemRowId: integer('work_item_row_id')
       .notNull()
-      .references(() => workItems.id, { onDelete: 'cascade' }),
+      .references(() => workItems.rowId, { onDelete: 'cascade' }),
     author: text('author').notNull().default(''),
     body: text('body').notNull(),
     created: text('created').notNull(),
   },
-  (t) => [index('idx_comment_item').on(t.workItemId)],
+  (t) => [index('idx_comment_item').on(t.workItemRowId)],
 );
 
 // 5. Templates
@@ -125,7 +128,6 @@ export const projectConfig = sqliteTable('project_config', {
   id: integer('id').primaryKey().default(1),
   backend: text('backend').notNull().default('none'),
   currentIteration: text('current_iteration').notNull().default(''),
-  nextId: integer('next_id').notNull().default(1),
   branchMode: text('branch_mode').notNull().default('branch'),
   branchCommand: text('branch_command').notNull().default(''),
   copyToClipboard: integer('copy_to_clipboard', { mode: 'boolean' })
@@ -208,66 +210,26 @@ export const syncQueue = sqliteTable(
   {
     id: integer('id').primaryKey({ autoIncrement: true }),
     action: text('action').notNull(),
-    itemId: text('item_id').notNull(),
+    itemRowId: integer('item_row_id').notNull(),
     timestamp: text('timestamp').notNull(),
     commentData: text('comment_data'),
     templateSlug: text('template_slug'),
   },
-  (t) => [index('idx_queue_item').on(t.itemId, t.action)],
+  (t) => [index('idx_queue_item').on(t.itemRowId, t.action)],
 );
 
 // 17. Undo Stack
 export const undoStack = sqliteTable('undo_stack', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   action: text('action').notNull(),
-  itemId: text('item_id').notNull(),
+  metadata: text('metadata').notNull(),
   createdAt: text('created_at').notNull(),
 });
 
-// 18. Undo Item Snapshot (1:1 with undo_stack)
-export const undoItemSnapshot = sqliteTable('undo_item_snapshot', {
-  undoId: integer('undo_id')
-    .primaryKey()
-    .references(() => undoStack.id, { onDelete: 'cascade' }),
-  title: text('title').notNull(),
-  type: text('type').notNull(),
-  status: text('status').notNull(),
-  iteration: text('iteration').notNull(),
-  priority: text('priority').notNull(),
-  assignee: text('assignee').notNull(),
-  description: text('description').notNull(),
-  parent: text('parent'),
-  created: text('created').notNull(),
-  updated: text('updated').notNull(),
-});
-
-// 19. Undo Item Snapshot Labels (junction)
-export const undoItemSnapshotLabels = sqliteTable(
-  'undo_item_snapshot_labels',
-  {
-    undoId: integer('undo_id')
-      .notNull()
-      .references(() => undoStack.id, { onDelete: 'cascade' }),
-    label: text('label').notNull(),
-  },
-  (t) => [primaryKey({ columns: [t.undoId, t.label] })],
-);
-
-// 20. Undo Item Snapshot Dependencies (junction)
-export const undoItemSnapshotDeps = sqliteTable(
-  'undo_item_snapshot_deps',
-  {
-    undoId: integer('undo_id')
-      .notNull()
-      .references(() => undoStack.id, { onDelete: 'cascade' }),
-    dependsOnId: text('depends_on_id').notNull(),
-  },
-  (t) => [primaryKey({ columns: [t.undoId, t.dependsOnId] })],
-);
-
-// 21. File Sync State
+// 18. File Sync State
 export const fileSyncState = sqliteTable('file_sync_state', {
-  itemId: text('item_id').primaryKey(),
+  itemRowId: integer('item_row_id').primaryKey(),
+  displayId: text('display_id').notNull(),
   hash: text('hash').notNull(),
   syncedAt: text('synced_at').notNull(),
 });
@@ -314,12 +276,12 @@ export const prItemLinks = sqliteTable(
     prId: text('pr_id')
       .notNull()
       .references(() => pullRequests.id, { onDelete: 'cascade' }),
-    itemId: text('item_id')
+    itemRowId: integer('item_row_id')
       .notNull()
-      .references(() => workItems.id, { onDelete: 'cascade' }),
+      .references(() => workItems.rowId, { onDelete: 'cascade' }),
   },
   (t) => [
-    primaryKey({ columns: [t.prId, t.itemId] }),
-    index('idx_pr_link_item').on(t.itemId),
+    primaryKey({ columns: [t.prId, t.itemRowId] }),
+    index('idx_pr_link_item').on(t.itemRowId),
   ],
 );

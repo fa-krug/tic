@@ -65,6 +65,7 @@ describe('FilesBackend', () => {
   describe('importWorkItem', () => {
     it('writes item preserving ID', async () => {
       const item: WorkItem = {
+        rowId: 42,
         id: '42',
         title: 'Test item',
         type: 'issue',
@@ -107,6 +108,7 @@ describe('FilesBackend', () => {
 
     it('preserves relationships', async () => {
       const parent: WorkItem = {
+        rowId: 1,
         id: '1',
         title: 'Parent',
         type: 'epic',
@@ -124,6 +126,7 @@ describe('FilesBackend', () => {
       };
 
       const child: WorkItem = {
+        rowId: 2,
         id: '2',
         title: 'Child',
         type: 'task',
@@ -136,20 +139,21 @@ describe('FilesBackend', () => {
         updated: '2025-01-01T00:00:00.000Z',
         description: '',
         comments: [],
-        parent: '1',
-        dependsOn: ['1'],
+        parent: 1,
+        dependsOn: [1],
       };
 
       await backend.importWorkItem(parent);
       await backend.importWorkItem(child);
 
       const readChild = await backend.getWorkItem('2');
-      expect(readChild.parent).toBe('1');
-      expect(readChild.dependsOn).toEqual(['1']);
+      expect(readChild.parent).toBe(1);
+      expect(readChild.dependsOn).toEqual([1]);
     });
 
     it('preserves comments', async () => {
       const item: WorkItem = {
+        rowId: 10,
         id: '10',
         title: 'Commented item',
         type: 'issue',
@@ -187,6 +191,7 @@ describe('FilesBackend', () => {
 
     it('overwrites existing item with same ID', async () => {
       const item1: WorkItem = {
+        rowId: 5,
         id: '5',
         title: 'Version 1',
         type: 'issue',
@@ -222,6 +227,7 @@ describe('FilesBackend', () => {
 
   describe('CRUD operations', () => {
     const sampleItem: WorkItem = {
+      rowId: 1,
       id: '1',
       title: 'Sample item',
       type: 'task',
@@ -289,6 +295,7 @@ describe('FilesBackend', () => {
   describe('comments', () => {
     it('adds a comment to an existing item', async () => {
       const item: WorkItem = {
+        rowId: 7,
         id: '7',
         title: 'Commentable',
         type: 'issue',
@@ -324,6 +331,7 @@ describe('FilesBackend', () => {
   describe('children and dependents', () => {
     it('finds children of an item', async () => {
       await backend.importWorkItem({
+        rowId: 1,
         id: '1',
         title: 'Parent',
         type: 'epic',
@@ -340,6 +348,7 @@ describe('FilesBackend', () => {
         dependsOn: [],
       });
       await backend.importWorkItem({
+        rowId: 2,
         id: '2',
         title: 'Child 1',
         type: 'task',
@@ -352,10 +361,11 @@ describe('FilesBackend', () => {
         updated: '2025-01-01T00:00:00.000Z',
         description: '',
         comments: [],
-        parent: '1',
+        parent: 1,
         dependsOn: [],
       });
       await backend.importWorkItem({
+        rowId: 3,
         id: '3',
         title: 'Not a child',
         type: 'task',
@@ -379,6 +389,7 @@ describe('FilesBackend', () => {
 
     it('finds dependents of an item', async () => {
       await backend.importWorkItem({
+        rowId: 1,
         id: '1',
         title: 'Dependency',
         type: 'task',
@@ -395,6 +406,7 @@ describe('FilesBackend', () => {
         dependsOn: [],
       });
       await backend.importWorkItem({
+        rowId: 2,
         id: '2',
         title: 'Depends on 1',
         type: 'task',
@@ -408,7 +420,7 @@ describe('FilesBackend', () => {
         description: '',
         comments: [],
         parent: null,
-        dependsOn: ['1'],
+        dependsOn: [1],
       });
 
       const dependents = await backend.getDependents('1');
