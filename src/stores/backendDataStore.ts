@@ -701,7 +701,9 @@ export const backendDataStore = createStore<BackendDataStoreState>(
       // Import into local storage
       if (currentBackend && isPrBackend(currentBackend)) {
         type StorageType = import('../storage/index.js').Storage;
-        await (currentBackend as StorageType).importPullRequest(result);
+        await (currentBackend as unknown as StorageType).importPullRequest(
+          result,
+        );
       }
       await get().loadPullRequests();
       return result;
@@ -714,7 +716,9 @@ export const backendDataStore = createStore<BackendDataStoreState>(
       const result = await currentRemoteBackend.mergePullRequest(id);
       if (currentBackend && isPrBackend(currentBackend)) {
         type StorageType = import('../storage/index.js').Storage;
-        await (currentBackend as StorageType).importPullRequest(result);
+        await (currentBackend as unknown as StorageType).importPullRequest(
+          result,
+        );
       }
       await get().loadPullRequests();
       return result;
@@ -727,7 +731,9 @@ export const backendDataStore = createStore<BackendDataStoreState>(
       const result = await currentRemoteBackend.closePullRequest(id);
       if (currentBackend && isPrBackend(currentBackend)) {
         type StorageType = import('../storage/index.js').Storage;
-        await (currentBackend as StorageType).importPullRequest(result);
+        await (currentBackend as unknown as StorageType).importPullRequest(
+          result,
+        );
       }
       await get().loadPullRequests();
       return result;

@@ -55,16 +55,22 @@ export async function runPrCreate(
   if (!caps.create) {
     throw new Error('This backend does not support creating pull requests');
   }
+  const linkDisplayIds = opts.link
+    ? opts.link
+        .split(',')
+        .map((l) => l.trim())
+        .filter((l) => l.length > 0)
+    : [];
+  const linkedRowIds: number[] = [];
+  for (const lid of linkDisplayIds) {
+    const item = await backend.getWorkItem(lid);
+    linkedRowIds.push(item.rowId);
+  }
   const newPr: NewPullRequest = {
     title: opts.title,
     sourceBranch: opts.source,
     targetBranch: opts.target,
-    linkedItems: opts.link
-      ? opts.link
-          .split(',')
-          .map((l) => l.trim())
-          .filter((l) => l.length > 0)
-      : [],
+    linkedItems: linkedRowIds,
   };
   return prBackend.createPullRequest(newPr);
 }

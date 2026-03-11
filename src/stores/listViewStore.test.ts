@@ -27,42 +27,40 @@ describe('listViewStore', () => {
 
   describe('expandedIds', () => {
     it('toggles expanded state on', () => {
-      listViewStore.getState().toggleExpanded('item-1');
-      expect(listViewStore.getState().expandedIds.has('item-1')).toBe(true);
+      listViewStore.getState().toggleExpanded(1);
+      expect(listViewStore.getState().expandedIds.has(1)).toBe(true);
     });
 
     it('toggles expanded state off', () => {
-      listViewStore.getState().toggleExpanded('item-1');
-      listViewStore.getState().toggleExpanded('item-1');
-      expect(listViewStore.getState().expandedIds.has('item-1')).toBe(false);
+      listViewStore.getState().toggleExpanded(1);
+      listViewStore.getState().toggleExpanded(1);
+      expect(listViewStore.getState().expandedIds.has(1)).toBe(false);
     });
   });
 
   describe('markedIds', () => {
     it('toggles marked state', () => {
-      listViewStore.getState().toggleMarked('item-1');
-      expect(listViewStore.getState().markedIds.has('item-1')).toBe(true);
-      listViewStore.getState().toggleMarked('item-1');
-      expect(listViewStore.getState().markedIds.has('item-1')).toBe(false);
+      listViewStore.getState().toggleMarked(1);
+      expect(listViewStore.getState().markedIds.has(1)).toBe(true);
+      listViewStore.getState().toggleMarked(1);
+      expect(listViewStore.getState().markedIds.has(1)).toBe(false);
     });
 
     it('clears all marked items', () => {
-      listViewStore.getState().toggleMarked('item-1');
-      listViewStore.getState().toggleMarked('item-2');
+      listViewStore.getState().toggleMarked(1);
+      listViewStore.getState().toggleMarked(2);
       listViewStore.getState().clearMarked();
       expect(listViewStore.getState().markedIds.size).toBe(0);
     });
 
     it('sets marked ids to exact set', () => {
-      listViewStore.getState().toggleMarked('item-1');
-      listViewStore.getState().setMarkedIds(new Set(['item-2', 'item-3']));
-      expect(listViewStore.getState().markedIds).toEqual(
-        new Set(['item-2', 'item-3']),
-      );
+      listViewStore.getState().toggleMarked(1);
+      listViewStore.getState().setMarkedIds(new Set([2, 3]));
+      expect(listViewStore.getState().markedIds).toEqual(new Set([2, 3]));
     });
 
     it('sets marked ids to empty set', () => {
-      listViewStore.getState().toggleMarked('item-1');
+      listViewStore.getState().toggleMarked(1);
       listViewStore.getState().setMarkedIds(new Set());
       expect(listViewStore.getState().markedIds.size).toBe(0);
     });
@@ -89,11 +87,11 @@ describe('listViewStore', () => {
 
   describe('removeDeletedItem', () => {
     it('removes item from expandedIds and markedIds', () => {
-      listViewStore.getState().toggleExpanded('item-1');
-      listViewStore.getState().toggleMarked('item-1');
-      listViewStore.getState().removeDeletedItem('item-1');
-      expect(listViewStore.getState().expandedIds.has('item-1')).toBe(false);
-      expect(listViewStore.getState().markedIds.has('item-1')).toBe(false);
+      listViewStore.getState().toggleExpanded(1);
+      listViewStore.getState().toggleMarked(1);
+      listViewStore.getState().removeDeletedItem(1);
+      expect(listViewStore.getState().expandedIds.has(1)).toBe(false);
+      expect(listViewStore.getState().markedIds.has(1)).toBe(false);
     });
   });
 
@@ -175,8 +173,8 @@ describe('listViewStore', () => {
   describe('reset', () => {
     it('resets all state', () => {
       listViewStore.getState().setCursor(5);
-      listViewStore.getState().toggleExpanded('item-1');
-      listViewStore.getState().toggleMarked('item-2');
+      listViewStore.getState().toggleExpanded(1);
+      listViewStore.getState().toggleMarked(2);
       listViewStore.getState().setScrollOffset(100);
       listViewStore.getState().reset();
 

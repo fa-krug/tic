@@ -68,10 +68,7 @@ describe('Breadcrumbs', () => {
     formStackStore
       .getState()
       .push(
-        createDraft(
-          1,
-          'This is a very long title that should be truncated',
-        ),
+        createDraft(1, 'This is a very long title that should be truncated'),
       );
     formStackStore.getState().push(createDraft(2, 'Short'));
 

@@ -66,6 +66,24 @@ export async function runItemCreate(
     );
   }
 
+  // Resolve display ID strings to rowIds for relationships
+  let parentRowId: number | null = null;
+  if (opts.parent) {
+    const parentItem = await backend.getWorkItem(opts.parent);
+    parentRowId = parentItem.rowId;
+  }
+  const depDisplayIds = opts.dependsOn
+    ? opts.dependsOn
+        .split(',')
+        .map((d) => d.trim())
+        .filter((d) => d.length > 0)
+    : [];
+  const depRowIds: number[] = [];
+  for (const depId of depDisplayIds) {
+    const depItem = await backend.getWorkItem(depId);
+    depRowIds.push(depItem.rowId);
+  }
+
   return backend.cachedCreateWorkItem({
     title,
     type: opts.type ?? (types.includes('task') ? 'task' : (types[0] ?? 'task')),
@@ -74,13 +92,8 @@ export async function runItemCreate(
     assignee: opts.assignee ?? '',
     labels: opts.labels ? opts.labels.split(',').map((l) => l.trim()) : [],
     iteration: opts.iteration ?? (await backend.getCurrentIteration()),
-    parent: opts.parent ? opts.parent : null,
-    dependsOn: opts.dependsOn
-      ? opts.dependsOn
-          .split(',')
-          .map((d) => d.trim())
-          .filter((d) => d.length > 0)
-      : [],
+    parent: parentRowId,
+    dependsOn: depRowIds,
     description: opts.description ?? '',
   });
 }
@@ -149,16 +162,30 @@ export async function runItemUpdate(
   if (opts.labels !== undefined)
     data.labels = opts.labels.split(',').map((l) => l.trim());
   if (opts.iteration !== undefined) data.iteration = opts.iteration;
-  if (opts.parent !== undefined)
-    data.parent = opts.parent === '' ? null : opts.parent;
-  if (opts.dependsOn !== undefined)
-    data.dependsOn =
-      opts.dependsOn === ''
-        ? []
-        : opts.dependsOn
-            .split(',')
-            .map((d) => d.trim())
-            .filter((d) => d.length > 0);
+  if (opts.parent !== undefined) {
+    if (opts.parent === '') {
+      data.parent = null;
+    } else {
+      const parentItem = await backend.getWorkItem(opts.parent);
+      data.parent = parentItem.rowId;
+    }
+  }
+  if (opts.dependsOn !== undefined) {
+    if (opts.dependsOn === '') {
+      data.dependsOn = [];
+    } else {
+      const depDisplayIds = opts.dependsOn
+        .split(',')
+        .map((d) => d.trim())
+        .filter((d) => d.length > 0);
+      const depRowIds: number[] = [];
+      for (const depId of depDisplayIds) {
+        const depItem = await backend.getWorkItem(depId);
+        depRowIds.push(depItem.rowId);
+      }
+      data.dependsOn = depRowIds;
+    }
+  }
   if (opts.description !== undefined) data.description = opts.description;
   return backend.cachedUpdateWorkItem(id, data);
 }

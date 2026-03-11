@@ -293,9 +293,8 @@ export function WorkItemForm() {
   );
 
   // Convert selectedWorkItemId (rowId) to display ID for validation
-  const selectedDisplayId = selectedWorkItemId !== null
-    ? displayIdOf(selectedWorkItemId)
-    : null;
+  const selectedDisplayId =
+    selectedWorkItemId !== null ? displayIdOf(selectedWorkItemId) : null;
 
   const {
     errors: validationErrors,
@@ -666,9 +665,7 @@ export function WorkItemForm() {
       await backendDataStore.getState().reloadItem(selectedDisplayId);
       uiStore
         .getState()
-        .setToast(
-          `Item #${selectedDisplayId} updated — press u to undo`,
-        );
+        .setToast(`Item #${selectedDisplayId} updated — press u to undo`);
     } else {
       const created = await backend.cachedCreateWorkItem({
         title: title || 'Untitled',
@@ -763,8 +760,7 @@ export function WorkItemForm() {
               const newDraft: FormDraft = {
                 itemId: pendingRelNav,
                 itemTitle:
-                  targetItem?.title ??
-                  `#${targetItem?.id ?? pendingRelNav}`,
+                  targetItem?.title ?? `#${targetItem?.id ?? pendingRelNav}`,
                 fields: defaultFields,
                 initialSnapshot: { ...defaultFields },
                 focusedField: 0,
@@ -795,9 +791,7 @@ export function WorkItemForm() {
           if (pendingRelNav) {
             // Push a new draft for the target item (discarding current)
             formStackStore.getState().pop();
-            const targetItem = allItems.find(
-              (i) => i.rowId === pendingRelNav,
-            );
+            const targetItem = allItems.find((i) => i.rowId === pendingRelNav);
             const defaultFields: FormFields = {
               title: '',
               type: activeType ?? types[0] ?? '',
@@ -814,8 +808,7 @@ export function WorkItemForm() {
             const newDraft: FormDraft = {
               itemId: pendingRelNav,
               itemTitle:
-                targetItem?.title ??
-                `#${targetItem?.id ?? pendingRelNav}`,
+                targetItem?.title ?? `#${targetItem?.id ?? pendingRelNav}`,
               fields: defaultFields,
               initialSnapshot: { ...defaultFields },
               focusedField: 0,
@@ -953,9 +946,7 @@ export function WorkItemForm() {
             } else if (currentField.startsWith('rel-child-')) {
               targetRowId = Number(currentField.slice('rel-child-'.length));
             } else if (currentField.startsWith('rel-dependent-')) {
-              targetRowId = Number(
-                currentField.slice('rel-dependent-'.length),
-              );
+              targetRowId = Number(currentField.slice('rel-dependent-'.length));
             }
             if (targetRowId) {
               if (isDirty) {
@@ -982,8 +973,7 @@ export function WorkItemForm() {
                 const newDraft: FormDraft = {
                   itemId: targetRowId,
                   itemTitle:
-                    targetItem?.title ??
-                    `#${targetItem?.id ?? targetRowId}`,
+                    targetItem?.title ?? `#${targetItem?.id ?? targetRowId}`,
                   fields: defaultFields,
                   initialSnapshot: { ...defaultFields },
                   focusedField: 0,

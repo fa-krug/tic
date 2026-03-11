@@ -46,8 +46,6 @@ const DEFAULT_AUTO_UPDATE = true;
 const DEFAULT_BRANCH_COMMAND = `claude "Brainstorm the implementation of issue #$TIC_ITEM_ID: $TIC_ITEM_TITLE. $TIC_ITEM_DESCRIPTION"`;
 const DEFAULT_COPY_TO_CLIPBOARD = true;
 
-export interface StorageOptions {}
-
 export class Storage
   extends BaseBackend
   implements SoftDeleteBackend, PrBackend, ImageUploadBackend
@@ -56,11 +54,7 @@ export class Storage
   private root: string;
   private _hasRemoteBackend = false;
 
-  private constructor(
-    db: TicDatabase,
-    root: string,
-    _options?: StorageOptions,
-  ) {
+  private constructor(db: TicDatabase, root: string) {
     super(0); // No TTL — DB is always fresh
     this.db = db;
     this.root = root;
@@ -77,9 +71,9 @@ export class Storage
   /**
    * Create a Storage instance, initializing the database and seeding defaults.
    */
-  static create(root: string, options?: StorageOptions): Storage {
+  static create(root: string): Storage {
     const db = createDatabase(root);
-    const backend = new Storage(db, root, options);
+    const backend = new Storage(db, root);
     backend.seedDefaults();
     backend.migrateFromYaml();
     return backend;
@@ -88,8 +82,8 @@ export class Storage
   /**
    * Create a Storage instance from an existing database instance (for testing).
    */
-  static createFromDb(db: TicDatabase, options?: StorageOptions): Storage {
-    const backend = new Storage(db, ':memory:', options);
+  static createFromDb(db: TicDatabase): Storage {
+    const backend = new Storage(db, ':memory:');
     backend.seedDefaults();
     return backend;
   }
@@ -1624,14 +1618,23 @@ export class Storage
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
-  async getLinkedItems(prId: string): Promise<number[]> {
+  async getLinkedItems(prId: string): Promise<string[]> {
     const rows = this.db
-      .select({ itemRowId: schema.prItemLinks.itemRowId })
+      .select({
+        itemRowId: schema.prItemLinks.itemRowId,
+        itemId: schema.workItems.id,
+      })
       .from(schema.prItemLinks)
+      .innerJoin(
+        schema.workItems,
+        eq(schema.prItemLinks.itemRowId, schema.workItems.rowId),
+      )
       .where(eq(schema.prItemLinks.prId, prId))
       .all();
 
-    return rows.map((r) => r.itemRowId);
+    return rows
+      .map((r) => r.itemId ?? String(r.itemRowId))
+      .filter((id) => id.length > 0);
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await

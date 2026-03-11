@@ -44,11 +44,7 @@ export function buildTree(
 
   const result: TreeItem[] = [];
 
-  function walk(
-    parentId: number | null,
-    depth: number,
-    parentPrefix: string,
-  ) {
+  function walk(parentId: number | null, depth: number, parentPrefix: string) {
     const children = childrenMap.get(parentId) ?? [];
     children.forEach((child, idx) => {
       // At depth 0, only include items from the filtered set (same type)
@@ -141,10 +137,7 @@ export function sortTree(
   if (sortStack.length === 0) return treeItems;
 
   // Group items by parent (depth 0 items have parent null)
-  const groups = new Map<
-    number | null,
-    { index: number; item: TreeItem }[]
-  >();
+  const groups = new Map<number | null, { index: number; item: TreeItem }[]>();
   for (let i = 0; i < treeItems.length; i++) {
     const t = treeItems[i]!;
     const key = t.depth === 0 ? null : t.item.parent;

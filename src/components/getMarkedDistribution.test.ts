@@ -7,12 +7,7 @@ describe('getMarkedDistribution', () => {
     ids.map((rowId) => ({ rowId }) as { rowId: number });
 
   it('returns zeros when no items are marked', () => {
-    const result = getMarkedDistribution(
-      new Set(),
-      items([1, 2, 3]),
-      0,
-      3,
-    );
+    const result = getMarkedDistribution(new Set(), items([1, 2, 3]), 0, 3);
     expect(result).toEqual({ above: 0, below: 0 });
   });
 

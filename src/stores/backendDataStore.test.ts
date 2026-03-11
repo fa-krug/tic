@@ -154,8 +154,8 @@ describe('backendDataStore', () => {
     expect(backendDataStore.getState().items).toHaveLength(1);
 
     // Mutate through backend and do targeted reload
-    await backend.updateWorkItem(item.id, { title: 'Updated' });
-    await backendDataStore.getState().reloadItem(item.id);
+    await backend.updateWorkItem(item.id!, { title: 'Updated' });
+    await backendDataStore.getState().reloadItem(item.id!);
 
     const items = backendDataStore.getState().items;
     expect(items).toHaveLength(1);
@@ -180,7 +180,7 @@ describe('backendDataStore', () => {
       dependsOn: [],
       description: '',
     });
-    await backendDataStore.getState().reloadItem(item.id);
+    await backendDataStore.getState().reloadItem(item.id!);
     expect(backendDataStore.getState().items).toHaveLength(1);
     expect(backendDataStore.getState().items[0]!.title).toBe('New');
   });

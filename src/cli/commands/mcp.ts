@@ -605,14 +605,16 @@ export function registerTools(
     async (args) => {
       const result = await handleCreateItem(backend, args);
       if (!result.isError && syncState?.queue && syncState?.syncManager) {
-        const data = JSON.parse(result.content[0]!.text) as { id: string };
+        const data = JSON.parse(result.content[0]!.text) as {
+          rowId: number;
+        };
         await syncState.queue.append({
           action: 'create',
-          itemId: data.id,
+          itemRowId: data.rowId,
           timestamp: new Date().toISOString(),
         });
         const pushResult = await syncState.syncManager.pushPending();
-        const resolvedId = pushResult.idMappings.get(data.id);
+        const resolvedId = pushResult.idMappings.get(data.rowId);
         if (resolvedId) {
           const resolved = await backend.getWorkItem(resolvedId);
           return success(resolved);
@@ -656,10 +658,12 @@ export function registerTools(
     async (args) => {
       const result = await handleUpdateItem(backend, args);
       if (!result.isError && syncState?.queue && syncState?.syncManager) {
-        const data = JSON.parse(result.content[0]!.text) as { id: string };
+        const data = JSON.parse(result.content[0]!.text) as {
+          rowId: number;
+        };
         await syncState.queue.append({
           action: 'update',
-          itemId: data.id,
+          itemRowId: data.rowId,
           timestamp: new Date().toISOString(),
         });
         await syncState.syncManager.pushPending();
@@ -686,11 +690,26 @@ export function registerTools(
       id: z.string().describe('Work item ID'),
     },
     async (args) => {
+      // Resolve rowId before delete (item won't exist after)
+      let itemRowId: number | undefined;
+      if (syncState?.queue && syncState?.syncManager) {
+        try {
+          const item = await backend.getWorkItem(args.id);
+          itemRowId = item.rowId;
+        } catch {
+          // Item may not be found if already deleted
+        }
+      }
       const result = await handleConfirmDelete(backend, args, pendingDeletes);
-      if (!result.isError && syncState?.queue && syncState?.syncManager) {
+      if (
+        !result.isError &&
+        syncState?.queue &&
+        syncState?.syncManager &&
+        itemRowId !== undefined
+      ) {
         await syncState.queue.append({
           action: 'delete',
-          itemId: args.id,
+          itemRowId,
           timestamp: new Date().toISOString(),
         });
         await syncState.syncManager.pushPending();
@@ -744,9 +763,10 @@ export function registerTools(
             author: string;
             body: string;
           };
+          const item = await backend.getWorkItem(args.id);
           await syncState.queue.append({
             action: 'comment',
-            itemId: args.id,
+            itemRowId: item.rowId,
             timestamp: new Date().toISOString(),
             commentData: { author: data.author, body: data.body },
           });

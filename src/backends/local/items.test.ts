@@ -198,7 +198,7 @@ describe('items', () => {
   });
 
   describe('soft-delete and restore', () => {
-    const makeItem = (id: string): WorkItem =>
+    const makeItem = (id: number): WorkItem =>
       makeWorkItem(id, {
         iteration: 'v1',
         description: 'Test item.',
@@ -207,7 +207,7 @@ describe('items', () => {
       });
 
     it('softDeleteWorkItem moves item to trash so readWorkItem fails', async () => {
-      await writeWorkItem(tmpDir, makeItem('10'));
+      await writeWorkItem(tmpDir, makeItem(10));
       await softDeleteWorkItem(tmpDir, '10');
 
       // readWorkItem should fail because file is gone from items/
@@ -219,7 +219,7 @@ describe('items', () => {
     });
 
     it('restoreWorkItem moves item back so readWorkItem works', async () => {
-      await writeWorkItem(tmpDir, makeItem('11'));
+      await writeWorkItem(tmpDir, makeItem(11));
       await softDeleteWorkItem(tmpDir, '11');
       await restoreWorkItem(tmpDir, '11');
 
@@ -233,7 +233,7 @@ describe('items', () => {
     });
 
     it('permanentlyDeleteWorkItem removes from trash', async () => {
-      await writeWorkItem(tmpDir, makeItem('12'));
+      await writeWorkItem(tmpDir, makeItem(12));
       await softDeleteWorkItem(tmpDir, '12');
 
       const trashFile = path.join(tmpDir, '.tic', 'trash', '12.md');
@@ -254,8 +254,8 @@ describe('items', () => {
     });
 
     it('cleanupTrash removes all trashed items', async () => {
-      await writeWorkItem(tmpDir, makeItem('20'));
-      await writeWorkItem(tmpDir, makeItem('21'));
+      await writeWorkItem(tmpDir, makeItem(20));
+      await writeWorkItem(tmpDir, makeItem(21));
       await softDeleteWorkItem(tmpDir, '20');
       await softDeleteWorkItem(tmpDir, '21');
 

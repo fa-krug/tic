@@ -297,7 +297,9 @@ export function BranchList() {
     const title = currentRow.linkedItem
       ? currentRow.linkedItem.title
       : currentRow.branch.name;
-    const linkedItems = currentRow.linkedItem ? [currentRow.linkedItem.rowId] : [];
+    const linkedItems = currentRow.linkedItem
+      ? [currentRow.linkedItem.rowId]
+      : [];
     void createPullRequest({
       title,
       sourceBranch: currentRow.branch.name,

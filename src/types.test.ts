@@ -12,14 +12,14 @@ describe('PullRequest types', () => {
       sourceBranch: 'fix/login-bug',
       targetBranch: 'main',
       author: 'octocat',
-      linkedItems: ['1', '5'],
+      linkedItems: [1, 5],
       created: '2026-02-14T00:00:00Z',
       updated: '2026-02-14T00:00:00Z',
       url: 'https://github.com/owner/repo/pull/42',
     };
     expect(pr.number).toBe(42);
     expect(pr.status).toBe('open');
-    expect(pr.linkedItems).toEqual(['1', '5']);
+    expect(pr.linkedItems).toEqual([1, 5]);
   });
 
   it('accepts a valid NewPullRequest object', () => {

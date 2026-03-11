@@ -125,7 +125,7 @@ describe('PR Storage Methods', () => {
     expect(ids).toEqual(['pr-1', 'pr-2']);
   });
 
-  it('getLinkedItems returns item rowIds linked to a PR', async () => {
+  it('getLinkedItems returns display IDs linked to a PR', async () => {
     const item1 = await storage.createWorkItem({
       title: 'Item 1',
       type: 'issue',
@@ -156,8 +156,8 @@ describe('PR Storage Methods', () => {
 
     const linkedItems = await storage.getLinkedItems('pr-1');
     expect(linkedItems).toHaveLength(2);
-    expect(linkedItems).toContain(item1.rowId);
-    expect(linkedItems).toContain(item2.rowId);
+    expect(linkedItems).toContain(item1.id!);
+    expect(linkedItems).toContain(item2.id!);
   });
 
   it('linkItem adds a link and unlinkItem removes it', async () => {
@@ -180,7 +180,7 @@ describe('PR Storage Methods', () => {
     // Link
     await storage.linkItem('pr-1', item.id!);
     let linkedItems = await storage.getLinkedItems('pr-1');
-    expect(linkedItems).toContain(item.rowId);
+    expect(linkedItems).toContain(item.id!);
 
     // Unlink
     await storage.unlinkItem('pr-1', item.id!);
@@ -216,7 +216,7 @@ describe('PR Storage Methods', () => {
 
     // Verify link exists
     let linkedItems = await storage.getLinkedItems('pr-1');
-    expect(linkedItems).toContain(item.rowId);
+    expect(linkedItems).toContain(item.id!);
 
     // Delete the work item
     await storage.deleteWorkItem(item.id!);

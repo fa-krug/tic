@@ -133,12 +133,12 @@ describe('MCP PR handlers', () => {
 
       const result = await handleLinkPr(storage, {
         prId: 'pr-1',
-        itemId: item.id,
+        itemId: item.id!,
       });
       expect(result.isError).toBeUndefined();
       const data = JSON.parse(result.content[0]!.text) as LinkedResult;
       expect(data.linked.prId).toBe('pr-1');
-      expect(data.linked.itemId).toBe(item.id);
+      expect(data.linked.itemId).toBe(item.id!);
     });
   });
 
@@ -158,10 +158,10 @@ describe('MCP PR handlers', () => {
         description: '',
       });
 
-      await storage.linkItem('pr-1', item.id);
+      await storage.linkItem('pr-1', item.id!);
       const result = await handleUnlinkPr(storage, {
         prId: 'pr-1',
-        itemId: item.id,
+        itemId: item.id!,
       });
       expect(result.isError).toBeUndefined();
     });
@@ -183,8 +183,8 @@ describe('MCP PR handlers', () => {
         description: '',
       });
 
-      await storage.linkItem('pr-1', item.id);
-      const result = await handleGetLinkedPrs(storage, { itemId: item.id });
+      await storage.linkItem('pr-1', item.id!);
+      const result = await handleGetLinkedPrs(storage, { itemId: item.id! });
       expect(result.isError).toBeUndefined();
       const data = JSON.parse(result.content[0]!.text) as PullRequest[];
       expect(data).toHaveLength(1);
@@ -205,7 +205,7 @@ describe('MCP PR handlers', () => {
         description: '',
       });
 
-      const result = await handleGetLinkedPrs(storage, { itemId: item.id });
+      const result = await handleGetLinkedPrs(storage, { itemId: item.id! });
       expect(result.isError).toBeUndefined();
       const data = JSON.parse(result.content[0]!.text) as PullRequest[];
       expect(data).toEqual([]);

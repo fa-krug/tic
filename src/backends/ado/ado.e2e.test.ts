@@ -248,7 +248,7 @@ describeE2e('ADO E2E', () => {
       expect(item.id).toBeTruthy();
       expect(item.status).toBeTruthy();
       expect(item.type).toBeTruthy();
-      createdItemId = item.id;
+      createdItemId = item.id!;
     });
 
     it('lists work items', async () => {
@@ -298,12 +298,12 @@ describeE2e('ADO E2E', () => {
   describe('relationships', () => {
     it('creates parent and child items', async () => {
       const parent = await runItemCreate(backend, 'E2E Parent', {});
-      parentItemId = parent.id;
+      parentItemId = parent.id!;
 
       const child = await runItemCreate(backend, 'E2E Child', {
         parent: parentItemId,
       });
-      childItemId = child.id;
+      childItemId = child.id!;
 
       expect(child.parent).toBe(parentItemId);
     });
@@ -333,10 +333,10 @@ describeE2e('ADO E2E', () => {
 
     it('creates dependency between items', async () => {
       const source = await runItemCreate(backend, 'E2E Dep Source', {});
-      depSourceId = source.id;
+      depSourceId = source.id!;
 
       const target = await runItemCreate(backend, 'E2E Dep Target', {});
-      depTargetId = target.id;
+      depTargetId = target.id!;
 
       // source depends on target
       const updated = await runItemUpdate(backend, depSourceId, {

@@ -2,9 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { buildTree, sortTree } from './buildTree.js';
 import type { WorkItem } from '../types.js';
 
-function makeItem(
-  overrides: Partial<WorkItem> & { rowId: number },
-): WorkItem {
+function makeItem(overrides: Partial<WorkItem> & { rowId: number }): WorkItem {
   return {
     id: String(overrides.rowId),
     title: `Item ${overrides.rowId}`,
@@ -35,10 +33,7 @@ describe('buildTree', () => {
   });
 
   it('nests same-type children under parent', () => {
-    const items = [
-      makeItem({ rowId: 1 }),
-      makeItem({ rowId: 2, parent: 1 }),
-    ];
+    const items = [makeItem({ rowId: 1 }), makeItem({ rowId: 2, parent: 1 })];
     const result = buildTree(items, items, 'task');
     expect(result.map((t) => t.item.rowId)).toEqual([1, 2]);
     expect(result[0]!.depth).toBe(0);

@@ -6,13 +6,13 @@ import { createDatabase, type TicDatabase } from '../storage/db.js';
 import { Storage } from '../storage/index.js';
 
 const makeEntry = (
-  id: string,
+  id: number,
   type: UndoEntry['type'] = 'delete',
 ): UndoEntry => ({
   type,
   label: `Undo ${type} item ${id}`,
   itemSnapshots: [makeWorkItem(id)],
-  syncItemIds: [id],
+  syncItemRowIds: [id],
   syncAction: type,
 });
 
@@ -30,8 +30,8 @@ describe('undoStore', () => {
   });
 
   it('pushUndo adds to front of stack', () => {
-    const entry1 = makeEntry('1');
-    const entry2 = makeEntry('2');
+    const entry1 = makeEntry(1);
+    const entry2 = makeEntry(2);
 
     undoStore.getState().pushUndo(entry1);
     undoStore.getState().pushUndo(entry2);
@@ -43,13 +43,13 @@ describe('undoStore', () => {
   });
 
   it('pushUndo returns undefined when stack is not full', () => {
-    const result = undoStore.getState().pushUndo(makeEntry('1'));
+    const result = undoStore.getState().pushUndo(makeEntry(1));
     expect(result).toBeUndefined();
   });
 
   it('popUndo returns most recent and removes it', () => {
-    const entry1 = makeEntry('1');
-    const entry2 = makeEntry('2');
+    const entry1 = makeEntry(1);
+    const entry2 = makeEntry(2);
 
     undoStore.getState().pushUndo(entry1);
     undoStore.getState().pushUndo(entry2);
@@ -68,14 +68,14 @@ describe('undoStore', () => {
   it('enforces max depth of 5 and returns evicted entry', () => {
     // Fill the stack with 5 entries
     for (let i = 1; i <= 5; i++) {
-      const result = undoStore.getState().pushUndo(makeEntry(String(i)));
+      const result = undoStore.getState().pushUndo(makeEntry(i));
       expect(result).toBeUndefined();
     }
 
     expect(undoStore.getState().stack).toHaveLength(5);
 
     // Push a 6th — should evict the oldest (entry "1")
-    const entry6 = makeEntry('6');
+    const entry6 = makeEntry(6);
     const evicted = undoStore.getState().pushUndo(entry6);
 
     expect(undoStore.getState().stack).toHaveLength(5);
@@ -89,9 +89,9 @@ describe('undoStore', () => {
   });
 
   it('clear empties the stack and returns all entries', () => {
-    const entry1 = makeEntry('1');
-    const entry2 = makeEntry('2');
-    const entry3 = makeEntry('3');
+    const entry1 = makeEntry(1);
+    const entry2 = makeEntry(2);
+    const entry3 = makeEntry(3);
 
     undoStore.getState().pushUndo(entry1);
     undoStore.getState().pushUndo(entry2);
@@ -123,7 +123,7 @@ describe('undoStore with SQLite backing', () => {
   });
 
   it('push and pop with SQLite backing', () => {
-    const entry = makeEntry('1');
+    const entry = makeEntry(1);
     undoStore.getState().pushUndo(entry);
     expect(undoStore.getState().stack).toHaveLength(1);
 
@@ -135,23 +135,23 @@ describe('undoStore with SQLite backing', () => {
 
   it('respects max depth with SQLite backing', () => {
     for (let i = 1; i <= 6; i++) {
-      undoStore.getState().pushUndo(makeEntry(String(i)));
+      undoStore.getState().pushUndo(makeEntry(i));
     }
     expect(undoStore.getState().stack).toHaveLength(5);
     expect(undoStore.getState().stack[0]!.label).toContain('6');
   });
 
   it('clear returns entries and empties stack', () => {
-    undoStore.getState().pushUndo(makeEntry('1'));
-    undoStore.getState().pushUndo(makeEntry('2'));
+    undoStore.getState().pushUndo(makeEntry(1));
+    undoStore.getState().pushUndo(makeEntry(2));
     const cleared = undoStore.getState().clear();
     expect(cleared).toHaveLength(2);
     expect(undoStore.getState().stack).toHaveLength(0);
   });
 
   it('recovers stack from DB on setDatabase', () => {
-    undoStore.getState().pushUndo(makeEntry('1'));
-    undoStore.getState().pushUndo(makeEntry('2'));
+    undoStore.getState().pushUndo(makeEntry(1));
+    undoStore.getState().pushUndo(makeEntry(2));
 
     // Simulate crash: destroy store, set new DB reference
     undoStore.getState().destroy();
@@ -165,7 +165,7 @@ describe('undoStore with SQLite backing', () => {
   it('falls back to in-memory when no database set', () => {
     undoStore.getState().destroy();
     // No DB set, should work in-memory
-    undoStore.getState().pushUndo(makeEntry('1'));
+    undoStore.getState().pushUndo(makeEntry(1));
     expect(undoStore.getState().stack).toHaveLength(1);
     undoStore.getState().clear();
   });

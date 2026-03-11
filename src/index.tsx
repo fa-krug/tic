@@ -54,7 +54,9 @@ if (process.argv.length > 2) {
     for (const entry of remaining) {
       if (entry.type === 'delete') {
         for (const snap of entry.itemSnapshots) {
-          await backend.permanentlyDeleteWorkItem(snap.id);
+          if (snap.id) {
+            await backend.permanentlyDeleteWorkItem(snap.id);
+          }
         }
       }
     }

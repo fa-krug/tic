@@ -148,7 +148,7 @@ describe('backendDataStore PR support', () => {
       sourceBranch: 'feature/linked',
       targetBranch: 'main',
       author: 'charlie',
-      linkedItems: [item.id],
+      linkedItems: [item.rowId],
       created: '2025-01-03T00:00:00Z',
       updated: '2025-01-03T00:00:00Z',
       url: 'https://example.com/pr/3',
@@ -157,7 +157,7 @@ describe('backendDataStore PR support', () => {
 
     const linkedPrs = await backendDataStore
       .getState()
-      .getLinkedPullRequests(item.id);
+      .getLinkedPullRequests(item.id!);
     expect(linkedPrs).toHaveLength(1);
     expect(linkedPrs[0]!.id).toBe('pr-linked');
   });
@@ -230,20 +230,20 @@ describe('backendDataStore PR support', () => {
     await backend.importPullRequest(pr);
 
     // Link the PR to the item
-    await backendDataStore.getState().linkPrItem('pr-link-test', item.id);
+    await backendDataStore.getState().linkPrItem('pr-link-test', item.id!);
 
     let linkedPrs = await backendDataStore
       .getState()
-      .getLinkedPullRequests(item.id);
+      .getLinkedPullRequests(item.id!);
     expect(linkedPrs).toHaveLength(1);
     expect(linkedPrs[0]!.id).toBe('pr-link-test');
 
     // Unlink the PR from the item
-    await backendDataStore.getState().unlinkPrItem('pr-link-test', item.id);
+    await backendDataStore.getState().unlinkPrItem('pr-link-test', item.id!);
 
     linkedPrs = await backendDataStore
       .getState()
-      .getLinkedPullRequests(item.id);
+      .getLinkedPullRequests(item.id!);
     expect(linkedPrs).toHaveLength(0);
   });
 });

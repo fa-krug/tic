@@ -411,7 +411,7 @@ export class GitLabBackend extends BaseBackend implements ImageUploadBackend {
     const items: WorkItem[] = [];
     for (const gl of all) {
       const item = mapWorkItemToWorkItem(gl);
-      this.cacheGid(item.id, gl.id);
+      if (item.id) this.cacheGid(item.id, gl.id);
       items.push(item);
     }
 
@@ -429,7 +429,7 @@ export class GitLabBackend extends BaseBackend implements ImageUploadBackend {
       id: gid,
     });
     const item = mapWorkItemToWorkItem(data.workItem);
-    this.cacheGid(item.id, data.workItem.id);
+    if (item.id) this.cacheGid(item.id, data.workItem.id);
     return item;
   }
 
@@ -463,7 +463,7 @@ export class GitLabBackend extends BaseBackend implements ImageUploadBackend {
 
     const created = res.workItemCreate.workItem;
     const item = mapWorkItemToWorkItem(created);
-    this.cacheGid(item.id, created.id);
+    if (item.id) this.cacheGid(item.id, created.id);
 
     const needsUpdate =
       data.assignee ||
@@ -787,7 +787,7 @@ export class GitLabBackend extends BaseBackend implements ImageUploadBackend {
 
     const updated = res.workItemUpdate.workItem;
     const item = mapWorkItemToWorkItem(updated);
-    this.cacheGid(item.id, updated.id);
+    if (item.id) this.cacheGid(item.id, updated.id);
     return item;
   }
 

@@ -792,7 +792,11 @@ export function WorkItemList() {
         capabilities.iterations &&
         treeItems.length > 0
       ) {
-        const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item, allItems);
+        const targetIds = getTargetIds(
+          markedIds,
+          treeItems[cursor]?.item,
+          allItems,
+        );
         if (targetIds.length > 0) {
           openOverlay({ type: 'iteration-picker', targetIds });
         }
@@ -831,7 +835,11 @@ export function WorkItemList() {
       }
 
       if (matchesCommand('delete', input, key) && treeItems.length > 0) {
-        const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item, allItems);
+        const targetIds = getTargetIds(
+          markedIds,
+          treeItems[cursor]?.item,
+          allItems,
+        );
         if (targetIds.length > 0) {
           openOverlay({ type: 'delete-confirm', targetIds });
         }
@@ -931,9 +939,7 @@ export function WorkItemList() {
             process.stdin.setRawMode?.(true);
             console.clear();
             setWarning(
-              e instanceof Error
-                ? e.message
-                : 'Failed to start implementation',
+              e instanceof Error ? e.message : 'Failed to start implementation',
             );
           }
           void backendDataStore
@@ -965,7 +971,11 @@ export function WorkItemList() {
       }
 
       if (matchesCommand('list-status', input, key) && treeItems.length > 0) {
-        const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item, allItems);
+        const targetIds = getTargetIds(
+          markedIds,
+          treeItems[cursor]?.item,
+          allItems,
+        );
         if (targetIds.length > 0) {
           openOverlay({ type: 'status-picker', targetIds });
         }
@@ -1065,7 +1075,11 @@ export function WorkItemList() {
         capabilities.fields.priority &&
         treeItems.length > 0
       ) {
-        const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item, allItems);
+        const targetIds = getTargetIds(
+          markedIds,
+          treeItems[cursor]?.item,
+          allItems,
+        );
         if (targetIds.length > 0) {
           openOverlay({ type: 'priority-picker', targetIds });
         }
@@ -1076,7 +1090,11 @@ export function WorkItemList() {
         capabilities.fields.parent &&
         treeItems.length > 0
       ) {
-        const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item, allItems);
+        const targetIds = getTargetIds(
+          markedIds,
+          treeItems[cursor]?.item,
+          allItems,
+        );
         if (targetIds.length > 0) {
           openOverlay({ type: 'parent-input', targetIds });
         }
@@ -1087,7 +1105,11 @@ export function WorkItemList() {
         capabilities.fields.assignee &&
         treeItems.length > 0
       ) {
-        const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item, allItems);
+        const targetIds = getTargetIds(
+          markedIds,
+          treeItems[cursor]?.item,
+          allItems,
+        );
         if (targetIds.length > 0) {
           openOverlay({ type: 'assignee-input', targetIds });
         }
@@ -1098,7 +1120,11 @@ export function WorkItemList() {
         capabilities.fields.labels &&
         treeItems.length > 0
       ) {
-        const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item, allItems);
+        const targetIds = getTargetIds(
+          markedIds,
+          treeItems[cursor]?.item,
+          allItems,
+        );
         if (targetIds.length > 0) {
           openOverlay({ type: 'labels-input', targetIds });
         }
@@ -1109,7 +1135,11 @@ export function WorkItemList() {
         capabilities.customTypes &&
         treeItems.length > 0
       ) {
-        const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item, allItems);
+        const targetIds = getTargetIds(
+          markedIds,
+          treeItems[cursor]?.item,
+          allItems,
+        );
         if (targetIds.length > 0) {
           openOverlay({ type: 'type-picker', targetIds });
         }
@@ -1321,7 +1351,11 @@ export function WorkItemList() {
         break;
       case 'delete':
         if (treeItems.length > 0) {
-          const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item, allItems);
+          const targetIds = getTargetIds(
+            markedIds,
+            treeItems[cursor]?.item,
+            allItems,
+          );
           if (targetIds.length > 0) {
             openOverlay({ type: 'delete-confirm', targetIds });
           }
@@ -1388,7 +1422,11 @@ export function WorkItemList() {
         break;
       case 'set-iteration':
         if (treeItems.length > 0) {
-          const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item, allItems);
+          const targetIds = getTargetIds(
+            markedIds,
+            treeItems[cursor]?.item,
+            allItems,
+          );
           if (targetIds.length > 0) {
             openOverlay({ type: 'iteration-picker', targetIds });
           }
@@ -1417,7 +1455,11 @@ export function WorkItemList() {
         break;
       case 'set-priority':
         {
-          const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item, allItems);
+          const targetIds = getTargetIds(
+            markedIds,
+            treeItems[cursor]?.item,
+            allItems,
+          );
           if (targetIds.length > 0) {
             openOverlay({ type: 'priority-picker', targetIds });
           }
@@ -1425,7 +1467,11 @@ export function WorkItemList() {
         break;
       case 'set-assignee':
         {
-          const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item, allItems);
+          const targetIds = getTargetIds(
+            markedIds,
+            treeItems[cursor]?.item,
+            allItems,
+          );
           if (targetIds.length > 0) {
             openOverlay({ type: 'assignee-input', targetIds });
           }
@@ -1433,7 +1479,11 @@ export function WorkItemList() {
         break;
       case 'set-labels':
         {
-          const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item, allItems);
+          const targetIds = getTargetIds(
+            markedIds,
+            treeItems[cursor]?.item,
+            allItems,
+          );
           if (targetIds.length > 0) {
             openOverlay({ type: 'labels-input', targetIds });
           }
@@ -1441,7 +1491,11 @@ export function WorkItemList() {
         break;
       case 'set-type':
         {
-          const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item, allItems);
+          const targetIds = getTargetIds(
+            markedIds,
+            treeItems[cursor]?.item,
+            allItems,
+          );
           if (targetIds.length > 0) {
             openOverlay({ type: 'type-picker', targetIds });
           }
@@ -1484,7 +1538,11 @@ export function WorkItemList() {
     }
   };
   const handleBulkAction = (action: BulkAction) => {
-    const targetIds = getTargetIds(markedIds, treeItems[cursor]?.item, allItems);
+    const targetIds = getTargetIds(
+      markedIds,
+      treeItems[cursor]?.item,
+      allItems,
+    );
     if (targetIds.length === 0) return;
 
     switch (action) {

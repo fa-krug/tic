@@ -13,11 +13,11 @@ describe('sync types', () => {
   it('QueueEntry has required shape', () => {
     const entry: QueueEntry = {
       action: 'create',
-      itemId: 'local-abc',
+      itemRowId: 1,
       timestamp: new Date().toISOString(),
     };
     expect(entry.action).toBe('create');
-    expect(entry.itemId).toBe('local-abc');
+    expect(entry.itemRowId).toBe(1);
     expect(entry.timestamp).toBeDefined();
   });
 
@@ -41,7 +41,7 @@ describe('sync types', () => {
   it('SyncError has required fields', () => {
     const entry: QueueEntry = {
       action: 'update',
-      itemId: 'item-1',
+      itemRowId: 1,
       timestamp: new Date().toISOString(),
     };
     const error: SyncError = {
@@ -58,12 +58,12 @@ describe('sync types', () => {
       pushed: 3,
       failed: 1,
       errors: [],
-      idMappings: new Map([['local-1', '42']]),
+      idMappings: new Map([[1, '42']]),
     };
     expect(result.pushed).toBe(3);
     expect(result.failed).toBe(1);
     expect(result.errors).toEqual([]);
-    expect(result.idMappings.get('local-1')).toBe('42');
+    expect(result.idMappings.get(1)).toBe('42');
   });
 
   it('SyncResult has required fields', () => {
