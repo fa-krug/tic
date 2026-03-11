@@ -18,21 +18,21 @@ export interface SortEntry {
 
 interface ListViewState {
   cursor: number;
-  expandedIds: Set<string>;
-  markedIds: Set<string>;
+  expandedIds: Set<number>;
+  markedIds: Set<number>;
   scrollOffset: number;
   rangeAnchor: number | null;
   sortStack: SortEntry[];
 
   setCursor: (index: number) => void;
   clampCursor: (maxIndex: number) => void;
-  toggleExpanded: (id: string) => void;
-  toggleMarked: (id: string) => void;
+  toggleExpanded: (id: number) => void;
+  toggleMarked: (id: number) => void;
   clearMarked: () => void;
-  setMarkedIds: (ids: Set<string>) => void;
+  setMarkedIds: (ids: Set<number>) => void;
   setScrollOffset: (offset: number) => void;
   setRangeAnchor: (index: number | null) => void;
-  removeDeletedItem: (id: string) => void;
+  removeDeletedItem: (id: number) => void;
   toggleSortColumn: (column: SortColumn) => void;
   clearSort: () => void;
   setSortStack: (stack: SortEntry[]) => void;
@@ -41,8 +41,8 @@ interface ListViewState {
 
 const initialState = {
   cursor: 0,
-  expandedIds: new Set<string>(),
-  markedIds: new Set<string>(),
+  expandedIds: new Set<number>(),
+  markedIds: new Set<number>(),
   scrollOffset: 0,
   rangeAnchor: null as number | null,
   sortStack: [] as SortEntry[],
