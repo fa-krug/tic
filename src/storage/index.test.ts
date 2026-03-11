@@ -6,7 +6,7 @@ import { createDatabase, type TicDatabase } from './db.js';
 import { Storage } from './index.js';
 import { isSoftDeleteBackend } from '../backends/types.js';
 import { makeNewWorkItem, makeTemplate } from '../test-helpers.js';
-import { readConfig, updateConfig } from './config.js';
+import { updateConfig } from './config.js';
 
 describe('Storage', () => {
   let db: TicDatabase;
@@ -115,7 +115,7 @@ describe('Storage', () => {
         makeNewWorkItem({ assignee: 'Deleted' }),
       );
       await backend.createWorkItem(makeNewWorkItem({ assignee: 'Active' }));
-      await backend.softDeleteWorkItem(item.id);
+      await backend.softDeleteWorkItem(item.id!);
 
       const assignees = await backend.getAssignees();
       expect(assignees).toEqual(['Active']);
@@ -149,7 +149,7 @@ describe('Storage', () => {
       await backend.createWorkItem(
         makeNewWorkItem({ labels: ['active-label'] }),
       );
-      await backend.softDeleteWorkItem(item.id);
+      await backend.softDeleteWorkItem(item.id!);
 
       const labels = await backend.getLabels();
       expect(labels).toEqual(['active-label']);
@@ -210,15 +210,15 @@ describe('Storage', () => {
         makeNewWorkItem({
           title: 'Main item',
           labels: ['bug', 'urgent'],
-          dependsOn: [item1.id],
+          dependsOn: [item1.rowId],
         }),
       );
 
       const items = await backend.listWorkItems();
-      const main = items.find((i) => i.id === item2.id);
+      const main = items.find((i) => i.id === item2.id!);
       expect(main).toBeDefined();
       expect(main!.labels).toEqual(['bug', 'urgent']);
-      expect(main!.dependsOn).toEqual([item1.id]);
+      expect(main!.dependsOn).toEqual([item1.rowId]);
     });
 
     it('filters by iteration', async () => {
@@ -239,7 +239,7 @@ describe('Storage', () => {
         makeNewWorkItem({ title: 'To delete' }),
       );
       await backend.createWorkItem(makeNewWorkItem({ title: 'To keep' }));
-      await backend.softDeleteWorkItem(item.id);
+      await backend.softDeleteWorkItem(item.id!);
 
       const items = await backend.listWorkItems();
       expect(items).toHaveLength(1);
@@ -263,7 +263,7 @@ describe('Storage', () => {
       const items = await backend.listWorkItems();
       expect(items).toHaveLength(1);
       const item = items[0]!;
-      expect(item.id).toBe('1');
+      expect(item.id!).toBe('1');
       expect(item.title).toBe('Full item');
       expect(item.type).toBe('issue');
       expect(item.status).toBe('in-progress');
@@ -288,8 +288,8 @@ describe('Storage', () => {
         makeNewWorkItem({ title: 'Find me' }),
       );
 
-      const item = await backend.getWorkItem(created.id);
-      expect(item.id).toBe(created.id);
+      const item = await backend.getWorkItem(created.id!);
+      expect(item.id!).toBe(created.id!);
       expect(item.title).toBe('Find me');
     });
 
@@ -303,10 +303,10 @@ describe('Storage', () => {
       const created = await backend.createWorkItem(
         makeNewWorkItem({ title: 'Deleted' }),
       );
-      await backend.softDeleteWorkItem(created.id);
+      await backend.softDeleteWorkItem(created.id!);
 
-      await expect(backend.getWorkItem(created.id)).rejects.toThrow(
-        `Work item #${created.id} not found`,
+      await expect(backend.getWorkItem(created.id!)).rejects.toThrow(
+        `Work item #${created.id!} not found`,
       );
     });
 
@@ -318,13 +318,13 @@ describe('Storage', () => {
         makeNewWorkItem({
           title: 'With relations',
           labels: ['important', 'review'],
-          dependsOn: [dep.id],
+          dependsOn: [dep.rowId],
         }),
       );
 
-      const fetched = await backend.getWorkItem(item.id);
+      const fetched = await backend.getWorkItem(item.id!);
       expect(fetched.labels).toEqual(['important', 'review']);
-      expect(fetched.dependsOn).toEqual([dep.id]);
+      expect(fetched.dependsOn).toEqual([dep.rowId]);
     });
   });
 
@@ -333,7 +333,7 @@ describe('Storage', () => {
   describe('getChildren', () => {
     it('returns empty array when no children', async () => {
       const item = await backend.createWorkItem(makeNewWorkItem());
-      const children = await backend.getChildren(item.id);
+      const children = await backend.getChildren(item.id!);
       expect(children).toEqual([]);
     });
 
@@ -342,14 +342,14 @@ describe('Storage', () => {
         makeNewWorkItem({ title: 'Parent' }),
       );
       await backend.createWorkItem(
-        makeNewWorkItem({ title: 'Child 1', parent: parent.id }),
+        makeNewWorkItem({ title: 'Child 1', parent: parent.rowId }),
       );
       await backend.createWorkItem(
-        makeNewWorkItem({ title: 'Child 2', parent: parent.id }),
+        makeNewWorkItem({ title: 'Child 2', parent: parent.rowId }),
       );
       await backend.createWorkItem(makeNewWorkItem({ title: 'Not a child' }));
 
-      const children = await backend.getChildren(parent.id);
+      const children = await backend.getChildren(parent.id!);
       expect(children).toHaveLength(2);
       expect(children.map((c) => c.title).sort()).toEqual([
         'Child 1',
@@ -362,14 +362,14 @@ describe('Storage', () => {
         makeNewWorkItem({ title: 'Parent' }),
       );
       const child = await backend.createWorkItem(
-        makeNewWorkItem({ title: 'Deleted child', parent: parent.id }),
+        makeNewWorkItem({ title: 'Deleted child', parent: parent.rowId }),
       );
       await backend.createWorkItem(
-        makeNewWorkItem({ title: 'Active child', parent: parent.id }),
+        makeNewWorkItem({ title: 'Active child', parent: parent.rowId }),
       );
-      await backend.softDeleteWorkItem(child.id);
+      await backend.softDeleteWorkItem(child.id!);
 
-      const children = await backend.getChildren(parent.id);
+      const children = await backend.getChildren(parent.id!);
       expect(children).toHaveLength(1);
       expect(children[0]!.title).toBe('Active child');
     });
@@ -380,7 +380,7 @@ describe('Storage', () => {
   describe('getDependents', () => {
     it('returns empty array when no dependents', async () => {
       const item = await backend.createWorkItem(makeNewWorkItem());
-      const dependents = await backend.getDependents(item.id);
+      const dependents = await backend.getDependents(item.id!);
       expect(dependents).toEqual([]);
     });
 
@@ -389,14 +389,14 @@ describe('Storage', () => {
         makeNewWorkItem({ title: 'Target' }),
       );
       await backend.createWorkItem(
-        makeNewWorkItem({ title: 'Depends 1', dependsOn: [target.id] }),
+        makeNewWorkItem({ title: 'Depends 1', dependsOn: [target.rowId] }),
       );
       await backend.createWorkItem(
-        makeNewWorkItem({ title: 'Depends 2', dependsOn: [target.id] }),
+        makeNewWorkItem({ title: 'Depends 2', dependsOn: [target.rowId] }),
       );
       await backend.createWorkItem(makeNewWorkItem({ title: 'Independent' }));
 
-      const dependents = await backend.getDependents(target.id);
+      const dependents = await backend.getDependents(target.id!);
       expect(dependents).toHaveLength(2);
       expect(dependents.map((d) => d.title).sort()).toEqual([
         'Depends 1',
@@ -409,14 +409,14 @@ describe('Storage', () => {
         makeNewWorkItem({ title: 'Target' }),
       );
       const dep = await backend.createWorkItem(
-        makeNewWorkItem({ title: 'Deleted dep', dependsOn: [target.id] }),
+        makeNewWorkItem({ title: 'Deleted dep', dependsOn: [target.rowId] }),
       );
       await backend.createWorkItem(
-        makeNewWorkItem({ title: 'Active dep', dependsOn: [target.id] }),
+        makeNewWorkItem({ title: 'Active dep', dependsOn: [target.rowId] }),
       );
-      await backend.softDeleteWorkItem(dep.id);
+      await backend.softDeleteWorkItem(dep.id!);
 
-      const dependents = await backend.getDependents(target.id);
+      const dependents = await backend.getDependents(target.id!);
       expect(dependents).toHaveLength(1);
       expect(dependents[0]!.title).toBe('Active dep');
     });
@@ -454,22 +454,19 @@ describe('Storage', () => {
         makeNewWorkItem({ title: 'Parent' }),
       );
       const child = await backend.createWorkItem(
-        makeNewWorkItem({ title: 'Child', parent: parent.id }),
+        makeNewWorkItem({ title: 'Child', parent: parent.rowId }),
       );
 
-      const fetched = await backend.getWorkItem(child.id);
-      expect(fetched.parent).toBe(parent.id);
+      const fetched = await backend.getWorkItem(child.id!);
+      expect(fetched.parent).toBe(parent.rowId);
     });
 
-    it('assigns unique IDs when two connections create items', async () => {
+    it('assigns unique rowIds when two connections create items', async () => {
       // Regression test for #37: UNIQUE constraint errors with concurrent MCP calls.
-      // The actual race requires separate processes; this verifies two DB connections
-      // sharing the same file produce unique IDs via IMMEDIATE transactions.
+      // With AUTOINCREMENT rowIds, SQLite handles uniqueness natively.
       const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-race-'));
-      const db1 = createDatabase(tmpDir);
-      const db2 = createDatabase(tmpDir);
-      const storage1 = Storage.createFromDb(db1);
-      const storage2 = Storage.createFromDb(db2);
+      const storage1 = Storage.create(tmpDir);
+      const storage2 = Storage.create(tmpDir);
 
       try {
         const [item1, item2] = await Promise.all([
@@ -477,13 +474,14 @@ describe('Storage', () => {
           storage2.createWorkItem(makeNewWorkItem({ title: 'From conn 2' })),
         ]);
 
+        expect(item1.rowId).not.toBe(item2.rowId);
         expect(item1.id).not.toBe(item2.id);
 
         const all = await storage1.listWorkItems();
         expect(all).toHaveLength(2);
       } finally {
-        db1.close();
-        db2.close();
+        storage1.destroy();
+        storage2.destroy();
         fs.rmSync(tmpDir, { recursive: true, force: true });
       }
     });
@@ -496,24 +494,18 @@ describe('Storage', () => {
       expect(iterations.map((i) => i.name)).toContain('new-sprint');
     });
 
-    it('nextId is not reset by config updates', async () => {
-      // Create items to advance nextId
+    it('auto-increment IDs are stable across config updates', async () => {
       await backend.createWorkItem(makeNewWorkItem({ title: 'Item 1' }));
       await backend.createWorkItem(makeNewWorkItem({ title: 'Item 2' }));
-      const configBefore = readConfig(db);
-      expect(configBefore.next_id).toBe(3);
 
       // Simulate a config update (e.g., changing statuses from Settings)
       updateConfig(db, { statuses: ['open', 'closed', 'in progress'] });
 
-      // nextId must still be 3, not reset
-      const configAfter = readConfig(db);
-      expect(configAfter.next_id).toBe(3);
-
-      // Creating another item should get ID 3, not collide
+      // Creating another item should get the next rowId, not collide
       const item3 = await backend.createWorkItem(
         makeNewWorkItem({ title: 'Item 3' }),
       );
+      expect(item3.rowId).toBe(3);
       expect(item3.id).toBe('3');
     });
   });
@@ -536,13 +528,13 @@ describe('Storage', () => {
 
       // The most realistic self-ref test is via updateWorkItem
       await expect(
-        backend.updateWorkItem(item.id, { parent: item.id }),
-      ).rejects.toThrow(`Work item #${item.id} cannot be its own parent`);
+        backend.updateWorkItem(item.id!, { parent: item.rowId }),
+      ).rejects.toThrow(`Work item #${item.id!} cannot be its own parent`);
     });
 
     it('rejects non-existent parent', async () => {
       await expect(
-        backend.createWorkItem(makeNewWorkItem({ parent: '999' })),
+        backend.createWorkItem(makeNewWorkItem({ parent: 999 })),
       ).rejects.toThrow('Parent #999 does not exist');
     });
 
@@ -551,17 +543,17 @@ describe('Storage', () => {
         makeNewWorkItem({ title: 'Grandparent' }),
       );
       const parent = await backend.createWorkItem(
-        makeNewWorkItem({ title: 'Parent', parent: grandparent.id }),
+        makeNewWorkItem({ title: 'Parent', parent: grandparent.rowId }),
       );
       const child = await backend.createWorkItem(
-        makeNewWorkItem({ title: 'Child', parent: parent.id }),
+        makeNewWorkItem({ title: 'Child', parent: parent.rowId }),
       );
 
       // Now try to set grandparent's parent to child — creates a cycle
       await expect(
-        backend.updateWorkItem(grandparent.id, { parent: child.id }),
+        backend.updateWorkItem(grandparent.id!, { parent: child.rowId }),
       ).rejects.toThrow(
-        `Circular parent chain detected for #${grandparent.id}`,
+        `Circular parent chain detected for #${grandparent.id!}`,
       );
     });
 
@@ -569,29 +561,29 @@ describe('Storage', () => {
       // Create an item, then try to make it depend on itself via update
       const item = await backend.createWorkItem(makeNewWorkItem());
       await expect(
-        backend.updateWorkItem(item.id, { dependsOn: [item.id] }),
-      ).rejects.toThrow(`Work item #${item.id} cannot depend on itself`);
+        backend.updateWorkItem(item.id!, { dependsOn: [item.rowId] }),
+      ).rejects.toThrow(`Work item #${item.id!} cannot depend on itself`);
     });
 
     it('rejects non-existent dependency', async () => {
       await expect(
-        backend.createWorkItem(makeNewWorkItem({ dependsOn: ['999'] })),
+        backend.createWorkItem(makeNewWorkItem({ dependsOn: [999] })),
       ).rejects.toThrow('Dependency #999 does not exist');
     });
 
     it('rejects circular dependency chain', async () => {
       const a = await backend.createWorkItem(makeNewWorkItem({ title: 'A' }));
       const b = await backend.createWorkItem(
-        makeNewWorkItem({ title: 'B', dependsOn: [a.id] }),
+        makeNewWorkItem({ title: 'B', dependsOn: [a.rowId] }),
       );
       const c = await backend.createWorkItem(
-        makeNewWorkItem({ title: 'C', dependsOn: [b.id] }),
+        makeNewWorkItem({ title: 'C', dependsOn: [b.rowId] }),
       );
 
       // Now try to make A depend on C — creates a cycle: A -> C -> B -> A
       await expect(
-        backend.updateWorkItem(a.id, { dependsOn: [c.id] }),
-      ).rejects.toThrow(`Circular dependency chain detected for #${a.id}`);
+        backend.updateWorkItem(a.id!, { dependsOn: [c.rowId] }),
+      ).rejects.toThrow(`Circular dependency chain detected for #${a.id!}`);
     });
   });
 
@@ -602,13 +594,13 @@ describe('Storage', () => {
       const item = await backend.createWorkItem(
         makeNewWorkItem({ title: 'Original' }),
       );
-      const updated = await backend.updateWorkItem(item.id, {
+      const updated = await backend.updateWorkItem(item.id!, {
         title: 'Updated',
       });
       expect(updated.title).toBe('Updated');
 
       // Verify persisted
-      const fetched = await backend.getWorkItem(item.id);
+      const fetched = await backend.getWorkItem(item.id!);
       expect(fetched.title).toBe('Updated');
     });
 
@@ -616,7 +608,7 @@ describe('Storage', () => {
       const item = await backend.createWorkItem(
         makeNewWorkItem({ status: 'todo' }),
       );
-      const updated = await backend.updateWorkItem(item.id, {
+      const updated = await backend.updateWorkItem(item.id!, {
         status: 'in-progress',
       });
       expect(updated.status).toBe('in-progress');
@@ -626,7 +618,7 @@ describe('Storage', () => {
       const item = await backend.createWorkItem(
         makeNewWorkItem({ priority: 'low' }),
       );
-      const updated = await backend.updateWorkItem(item.id, {
+      const updated = await backend.updateWorkItem(item.id!, {
         priority: 'high',
       });
       expect(updated.priority).toBe('high');
@@ -636,7 +628,7 @@ describe('Storage', () => {
       const item = await backend.createWorkItem(
         makeNewWorkItem({ assignee: 'Alice' }),
       );
-      const updated = await backend.updateWorkItem(item.id, {
+      const updated = await backend.updateWorkItem(item.id!, {
         assignee: 'Bob',
       });
       expect(updated.assignee).toBe('Bob');
@@ -646,7 +638,7 @@ describe('Storage', () => {
       const item = await backend.createWorkItem(
         makeNewWorkItem({ labels: ['old-label', 'keep-label'] }),
       );
-      const updated = await backend.updateWorkItem(item.id, {
+      const updated = await backend.updateWorkItem(item.id!, {
         labels: ['new-label', 'another-label'],
       });
       expect(updated.labels.sort()).toEqual(
@@ -654,7 +646,7 @@ describe('Storage', () => {
       );
 
       // Verify old labels are gone
-      const fetched = await backend.getWorkItem(item.id);
+      const fetched = await backend.getWorkItem(item.id!);
       expect(fetched.labels.sort()).toEqual(
         ['another-label', 'new-label'].sort(),
       );
@@ -673,18 +665,18 @@ describe('Storage', () => {
         makeNewWorkItem({ title: 'Dep 3' }),
       );
       const item = await backend.createWorkItem(
-        makeNewWorkItem({ title: 'Main', dependsOn: [dep1.id, dep2.id] }),
+        makeNewWorkItem({ title: 'Main', dependsOn: [dep1.rowId, dep2.rowId] }),
       );
 
-      const updated = await backend.updateWorkItem(item.id, {
-        dependsOn: [dep2.id, dep3.id],
+      const updated = await backend.updateWorkItem(item.id!, {
+        dependsOn: [dep2.rowId, dep3.rowId],
       });
-      expect(updated.dependsOn).toEqual([dep2.id, dep3.id]);
+      expect(updated.dependsOn).toEqual([dep2.rowId, dep3.rowId]);
 
       // Verify dep1 is no longer referenced
-      const fetched = await backend.getWorkItem(item.id);
-      expect(fetched.dependsOn).toEqual([dep2.id, dep3.id]);
-      expect(fetched.dependsOn).not.toContain(dep1.id);
+      const fetched = await backend.getWorkItem(item.id!);
+      expect(fetched.dependsOn).toEqual([dep2.rowId, dep3.rowId]);
+      expect(fetched.dependsOn).not.toContain(dep1.rowId);
     });
 
     it('validates relationships on update', async () => {
@@ -692,12 +684,12 @@ describe('Storage', () => {
 
       // Non-existent parent
       await expect(
-        backend.updateWorkItem(item.id, { parent: '999' }),
+        backend.updateWorkItem(item.id!, { parent: 999 }),
       ).rejects.toThrow('Parent #999 does not exist');
 
       // Non-existent dependency
       await expect(
-        backend.updateWorkItem(item.id, { dependsOn: ['999'] }),
+        backend.updateWorkItem(item.id!, { dependsOn: [999] }),
       ).rejects.toThrow('Dependency #999 does not exist');
     });
 
@@ -708,7 +700,7 @@ describe('Storage', () => {
       // Small delay to ensure timestamp differs
       await new Promise((r) => setTimeout(r, 10));
 
-      const updated = await backend.updateWorkItem(item.id, {
+      const updated = await backend.updateWorkItem(item.id!, {
         title: 'Changed',
       });
       expect(updated.updated).not.toBe(originalUpdated);
@@ -723,7 +715,7 @@ describe('Storage', () => {
 
       await new Promise((r) => setTimeout(r, 10));
 
-      const updated = await backend.updateWorkItem(item.id, {
+      const updated = await backend.updateWorkItem(item.id!, {
         title: 'Changed',
       });
       expect(updated.created).toBe(originalCreated);
@@ -748,7 +740,7 @@ describe('Storage', () => {
       );
 
       // Only update title
-      const updated = await backend.updateWorkItem(item.id, {
+      const updated = await backend.updateWorkItem(item.id!, {
         title: 'New Title',
       });
 
@@ -787,13 +779,13 @@ describe('Storage', () => {
         makeNewWorkItem({
           title: 'Child',
           iteration: 'sprint-1',
-          parent: parent.id,
+          parent: parent.rowId,
         }),
       );
 
-      await backend.updateWorkItem(parent.id, { iteration: 'sprint-2' });
+      await backend.updateWorkItem(parent.id!, { iteration: 'sprint-2' });
 
-      const updatedChild = await backend.getWorkItem(child.id);
+      const updatedChild = await backend.getWorkItem(child.id!);
       expect(updatedChild.iteration).toBe('sprint-2');
     });
 
@@ -805,21 +797,21 @@ describe('Storage', () => {
         makeNewWorkItem({
           title: 'Child',
           iteration: 'sprint-1',
-          parent: parent.id,
+          parent: parent.rowId,
         }),
       );
       const grandchild = await backend.createWorkItem(
         makeNewWorkItem({
           title: 'Grandchild',
           iteration: 'sprint-1',
-          parent: child.id,
+          parent: child.rowId,
         }),
       );
 
-      await backend.updateWorkItem(parent.id, { iteration: 'sprint-2' });
+      await backend.updateWorkItem(parent.id!, { iteration: 'sprint-2' });
 
-      const updatedChild = await backend.getWorkItem(child.id);
-      const updatedGrandchild = await backend.getWorkItem(grandchild.id);
+      const updatedChild = await backend.getWorkItem(child.id!);
+      const updatedGrandchild = await backend.getWorkItem(grandchild.id!);
       expect(updatedChild.iteration).toBe('sprint-2');
       expect(updatedGrandchild.iteration).toBe('sprint-2');
     });
@@ -833,7 +825,7 @@ describe('Storage', () => {
           title: 'Open Child',
           iteration: 'sprint-1',
           status: 'todo',
-          parent: parent.id,
+          parent: parent.rowId,
         }),
       );
       const closedChild = await backend.createWorkItem(
@@ -841,14 +833,14 @@ describe('Storage', () => {
           title: 'Closed Child',
           iteration: 'sprint-1',
           status: 'done',
-          parent: parent.id,
+          parent: parent.rowId,
         }),
       );
 
-      await backend.updateWorkItem(parent.id, { iteration: 'sprint-2' });
+      await backend.updateWorkItem(parent.id!, { iteration: 'sprint-2' });
 
-      const updatedOpen = await backend.getWorkItem(openChild.id);
-      const updatedClosed = await backend.getWorkItem(closedChild.id);
+      const updatedOpen = await backend.getWorkItem(openChild.id!);
+      const updatedClosed = await backend.getWorkItem(closedChild.id!);
       expect(updatedOpen.iteration).toBe('sprint-2');
       expect(updatedClosed.iteration).toBe('sprint-1');
     });
@@ -862,7 +854,7 @@ describe('Storage', () => {
           title: 'Closed Child',
           iteration: 'sprint-1',
           status: 'done',
-          parent: parent.id,
+          parent: parent.rowId,
         }),
       );
       const grandchild = await backend.createWorkItem(
@@ -870,14 +862,14 @@ describe('Storage', () => {
           title: 'Grandchild under closed',
           iteration: 'sprint-1',
           status: 'todo',
-          parent: closedChild.id,
+          parent: closedChild.rowId,
         }),
       );
 
-      await backend.updateWorkItem(parent.id, { iteration: 'sprint-2' });
+      await backend.updateWorkItem(parent.id!, { iteration: 'sprint-2' });
 
-      const updatedClosed = await backend.getWorkItem(closedChild.id);
-      const updatedGrandchild = await backend.getWorkItem(grandchild.id);
+      const updatedClosed = await backend.getWorkItem(closedChild.id!);
+      const updatedGrandchild = await backend.getWorkItem(grandchild.id!);
       expect(updatedClosed.iteration).toBe('sprint-1');
       expect(updatedGrandchild.iteration).toBe('sprint-1');
     });
@@ -890,14 +882,14 @@ describe('Storage', () => {
         makeNewWorkItem({
           title: 'Child',
           iteration: 'sprint-1',
-          parent: parent.id,
+          parent: parent.rowId,
         }),
       );
 
       // Update title only, not iteration
-      await backend.updateWorkItem(parent.id, { title: 'New Title' });
+      await backend.updateWorkItem(parent.id!, { title: 'New Title' });
 
-      const updatedChild = await backend.getWorkItem(child.id);
+      const updatedChild = await backend.getWorkItem(child.id!);
       expect(updatedChild.iteration).toBe('sprint-1');
     });
   });
@@ -907,10 +899,10 @@ describe('Storage', () => {
   describe('deleteWorkItem', () => {
     it('removes item', async () => {
       const item = await backend.createWorkItem(makeNewWorkItem());
-      await backend.deleteWorkItem(item.id);
+      await backend.deleteWorkItem(item.id!);
 
-      await expect(backend.getWorkItem(item.id)).rejects.toThrow(
-        `Work item #${item.id} not found`,
+      await expect(backend.getWorkItem(item.id!)).rejects.toThrow(
+        `Work item #${item.id!} not found`,
       );
     });
 
@@ -918,14 +910,14 @@ describe('Storage', () => {
       const item = await backend.createWorkItem(
         makeNewWorkItem({ labels: ['bug', 'feature'] }),
       );
-      await backend.deleteWorkItem(item.id);
+      await backend.deleteWorkItem(item.id!);
 
       // Verify labels are gone from the database
       const labelCount = db.raw
         .prepare(
-          'SELECT COUNT(*) as count FROM work_item_labels WHERE work_item_id = ?',
+          'SELECT COUNT(*) as count FROM work_item_labels WHERE work_item_row_id = ?',
         )
-        .get(item.id) as { count: number };
+        .get(item.rowId) as { count: number };
       expect(labelCount.count).toBe(0);
     });
 
@@ -934,33 +926,33 @@ describe('Storage', () => {
         makeNewWorkItem({ title: 'Dep target' }),
       );
       const item = await backend.createWorkItem(
-        makeNewWorkItem({ dependsOn: [dep.id] }),
+        makeNewWorkItem({ dependsOn: [dep.rowId] }),
       );
-      await backend.deleteWorkItem(item.id);
+      await backend.deleteWorkItem(item.id!);
 
       // Verify deps are gone
       const depCount = db.raw
         .prepare(
-          'SELECT COUNT(*) as count FROM work_item_deps WHERE work_item_id = ?',
+          'SELECT COUNT(*) as count FROM work_item_deps WHERE work_item_row_id = ?',
         )
-        .get(item.id) as { count: number };
+        .get(item.rowId) as { count: number };
       expect(depCount.count).toBe(0);
     });
 
     it('cascade deletes comments of the deleted item', async () => {
       const item = await backend.createWorkItem(makeNewWorkItem());
-      await backend.addComment(item.id, {
+      await backend.addComment(item.id!, {
         author: 'Alice',
         body: 'A comment',
       });
-      await backend.deleteWorkItem(item.id);
+      await backend.deleteWorkItem(item.id!);
 
       // Verify comments are gone
       const commentCount = db.raw
         .prepare(
-          'SELECT COUNT(*) as count FROM comments WHERE work_item_id = ?',
+          'SELECT COUNT(*) as count FROM comments WHERE work_item_row_id = ?',
         )
-        .get(item.id) as { count: number };
+        .get(item.rowId) as { count: number };
       expect(commentCount.count).toBe(0);
     });
 
@@ -969,12 +961,12 @@ describe('Storage', () => {
         makeNewWorkItem({ title: 'Parent' }),
       );
       const child = await backend.createWorkItem(
-        makeNewWorkItem({ title: 'Child', parent: parent.id }),
+        makeNewWorkItem({ title: 'Child', parent: parent.rowId }),
       );
 
-      await backend.deleteWorkItem(parent.id);
+      await backend.deleteWorkItem(parent.id!);
 
-      const fetchedChild = await backend.getWorkItem(child.id);
+      const fetchedChild = await backend.getWorkItem(child.id!);
       expect(fetchedChild.parent).toBeNull();
     });
 
@@ -983,12 +975,12 @@ describe('Storage', () => {
         makeNewWorkItem({ title: 'Target' }),
       );
       const dependent = await backend.createWorkItem(
-        makeNewWorkItem({ title: 'Dependent', dependsOn: [target.id] }),
+        makeNewWorkItem({ title: 'Dependent', dependsOn: [target.rowId] }),
       );
 
-      await backend.deleteWorkItem(target.id);
+      await backend.deleteWorkItem(target.id!);
 
-      const fetchedDependent = await backend.getWorkItem(dependent.id);
+      const fetchedDependent = await backend.getWorkItem(dependent.id!);
       expect(fetchedDependent.dependsOn).toEqual([]);
     });
   });
@@ -998,7 +990,7 @@ describe('Storage', () => {
   describe('addComment', () => {
     it('adds comment to existing item', async () => {
       const item = await backend.createWorkItem(makeNewWorkItem());
-      const comment = await backend.addComment(item.id, {
+      const comment = await backend.addComment(item.id!, {
         author: 'Alice',
         body: 'This is a comment',
       });
@@ -1011,7 +1003,7 @@ describe('Storage', () => {
 
     it('comment has author, date, and body', async () => {
       const item = await backend.createWorkItem(makeNewWorkItem());
-      const comment = await backend.addComment(item.id, {
+      const comment = await backend.addComment(item.id!, {
         author: 'Bob',
         body: 'Hello world',
       });
@@ -1023,16 +1015,16 @@ describe('Storage', () => {
 
     it('comment is retrievable via getWorkItem', async () => {
       const item = await backend.createWorkItem(makeNewWorkItem());
-      await backend.addComment(item.id, {
+      await backend.addComment(item.id!, {
         author: 'Alice',
         body: 'First comment',
       });
-      await backend.addComment(item.id, {
+      await backend.addComment(item.id!, {
         author: 'Bob',
         body: 'Second comment',
       });
 
-      const fetched = await backend.getWorkItem(item.id);
+      const fetched = await backend.getWorkItem(item.id!);
       expect(fetched.comments).toHaveLength(2);
       expect(fetched.comments[0]!.author).toBe('Alice');
       expect(fetched.comments[0]!.body).toBe('First comment');
@@ -1046,19 +1038,19 @@ describe('Storage', () => {
 
       await new Promise((r) => setTimeout(r, 10));
 
-      await backend.addComment(item.id, {
+      await backend.addComment(item.id!, {
         author: 'Alice',
         body: 'A comment',
       });
 
-      const fetched = await backend.getWorkItem(item.id);
+      const fetched = await backend.getWorkItem(item.id!);
       expect(fetched.updated).toBe(originalUpdated);
     });
 
     it('throws if item does not exist', async () => {
       await expect(
         backend.addComment('999', { author: 'Alice', body: 'Nope' }),
-      ).rejects.toThrow('Work item #999 not found');
+      ).rejects.toThrow('Work item "999" not found');
     });
   });
 
@@ -1083,7 +1075,7 @@ describe('Storage', () => {
   describe('SoftDeleteBackend', () => {
     it('soft-deletes by setting deletedAt', async () => {
       const item = await backend.createWorkItem(makeNewWorkItem());
-      await backend.softDeleteWorkItem(item.id);
+      await backend.softDeleteWorkItem(item.id!);
 
       const items = await backend.listWorkItems();
       expect(items).toHaveLength(0);
@@ -1093,31 +1085,31 @@ describe('Storage', () => {
       const item = await backend.createWorkItem(
         makeNewWorkItem({ title: 'Restore me' }),
       );
-      await backend.softDeleteWorkItem(item.id);
+      await backend.softDeleteWorkItem(item.id!);
 
       // Verify it's gone from list
       let items = await backend.listWorkItems();
       expect(items).toHaveLength(0);
 
       // Restore it
-      await backend.restoreWorkItem(item.id);
+      await backend.restoreWorkItem(item.id!);
 
       // Verify it's back
       items = await backend.listWorkItems();
       expect(items).toHaveLength(1);
-      expect(items[0]!.id).toBe(item.id);
+      expect(items[0]!.id).toBe(item.id!);
       expect(items[0]!.title).toBe('Restore me');
     });
 
     it('permanently deletes from trash', async () => {
       const item = await backend.createWorkItem(makeNewWorkItem());
-      await backend.softDeleteWorkItem(item.id);
-      await backend.permanentlyDeleteWorkItem(item.id);
+      await backend.softDeleteWorkItem(item.id!);
+      await backend.permanentlyDeleteWorkItem(item.id!);
 
       // Verify completely gone — even a direct DB query should return nothing
       const row = db.raw
-        .prepare('SELECT COUNT(*) as count FROM work_items WHERE id = ?')
-        .get(item.id) as { count: number };
+        .prepare('SELECT COUNT(*) as count FROM work_items WHERE row_id = ?')
+        .get(item.rowId) as { count: number };
       expect(row.count).toBe(0);
     });
 
@@ -1131,8 +1123,8 @@ describe('Storage', () => {
       const item3 = await backend.createWorkItem(
         makeNewWorkItem({ title: 'Item 3 (keep)' }),
       );
-      await backend.softDeleteWorkItem(item1.id);
-      await backend.softDeleteWorkItem(item2.id);
+      await backend.softDeleteWorkItem(item1.id!);
+      await backend.softDeleteWorkItem(item2.id!);
 
       await backend.cleanupTrash();
 
@@ -1147,7 +1139,7 @@ describe('Storage', () => {
       // The non-deleted item should still exist
       const items = await backend.listWorkItems();
       expect(items).toHaveLength(1);
-      expect(items[0]!.id).toBe(item3.id);
+      expect(items[0]!.id).toBe(item3.id!);
     });
 
     it('isSoftDeleteBackend returns true', () => {
@@ -1398,31 +1390,41 @@ describe('Storage', () => {
     });
   });
 
-  // ─── Temp IDs ───────────────────────────────────────────────────
+  // ─── hasRemoteBackend ────────────────────────────────────────────
 
-  describe('temp IDs', () => {
-    it('prefixes IDs with local- when tempIds is true', async () => {
+  describe('hasRemoteBackend', () => {
+    it('assigns display id = rowId when hasRemoteBackend is false (default)', async () => {
+      const item = await backend.createWorkItem(makeNewWorkItem());
+      expect(item.id).toBe(String(item.rowId));
+      expect(item.id).toBe('1');
+    });
+
+    it('leaves display id null when hasRemoteBackend is true', async () => {
       const tempDb = createDatabase(':memory:');
-      const tempBackend = Storage.createFromDb(tempDb, {
-        tempIds: true,
-      });
+      const tempBackend = Storage.createFromDb(tempDb);
+      tempBackend.setHasRemoteBackend(true);
 
       const item = await tempBackend.createWorkItem(makeNewWorkItem());
-      expect(item.id).toMatch(/^local-/);
-      expect(item.id).toBe('local-1');
-
-      const item2 = await tempBackend.createWorkItem(
-        makeNewWorkItem({ title: 'Second' }),
-      );
-      expect(item2.id).toBe('local-2');
+      expect(item.id).toBeNull();
+      expect(item.rowId).toBe(1);
 
       tempBackend.destroy();
     });
 
-    it('uses numeric IDs when tempIds is false (default)', async () => {
-      const item = await backend.createWorkItem(makeNewWorkItem());
-      expect(item.id).toBe('1');
-      expect(item.id).not.toMatch(/^local-/);
+    it('allows setting display id later via setDisplayId', async () => {
+      const tempDb = createDatabase(':memory:');
+      const tempBackend = Storage.createFromDb(tempDb);
+      tempBackend.setHasRemoteBackend(true);
+
+      const item = await tempBackend.createWorkItem(makeNewWorkItem());
+      expect(item.id).toBeNull();
+
+      tempBackend.setDisplayId(item.rowId, '42');
+      const fetched = await tempBackend.getWorkItem('42');
+      expect(fetched.id).toBe('42');
+      expect(fetched.rowId).toBe(item.rowId);
+
+      tempBackend.destroy();
     });
   });
 
@@ -1441,23 +1443,23 @@ describe('Storage', () => {
   describe('comment loading', () => {
     it('listWorkItems omits comments by default', async () => {
       const item = await backend.createWorkItem(makeNewWorkItem());
-      await backend.addComment(item.id, { body: 'hello', author: 'me' });
+      await backend.addComment(item.id!, { body: 'hello', author: 'me' });
       const items = await backend.listWorkItems();
       expect(items[0]!.comments).toEqual([]);
     });
 
     it('getWorkItem includes comments', async () => {
       const item = await backend.createWorkItem(makeNewWorkItem());
-      await backend.addComment(item.id, { body: 'hello', author: 'me' });
-      const fetched = await backend.getWorkItem(item.id);
+      await backend.addComment(item.id!, { body: 'hello', author: 'me' });
+      const fetched = await backend.getWorkItem(item.id!);
       expect(fetched.comments).toHaveLength(1);
       expect(fetched.comments[0]!.body).toBe('hello');
     });
   });
 
-  // ─── YAML migration: nextId recalculation ───────────────────────
+  // ─── YAML migration ──────────────────────────────────────────────
 
-  describe('migrateFromYaml nextId', () => {
+  describe('migrateFromYaml', () => {
     let tmpDir: string;
 
     beforeEach(() => {
@@ -1468,49 +1470,23 @@ describe('Storage', () => {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     });
 
-    it('recalculates nextId from existing items when YAML next_id is stale', async () => {
+    it('new items after migration use AUTOINCREMENT rowId', async () => {
       // 1. Create initial Storage to get a DB with some items
       const initial = Storage.create(tmpDir);
       await initial.createWorkItem(makeNewWorkItem({ title: 'Item 1' }));
       await initial.createWorkItem(makeNewWorkItem({ title: 'Item 2' }));
       await initial.createWorkItem(makeNewWorkItem({ title: 'Item 3' }));
-      // Items have IDs 1, 2, 3 — nextId is now 4
       initial.destroy();
 
-      // 2. Write a config.yml with a stale next_id (1) to simulate the bug
-      const yamlContent = [
-        'backend: none',
-        'types:',
-        '  - issue',
-        '  - task',
-        'statuses:',
-        '  - open',
-        '  - closed',
-        'current_iteration: default',
-        'iterations:',
-        '  - default',
-        'next_id: 1',
-        'branchMode: worktree',
-        'autoUpdate: true',
-      ].join('\n');
-      fs.writeFileSync(path.join(tmpDir, '.tic', 'config.yml'), yamlContent);
-
-      // 3. Force the DB to think it's a fresh seed so migration triggers
-      //    (migrateFromYaml only runs when backend === 'drizzle')
-      const tempDb = createDatabase(tmpDir);
-      tempDb.raw.exec(
-        "UPDATE project_config SET backend = 'drizzle' WHERE id = 1",
-      );
-      tempDb.close();
-
-      // 4. Re-open Storage — this triggers migrateFromYaml
+      // 2. Re-open Storage
       const reopened = Storage.create(tmpDir);
 
-      // 5. Create a new item — should NOT collide with existing IDs
-      const newItem = await reopened.createWorkItem(
+      // 3. New items use AUTOINCREMENT rowId — will get 4 since 1,2,3 are taken
+      const item = await reopened.createWorkItem(
         makeNewWorkItem({ title: 'Item 4' }),
       );
-      expect(Number(newItem.id)).toBeGreaterThanOrEqual(4);
+      expect(item.rowId).toBe(4);
+      expect(item.id).toBe('4');
 
       reopened.destroy();
     });

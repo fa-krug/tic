@@ -11,7 +11,6 @@ export interface Config {
   statuses: string[];
   current_iteration: string;
   iterations: Iteration[];
-  next_id: number;
   branchMode: 'worktree' | 'branch';
   autoUpdate: boolean;
   defaultType?: string;
@@ -44,7 +43,6 @@ export const defaultConfig: Config = {
   statuses: ['backlog', 'todo', 'in-progress', 'review', 'done'],
   current_iteration: 'default',
   iterations: [{ name: 'default', startDate: null, endDate: null }],
-  next_id: 1,
   branchMode: 'worktree',
   autoUpdate: true,
   branchCommand: `claude "Brainstorm the implementation of issue #$TIC_ITEM_ID: $TIC_ITEM_TITLE. $TIC_ITEM_DESCRIPTION"`,
@@ -130,7 +128,6 @@ export function readConfig(db: TicDatabase): Config {
       startDate: r.startDate ?? null,
       endDate: r.endDate ?? null,
     })),
-    next_id: pc?.nextId ?? 1,
     branchMode: (pc?.branchMode as 'worktree' | 'branch') ?? 'worktree',
     autoUpdate: pc?.autoUpdate ?? true,
   };
@@ -242,7 +239,6 @@ export function insertConfigTx(tx: TicTransaction, config: Config): void {
       id: 1,
       backend: config.backend,
       currentIteration: config.current_iteration,
-      nextId: config.next_id,
       branchMode: config.branchMode,
       branchCommand: config.branchCommand ?? '',
       copyToClipboard: config.copyToClipboard ?? true,
@@ -257,9 +253,6 @@ export function insertConfigTx(tx: TicTransaction, config: Config): void {
       set: {
         backend: config.backend,
         currentIteration: config.current_iteration,
-        // nextId is intentionally excluded — it is managed atomically
-        // by Storage.createWorkItem() and must not be overwritten by
-        // config updates that may hold a stale value.
         branchMode: config.branchMode,
         branchCommand: config.branchCommand ?? '',
         copyToClipboard: config.copyToClipboard ?? true,

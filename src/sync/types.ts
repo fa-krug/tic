@@ -13,7 +13,7 @@ export type QueueAction =
 
 export interface QueueEntry {
   action: QueueAction;
-  itemId: string;
+  itemRowId: number;
   timestamp: string;
   /** For comments: the comment body and author */
   commentData?: { author: string; body: string };
@@ -28,11 +28,13 @@ export interface SyncQueueData {
 export interface SyncQueueAdapter {
   read(): SyncQueueData | Promise<SyncQueueData>;
   append(entry: QueueEntry): void | Promise<void>;
-  remove(itemId: string, action: QueueAction): void | Promise<void>;
-  removeByIds(itemIds: string[], action: QueueAction): void | Promise<void>;
+  remove(itemRowId: number, action: QueueAction): void | Promise<void>;
+  removeByRowIds(
+    itemRowIds: number[],
+    action: QueueAction,
+  ): void | Promise<void>;
   claimNext(): QueueEntry | null | Promise<QueueEntry | null>;
   clear(): void | Promise<void>;
-  renameItem(oldId: string, newId: string): void | Promise<void>;
 }
 
 export interface SyncError {
@@ -50,7 +52,7 @@ export interface SyncProgress {
 export interface SyncLogEntry {
   phase: 'push' | 'pull';
   action: QueueAction;
-  itemId: string;
+  itemRowId: number;
   result: 'success' | 'error';
   message?: string;
   timestamp: string;
@@ -69,8 +71,8 @@ export interface PushResult {
   pushed: number;
   failed: number;
   errors: SyncError[];
-  /** Maps local temp IDs to resolved remote IDs (e.g. "local-1" → "42") */
-  idMappings: Map<string, string>;
+  /** Maps local rowIds to resolved remote display IDs (e.g. rowId 1 → "42") */
+  idMappings: Map<number, string>;
 }
 
 export interface SyncResult {
