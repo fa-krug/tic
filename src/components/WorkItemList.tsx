@@ -40,6 +40,7 @@ import { formStackStore } from '../stores/formStackStore.js';
 import { CommandBar } from './CommandBar.js';
 import { isSoftDeleteBackend } from '../backends/types.js';
 import type { BackendCapabilities } from '../backends/types.js';
+import { useMouseScroll, usePageKeys } from '../hooks/useMouseScroll.js';
 
 import { filterStore, useFilterStore } from '../stores/filterStore.js';
 import { useThemeStore, autoFg } from '../stores/themeStore.js';
@@ -400,6 +401,7 @@ export function WorkItemList() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [descriptionScrollOffset, setDescriptionScrollOffset] = useState(0);
+  const pageKeysRef = usePageKeys();
 
   // UI overlay state from store
   const { activeOverlay, warning, toast } = useUIStore(
@@ -707,6 +709,18 @@ export function WorkItemList() {
         const step = key.shift ? maxDescriptionHeight : 1;
         setDescriptionScrollOffset((o) => Math.min(maxScroll, o + step));
       }
+      if (key.pageUp || pageKeysRef.current.pageUp) {
+        pageKeysRef.current.pageUp = false;
+        setDescriptionScrollOffset((o) =>
+          Math.max(0, o - maxDescriptionHeight),
+        );
+      }
+      if (key.pageDown || pageKeysRef.current.pageDown) {
+        pageKeysRef.current.pageDown = false;
+        setDescriptionScrollOffset((o) =>
+          Math.min(maxScroll, o + maxDescriptionHeight),
+        );
+      }
       // Vim-style: u = half page up, d = half page down
       const halfPage = Math.max(1, Math.floor(maxDescriptionHeight / 2));
       if (_input === 'u') {
@@ -724,6 +738,40 @@ export function WorkItemList() {
       }
     },
     { isActive: showFullDescription && activeOverlay === null },
+  );
+
+  // Mouse wheel scrolling — scrolls description when expanded, list otherwise
+  useMouseScroll(
+    useCallback(
+      (direction: 'up' | 'down') => {
+        const SCROLL_LINES = 3;
+        if (showFullDescription) {
+          const maxScroll = Math.max(
+            0,
+            descriptionTotalLines - maxDescriptionHeight,
+          );
+          setDescriptionScrollOffset((o) =>
+            direction === 'up'
+              ? Math.max(0, o - SCROLL_LINES)
+              : Math.min(maxScroll, o + SCROLL_LINES),
+          );
+        } else {
+          const ls = listViewStore.getState();
+          const newCursor =
+            direction === 'up'
+              ? Math.max(0, ls.cursor - SCROLL_LINES)
+              : Math.min(treeItems.length - 1, ls.cursor + SCROLL_LINES);
+          ls.setCursor(newCursor);
+        }
+      },
+      [
+        showFullDescription,
+        descriptionTotalLines,
+        maxDescriptionHeight,
+        treeItems.length,
+      ],
+    ),
+    activeOverlay === null,
   );
 
   // Block 3: Main input handler — only active when no overlay is open
@@ -762,10 +810,16 @@ export function WorkItemList() {
         }
         clearWarning();
       }
-      if (matchesCommand('list-page', input, key)) {
-        if (key.pageUp) {
+      if (
+        matchesCommand('list-page', input, key) ||
+        pageKeysRef.current.pageUp ||
+        pageKeysRef.current.pageDown
+      ) {
+        if (key.pageUp || pageKeysRef.current.pageUp) {
+          pageKeysRef.current.pageUp = false;
           setCursor(Math.max(0, cursor - viewport.maxVisible));
         } else {
+          pageKeysRef.current.pageDown = false;
           setCursor(
             Math.min(treeItems.length - 1, cursor + viewport.maxVisible),
           );

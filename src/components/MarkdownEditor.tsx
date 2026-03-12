@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect } from 'react';
+import { useCallback, useLayoutEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import {
   editorStore,
@@ -22,14 +22,7 @@ import { readClipboardImage, ClipboardError } from '../clipboard.js';
 import { getImageUploadBackend } from '../stores/backendDataStore.js';
 import { uiStore } from '../stores/uiStore.js';
 import { useForwardDelete } from '../hooks/useForwardDelete.js';
-
-// Escape codes to disable terminal mouse tracking and focus reporting
-// so that click/focus events don't leak through as printable characters.
-const DISABLE_MOUSE_FOCUS =
-  '\x1b[?1000l' + // disable basic mouse tracking
-  '\x1b[?1002l' + // disable button-event tracking
-  '\x1b[?1003l' + // disable any-event tracking
-  '\x1b[?1004l'; // disable focus reporting
+import { useMouseScroll, usePageKeys } from '../hooks/useMouseScroll.js';
 
 export function MarkdownEditor() {
   const lines = useEditorStore((s) => s.lines);
@@ -43,11 +36,32 @@ export function MarkdownEditor() {
   const accent = useThemeStore((s) => s.colors.accent);
   const viewportHeight = height - 2; // status bar + help bar
   const isForwardDeleteRef = useForwardDelete();
+  const pageKeysRef = usePageKeys();
 
-  // Disable mouse tracking and focus reporting so clicks don't produce [I / [O
-  useEffect(() => {
-    process.stdout.write(DISABLE_MOUSE_FOCUS);
-  }, []);
+  // Mouse wheel scrolling
+  useMouseScroll(
+    useCallback(
+      (direction: 'up' | 'down') => {
+        const SCROLL_LINES = 3;
+        editorStore.setState((s) => {
+          let totalVisualLines = 0;
+          for (const l of s.lines) {
+            totalVisualLines +=
+              terminalWidth > 0 && l.length > 0
+                ? Math.ceil(l.length / terminalWidth)
+                : 1;
+          }
+          const maxScroll = Math.max(0, totalVisualLines - viewportHeight);
+          const newOffset =
+            direction === 'up'
+              ? Math.max(0, s.scrollOffset - SCROLL_LINES)
+              : Math.min(maxScroll, s.scrollOffset + SCROLL_LINES);
+          return { scrollOffset: newOffset };
+        });
+      },
+      [viewportHeight, terminalWidth],
+    ),
+  );
 
   // Keep scroll in sync with cursor (useLayoutEffect to update before paint)
   useLayoutEffect(() => {
@@ -190,6 +204,18 @@ export function MarkdownEditor() {
     }
     if (input === 'f' && key.meta) {
       s.moveWordRight();
+      return;
+    }
+
+    // Page Up / Page Down (key.pageUp/Down or raw escape sequence via ref)
+    if (key.pageUp || pageKeysRef.current.pageUp) {
+      pageKeysRef.current.pageUp = false;
+      s.pageUp(viewportHeight);
+      return;
+    }
+    if (key.pageDown || pageKeysRef.current.pageDown) {
+      pageKeysRef.current.pageDown = false;
+      s.pageDown(viewportHeight);
       return;
     }
 
