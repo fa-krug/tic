@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getTargetIds } from './WorkItemList.js';
+import { getTargetIds, collectDescendants } from './WorkItemList.js';
 import type { WorkItem } from '../types.js';
 
 function makeItem(rowId: number, id: string | null): WorkItem {
@@ -52,5 +52,42 @@ describe('getTargetIds', () => {
     const cursor = makeItem(5, '5');
     const result = getTargetIds(marked, cursor, allItems);
     expect(result).not.toContain('5');
+  });
+});
+
+describe('collectDescendants', () => {
+  function makeTree(): WorkItem[] {
+    const root = makeItem(1, '1');
+    const child1 = { ...makeItem(2, '2'), parent: 1 };
+    const child2 = { ...makeItem(3, '3'), parent: 1 };
+    const grandchild = { ...makeItem(4, '4'), parent: 2 };
+    const unrelated = makeItem(5, '5');
+    return [root, child1, child2, grandchild, unrelated];
+  }
+
+  it('collects direct children', () => {
+    const items = makeTree();
+    const result = collectDescendants(new Set([1]), items);
+    const ids = result.map((i) => i.rowId).sort();
+    expect(ids).toEqual([2, 3, 4]);
+  });
+
+  it('collects grandchildren recursively', () => {
+    const items = makeTree();
+    const result = collectDescendants(new Set([2]), items);
+    expect(result.map((i) => i.rowId)).toEqual([4]);
+  });
+
+  it('returns empty for leaf items', () => {
+    const items = makeTree();
+    expect(collectDescendants(new Set([5]), items)).toEqual([]);
+  });
+
+  it('does not duplicate items already in target set', () => {
+    const items = makeTree();
+    // Target both parent and child — grandchild should appear once
+    const result = collectDescendants(new Set([1, 2]), items);
+    const ids = result.map((i) => i.rowId).sort();
+    expect(ids).toEqual([3, 4]);
   });
 });

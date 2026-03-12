@@ -5,7 +5,7 @@ export type ActiveOverlay =
   // WorkItemList overlays
   | { type: 'command-bar' }
   | { type: 'bulk-menu' }
-  | { type: 'delete-confirm'; targetIds: string[] }
+  | { type: 'delete-confirm'; targetIds: string[]; descendantCount: number }
   | { type: 'template-picker' }
   | { type: 'status-picker'; targetIds: string[] }
   | { type: 'type-picker'; targetIds: string[] }

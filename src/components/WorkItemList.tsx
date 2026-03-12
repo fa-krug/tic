@@ -245,6 +245,31 @@ export function getTargetIds(
   return cursorItem?.id ? [cursorItem.id] : [];
 }
 
+/** Collect all descendants of the given items (recursive). */
+export function collectDescendants(
+  targetRowIds: Set<number>,
+  allItems: WorkItem[],
+): WorkItem[] {
+  const result: WorkItem[] = [];
+  const visited = new Set<number>();
+  const queue = [...targetRowIds];
+  while (queue.length > 0) {
+    const parentRowId = queue.pop()!;
+    for (const item of allItems) {
+      if (
+        item.parent === parentRowId &&
+        !targetRowIds.has(item.rowId) &&
+        !visited.has(item.rowId)
+      ) {
+        visited.add(item.rowId);
+        result.push(item);
+        queue.push(item.rowId);
+      }
+    }
+  }
+  return result;
+}
+
 /** Get rowIds for target items. Used for undo entries and store operations. */
 export function getTargetRowIds(
   markedIds: Set<number>,
@@ -857,7 +882,18 @@ export function WorkItemList() {
           allItems,
         );
         if (targetIds.length > 0) {
-          openOverlay({ type: 'delete-confirm', targetIds });
+          const targetSnapshots = targetIds
+            .map((id) => allItems.find((i) => i.id === id))
+            .filter((i): i is WorkItem => i !== undefined);
+          const descCount = collectDescendants(
+            new Set(targetSnapshots.map((s) => s.rowId)),
+            allItems,
+          ).length;
+          openOverlay({
+            type: 'delete-confirm',
+            targetIds,
+            descendantCount: descCount,
+          });
         }
       }
 
@@ -1387,7 +1423,18 @@ export function WorkItemList() {
             allItems,
           );
           if (targetIds.length > 0) {
-            openOverlay({ type: 'delete-confirm', targetIds });
+            const snapshots = targetIds
+              .map((id) => allItems.find((i) => i.id === id))
+              .filter((i): i is WorkItem => i !== undefined);
+            const descCount = collectDescendants(
+              new Set(snapshots.map((s) => s.rowId)),
+              allItems,
+            ).length;
+            openOverlay({
+              type: 'delete-confirm',
+              targetIds,
+              descendantCount: descCount,
+            });
           }
         }
         break;
@@ -1597,9 +1644,21 @@ export function WorkItemList() {
       case 'labels':
         openOverlay({ type: 'labels-input', targetIds });
         break;
-      case 'delete':
-        openOverlay({ type: 'delete-confirm', targetIds });
+      case 'delete': {
+        const snapshots = targetIds
+          .map((id) => allItems.find((i) => i.id === id))
+          .filter((i): i is WorkItem => i !== undefined);
+        const descCount = collectDescendants(
+          new Set(snapshots.map((s) => s.rowId)),
+          allItems,
+        ).length;
+        openOverlay({
+          type: 'delete-confirm',
+          targetIds,
+          descendantCount: descCount,
+        });
         break;
+      }
     }
   };
 
@@ -2392,7 +2451,7 @@ export function WorkItemList() {
           />
         ) : activeOverlay?.type === 'delete-confirm' ? (
           <OverlayPanel
-            title={`Delete ${activeOverlay.targetIds.length} item${activeOverlay.targetIds.length > 1 ? 's' : ''}?`}
+            title={`Delete ${activeOverlay.targetIds.length} item${activeOverlay.targetIds.length > 1 ? 's' : ''}${activeOverlay.descendantCount > 0 ? ` (+${activeOverlay.descendantCount} children)` : ''}?`}
             items={[
               { id: 'yes', label: 'Yes, delete', value: 'yes' },
               { id: 'no', label: 'Cancel', value: 'no' },
@@ -2402,11 +2461,26 @@ export function WorkItemList() {
                 const targetIds = activeOverlay.targetIds;
                 if (!backend) return;
                 void (async () => {
-                  const snapshots = targetIds
+                  const targetSnapshots = targetIds
                     .map((id) => allItems.find((i) => i.id === id))
                     .filter((i): i is WorkItem => i !== undefined);
+
+                  // Collect all descendants to cascade-delete
+                  const targetRowIds = new Set(
+                    targetSnapshots.map((s) => s.rowId),
+                  );
+                  const descendants = collectDescendants(
+                    targetRowIds,
+                    allItems,
+                  );
+                  // All items to delete: targets + descendants
+                  const allSnapshots = [...targetSnapshots, ...descendants];
+                  const allDisplayIds = allSnapshots
+                    .map((s) => s.id)
+                    .filter((id): id is string => id !== null);
+
                   const softDelete = isSoftDeleteBackend(backend);
-                  for (const id of targetIds) {
+                  for (const id of allDisplayIds) {
                     if (softDelete) {
                       await backend.softDeleteWorkItem(id);
                     } else {
@@ -2419,10 +2493,10 @@ export function WorkItemList() {
                       type: 'delete',
                       label:
                         targetIds.length === 1
-                          ? `deleted #${targetIds[0]}`
-                          : `deleted ${targetIds.length} items`,
-                      itemSnapshots: snapshots,
-                      syncItemRowIds: snapshots.map((s) => s.rowId),
+                          ? `deleted #${targetIds[0]}${descendants.length > 0 ? ` (+${descendants.length} children)` : ''}`
+                          : `deleted ${targetIds.length} items${descendants.length > 0 ? ` (+${descendants.length} children)` : ''}`,
+                      itemSnapshots: allSnapshots,
+                      syncItemRowIds: allSnapshots.map((s) => s.rowId),
                       syncAction: 'delete',
                     });
                     if (evicted?.type === 'delete') {
@@ -2433,17 +2507,21 @@ export function WorkItemList() {
                     }
                   }
                   closeOverlay();
-                  for (const id of targetIds) {
+                  for (const id of allDisplayIds) {
                     removeDeletedItem(rowIdOf(id));
                   }
                   setCursor(Math.max(0, cursor - 1));
-                  for (const id of targetIds) {
+                  for (const id of allDisplayIds) {
                     backendDataStore.getState().removeItem(id);
                   }
+                  const childSuffix =
+                    descendants.length > 0
+                      ? ` (+${descendants.length} children)`
+                      : '';
                   setToast(
                     targetIds.length === 1
-                      ? `Item #${targetIds[0]} deleted${softDelete ? ' — press u to undo' : ''}`
-                      : `${targetIds.length} items deleted${softDelete ? ' — press u to undo' : ''}`,
+                      ? `Item #${targetIds[0]}${childSuffix} deleted${softDelete ? ' — press u to undo' : ''}`
+                      : `${targetIds.length} items${childSuffix} deleted${softDelete ? ' — press u to undo' : ''}`,
                   );
                 })().catch((err: unknown) => {
                   uiStore
