@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import yaml from 'yaml';
-import { eq, and, isNull, isNotNull, inArray } from 'drizzle-orm';
+import { eq, and, isNull, isNotNull, inArray, sql } from 'drizzle-orm';
 import { BaseBackend, UnsupportedOperationError } from '../backends/types.js';
 import type {
   BackendCapabilities,
@@ -731,8 +731,17 @@ export class Storage
 
         const rowId = Number(insertResult.lastInsertRowid);
 
-        // Assign display ID: if no remote backend, use rowId as display ID
-        const displayId = this._hasRemoteBackend ? null : String(rowId);
+        // Assign display ID: if no remote backend, use next sequential ID
+        // We can't just use rowId because after migration, existing display IDs
+        // may be higher than new rowIds (e.g. old id="54" but new rowId=48).
+        let displayId: string | null = null;
+        if (!this._hasRemoteBackend) {
+          const maxRow = tx
+            .select({ maxId: sql<number>`MAX(CAST(id AS INTEGER))` })
+            .from(schema.workItems)
+            .get();
+          displayId = String(Math.max(rowId, (maxRow?.maxId ?? 0) + 1));
+        }
         if (displayId !== null) {
           tx.update(schema.workItems)
             .set({ id: displayId })

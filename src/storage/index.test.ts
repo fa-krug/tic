@@ -1411,6 +1411,31 @@ describe('Storage', () => {
       tempBackend.destroy();
     });
 
+    it('avoids display id collision after migration (display ids > row ids)', async () => {
+      const tempDb = createDatabase(':memory:');
+      const tempBackend = Storage.createFromDb(tempDb);
+
+      // Simulate post-migration state: create items then manually set high display IDs
+      const item1 = await tempBackend.createWorkItem(
+        makeNewWorkItem({ title: 'first' }),
+      );
+      const item2 = await tempBackend.createWorkItem(
+        makeNewWorkItem({ title: 'second' }),
+      );
+      // Manually set display IDs to high values (simulating migrated data)
+      tempBackend.setDisplayId(item1.rowId, '100');
+      tempBackend.setDisplayId(item2.rowId, '101');
+
+      // New item should get display id = 102 (max + 1), not 3 (rowId)
+      const item3 = await tempBackend.createWorkItem(
+        makeNewWorkItem({ title: 'third' }),
+      );
+      expect(item3.rowId).toBe(3);
+      expect(item3.id).toBe('102');
+
+      tempBackend.destroy();
+    });
+
     it('allows setting display id later via setDisplayId', async () => {
       const tempDb = createDatabase(':memory:');
       const tempBackend = Storage.createFromDb(tempDb);
