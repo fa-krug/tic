@@ -91,19 +91,29 @@ describe('SyncQueue', () => {
     expect(result.pending[0]!.itemRowId).toBe(2);
   });
 
-  it('removeByRowIds batch deletes', () => {
+  it('removeByRowIds batch deletes and returns count', () => {
     queue.append(makeEntry({ itemRowId: 1, action: 'delete' }));
     queue.append(makeEntry({ itemRowId: 2, action: 'delete' }));
     queue.append(makeEntry({ itemRowId: 3, action: 'delete' }));
-    queue.removeByRowIds([1, 3], 'delete');
+    const removed = queue.removeByRowIds([1, 3], 'delete');
+    expect(removed).toBe(2);
     const result = queue.read();
     expect(result.pending).toHaveLength(1);
     expect(result.pending[0]!.itemRowId).toBe(2);
   });
 
-  it('removeByRowIds with empty array is no-op', () => {
+  it('removeByRowIds with empty array returns 0', () => {
     queue.append(makeEntry());
-    queue.removeByRowIds([], 'create');
+    const removed = queue.removeByRowIds([], 'create');
+    expect(removed).toBe(0);
+    const result = queue.read();
+    expect(result.pending).toHaveLength(1);
+  });
+
+  it('removeByRowIds returns 0 when no matching entries', () => {
+    queue.append(makeEntry({ itemRowId: 1, action: 'create' }));
+    const removed = queue.removeByRowIds([1], 'delete');
+    expect(removed).toBe(0);
     const result = queue.read();
     expect(result.pending).toHaveLength(1);
   });

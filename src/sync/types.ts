@@ -32,7 +32,7 @@ export interface SyncQueueAdapter {
   removeByRowIds(
     itemRowIds: number[],
     action: QueueAction,
-  ): void | Promise<void>;
+  ): number | Promise<number>;
   claimNext(): QueueEntry | null | Promise<QueueEntry | null>;
   clear(): void | Promise<void>;
 }

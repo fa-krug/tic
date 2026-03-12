@@ -77,9 +77,9 @@ export class SyncQueue implements SyncQueueAdapter {
       .run();
   }
 
-  removeByRowIds(itemRowIds: number[], action: QueueAction): void {
-    if (itemRowIds.length === 0) return;
-    this.db
+  removeByRowIds(itemRowIds: number[], action: QueueAction): number {
+    if (itemRowIds.length === 0) return 0;
+    const result = this.db
       .delete(s.syncQueue)
       .where(
         and(
@@ -88,6 +88,7 @@ export class SyncQueue implements SyncQueueAdapter {
         ),
       )
       .run();
+    return result.changes;
   }
 
   clear(): void {

@@ -871,8 +871,15 @@ export function WorkItemList() {
                 if (snap.id) await backend.restoreWorkItem(snap.id);
               }
             }
-            if (queue) {
-              await queue.removeByRowIds(entry.syncItemRowIds, 'delete');
+            // Remove pending delete from queue; if already pushed, re-create on remote
+            const removed = queue
+              ? await queue.removeByRowIds(entry.syncItemRowIds, 'delete')
+              : 0;
+            if (removed === 0) {
+              // Delete was already pushed to remote — queue create to re-sync
+              for (const snap of entry.itemSnapshots) {
+                await queueWrite('create', snap.rowId);
+              }
             }
             refreshData();
             setToast(
@@ -885,8 +892,15 @@ export function WorkItemList() {
               const item = allItems.find((i) => i.rowId === rowId);
               if (item?.id) await backend.cachedDeleteWorkItem(item.id);
             }
-            if (queue) {
-              await queue.removeByRowIds(entry.syncItemRowIds, 'create');
+            // Remove pending create from queue; if already pushed, queue delete for remote
+            const removed = queue
+              ? await queue.removeByRowIds(entry.syncItemRowIds, 'create')
+              : 0;
+            if (removed === 0) {
+              // Create was already pushed to remote — queue delete to remove it
+              for (const rowId of entry.syncItemRowIds) {
+                await queueWrite('delete', rowId);
+              }
             }
             refreshData();
             setToast(
