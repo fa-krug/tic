@@ -111,6 +111,7 @@ export async function createBackendWithSync(
   let syncManager: SyncManager | null = null;
   let queue: SyncQueueAdapter | null = null;
   if (remote) {
+    primary.setHasRemoteBackend(true);
     const { SyncQueue } = await import('../storage/syncQueue.js');
     const { SyncManager: SM } = await import('../sync/SyncManager.js');
     queue = new SyncQueue(primary.getDatabase());

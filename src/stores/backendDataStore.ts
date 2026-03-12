@@ -215,6 +215,7 @@ async function createBackendAndSync(cwd: string): Promise<{
   let syncManager: SyncManager | null = null;
   let queue: SyncQueueAdapter | null = null;
   if (remote) {
+    primary.setHasRemoteBackend(true);
     const { SyncManager: SM } = await import('../sync/SyncManager.js');
     const { SyncQueue } = await import('../storage/syncQueue.js');
     queue = new SyncQueue(primary.getDatabase());
@@ -416,6 +417,7 @@ export const backendDataStore = createStore<BackendDataStoreState>(
         const { SyncQueue } = await import('../storage/syncQueue.js');
         type StorageType = import('../storage/index.js').Storage;
         const primary = currentBackend as StorageType;
+        primary.setHasRemoteBackend(true);
         const queue = new SyncQueue(primary.getDatabase());
         const syncManager = new SM(primary, remote, queue);
 
@@ -484,6 +486,7 @@ export const backendDataStore = createStore<BackendDataStoreState>(
         const { SyncQueue } = await import('../storage/syncQueue.js');
         type StorageType = import('../storage/index.js').Storage;
         const primary = currentBackend as StorageType;
+        primary.setHasRemoteBackend(true);
         const queue = new SyncQueue(primary.getDatabase());
         const syncManager = new SM(primary, remote, queue);
 
@@ -579,6 +582,7 @@ export const backendDataStore = createStore<BackendDataStoreState>(
         const { SyncQueue } = await import('../storage/syncQueue.js');
         type StorageType = import('../storage/index.js').Storage;
         const primary = currentBackend as StorageType;
+        primary.setHasRemoteBackend(true);
         const queue = new SyncQueue(primary.getDatabase());
         const syncManager = new SM(primary, remote, queue);
 
