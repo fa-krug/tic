@@ -27,6 +27,9 @@ import { ColorPill } from './ColorPill.js';
 import { matchesCommand } from '../commands.js';
 import { uiStore } from '../stores/uiStore.js';
 import { undoStore } from '../stores/undoStore.js';
+import { listViewStore } from '../stores/listViewStore.js';
+import { isSoftDeleteBackend } from '../backends/types.js';
+import { collectDescendants } from './WorkItemList.js';
 import { useFormValidation } from '../hooks/useFormValidation.js';
 import { useThemeStore } from '../stores/themeStore.js';
 import type { FieldType } from '../stores/themeStore.js';
@@ -123,12 +126,6 @@ export function WorkItemForm() {
     return item?.rowId ?? -1;
   };
 
-  /** Look up the display ID for a rowId. Returns null if not found. */
-  const displayIdOf = (rowId: number): string | null => {
-    const item = allItems.find((i) => i.rowId === rowId);
-    return item?.id ?? null;
-  };
-
   const queueWrite = async (
     action: QueueAction,
     itemRowId: number,
@@ -169,6 +166,16 @@ export function WorkItemForm() {
   const [children, setChildren] = useState<WorkItem[]>([]);
   const [dependents, setDependents] = useState<WorkItem[]>([]);
   const [parentItem, setParentItem] = useState<WorkItem | null>(null);
+
+  /** Look up the display ID for a rowId. Returns null if not found. */
+  const displayIdOf = (rowId: number): string | null => {
+    const item =
+      allItems.find((i) => i.rowId === rowId) ??
+      children.find((i) => i.rowId === rowId) ??
+      dependents.find((i) => i.rowId === rowId) ??
+      (parentItem?.rowId === rowId ? parentItem : null);
+    return item?.id ?? null;
+  };
   const itemLoading = useBackendDataStore((s) => s.itemLoading);
   const setItemLoading = (v: boolean) =>
     backendDataStore.setState({ itemLoading: v });
@@ -190,6 +197,10 @@ export function WorkItemForm() {
     setItemLoading(true);
     const displayId = displayIdOf(selectedWorkItemId);
     if (!displayId) {
+      setExistingItem(null);
+      setChildren([]);
+      setDependents([]);
+      setParentItem(null);
       setItemLoading(false);
       return;
     }
@@ -526,6 +537,7 @@ export function WorkItemForm() {
   const [preEditValue, setPreEditValue] = useState<string>('');
   const [pendingRelNav, setPendingRelNav] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
+  const [showDeletePrompt, setShowDeletePrompt] = useState(false);
 
   useEffect(() => {
     // Only reset focusedField when entering a new item, not when returning
@@ -712,6 +724,85 @@ export function WorkItemForm() {
 
   useInput(
     (_input, key) => {
+      // Delete confirmation prompt — capture y/n/esc
+      if (showDeletePrompt) {
+        if (_input === 'y' || key.return) {
+          setShowDeletePrompt(false);
+          if (!backend || !existingItem || !existingItem.id) return;
+          const item = existingItem;
+          const displayId = item.id;
+          if (!displayId) return;
+          void (async () => {
+            const targetSnapshots: WorkItem[] = [item];
+            const descendants = collectDescendants(
+              new Set([item.rowId]),
+              allItems,
+            );
+            const allSnapshots = [...targetSnapshots, ...descendants];
+            const allDisplayIds = allSnapshots
+              .map((s) => s.id)
+              .filter((id): id is string => id !== null);
+
+            const softDelete = isSoftDeleteBackend(backend);
+            for (const id of allDisplayIds) {
+              if (softDelete) {
+                await backend.softDeleteWorkItem(id);
+              } else {
+                await backend.cachedDeleteWorkItem(id);
+              }
+              await queueWrite('delete', rowIdOf(id));
+            }
+            if (softDelete) {
+              const evicted = undoStore.getState().pushUndo({
+                type: 'delete',
+                label:
+                  descendants.length > 0
+                    ? `deleted #${displayId} (+${descendants.length} children)`
+                    : `deleted #${displayId}`,
+                itemSnapshots: allSnapshots,
+                syncItemRowIds: allSnapshots.map((s) => s.rowId),
+                syncAction: 'delete',
+              });
+              if (evicted?.type === 'delete') {
+                for (const snap of evicted.itemSnapshots) {
+                  if (snap.id) await backend.permanentlyDeleteWorkItem(snap.id);
+                }
+              }
+            }
+            for (const id of allDisplayIds) {
+              listViewStore.getState().removeDeletedItem(rowIdOf(id));
+            }
+            for (const id of allDisplayIds) {
+              backendDataStore.getState().removeItem(id);
+            }
+            const childSuffix =
+              descendants.length > 0
+                ? ` (+${descendants.length} children)`
+                : '';
+            uiStore
+              .getState()
+              .setToast(
+                `Item #${displayId}${childSuffix} deleted${softDelete ? ' — press u to undo' : ''}`,
+              );
+            // Navigate back to list
+            formStackStore.getState().clear();
+            navigationStore.getState().selectWorkItem(null);
+            navigate('list');
+          })().catch((err: unknown) => {
+            uiStore
+              .getState()
+              .setToast(err instanceof Error ? err.message : 'Delete failed');
+          });
+          return;
+        }
+        if (_input === 'n' || key.escape) {
+          setShowDeletePrompt(false);
+          return;
+        }
+        // Ignore all other keys while prompt is showing
+        return;
+      }
+
       // Dirty prompt overlay — capture s/d/esc only
       if (showDirtyPrompt) {
         if (
@@ -893,6 +984,17 @@ export function WorkItemForm() {
             .finally(() => {
               setSaving(false);
             });
+          return;
+        }
+
+        // d: delete current item (existing items only, not templates)
+        if (
+          _input === 'd' &&
+          selectedWorkItemId !== null &&
+          formMode === 'item' &&
+          existingItem
+        ) {
+          setShowDeletePrompt(true);
           return;
         }
 
@@ -1687,7 +1789,30 @@ export function WorkItemForm() {
         )}
 
       <Box marginTop={1}>
-        {showDirtyPrompt ? (
+        {showDeletePrompt ? (
+          <Text>
+            <Text>
+              Delete #{existingItem?.id ?? ''}
+              {(() => {
+                if (!existingItem) return '';
+                const desc = collectDescendants(
+                  new Set([existingItem.rowId]),
+                  allItems,
+                );
+                return desc.length > 0 ? ` (+${desc.length} children)` : '';
+              })()}
+              ?{' '}
+            </Text>
+            <Text color={error} bold>
+              (y)
+            </Text>
+            <Text>es </Text>
+            <Text color={warning} bold>
+              (n)
+            </Text>
+            <Text>o</Text>
+          </Text>
+        ) : showDirtyPrompt ? (
           <Text>
             {selectedWorkItemId !== null || title.trim() ? (
               <Text>
@@ -1725,7 +1850,9 @@ export function WorkItemForm() {
               ? 'enter confirm │ esc revert │ ? help'
               : isDirty
                 ? '↑↓ navigate │ enter edit │ s save & back │ esc back (unsaved changes) │ ? help'
-                : '↑↓ navigate │ enter edit │ s save & back │ esc back │ ? help'}
+                : selectedWorkItemId !== null && formMode === 'item'
+                  ? '↑↓ navigate │ enter edit │ s save & back │ d delete │ esc back │ ? help'
+                  : '↑↓ navigate │ enter edit │ s save & back │ esc back │ ? help'}
           </Text>
         )}
       </Box>
