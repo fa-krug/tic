@@ -2204,77 +2204,101 @@ export function WorkItemList() {
             placeholder="Type assignee name..."
           />
         ) : activeOverlay?.type === 'labels-input' ? (
-          <OverlayPanel
-            title={`Set Labels (${activeOverlay.targetIds.length} item${activeOverlay.targetIds.length > 1 ? 's' : ''})`}
-            fieldType="label"
-            items={labelSuggestions.map((l) => ({
-              id: l,
-              label: l,
-              value: l,
-            }))}
-            multiSelect
-            allowFreeform
-            onSelect={() => {}}
-            onConfirm={(selected) => {
-              const targetIds = getOverlayTargetIds();
-              closeOverlay();
-              if (!backend) return;
-              void (async () => {
-                pushUpdateUndo(targetIds, 'labels change');
-                const labels = selected.map((i) => i.value);
-                for (const id of targetIds) {
-                  await backend.cachedUpdateWorkItem(id, { labels });
-                  await queueWrite('update', rowIdOf(id));
-                }
-                for (const id of targetIds) {
-                  await backendDataStore.getState().reloadItem(id);
-                }
-                setToast(
-                  targetIds.length === 1
-                    ? 'Labels updated — press u to undo'
-                    : `${targetIds.length} items updated — press u to undo`,
-                );
-              })().catch((err: unknown) => {
-                uiStore
-                  .getState()
-                  .setToast(
-                    err instanceof Error ? err.message : 'Update failed',
-                  );
-              });
-            }}
-            onSubmitFreeform={(text) => {
-              const targetIds = getOverlayTargetIds();
-              closeOverlay();
-              if (!backend) return;
-              void (async () => {
-                pushUpdateUndo(targetIds, 'labels change');
-                const labels = text
-                  .split(',')
-                  .map((l) => l.trim())
-                  .filter(Boolean);
-                for (const id of targetIds) {
-                  await backend.cachedUpdateWorkItem(id, { labels });
-                  await queueWrite('update', rowIdOf(id));
-                }
-                for (const id of targetIds) {
-                  await backendDataStore.getState().reloadItem(id);
-                }
-                setToast(
-                  targetIds.length === 1
-                    ? 'Labels updated — press u to undo'
-                    : `${targetIds.length} items updated — press u to undo`,
-                );
-              })().catch((err: unknown) => {
-                uiStore
-                  .getState()
-                  .setToast(
-                    err instanceof Error ? err.message : 'Update failed',
-                  );
-              });
-            }}
-            onCancel={() => closeOverlay()}
-            placeholder="Type to filter labels..."
-          />
+          (() => {
+            const targetIdSet = new Set(activeOverlay.targetIds);
+            const targetItems = allItems.filter((it) =>
+              targetIdSet.has(String(it.rowId)),
+            );
+            const commonLabels = new Set<string>(targetItems[0]?.labels ?? []);
+            for (const it of targetItems.slice(1)) {
+              const itemLabels = new Set(it.labels);
+              for (const l of commonLabels) {
+                if (!itemLabels.has(l)) commonLabels.delete(l);
+              }
+            }
+            const seen = new Set<string>();
+            const allLabels: string[] = [];
+            for (const l of [...commonLabels, ...labelSuggestions]) {
+              if (!seen.has(l)) {
+                seen.add(l);
+                allLabels.push(l);
+              }
+            }
+            return (
+              <OverlayPanel
+                title={`Set Labels (${activeOverlay.targetIds.length} item${activeOverlay.targetIds.length > 1 ? 's' : ''})`}
+                fieldType="label"
+                items={allLabels.map((l) => ({
+                  id: l,
+                  label: l,
+                  value: l,
+                  selected: commonLabels.has(l),
+                }))}
+                multiSelect
+                allowFreeform
+                onSelect={() => {}}
+                onConfirm={(selected) => {
+                  const targetIds = getOverlayTargetIds();
+                  closeOverlay();
+                  if (!backend) return;
+                  void (async () => {
+                    pushUpdateUndo(targetIds, 'labels change');
+                    const labels = selected.map((i) => i.value);
+                    for (const id of targetIds) {
+                      await backend.cachedUpdateWorkItem(id, { labels });
+                      await queueWrite('update', rowIdOf(id));
+                    }
+                    for (const id of targetIds) {
+                      await backendDataStore.getState().reloadItem(id);
+                    }
+                    setToast(
+                      targetIds.length === 1
+                        ? 'Labels updated — press u to undo'
+                        : `${targetIds.length} items updated — press u to undo`,
+                    );
+                  })().catch((err: unknown) => {
+                    uiStore
+                      .getState()
+                      .setToast(
+                        err instanceof Error ? err.message : 'Update failed',
+                      );
+                  });
+                }}
+                onSubmitFreeform={(text) => {
+                  const targetIds = getOverlayTargetIds();
+                  closeOverlay();
+                  if (!backend) return;
+                  void (async () => {
+                    pushUpdateUndo(targetIds, 'labels change');
+                    const labels = text
+                      .split(',')
+                      .map((l) => l.trim())
+                      .filter(Boolean);
+                    for (const id of targetIds) {
+                      await backend.cachedUpdateWorkItem(id, { labels });
+                      await queueWrite('update', rowIdOf(id));
+                    }
+                    for (const id of targetIds) {
+                      await backendDataStore.getState().reloadItem(id);
+                    }
+                    setToast(
+                      targetIds.length === 1
+                        ? 'Labels updated — press u to undo'
+                        : `${targetIds.length} items updated — press u to undo`,
+                    );
+                  })().catch((err: unknown) => {
+                    uiStore
+                      .getState()
+                      .setToast(
+                        err instanceof Error ? err.message : 'Update failed',
+                      );
+                  });
+                }}
+                onCancel={() => closeOverlay()}
+                placeholder="Type to filter labels..."
+              />
+            );
+          })()
         ) : activeOverlay?.type === 'sort-picker' ? (
           <OverlayPanel
             title="Order by"
