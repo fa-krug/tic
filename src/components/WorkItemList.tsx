@@ -2478,6 +2478,19 @@ export function WorkItemList() {
               closeOverlay();
               if (!backend) return;
               void (async () => {
+                // Cascade mirrors Storage: non-closed descendants get the new
+                // iteration too. Collect them up front so we can queue sync
+                // writes — otherwise the remote update never fires and a
+                // subsequent sync may treat them as new items.
+                const closedStatus = statuses[statuses.length - 1];
+                const targetRowIds = new Set(
+                  targetIds.map((id) => rowIdOf(id)).filter((r) => r !== -1),
+                );
+                const cascadedDescendants = collectDescendants(
+                  targetRowIds,
+                  allItems,
+                ).filter((it) => it.status !== closedStatus);
+
                 pushUpdateUndo(targetIds, 'iteration change');
                 for (const id of targetIds) {
                   await backend.cachedUpdateWorkItem(id, {
@@ -2485,8 +2498,16 @@ export function WorkItemList() {
                   });
                   await queueWrite('update', rowIdOf(id));
                 }
+                for (const desc of cascadedDescendants) {
+                  await queueWrite('update', desc.rowId);
+                }
                 for (const id of targetIds) {
                   await backendDataStore.getState().reloadItem(id);
+                }
+                for (const desc of cascadedDescendants) {
+                  if (desc.id) {
+                    await backendDataStore.getState().reloadItem(desc.id);
+                  }
                 }
                 setToast(
                   targetIds.length === 1
