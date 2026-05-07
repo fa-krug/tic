@@ -195,12 +195,12 @@ export function WorkItemForm() {
     }
     let cancelled = false;
     setItemLoading(true);
+    setExistingItem(null);
+    setChildren([]);
+    setDependents([]);
+    setParentItem(null);
     const displayId = displayIdOf(selectedWorkItemId);
     if (!displayId) {
-      setExistingItem(null);
-      setChildren([]);
-      setDependents([]);
-      setParentItem(null);
       setItemLoading(false);
       return;
     }
