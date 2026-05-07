@@ -1,5 +1,11 @@
-import { useCallback, useLayoutEffect } from 'react';
-import { Box, Text, useInput } from 'ink';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  type ReactNode,
+} from 'react';
+import { Box, Text, useInput, useStdin } from 'ink';
 import {
   editorStore,
   useEditorStore,
@@ -38,6 +44,28 @@ export function MarkdownEditor() {
   const isForwardDeleteRef = useForwardDelete();
   const pageKeysRef = usePageKeys();
 
+  // Suppress key events that are actually mouse SGR sequences (clicks,
+  // drags, wheel). Without this, clicking inside the editor inserts the
+  // raw escape sequence as text and triggers the discard prompt.
+  const { internal_eventEmitter } = useStdin();
+  const mouseActivityRef = useRef(0);
+  useEffect(() => {
+    const handler = (data: string) => {
+      // SGR mouse: ESC[<B;X;Y(M|m); legacy x10: ESC[M...
+      // eslint-disable-next-line no-control-regex
+      if (/\x1b\[<\d+;\d+;\d+[Mm]/.test(data) || /\x1b\[M/.test(data)) {
+        mouseActivityRef.current = Date.now();
+      }
+    };
+    internal_eventEmitter?.on('input', handler);
+    return () => {
+      internal_eventEmitter?.removeListener('input', handler);
+    };
+  }, [internal_eventEmitter]);
+  const gutterDigits = Math.max(2, String(lines.length).length);
+  const gutterWidth = gutterDigits + 1; // digits + trailing space
+  const contentWidth = Math.max(1, terminalWidth - gutterWidth);
+
   // Mouse wheel scrolling
   useMouseScroll(
     useCallback(
@@ -47,8 +75,8 @@ export function MarkdownEditor() {
           let totalVisualLines = 0;
           for (const l of s.lines) {
             totalVisualLines +=
-              terminalWidth > 0 && l.length > 0
-                ? Math.ceil(l.length / terminalWidth)
+              contentWidth > 0 && l.length > 0
+                ? Math.ceil(l.length / contentWidth)
                 : 1;
           }
           const maxScroll = Math.max(0, totalVisualLines - viewportHeight);
@@ -59,23 +87,28 @@ export function MarkdownEditor() {
           return { scrollOffset: newOffset };
         });
       },
-      [viewportHeight, terminalWidth],
+      [viewportHeight, contentWidth],
     ),
   );
 
   // Keep scroll in sync with cursor (useLayoutEffect to update before paint)
   useLayoutEffect(() => {
-    editorStore.getState().updateScroll(viewportHeight, terminalWidth);
+    editorStore.getState().updateScroll(viewportHeight, contentWidth);
   }, [
     cursor.row,
     cursor.col,
     lines.length,
     viewportHeight,
-    terminalWidth,
+    contentWidth,
     scrollOffset,
   ]);
 
   useInput((input, key) => {
+    // If a mouse event arrived in the same tick, swallow whatever Ink
+    // emitted from that escape sequence (could be `key.escape` for the
+    // leading ESC and/or the rest of the sequence as `input`).
+    if (Date.now() - mouseActivityRef.current < 50) return;
+
     const s = editorStore.getState();
     const returnScreen = (s.returnScreen ?? 'form') as Screen;
 
@@ -258,9 +291,10 @@ export function MarkdownEditor() {
       return;
     }
 
-    // Tab
+    // Tab / Shift+Tab — indent or outdent list items
     if (key.tab) {
-      s.insertTab();
+      if (key.shift) s.outdentTab();
+      else s.insertTab();
       return;
     }
 
@@ -277,15 +311,24 @@ export function MarkdownEditor() {
     cursor,
     scrollOffset,
     viewportHeight,
-    terminalWidth,
+    contentWidth,
   );
   const visibleLines = computeVisibleLines(
     lines,
     adjustedScroll,
     viewportHeight,
-    terminalWidth,
+    contentWidth,
   );
   const lineContexts = computeLineContexts(lines);
+
+  function renderGutter(lineIndex: number, sliceStart: number) {
+    const label = sliceStart === 0 ? String(lineIndex + 1) : '';
+    return (
+      <Box width={gutterWidth} flexShrink={0}>
+        <Text dimColor>{label.padStart(gutterDigits, ' ') + ' '}</Text>
+      </Box>
+    );
+  }
 
   function renderVisibleLine(
     lineIndex: number,
@@ -294,46 +337,34 @@ export function MarkdownEditor() {
     context: LineContext,
     key: number,
   ) {
-    const sliceEnd = Math.min(sliceStart + terminalWidth, fullLine.length);
+    const sliceEnd = Math.min(sliceStart + contentWidth, fullLine.length);
     const isCursorLine = lineIndex === cursor.row;
     const cursorInSlice =
       isCursorLine &&
       cursor.col >= sliceStart &&
       (cursor.col < sliceEnd || sliceEnd === fullLine.length);
 
-    if (sliceStart === 0 && fullLine.length <= terminalWidth) {
-      // Short line — no wrapping needed, use fast path
-      if (isCursorLine) {
-        return (
-          <Box key={key} overflowX="hidden">
-            {highlightLineWithCursor(fullLine, cursor.col, context)}
-          </Box>
-        );
-      }
-      return (
-        <Box key={key} overflowX="hidden">
-          {highlightLine(fullLine, context)}
-        </Box>
+    let content: ReactNode;
+    if (sliceStart === 0 && fullLine.length <= contentWidth) {
+      content = isCursorLine
+        ? highlightLineWithCursor(fullLine, cursor.col, context)
+        : highlightLine(fullLine, context);
+    } else if (cursorInSlice) {
+      content = highlightSliceWithCursor(
+        fullLine,
+        sliceStart,
+        sliceEnd,
+        cursor.col,
+        context,
       );
+    } else {
+      content = highlightSlice(fullLine, sliceStart, sliceEnd, context);
     }
 
-    // Wrapped sub-line
-    if (cursorInSlice) {
-      return (
-        <Box key={key} overflowX="hidden">
-          {highlightSliceWithCursor(
-            fullLine,
-            sliceStart,
-            sliceEnd,
-            cursor.col,
-            context,
-          )}
-        </Box>
-      );
-    }
     return (
       <Box key={key} overflowX="hidden">
-        {highlightSlice(fullLine, sliceStart, sliceEnd, context)}
+        {renderGutter(lineIndex, sliceStart)}
+        <Box overflowX="hidden">{content}</Box>
       </Box>
     );
   }
@@ -369,6 +400,9 @@ export function MarkdownEditor() {
           length: Math.max(0, viewportHeight - visibleLines.length),
         }).map((_, i) => (
           <Box key={`empty-${i}`}>
+            <Box width={gutterWidth} flexShrink={0}>
+              <Text dimColor>{' '.repeat(gutterDigits) + ' '}</Text>
+            </Box>
             <Text dimColor>~</Text>
           </Box>
         ))}
@@ -384,7 +418,8 @@ export function MarkdownEditor() {
         ) : (
           <Text dimColor wrap="truncate">
             Ctrl+S save │ Esc cancel │ Ctrl+V paste image │ Ctrl+Z undo │ Ctrl+U
-            kill line │ Ctrl+Y yank │ Alt+↑↓ page │ Alt+←→ word
+            kill line │ Ctrl+Y yank │ Tab/Shift+Tab indent │ Alt+↑↓ page │
+            Alt+←→ word
           </Text>
         )}
       </Box>

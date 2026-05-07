@@ -70,6 +70,7 @@ interface EditorState {
   deleteWordBack: () => void;
   yank: () => void;
   insertTab: () => void;
+  outdentTab: () => void;
 
   // Image paste
   insertText: (text: string) => void;
@@ -596,12 +597,45 @@ export const editorStore = createStore<EditorState>((set, get) => ({
       { lines: [...lines], cursor: { ...cursor } },
     ];
     const line = lines[cursor.row]!;
-    const newLine = line.slice(0, cursor.col) + '  ' + line.slice(cursor.col);
     const newLines = [...lines];
+    // On a list line, indent the whole line so list nesting works regardless
+    // of cursor position within the line.
+    if (LIST_RE.test(line)) {
+      newLines[cursor.row] = '  ' + line;
+      set({
+        lines: newLines,
+        cursor: { row: cursor.row, col: cursor.col + 2 },
+        undoStack: newUndo,
+        redoStack: [],
+        dirty: true,
+      });
+      return;
+    }
+    const newLine = line.slice(0, cursor.col) + '  ' + line.slice(cursor.col);
     newLines[cursor.row] = newLine;
     set({
       lines: newLines,
       cursor: { row: cursor.row, col: cursor.col + 2 },
+      undoStack: newUndo,
+      redoStack: [],
+      dirty: true,
+    });
+  },
+
+  outdentTab: () => {
+    const { lines, cursor, undoStack } = get();
+    const line = lines[cursor.row]!;
+    if (!LIST_RE.test(line) || !line.startsWith('  ')) return;
+    const newUndo = [
+      ...undoStack.slice(-(MAX_UNDO - 1)),
+      { lines: [...lines], cursor: { ...cursor } },
+    ];
+    const newLines = [...lines];
+    newLines[cursor.row] = line.slice(2);
+    const newCol = Math.max(0, cursor.col - 2);
+    set({
+      lines: newLines,
+      cursor: { row: cursor.row, col: newCol },
       undoStack: newUndo,
       redoStack: [],
       dirty: true,
