@@ -2492,6 +2492,7 @@ export function WorkItemList() {
         ) : activeOverlay?.type === 'iteration-picker' ? (
           <OverlayPanel
             title="Set Iteration"
+            initialSelectedId={currentItem?.iteration || undefined}
             items={iterations.map((it) => ({
               id: it.name,
               label: it.name,

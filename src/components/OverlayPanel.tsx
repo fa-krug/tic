@@ -38,6 +38,7 @@ export interface OverlayPanelProps {
   externalFilter?: boolean;
   onQueryChange?: (query: string) => void;
   fieldType?: FieldType;
+  initialSelectedId?: string;
 }
 
 export function filterItems(
@@ -84,9 +85,14 @@ export function OverlayPanel({
   externalFilter = false,
   onQueryChange,
   fieldType,
+  initialSelectedId,
 }: OverlayPanelProps) {
   const [query, setQuery] = useState(initialQuery);
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [selectedIndex, setSelectedIndex] = useState(() => {
+    if (initialSelectedId === undefined) return 0;
+    const idx = items.findIndex((i) => i.id === initialSelectedId);
+    return idx === -1 ? 0 : idx;
+  });
   const [toggled, setToggled] = useState<Set<string>>(() => {
     if (!multiSelect) return new Set();
     return new Set(items.filter((i) => i.selected).map((i) => i.id));
