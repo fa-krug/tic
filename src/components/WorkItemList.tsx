@@ -866,6 +866,20 @@ export function WorkItemList() {
         navigate('form');
       }
 
+      if (
+        matchesCommand('list-edit-title', input, key) &&
+        treeItems.length > 0
+      ) {
+        const item = treeItems[cursor]!.item;
+        if (item.id) {
+          openOverlay({
+            type: 'title-input',
+            targetId: item.id,
+            currentTitle: item.title,
+          });
+        }
+      }
+
       if (matchesCommand('quit', input, key)) exit();
       if (
         matchesCommand('set-iteration', input, key) &&
@@ -2138,6 +2152,46 @@ export function WorkItemList() {
             onCancel={() => closeOverlay()}
             placeholder="Type parent ID or title..."
             emptyMessage="Type a parent ID (empty to clear)"
+          />
+        ) : activeOverlay?.type === 'title-input' ? (
+          <OverlayPanel
+            title={`Edit Title (#${activeOverlay.targetId})`}
+            items={[]}
+            allowFreeform
+            initialQuery={activeOverlay.currentTitle}
+            onSelect={() => {}}
+            onSubmitFreeform={(text) => {
+              const targetId =
+                activeOverlay.type === 'title-input'
+                  ? activeOverlay.targetId
+                  : '';
+              if (!backend || !targetId) return;
+              const newTitle = text.trim();
+              if (newTitle === '') {
+                setWarning('Title cannot be empty');
+                return;
+              }
+              void (async () => {
+                try {
+                  pushUpdateUndo([targetId], 'title change');
+                  await backend.cachedUpdateWorkItem(targetId, {
+                    title: newTitle,
+                  });
+                  await queueWrite('update', rowIdOf(targetId));
+                  clearWarning();
+                } catch (e) {
+                  setWarning(
+                    e instanceof Error ? e.message : 'Failed to update title',
+                  );
+                }
+                closeOverlay();
+                await backendDataStore.getState().reloadItem(targetId);
+                setToast('Title updated — press u to undo');
+              })().catch(() => {});
+            }}
+            onCancel={() => closeOverlay()}
+            placeholder="Edit title..."
+            emptyMessage="Type a title"
           />
         ) : activeOverlay?.type === 'assignee-input' ? (
           <OverlayPanel

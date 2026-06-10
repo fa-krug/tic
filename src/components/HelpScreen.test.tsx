@@ -140,7 +140,7 @@ describe('getShortcuts', () => {
     const allShortcuts = groups.flatMap((g) => g.shortcuts);
     const commandBarShortcut = allShortcuts.find((s) => s.key === '/');
     expect(commandBarShortcut).toBeDefined();
-    expect(commandBarShortcut?.description).toBe('Open command bar / search');
+    expect(commandBarShortcut?.description).toBe('Search / command bar');
   });
 });
 

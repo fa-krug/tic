@@ -11,6 +11,7 @@ export type ActiveOverlay =
   | { type: 'type-picker'; targetIds: string[] }
   | { type: 'priority-picker'; targetIds: string[] }
   | { type: 'parent-input'; targetIds: string[] }
+  | { type: 'title-input'; targetId: string; currentTitle: string }
   | { type: 'assignee-input'; targetIds: string[] }
   | { type: 'labels-input'; targetIds: string[] }
   | { type: 'iteration-picker'; targetIds: string[] }

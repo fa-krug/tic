@@ -68,6 +68,7 @@ The main screen shows work items filtered by type and iteration, displayed as a 
 | `PageUp` `PageDown` | Jump by viewport height |
 | `Home` `End` | Jump to first/last item |
 | `Enter` | Edit selected item |
+| `T` | Edit title inline (current item) |
 | `c` | Create new work item |
 | `d` | Delete item(s) (with confirmation) |
 | `u` | Undo last action (delete, create, or property change) |

@@ -88,6 +88,16 @@ const commands: Command[] = [
     when: (ctx) => ctx.screen === 'list' && ctx.hasSelectedItem,
   },
   {
+    id: 'list-edit-title',
+    label: 'Edit title inline',
+    category: 'Actions',
+    shortcut: 'T',
+    keys: ['T'],
+    screen: 'list',
+    helpGroup: 'Actions',
+    when: (ctx) => ctx.screen === 'list' && ctx.hasSelectedItem,
+  },
+  {
     id: 'delete',
     label: 'Delete selected item',
     category: 'Actions',

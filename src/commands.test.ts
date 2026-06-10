@@ -761,6 +761,43 @@ describe('matchesCommand', () => {
   });
 });
 
+describe('list-edit-title', () => {
+  it('is visible on the list screen when an item is selected', () => {
+    const ctx = makeContext({ hasSelectedItem: true });
+    const ids = getVisibleCommands(ctx).map((c) => c.id);
+    expect(ids).toContain('list-edit-title');
+  });
+
+  it('is hidden when no item is selected', () => {
+    const ctx = makeContext({ hasSelectedItem: false });
+    const ids = getVisibleCommands(ctx).map((c) => c.id);
+    expect(ids).not.toContain('list-edit-title');
+  });
+
+  it('is bound to the "T" key', () => {
+    const blank: Record<string, boolean> = {
+      upArrow: false,
+      downArrow: false,
+      leftArrow: false,
+      rightArrow: false,
+      pageDown: false,
+      pageUp: false,
+      home: false,
+      end: false,
+      return: false,
+      escape: false,
+      ctrl: false,
+      shift: false,
+      tab: false,
+      backspace: false,
+      delete: false,
+      meta: false,
+    };
+    expect(matchesCommand('list-edit-title', 'T', blank)).toBe(true);
+    expect(matchesCommand('list-edit-title', 't', blank)).toBe(false);
+  });
+});
+
 describe('Parity', () => {
   it('every command with keys also has a shortcut for display', () => {
     const allCmds = getVisibleCommands(makeContext());
