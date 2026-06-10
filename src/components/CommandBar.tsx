@@ -88,6 +88,7 @@ export function CommandBar({ commands, onCommand, onCancel }: CommandBarProps) {
         .filter(
           (item) =>
             item.title.toLowerCase().includes(q) ||
+            item.description.toLowerCase().includes(q) ||
             (item.id !== null && item.id.toLowerCase().includes(q)),
         )
         .slice(0, 5)
@@ -179,9 +180,9 @@ export function CommandBar({ commands, onCommand, onCancel }: CommandBarProps) {
 
   return (
     <OverlayPanel
-      title="Commands"
+      title="Search & Commands"
       items={items}
-      placeholder="Type to search..."
+      placeholder="Search items, PRs, branches… or type a command"
       externalFilter
       onQueryChange={setQuery}
       onSelect={handleSelect}

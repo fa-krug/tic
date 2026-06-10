@@ -332,14 +332,9 @@ export async function handleSearchItems(
       type: args.type,
       iteration: args.iteration,
       all: args.all,
+      query: args.query,
     });
-    const query = args.query.toLowerCase();
-    const filtered = items.filter(
-      (item) =>
-        item.title.toLowerCase().includes(query) ||
-        item.description.toLowerCase().includes(query),
-    );
-    return success(filtered);
+    return success(items);
   } catch (err) {
     return error(err instanceof Error ? err.message : String(err));
   }
@@ -720,9 +715,11 @@ export function registerTools(
 
   server.tool(
     'tic-search_items',
-    'Search work items by text query',
+    'Search work items by text query (matches id, title, or description)',
     {
-      query: z.string().describe('Search query'),
+      query: z
+        .string()
+        .describe('Search query (matches id, title, or description)'),
       type: z.string().optional().describe('Filter by work item type'),
       status: z.string().optional().describe('Filter by status'),
       iteration: z.string().optional().describe('Filter by iteration'),

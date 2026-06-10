@@ -18,6 +18,7 @@ export interface ItemListOptions {
   type?: string;
   iteration?: string;
   all?: boolean;
+  query?: string;
 }
 
 export interface ItemUpdateOptions {
@@ -111,6 +112,15 @@ export async function runItemList(
   }
   if (opts.type) {
     items = items.filter((i) => i.type === opts.type);
+  }
+  if (opts.query) {
+    const query = opts.query.toLowerCase();
+    items = items.filter(
+      (i) =>
+        (i.id !== null && i.id.toLowerCase().includes(query)) ||
+        i.title.toLowerCase().includes(query) ||
+        i.description.toLowerCase().includes(query),
+    );
   }
   return items;
 }

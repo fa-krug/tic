@@ -700,6 +700,14 @@ describe('MCP handlers', () => {
       expect(data.map((i) => i.title)).toContain('Update login styles');
     });
 
+    it('finds by id', async () => {
+      const result = await handleSearchItems(backend, { query: '2' });
+      const data = JSON.parse(result.content[0]!.text) as WorkItem[];
+      expect(data).toHaveLength(1);
+      expect(data[0]!.id).toBe('2');
+      expect(data[0]!.title).toBe('Add dashboard');
+    });
+
     it('finds by description', async () => {
       const result = await handleSearchItems(backend, { query: 'dashboard' });
       const data = JSON.parse(result.content[0]!.text) as WorkItem[];

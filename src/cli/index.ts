@@ -219,6 +219,10 @@ export function createProgram(): Command {
     .option('--type <type>', 'Filter by work item type')
     .option('--iteration <name>', 'Filter by iteration')
     .option('--all', 'Show all iterations')
+    .option(
+      '--query <text>',
+      'Filter by text matching id, title, or description',
+    )
     .option('--headers', 'Include column headers')
     .action(async (opts: ItemListOptions & { headers?: boolean }) => {
       const parentOpts = program.opts<GlobalOpts>();

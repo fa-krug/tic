@@ -530,14 +530,14 @@ const commands: Command[] = [
   },
   {
     id: 'list-command-bar',
-    label: 'Open command bar / search',
+    label: 'Search / command bar',
     category: 'Actions',
     shortcut: '/',
     keys: ['/'],
     screen: 'list',
     helpGroup: 'Actions',
     footer: true,
-    footerLabel: 'commands',
+    footerLabel: 'search',
   },
   // Navigation shared across sub-screens
   {

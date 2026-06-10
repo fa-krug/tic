@@ -91,6 +91,47 @@ describe('item commands', () => {
       const items = await runItemList(backend, { all: true });
       expect(items).toHaveLength(2);
     });
+
+    it('filters by query matching title', async () => {
+      await runItemCreate(backend, 'Fix login bug', {});
+      await runItemCreate(backend, 'Add dashboard', {});
+      const items = await runItemList(backend, { query: 'login' });
+      expect(items).toHaveLength(1);
+      expect(items[0]!.title).toBe('Fix login bug');
+    });
+
+    it('filters by query matching description', async () => {
+      await runItemCreate(backend, 'A', { description: 'crashes on submit' });
+      await runItemCreate(backend, 'B', { description: 'unrelated' });
+      const items = await runItemList(backend, { query: 'submit' });
+      expect(items).toHaveLength(1);
+      expect(items[0]!.title).toBe('A');
+    });
+
+    it('filters by query matching id', async () => {
+      await runItemCreate(backend, 'A', {});
+      await runItemCreate(backend, 'B', {});
+      const items = await runItemList(backend, { query: '2' });
+      expect(items).toHaveLength(1);
+      expect(items[0]!.id).toBe('2');
+    });
+
+    it('query is case-insensitive', async () => {
+      await runItemCreate(backend, 'Fix LOGIN bug', {});
+      const items = await runItemList(backend, { query: 'login' });
+      expect(items).toHaveLength(1);
+    });
+
+    it('combines query with status filter', async () => {
+      await runItemCreate(backend, 'login todo', { status: 'todo' });
+      await runItemCreate(backend, 'login done', { status: 'done' });
+      const items = await runItemList(backend, {
+        query: 'login',
+        status: 'todo',
+      });
+      expect(items).toHaveLength(1);
+      expect(items[0]!.title).toBe('login todo');
+    });
   });
 
   describe('runItemShow', () => {
