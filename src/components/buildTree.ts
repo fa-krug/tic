@@ -22,17 +22,47 @@ export function buildTree(
   // Build a map of ALL items for parent lookups (keyed by rowId)
   const allItemMap = new Map(allItems.map((i) => [i.rowId, i]));
 
-  // Build children map from ALL items (children grouped by parent rowId)
+  // Set of rowIds in the filtered (same-type) set — used to identify roots
+  const filteredIds = new Set(filteredItems.map((i) => i.rowId));
+
+  // A node renders if it's in the filtered set or descends from one. We only
+  // nest an item under its parent when that parent will actually render;
+  // otherwise the item would be hidden behind a non-rendered cross-type
+  // ancestor (e.g. an ADO issue whose only parent is an Epic of another type).
+  // In that case the item is promoted to a root so it stays visible.
+  const renderableCache = new Map<number, boolean>();
+  function isRenderable(rowId: number): boolean {
+    const cached = renderableCache.get(rowId);
+    if (cached !== undefined) return cached;
+    // Seed with false first to guard against parent cycles.
+    renderableCache.set(rowId, false);
+    let result = filteredIds.has(rowId);
+    const item = allItemMap.get(rowId);
+    if (
+      !result &&
+      item &&
+      item.parent !== null &&
+      allItemMap.has(item.parent)
+    ) {
+      result = isRenderable(item.parent);
+    }
+    renderableCache.set(rowId, result);
+    return result;
+  }
+
+  // Build children map from ALL items (children grouped by parent rowId).
+  // An item nests under its parent only if that parent itself renders.
   const childrenMap = new Map<number | null, WorkItem[]>();
   for (const item of allItems) {
     const parentId =
-      item.parent !== null && allItemMap.has(item.parent) ? item.parent : null;
+      item.parent !== null &&
+      allItemMap.has(item.parent) &&
+      isRenderable(item.parent)
+        ? item.parent
+        : null;
     if (!childrenMap.has(parentId)) childrenMap.set(parentId, []);
     childrenMap.get(parentId)!.push(item);
   }
-
-  // Set of rowIds in the filtered (same-type) set — used to identify roots
-  const filteredIds = new Set(filteredItems.map((i) => i.rowId));
 
   // Determine which rowIds have children (in allItems)
   const idsWithChildren = new Set<number>();

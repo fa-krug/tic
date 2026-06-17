@@ -77,6 +77,34 @@ describe('buildTree', () => {
     expect(result[2]!.depth).toBe(2);
   });
 
+  it('promotes a filtered item to a root when its only parent is a cross-type root (ADO epic→issue)', () => {
+    const epic = makeItem({ rowId: 1, type: 'epic' });
+    const issue = makeItem({ rowId: 2, type: 'issue', parent: 1 });
+    const filteredItems = [issue]; // viewing "issue" type
+    const allItems = [epic, issue];
+    const result = buildTree(filteredItems, allItems, 'issue');
+    // The epic is a different type and not a root, but the issue must still
+    // be visible — promoted to a root rather than hidden behind the epic.
+    expect(result.map((t) => t.item.rowId)).toEqual([2]);
+    expect(result[0]!.depth).toBe(0);
+    expect(result[0]!.isCrossType).toBe(false);
+  });
+
+  it('keeps cross-type descendants of a promoted item visible (epic→issue→task)', () => {
+    const epic = makeItem({ rowId: 1, type: 'epic' });
+    const issue = makeItem({ rowId: 2, type: 'issue', parent: 1 });
+    const task = makeItem({ rowId: 3, type: 'task', parent: 2 });
+    const filteredItems = [issue];
+    const allItems = [epic, issue, task];
+    const result = buildTree(filteredItems, allItems, 'issue');
+    // Issue is promoted to root; its task child nests under it as before.
+    expect(result.map((t) => t.item.rowId)).toEqual([2, 3]);
+    expect(result[0]!.depth).toBe(0);
+    expect(result[0]!.hasChildren).toBe(true);
+    expect(result[1]!.depth).toBe(1);
+    expect(result[1]!.isCrossType).toBe(true);
+  });
+
   it('marks hasChildren correctly for items whose children are all cross-type', () => {
     const task = makeItem({ rowId: 1, type: 'task' });
     const bug = makeItem({ rowId: 2, type: 'bug', parent: 1 });
