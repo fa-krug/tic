@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { themeStore, autoFg, themes } from './themeStore.js';
+import { themeStore, autoFg, ensureContrast, themes } from './themeStore.js';
 
 describe('themeStore resolveFieldColor', () => {
   beforeEach(() => {
@@ -203,6 +203,29 @@ describe('autoFg', () => {
     expect(autoFg('blue')).toBe('white');
     expect(autoFg('green')).toBe('white');
     expect(autoFg('magenta')).toBe('white');
+  });
+});
+
+describe('ensureContrast', () => {
+  it('keeps a color that already contrasts with the background', () => {
+    // blue text on the cyanBright selection background reads fine
+    expect(ensureContrast('blue', 'cyanBright')).toBe('blue');
+  });
+
+  it('replaces a low-contrast color with a legible one', () => {
+    // cyan text on cyanBright is nearly invisible -> falls back to autoFg
+    expect(ensureContrast('cyan', 'cyanBright')).toBe('black');
+    expect(ensureContrast('cyanBright', 'cyanBright')).toBe('black');
+  });
+
+  it('uses white when the background is dark', () => {
+    // magenta text on a magenta selection background clashes
+    expect(ensureContrast('magenta', 'magenta')).toBe('white');
+  });
+
+  it('leaves unknown color names untouched', () => {
+    expect(ensureContrast('#123456', 'cyanBright')).toBe('#123456');
+    expect(ensureContrast('cyan', 'not-a-color')).toBe('cyan');
   });
 });
 

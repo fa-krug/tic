@@ -60,6 +60,7 @@ function buildWorkItemColumns(
   capabilities: BackendCapabilities,
   collapsedIds: Set<number>,
   selectionFg: string,
+  selectionBg: string,
 ): ColumnDef<TreeItem>[] {
   const columns: ColumnDef<TreeItem>[] = [];
 
@@ -126,7 +127,11 @@ function buildWorkItemColumns(
           {capabilities.fields.dependsOn && hasUnresolvedDeps && (
             <Text dimColor={ti.isCrossType && !selected}>{'\u29D7'} </Text>
           )}
-          <ColorPill field="status" value={ti.item.status} />
+          <ColorPill
+            field="status"
+            value={ti.item.status}
+            selectionBg={selected ? selectionBg : undefined}
+          />
         </>
       );
     },
@@ -162,7 +167,8 @@ function buildWorkItemColumns(
       width: 20,
       hidePriority: 2,
       hasData: (items) => items.some(({ item }) => item.labels.length > 0),
-      render: (ti) => {
+      render: (ti, selected) => {
+        const pillBg = selected ? selectionBg : undefined;
         const maxWidth = 20;
         const rendered: string[] = [];
         let usedWidth = 0;
@@ -175,7 +181,12 @@ function buildWorkItemColumns(
               return (
                 <Box gap={1}>
                   {rendered.map((l) => (
-                    <ColorPill key={l} field="label" value={l} />
+                    <ColorPill
+                      key={l}
+                      field="label"
+                      value={l}
+                      selectionBg={pillBg}
+                    />
                   ))}
                   <Text dimColor>+{remaining}</Text>
                 </Box>
@@ -189,7 +200,7 @@ function buildWorkItemColumns(
         return (
           <Box gap={1}>
             {rendered.map((l) => (
-              <ColorPill key={l} field="label" value={l} />
+              <ColorPill key={l} field="label" value={l} selectionBg={pillBg} />
             ))}
           </Box>
         );
@@ -206,9 +217,13 @@ function buildWorkItemColumns(
       hidePriority: 1,
       sortable: true,
       hasData: (items) => items.some(({ item }) => !!item.priority),
-      render: (ti) =>
+      render: (ti, selected) =>
         ti.item.priority ? (
-          <ColorPill field="priority" value={ti.item.priority} />
+          <ColorPill
+            field="priority"
+            value={ti.item.priority}
+            selectionBg={selected ? selectionBg : undefined}
+          />
         ) : (
           <Text> </Text>
         ),
@@ -1748,6 +1763,7 @@ export function WorkItemList() {
       capabilities,
       collapsedIds,
       autoFg(selectionBg),
+      selectionBg,
     );
     cols[0]!.width = maxIdLen + 2;
     return cols;

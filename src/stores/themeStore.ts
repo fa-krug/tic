@@ -182,6 +182,66 @@ export function autoFg(bg: string): string {
   return lightBgs.includes(bg) ? 'black' : 'white';
 }
 
+// --- Contrast helpers ---
+
+// Approximate sRGB values for the 16 ANSI color names Ink accepts, used to
+// estimate whether two named colors have enough perceptual contrast.
+const ANSI_RGB: Record<string, [number, number, number]> = {
+  black: [0, 0, 0],
+  red: [205, 0, 0],
+  green: [0, 205, 0],
+  yellow: [205, 205, 0],
+  blue: [0, 0, 238],
+  magenta: [205, 0, 205],
+  cyan: [0, 205, 205],
+  white: [229, 229, 229],
+  gray: [127, 127, 127],
+  grey: [127, 127, 127],
+  blackBright: [127, 127, 127],
+  redBright: [255, 0, 0],
+  greenBright: [0, 255, 0],
+  yellowBright: [255, 255, 0],
+  blueBright: [92, 92, 255],
+  magentaBright: [255, 0, 255],
+  cyanBright: [0, 255, 255],
+  whiteBright: [255, 255, 255],
+  grayBright: [168, 168, 168],
+  greyBright: [168, 168, 168],
+};
+
+function relativeLuminance([r, g, b]: [number, number, number]): number {
+  const channel = (v: number) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+}
+
+function contrastRatio(
+  a: [number, number, number],
+  b: [number, number, number],
+): number {
+  const la = relativeLuminance(a);
+  const lb = relativeLuminance(b);
+  const lighter = Math.max(la, lb);
+  const darker = Math.min(la, lb);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+/**
+ * Return a foreground color that reads clearly against `bg`. If `fg` already
+ * has sufficient contrast (or either color is unknown) it is kept as-is;
+ * otherwise it falls back to `autoFg(bg)` (black or white), which is
+ * guaranteed to contrast with the background.
+ */
+export function ensureContrast(fg: string, bg: string, min = 3): string {
+  const fgRgb = ANSI_RGB[fg];
+  const bgRgb = ANSI_RGB[bg];
+  if (!fgRgb || !bgRgb) return fg;
+  if (contrastRatio(fgRgb, bgRgb) >= min) return fg;
+  return autoFg(bg);
+}
+
 // --- Store ---
 
 export interface ThemeStoreState {
