@@ -22,4 +22,11 @@ describe('ColorPill', () => {
     );
     expect(lastFrame()).toContain('unknown-xyz');
   });
+
+  it('renders the value when placed on a selection background', () => {
+    const { lastFrame } = render(
+      <ColorPill field="status" value="design" selectionBg="cyanBright" />,
+    );
+    expect(lastFrame()).toContain('design');
+  });
 });
