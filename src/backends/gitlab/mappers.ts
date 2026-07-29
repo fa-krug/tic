@@ -64,8 +64,7 @@ function findWidget<T extends GlWidget['__typename']>(
   typename: T,
 ): WidgetByType<T> | undefined {
   return widgets.find((w) => w.__typename === typename) as
-    | WidgetByType<T>
-    | undefined;
+    WidgetByType<T> | undefined;
 }
 
 // --- Mappers ---

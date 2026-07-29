@@ -1,9 +1,10 @@
 import { useEffect, useRef } from 'react';
-import { useStdin } from 'ink';
+import { useInkInputEmitter } from './useInkInputEmitter.js';
 
 /**
- * Ink 6 maps both the physical Backspace key (\x7f) and the Delete key
- * (\x1b[3~) to `key.delete` in useInput, making them indistinguishable.
+ * Terminals send bytes for the physical Backspace key (\x7f) and the Delete
+ * key (\x1b[3~) that Ink reports through overlapping `key` flags, making the
+ * two hard to tell apart in a `useInput` handler.
  *
  * This hook listens to raw stdin data via Ink's internal event emitter
  * and sets a ref flag when the Delete key escape sequence is detected.
@@ -12,7 +13,7 @@ import { useStdin } from 'ink';
  */
 export function useForwardDelete(active = true): React.RefObject<boolean> {
   const isForwardDeleteRef = useRef(false);
-  const { internal_eventEmitter } = useStdin();
+  const internal_eventEmitter = useInkInputEmitter();
 
   useEffect(() => {
     if (!active) return;

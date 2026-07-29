@@ -34,7 +34,7 @@ npx vitest run src/storage/config.test.ts
 
 ## Tech Stack
 
-- **UI**: React 19 + [Ink](https://github.com/vadimdemedes/ink) 6 (terminal rendering)
+- **UI**: React 19 + [Ink](https://github.com/vadimdemedes/ink) 7 (terminal rendering)
 - **Language**: TypeScript 5.9 (strict mode via `@sindresorhus/tsconfig`)
 - **Module system**: ESM (`"type": "module"` in package.json)
 - **Testing**: Vitest 4

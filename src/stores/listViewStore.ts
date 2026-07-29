@@ -3,13 +3,7 @@ import { useStore } from 'zustand';
 
 export type SortDirection = 'asc' | 'desc';
 export type SortColumn =
-  | 'id'
-  | 'title'
-  | 'status'
-  | 'priority'
-  | 'assignee'
-  | 'created'
-  | 'updated';
+  'id' | 'title' | 'status' | 'priority' | 'assignee' | 'created' | 'updated';
 
 export interface SortEntry {
   column: SortColumn;

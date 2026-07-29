@@ -186,6 +186,7 @@ describeE2e('ADO E2E', () => {
     } catch (err: unknown) {
       throw new Error(
         `Failed to initialize AzureDevOpsBackend for project ${projectName}: ${String(err)}`,
+        { cause: err },
       );
     }
   });

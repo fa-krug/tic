@@ -1,11 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import type {
-  WorkItem,
-  NewWorkItem,
-  Comment,
-  Template,
-  Iteration,
-} from '../types.js';
+import type { WorkItem, NewWorkItem, Template, Iteration } from '../types.js';
 import { BaseBackend } from './types.js';
 import type { BackendCapabilities } from './types.js';
 import { makeWorkItem } from '../test-helpers.js';
@@ -58,7 +52,7 @@ class TestBackend extends BaseBackend {
   getCurrentIteration = async () => 'sprint-1';
   setCurrentIteration = async () => {};
   getWorkItem = async (id: string) => this.items.find((i) => i.id === id)!;
-  addComment = async () => ({ author: '', date: '', body: '' }) as Comment;
+  addComment = async () => ({ author: '', date: '', body: '' });
   getItemUrl = () => '';
   openItem = async () => {};
 

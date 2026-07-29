@@ -124,8 +124,7 @@ export function markdownToHtml(md: string): string {
 export function mapWorkItemToWorkItem(ado: AdoWorkItem): WorkItem {
   const fields = ado.fields;
   const assignedTo = fields['System.AssignedTo'] as
-    | { displayName: string }
-    | undefined;
+    { displayName: string } | undefined;
 
   return {
     rowId: ado.id,

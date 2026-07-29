@@ -5,7 +5,7 @@ import {
   useRef,
   type ReactNode,
 } from 'react';
-import { Box, Text, useInput, useStdin } from 'ink';
+import { Box, Text, useInput } from 'ink';
 import {
   editorStore,
   useEditorStore,
@@ -29,6 +29,7 @@ import { getImageUploadBackend } from '../stores/backendDataStore.js';
 import { uiStore } from '../stores/uiStore.js';
 import { useForwardDelete } from '../hooks/useForwardDelete.js';
 import { useMouseScroll, usePageKeys } from '../hooks/useMouseScroll.js';
+import { useInkInputEmitter } from '../hooks/useInkInputEmitter.js';
 
 export function MarkdownEditor() {
   const lines = useEditorStore((s) => s.lines);
@@ -47,7 +48,7 @@ export function MarkdownEditor() {
   // Suppress key events that are actually mouse SGR sequences (clicks,
   // drags, wheel). Without this, clicking inside the editor inserts the
   // raw escape sequence as text and triggers the discard prompt.
-  const { internal_eventEmitter } = useStdin();
+  const internal_eventEmitter = useInkInputEmitter();
   const mouseActivityRef = useRef(0);
   useEffect(() => {
     const handler = (data: string) => {

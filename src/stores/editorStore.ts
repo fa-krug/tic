@@ -88,7 +88,7 @@ const MAX_UNDO = 50;
 
 const initialState = {
   lines: [''] as string[],
-  cursor: { row: 0, col: 0 } as Cursor,
+  cursor: { row: 0, col: 0 },
   goalCol: 0,
   scrollOffset: 0,
   undoStack: [] as Snapshot[],

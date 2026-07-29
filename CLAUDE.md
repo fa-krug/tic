@@ -141,7 +141,7 @@ Zustand vanilla stores in `src/stores/`:
 
 ## Tech Stack
 
-- **UI**: React 19 + Ink 6 (terminal rendering)
+- **UI**: React 19 + Ink 7 (terminal rendering)
 - **Language**: TypeScript 5.9 (strict, via `@sindresorhus/tsconfig`)
 - **Module system**: ESM (`"type": "module"` in package.json)
 - **Testing**: Vitest 4 (tests use temp directories for isolation)
