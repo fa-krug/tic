@@ -16,9 +16,9 @@ Two independent causes:
    without the `selectionBg` prop, so `ensureContrast()` never runs. The same
    omission exists in `MultiSelectInput` (label picker rows) and
    `PullRequestList` (status column).
-2. `ensureContrast()` defaults to `min = 3`. Gray on `cyanBright` scores ~3.19,
-   so even with the prop wired through the color would be kept. Cyan (~3.86),
-   yellow (~3.39) and green (~4.15) sit in the same gap.
+2. `ensureContrast()` defaults to `min = 3`. Gray on `cyanBright` scores 3.19,
+   so even with the prop wired through the color would be kept. `redBright`
+   (3.19), `magenta` (3.74) and `blueBright` (3.78) sit in the same gap.
 
 A related defect: `TableLayout` computes the row background from both `selected`
 and `marked`, but that value never leaves the row component. Columns therefore
@@ -41,9 +41,15 @@ cursor is on the row.
 ### 1. `src/stores/themeStore.ts`
 
 `ensureContrast(fg, bg, min = 3)` becomes `min = 4.5` (WCAG AA for normal
-text). Against the default `cyanBright` selection background this flips gray,
-cyan, yellow, green and `greenBright` to `black`, while red (~8.8), blue (~7.5)
-and magenta (~5.3) keep their hue.
+text). Against the default `cyanBright` selection background only `black`
+(16.75), `blue` (7.49) and `red` (4.66) clear the threshold; everything else
+falls back to `black`.
+
+That is aggressive, but it is what a light selection background implies: with
+`cyanBright` at a relative luminance of 0.787, no saturated mid-luminance color
+can reach 4.5. The same holds for `selectedMarkedBg` (`magenta`), where nothing
+clears 4.5 — `autoFg()` returns the best available foreground, not a guaranteed
+one.
 
 The change also applies to `WorkItemList`, which already threads `selectionBg`
 through — the too-lenient threshold affects it identically.
@@ -88,13 +94,25 @@ Their pills get `selectionBg={isSelected ? selectionBg : undefined}`.
 
 ## Testing
 
-- `src/stores/themeStore.test.ts` — pin the new threshold: `gray`, `yellow`,
-  `green` on `cyanBright` resolve to `black`; `blue` still stays `blue`. The
-  existing `ensureContrast` cases must continue to pass.
-- `src/components/ColorPill.test.tsx` — assert the emitted foreground changes.
-  The current tests only check that the text appears, so they pass regardless of
-  color; the new ones assert the black SGR sequence is present for a
-  low-contrast value on `cyanBright` and absent without `selectionBg`.
-- `src/components/PullRequestList.test.tsx` — the selected row's status pill
-  renders with the inverted foreground.
+- `src/stores/themeStore.test.ts` — pin the new threshold: the gap cases
+  (`gray`, `redBright`, `magenta`, `blueBright` on `cyanBright`) resolve to
+  `black`, `red` and `blue` keep their hue, and an explicit `min = 3` still
+  keeps `gray`. The existing `ensureContrast` cases must continue to pass.
+- `src/components/TableLayout.test.tsx` (new) — a column captures the `rowBg` it
+  is handed and the test pins all four cases: plain, selected, marked, and
+  selected+marked. The last one is the regression guard, since columns
+  previously assumed `selectionBg`.
 - Full `npm test`, `npm run lint`, `npm run format:check`, `tsc --noEmit`.
+
+Assertions on the emitted SGR sequences are *not* included.
+`ink-testing-library` renders with colors disabled unless `FORCE_COLOR` is set,
+so `lastFrame()` contains no color information — which is why the existing
+`ColorPill` tests only check that the text appears. Forcing color globally would
+change what every other component test sees, for too little gain. The color
+decision itself is covered by the `ensureContrast` unit tests, the plumbing that
+feeds it by the `TableLayout` tests, and the prop wiring by `tsc`.
+
+Verified manually under `FORCE_COLOR=3`: with the cursor on `todo` in the status
+overlay, the value now renders `\u001b[30m` (black) on the `\u001b[106m`
+selection background instead of `\u001b[90m` (gray). The label picker behaves
+the same.

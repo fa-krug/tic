@@ -256,7 +256,11 @@ export function OverlayPanel({
                 </Text>
                 <Box flexGrow={1} gap={1}>
                   {fieldType && !item.value.startsWith('__') ? (
-                    <ColorPill field={fieldType} value={item.value} />
+                    <ColorPill
+                      field={fieldType}
+                      value={item.value}
+                      selectionBg={isSelected ? selectionBg : undefined}
+                    />
                   ) : (
                     <Text
                       color={isSelected ? autoFg(selectionBg) : undefined}

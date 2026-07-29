@@ -233,8 +233,12 @@ function contrastRatio(
  * has sufficient contrast (or either color is unknown) it is kept as-is;
  * otherwise it falls back to `autoFg(bg)` (black or white), which is
  * guaranteed to contrast with the background.
+ *
+ * `min` defaults to the WCAG AA ratio for normal text. A looser 3:1 leaves
+ * gray, cyan, yellow and green illegible on the light `cyanBright` selection
+ * background — they all score between 3 and 4.5.
  */
-export function ensureContrast(fg: string, bg: string, min = 3): string {
+export function ensureContrast(fg: string, bg: string, min = 4.5): string {
   const fgRgb = ANSI_RGB[fg];
   const bgRgb = ANSI_RGB[bg];
   if (!fgRgb || !bgRgb) return fg;

@@ -223,6 +223,25 @@ describe('ensureContrast', () => {
     expect(ensureContrast('magenta', 'magenta')).toBe('white');
   });
 
+  it('inverts colors that only just clear a 3:1 ratio', () => {
+    // These score between 3 and 4.5 against cyanBright -- legible enough for
+    // the old threshold, unreadable in practice. `gray` is what the `todo`
+    // status resolves to in the status picker.
+    expect(ensureContrast('gray', 'cyanBright')).toBe('black');
+    expect(ensureContrast('redBright', 'cyanBright')).toBe('black');
+    expect(ensureContrast('magenta', 'cyanBright')).toBe('black');
+    expect(ensureContrast('blueBright', 'cyanBright')).toBe('black');
+  });
+
+  it('keeps hues that clear the AA threshold', () => {
+    expect(ensureContrast('red', 'cyanBright')).toBe('red');
+    expect(ensureContrast('blue', 'cyanBright')).toBe('blue');
+  });
+
+  it('honours an explicit min override', () => {
+    expect(ensureContrast('gray', 'cyanBright', 3)).toBe('gray');
+  });
+
   it('leaves unknown color names untouched', () => {
     expect(ensureContrast('#123456', 'cyanBright')).toBe('#123456');
     expect(ensureContrast('cyan', 'not-a-color')).toBe('cyan');

@@ -59,8 +59,6 @@ const EMPTY_VIEWS: SavedView[] = [];
 function buildWorkItemColumns(
   capabilities: BackendCapabilities,
   collapsedIds: Set<number>,
-  selectionFg: string,
-  selectionBg: string,
 ): ColumnDef<TreeItem>[] {
   const columns: ColumnDef<TreeItem>[] = [];
 
@@ -71,9 +69,9 @@ function buildWorkItemColumns(
     width: 4, // overridden dynamically via useMemo
     required: true,
     sortable: true,
-    render: (ti, selected) => (
+    render: (ti, selected, rowBg) => (
       <Text
-        color={selected ? selectionFg : undefined}
+        color={rowBg ? autoFg(rowBg) : undefined}
         bold={selected}
         dimColor={ti.isCrossType && !selected}
       >
@@ -89,7 +87,7 @@ function buildWorkItemColumns(
     width: -1,
     required: true,
     sortable: true,
-    render: (ti, selected) => {
+    render: (ti, selected, rowBg) => {
       const { item, prefix, isCrossType, hasChildren } = ti;
       const collapseIndicator = hasChildren
         ? collapsedIds.has(item.rowId)
@@ -99,7 +97,7 @@ function buildWorkItemColumns(
       const typeLabel = isCrossType ? ` (${item.type})` : '';
       return (
         <Text
-          color={selected ? selectionFg : undefined}
+          color={rowBg ? autoFg(rowBg) : undefined}
           bold={selected}
           dimColor={isCrossType && !selected}
           wrap="truncate"
@@ -120,7 +118,7 @@ function buildWorkItemColumns(
     width: 14,
     hidePriority: 3,
     sortable: true,
-    render: (ti, selected) => {
+    render: (ti, selected, rowBg) => {
       const hasUnresolvedDeps = ti.item.dependsOn.length > 0;
       return (
         <>
@@ -130,7 +128,7 @@ function buildWorkItemColumns(
           <ColorPill
             field="status"
             value={ti.item.status}
-            selectionBg={selected ? selectionBg : undefined}
+            selectionBg={rowBg}
           />
         </>
       );
@@ -146,9 +144,9 @@ function buildWorkItemColumns(
       hidePriority: 4,
       sortable: true,
       hasData: (items) => items.some(({ item }) => !!item.assignee),
-      render: (ti, selected) => (
+      render: (ti, selected, rowBg) => (
         <Text
-          color={selected ? selectionFg : undefined}
+          color={rowBg ? autoFg(rowBg) : undefined}
           bold={selected}
           dimColor={ti.isCrossType && !selected}
           wrap="truncate"
@@ -167,8 +165,7 @@ function buildWorkItemColumns(
       width: 20,
       hidePriority: 2,
       hasData: (items) => items.some(({ item }) => item.labels.length > 0),
-      render: (ti, selected) => {
-        const pillBg = selected ? selectionBg : undefined;
+      render: (ti, _selected, rowBg) => {
         const maxWidth = 20;
         const rendered: string[] = [];
         let usedWidth = 0;
@@ -185,7 +182,7 @@ function buildWorkItemColumns(
                       key={l}
                       field="label"
                       value={l}
-                      selectionBg={pillBg}
+                      selectionBg={rowBg}
                     />
                   ))}
                   <Text dimColor>+{remaining}</Text>
@@ -200,7 +197,7 @@ function buildWorkItemColumns(
         return (
           <Box gap={1}>
             {rendered.map((l) => (
-              <ColorPill key={l} field="label" value={l} selectionBg={pillBg} />
+              <ColorPill key={l} field="label" value={l} selectionBg={rowBg} />
             ))}
           </Box>
         );
@@ -217,12 +214,12 @@ function buildWorkItemColumns(
       hidePriority: 1,
       sortable: true,
       hasData: (items) => items.some(({ item }) => !!item.priority),
-      render: (ti, selected) =>
+      render: (ti, _selected, rowBg) =>
         ti.item.priority ? (
           <ColorPill
             field="priority"
             value={ti.item.priority}
-            selectionBg={selected ? selectionBg : undefined}
+            selectionBg={rowBg}
           />
         ) : (
           <Text> </Text>
@@ -305,7 +302,6 @@ export function WorkItemList() {
     warning: warningColor,
     marked,
     mutedDim,
-    selectionBg,
   } = useThemeStore((s) => s.colors);
 
   // Backend data store - split by change frequency for minimal re-renders
@@ -1759,15 +1755,10 @@ export function WorkItemList() {
       (max, { item }) => Math.max(max, (item.id ?? '\u00B7').length),
       2,
     );
-    const cols = buildWorkItemColumns(
-      capabilities,
-      collapsedIds,
-      autoFg(selectionBg),
-      selectionBg,
-    );
+    const cols = buildWorkItemColumns(capabilities, collapsedIds);
     cols[0]!.width = maxIdLen + 2;
     return cols;
-  }, [visibleTreeItems, capabilities, collapsedIds, selectionBg]);
+  }, [visibleTreeItems, capabilities, collapsedIds]);
 
   const positionText =
     treeItems.length > viewport.maxVisible
