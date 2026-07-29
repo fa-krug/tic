@@ -99,7 +99,7 @@ describe('SyncManager push phase', () => {
     });
     // Simulate it already exists on remote by pre-populating the mock store
     const remoteItems = createMockRemote([
-      { ...item, id: item.id!, parent: null, dependsOn: [] } as WorkItem,
+      { ...item, id: item.id!, parent: null, dependsOn: [] },
     ]);
     const mgr = new SyncManager(local, remoteItems, queueStore);
 
@@ -402,7 +402,7 @@ describe('SyncManager strips unsupported fields', () => {
 
     // Build a limited remote pre-populated with the item
     const remote = createLimitedRemote([
-      { ...item, id: item.id!, parent: null, dependsOn: [] } as WorkItem,
+      { ...item, id: item.id!, parent: null, dependsOn: [] },
     ]);
 
     const updateSpy = vi.spyOn(remote, 'updateWorkItem');

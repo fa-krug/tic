@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { JiraBackend, escapeJqlValue } from './index.js';
 
@@ -86,7 +86,7 @@ describe('JiraBackend', () => {
     vi.clearAllMocks();
     MockJiraApiClient.mockImplementation(function (this: any) {
       Object.assign(this, mockApi);
-    } as any);
+    });
     mockGetJiraCredentials.mockReturnValue({
       email: 'user@example.com',
       token: 'test-token',

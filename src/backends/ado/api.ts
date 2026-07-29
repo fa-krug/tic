@@ -8,8 +8,7 @@ import { getAdoRefreshToken, refreshAdoToken } from '../../auth/ado.js';
 const ADO_API_VERSION = '7.1';
 
 export type AdoAuth =
-  | { type: 'bearer'; token: string }
-  | { type: 'basic'; pat: string };
+  { type: 'bearer'; token: string } | { type: 'basic'; pat: string };
 
 export class AdoApiClient extends BaseApiClient {
   private auth: AdoAuth;
@@ -64,7 +63,7 @@ export class AdoApiClient extends BaseApiClient {
       });
     } catch (error: unknown) {
       if (error instanceof DOMException && error.name === 'AbortError') {
-        throw new Error('Request timed out');
+        throw new Error('Request timed out', { cause: error });
       }
       throw error;
     } finally {
@@ -103,7 +102,7 @@ export class AdoApiClient extends BaseApiClient {
             });
           } catch (error: unknown) {
             if (error instanceof DOMException && error.name === 'AbortError') {
-              throw new Error('Request timed out');
+              throw new Error('Request timed out', { cause: error });
             }
             throw error;
           } finally {
@@ -181,7 +180,7 @@ export class AdoApiClient extends BaseApiClient {
         });
       } catch (error: unknown) {
         if (error instanceof DOMException && error.name === 'AbortError') {
-          throw new Error('Request timed out');
+          throw new Error('Request timed out', { cause: error });
         }
         throw error;
       } finally {
@@ -224,7 +223,7 @@ export class AdoApiClient extends BaseApiClient {
         });
       } catch (error: unknown) {
         if (error instanceof DOMException && error.name === 'AbortError') {
-          throw new Error('Request timed out');
+          throw new Error('Request timed out', { cause: error });
         }
         throw error;
       } finally {

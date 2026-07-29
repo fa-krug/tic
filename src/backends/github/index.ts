@@ -380,6 +380,7 @@ export class GitHubBackend
         }
         throw new Error(
           `Failed to link parent #${data.parent} to issue #${id}; issue was rolled back: ${err instanceof Error ? err.message : String(err)}`,
+          { cause: err },
         );
       }
     }
@@ -406,6 +407,7 @@ export class GitHubBackend
       } catch (err) {
         throw new Error(
           `Failed to update parent relationship for issue #${id}: ${err instanceof Error ? err.message : String(err)}`,
+          { cause: err },
         );
       }
     }

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useStdin } from 'ink';
+import { useInkInputEmitter } from './useInkInputEmitter.js';
 
 /**
  * Enable terminal mouse wheel tracking and call `onScroll` when the user
@@ -14,7 +14,7 @@ export function useMouseScroll(
   onScroll: (direction: 'up' | 'down') => void,
   active = true,
 ): void {
-  const { internal_eventEmitter } = useStdin();
+  const internal_eventEmitter = useInkInputEmitter();
 
   useEffect(() => {
     if (!active) return;
@@ -66,7 +66,7 @@ export function usePageKeys(active = true): React.RefObject<{
   pageDown: boolean;
 }> {
   const ref = useRef({ pageUp: false, pageDown: false });
-  const { internal_eventEmitter } = useStdin();
+  const internal_eventEmitter = useInkInputEmitter();
 
   useEffect(() => {
     if (!active) return;

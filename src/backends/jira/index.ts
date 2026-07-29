@@ -299,6 +299,7 @@ export class JiraBackend extends BaseBackend {
         this.invalidateCache();
         throw new Error(
           `Failed to create dependency links for ${key}; issue was rolled back: ${err instanceof Error ? err.message : String(err)}`,
+          { cause: err },
         );
       }
     }

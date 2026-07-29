@@ -227,9 +227,10 @@ export function Settings() {
         items.splice(
           jiraIdx + 1,
           0,
-          ...JIRA_FIELDS.map(
-            (field) => ({ kind: 'jira-field' as const, field }) as NavItem,
-          ),
+          ...JIRA_FIELDS.map((field) => ({
+            kind: 'jira-field' as const,
+            field,
+          })),
         );
       }
     }

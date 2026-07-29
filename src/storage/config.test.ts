@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createDatabase, type TicDatabase } from './db.js';
 import { Storage } from './index.js';
 import { readConfig, writeConfig, updateConfig } from './config.js';
-import type { Config } from './config.js';
 
 describe('drizzle config', () => {
   let db: TicDatabase;
@@ -225,7 +224,7 @@ describe('drizzle config', () => {
     // Now write config without jira (undefined)
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { jira: _jira, ...rest } = config;
-    writeConfig(db, { ...rest } as unknown as Config);
+    writeConfig(db, { ...rest });
 
     config = readConfig(db);
     expect(config.jira).toBeUndefined();

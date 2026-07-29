@@ -38,8 +38,8 @@ export function parseTemplateFile(raw: string, slug: string): Template {
     template.labels = data['labels'] as string[];
   if (data['iteration'] != null)
     template.iteration = data['iteration'] as string;
-  if (data['parent'] != null)
-    template.parent = String(data['parent'] as string | number);
+  const parent = data['parent'] as string | number | null | undefined;
+  if (parent != null) template.parent = String(parent);
   if (Array.isArray(data['depends_on']))
     template.dependsOn = (data['depends_on'] as unknown[]).map(String);
 

@@ -321,10 +321,7 @@ export function WorkItemForm() {
   const status = currentDraft?.fields.status ?? statuses[0] ?? '';
   const iteration = currentDraft?.fields.iteration ?? currentIteration;
   const priority = (currentDraft?.fields.priority ?? 'medium') as
-    | 'low'
-    | 'medium'
-    | 'high'
-    | 'critical';
+    'low' | 'medium' | 'high' | 'critical';
   const assignee = currentDraft?.fields.assignee ?? '';
   const labels = currentDraft?.fields.labels ?? '';
   const description = currentDraft?.fields.description ?? '';
@@ -1217,7 +1214,7 @@ export function WorkItemForm() {
       }
 
       case 'priority': {
-        setPriority(value as 'low' | 'medium' | 'high' | 'critical');
+        setPriority(value);
         break;
       }
 

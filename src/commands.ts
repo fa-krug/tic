@@ -1095,14 +1095,14 @@ export function buildFooterHints(
 export function matchesCommand(
   id: string,
   input: string,
-  key: Record<string, boolean>,
+  key: Record<string, unknown>,
 ): boolean {
   const cmd = findCommand(id);
   if (!cmd?.keys) return false;
   return cmd.keys.some((k) => {
     if (typeof k === 'string') return input === k;
-    if (k.modifier === 'shift') return key[k.special] && key['shift'];
-    return key[k.special] && !key['shift'];
+    if (k.modifier === 'shift') return Boolean(key[k.special] && key['shift']);
+    return Boolean(key[k.special]) && !key['shift'];
   });
 }
 

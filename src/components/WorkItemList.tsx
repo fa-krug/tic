@@ -2019,10 +2019,7 @@ export function WorkItemList() {
               closeOverlay();
               if (!backend) return;
               const priority = item.value as
-                | 'low'
-                | 'medium'
-                | 'high'
-                | 'critical';
+                'low' | 'medium' | 'high' | 'critical';
               void (async () => {
                 pushUpdateUndo(targetIds, 'priority change');
                 for (const id of targetIds) {

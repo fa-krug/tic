@@ -3,8 +3,7 @@ import { getMarkedDistribution } from './getMarkedDistribution.js';
 
 describe('getMarkedDistribution', () => {
   // Helper: create tree items with given rowIds
-  const items = (ids: number[]) =>
-    ids.map((rowId) => ({ rowId }) as { rowId: number });
+  const items = (ids: number[]) => ids.map((rowId) => ({ rowId }));
 
   it('returns zeros when no items are marked', () => {
     const result = getMarkedDistribution(new Set(), items([1, 2, 3]), 0, 3);

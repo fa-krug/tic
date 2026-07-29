@@ -450,9 +450,7 @@ export class SyncManager {
         if (localDisplayIds.has(item.id!)) {
           await this.primary.updateWorkItem(item.id!, item);
         } else {
-          await this.primary.createWorkItem(
-            item as unknown as import('../types.js').NewWorkItem,
-          );
+          await this.primary.createWorkItem(item);
         }
       }
     }

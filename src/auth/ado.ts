@@ -104,7 +104,7 @@ export async function refreshAdoToken(
       });
     } catch (error: unknown) {
       if (error instanceof DOMException && error.name === 'AbortError') {
-        throw new Error('Request timed out');
+        throw new Error('Request timed out', { cause: error });
       }
       throw error;
     } finally {
@@ -162,7 +162,7 @@ export async function authenticateAdo(
     });
   } catch (error: unknown) {
     if (error instanceof DOMException && error.name === 'AbortError') {
-      throw new Error('Request timed out');
+      throw new Error('Request timed out', { cause: error });
     }
     throw error;
   } finally {
@@ -207,7 +207,7 @@ export async function authenticateAdo(
       });
     } catch (error: unknown) {
       if (error instanceof DOMException && error.name === 'AbortError') {
-        throw new Error('Request timed out');
+        throw new Error('Request timed out', { cause: error });
       }
       throw error;
     } finally {
