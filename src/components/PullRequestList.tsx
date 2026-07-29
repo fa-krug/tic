@@ -78,7 +78,7 @@ function buildPrColumns(
           dimColor={!selected ? mutedDim : undefined}
           wrap="truncate"
         >
-          {pr.sourceBranch} \u2192 {pr.targetBranch}
+          {`${pr.sourceBranch} \u2192 ${pr.targetBranch}`}
         </Text>
       ),
     },
