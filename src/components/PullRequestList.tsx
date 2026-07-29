@@ -30,7 +30,6 @@ const openInBrowser = async (url: string) => {
 function buildPrColumns(
   muted: string | undefined,
   mutedDim: boolean,
-  selectionBg: string,
 ): ColumnDef<PullRequest>[] {
   return [
     {
@@ -38,11 +37,8 @@ function buildPrColumns(
       header: '#',
       width: 8,
       required: true,
-      render: (pr, selected) => (
-        <Text
-          color={selected ? autoFg(selectionBg) : undefined}
-          bold={selected}
-        >
+      render: (pr, selected, rowBg) => (
+        <Text color={rowBg ? autoFg(rowBg) : undefined} bold={selected}>
           #{pr.number}
         </Text>
       ),
@@ -52,9 +48,9 @@ function buildPrColumns(
       header: 'Title',
       width: -1,
       required: true,
-      render: (pr, selected) => (
+      render: (pr, selected, rowBg) => (
         <Text
-          color={selected ? autoFg(selectionBg) : undefined}
+          color={rowBg ? autoFg(rowBg) : undefined}
           bold={selected}
           wrap="truncate"
         >
@@ -67,20 +63,22 @@ function buildPrColumns(
       header: 'Status',
       width: 12,
       hidePriority: 3,
-      render: (pr) => <ColorPill field="status" value={pr.status} />,
+      render: (pr, _selected, rowBg) => (
+        <ColorPill field="status" value={pr.status} selectionBg={rowBg} />
+      ),
     },
     {
       key: 'branches',
       header: 'Branches',
       width: 30,
       hidePriority: 2,
-      render: (pr, selected) => (
+      render: (pr, selected, rowBg) => (
         <Text
-          color={selected ? undefined : muted}
+          color={rowBg ? autoFg(rowBg) : muted}
           dimColor={!selected ? mutedDim : undefined}
           wrap="truncate"
         >
-          {pr.sourceBranch} \u2192 {pr.targetBranch}
+          {`${pr.sourceBranch} \u2192 ${pr.targetBranch}`}
         </Text>
       ),
     },
@@ -89,11 +87,8 @@ function buildPrColumns(
       header: 'Author',
       width: 16,
       hidePriority: 1,
-      render: (pr, selected) => (
-        <Text
-          color={selected ? autoFg(selectionBg) : undefined}
-          wrap="truncate"
-        >
+      render: (pr, _selected, rowBg) => (
+        <Text color={rowBg ? autoFg(rowBg) : undefined} wrap="truncate">
           {pr.author}
         </Text>
       ),
@@ -103,8 +98,8 @@ function buildPrColumns(
       header: 'Links',
       width: 6,
       hidePriority: 0,
-      render: (pr) => (
-        <Text>
+      render: (pr, _selected, rowBg) => (
+        <Text color={rowBg ? autoFg(rowBg) : undefined}>
           {pr.linkedItems.length > 0 ? String(pr.linkedItems.length) : ''}
         </Text>
       ),
@@ -113,9 +108,7 @@ function buildPrColumns(
 }
 
 export function PullRequestList() {
-  const { accent, muted, mutedDim, selectionBg } = useThemeStore(
-    (s) => s.colors,
-  );
+  const { accent, muted, mutedDim } = useThemeStore((s) => s.colors);
   const { navigate, navigateToHelp } = navigationStore.getState();
   const selectedPrId = useNavigationStore((s) => s.selectedPrId);
   const { pullRequests, capabilities } = useBackendDataStore(
@@ -130,8 +123,8 @@ export function PullRequestList() {
   const activeOverlay = useUIStore((s) => s.activeOverlay);
   const { openOverlay, closeOverlay } = uiStore.getState();
   const prColumns = useMemo(
-    () => buildPrColumns(muted, mutedDim, selectionBg),
-    [muted, mutedDim, selectionBg],
+    () => buildPrColumns(muted, mutedDim),
+    [muted, mutedDim],
   );
 
   // Set initial cursor from navigation

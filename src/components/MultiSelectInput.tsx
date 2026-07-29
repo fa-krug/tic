@@ -147,7 +147,11 @@ export function MultiSelectInput({
                 >
                   {isToggled ? '☑ ' : '☐ '}
                 </Text>
-                <ColorPill field="label" value={item} />
+                <ColorPill
+                  field="label"
+                  value={item}
+                  selectionBg={isSelected ? selectionBg : undefined}
+                />
               </Box>
             );
           })}

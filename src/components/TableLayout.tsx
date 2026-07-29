@@ -9,7 +9,12 @@ export interface ColumnDef<T> {
   header: string;
   /** Fixed width in chars. Use -1 for flex column (gets remaining space). */
   width: number;
-  render: (item: T, selected: boolean) => ReactNode;
+  /**
+   * `rowBg` is the background the row is actually painted with (selection,
+   * marked, or selected+marked), or `undefined` for a plain row. Use it to
+   * derive foreground colors instead of assuming `selectionBg`.
+   */
+  render: (item: T, selected: boolean, rowBg: string | undefined) => ReactNode;
   /** If true, column is never hidden responsively. Default false. */
   required?: boolean;
   /** Higher number = kept longer when space is tight. Default 0. */
@@ -129,21 +134,19 @@ const GenericTableRow = memo(function GenericTableRow<T>({
   const { accent, accentBg, selectionBg, selectedMarkedBg } = useThemeStore(
     (s) => s.colors,
   );
+  const rowBg =
+    selected && marked
+      ? selectedMarkedBg
+      : selected
+        ? selectionBg
+        : marked
+          ? accentBg
+          : undefined;
   return (
-    <Box
-      backgroundColor={
-        selected && marked
-          ? selectedMarkedBg
-          : selected
-            ? selectionBg
-            : marked
-              ? accentBg
-              : undefined
-      }
-    >
+    <Box backgroundColor={rowBg}>
       {showMarker && (
         <Box width={MARKER_WIDTH}>
-          <Text color={selected ? autoFg(selectionBg) : accent}>
+          <Text color={rowBg ? autoFg(rowBg) : accent}>
             {selected ? '>' : ' '}
           </Text>
         </Box>
@@ -162,7 +165,7 @@ const GenericTableRow = memo(function GenericTableRow<T>({
             marginRight={isLast ? 0 : gap}
             overflowX="hidden"
           >
-            {colDef.render(item, selected)}
+            {colDef.render(item, selected, rowBg)}
           </Box>
         );
       })}
