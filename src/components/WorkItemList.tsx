@@ -258,6 +258,28 @@ export function getTargetIds(
   return cursorItem?.id ? [cursorItem.id] : [];
 }
 
+/**
+ * Scope items to an iteration for list display. An empty iteration name means
+ * no iteration is active, so every item is in scope.
+ */
+export function scopeToIteration(
+  items: WorkItem[],
+  iteration: string,
+): WorkItem[] {
+  if (!iteration) return items;
+  return items.filter((item) => item.iteration === iteration);
+}
+
+/**
+ * The iteration shared by all given items, or null when they disagree (or when
+ * there are none). Used to mark the current value in the iteration picker.
+ */
+export function commonIteration(items: WorkItem[]): string | null {
+  if (items.length === 0) return null;
+  const first = items[0]!.iteration;
+  return items.every((item) => item.iteration === first) ? first : null;
+}
+
 /** Collect all descendants of the given items (recursive). */
 export function collectDescendants(
   targetRowIds: Set<number>,
@@ -538,23 +560,29 @@ export function WorkItemList() {
     }
   }, [activeType, types, setActiveType, defaultType]);
 
+  // The store holds every item; the list itself shows one iteration at a time
+  const iterationItems = useMemo(
+    () => scopeToIteration(allItems, currentIteration),
+    [allItems, currentIteration],
+  );
+
   // Apply view filters to all items (used for children in tree view)
   const viewFilteredItems = useMemo(
-    () => applyFilters(allItems, activeFilters),
-    [allItems, activeFilters],
+    () => applyFilters(iterationItems, activeFilters),
+    [iterationItems, activeFilters],
   );
   const unfilteredCount = useMemo(
-    () => allItems.filter((item) => item.type === activeType).length,
-    [allItems, activeType],
+    () => iterationItems.filter((item) => item.type === activeType).length,
+    [iterationItems, activeType],
   );
   const items = useMemo(() => {
     const hasTypeFilter = (activeFilters.types?.length ?? 0) > 0;
     let filtered = hasTypeFilter
-      ? allItems
-      : allItems.filter((item) => item.type === activeType);
+      ? iterationItems
+      : iterationItems.filter((item) => item.type === activeType);
     filtered = applyFilters(filtered, activeFilters);
     return filtered;
-  }, [allItems, activeType, activeFilters]);
+  }, [iterationItems, activeType, activeFilters]);
   const fullTree = useMemo(() => {
     const tree = capabilities.relationships
       ? buildTree(items, viewFilteredItems, activeType ?? '')
@@ -2548,65 +2576,78 @@ export function WorkItemList() {
             onCancel={() => closeOverlay()}
           />
         ) : activeOverlay?.type === 'iteration-picker' ? (
-          <OverlayPanel
-            title="Set Iteration"
-            initialSelectedId={currentItem?.iteration || undefined}
-            items={iterations.map((it) => ({
-              id: it.name,
-              label: it.name,
-              value: it.name,
-            }))}
-            onSelect={(item) => {
-              const targetIds = getOverlayTargetIds();
-              closeOverlay();
-              if (!backend) return;
-              void (async () => {
-                // Cascade mirrors Storage: non-closed descendants get the new
-                // iteration too. Collect them up front so we can queue sync
-                // writes — otherwise the remote update never fires and a
-                // subsequent sync may treat them as new items.
-                const closedStatus = statuses[statuses.length - 1];
-                const targetRowIds = new Set(
-                  targetIds.map((id) => rowIdOf(id)).filter((r) => r !== -1),
-                );
-                const cascadedDescendants = collectDescendants(
-                  targetRowIds,
-                  allItems,
-                ).filter((it) => it.status !== closedStatus);
+          (() => {
+            // Mark the iteration the target(s) are already in — null when a
+            // bulk selection spans several iterations.
+            const targetIdSet = new Set(activeOverlay.targetIds);
+            const current = commonIteration(
+              allItems.filter((it) => it.id !== null && targetIdSet.has(it.id)),
+            );
+            return (
+              <OverlayPanel
+                title="Set Iteration"
+                initialSelectedId={current || undefined}
+                currentId={current || undefined}
+                items={iterations.map((it) => ({
+                  id: it.name,
+                  label: it.name,
+                  value: it.name,
+                }))}
+                onSelect={(item) => {
+                  const targetIds = getOverlayTargetIds();
+                  closeOverlay();
+                  if (!backend) return;
+                  void (async () => {
+                    // Cascade mirrors Storage: non-closed descendants get the new
+                    // iteration too. Collect them up front so we can queue sync
+                    // writes — otherwise the remote update never fires and a
+                    // subsequent sync may treat them as new items.
+                    const closedStatus = statuses[statuses.length - 1];
+                    const targetRowIds = new Set(
+                      targetIds
+                        .map((id) => rowIdOf(id))
+                        .filter((r) => r !== -1),
+                    );
+                    const cascadedDescendants = collectDescendants(
+                      targetRowIds,
+                      allItems,
+                    ).filter((it) => it.status !== closedStatus);
 
-                pushUpdateUndo(targetIds, 'iteration change');
-                for (const id of targetIds) {
-                  await backend.cachedUpdateWorkItem(id, {
-                    iteration: item.value,
+                    pushUpdateUndo(targetIds, 'iteration change');
+                    for (const id of targetIds) {
+                      await backend.cachedUpdateWorkItem(id, {
+                        iteration: item.value,
+                      });
+                      await queueWrite('update', rowIdOf(id));
+                    }
+                    for (const desc of cascadedDescendants) {
+                      await queueWrite('update', desc.rowId);
+                    }
+                    for (const id of targetIds) {
+                      await backendDataStore.getState().reloadItem(id);
+                    }
+                    for (const desc of cascadedDescendants) {
+                      if (desc.id) {
+                        await backendDataStore.getState().reloadItem(desc.id);
+                      }
+                    }
+                    setToast(
+                      targetIds.length === 1
+                        ? 'Iteration updated — press u to undo'
+                        : `${targetIds.length} items updated — press u to undo`,
+                    );
+                  })().catch((err: unknown) => {
+                    uiStore
+                      .getState()
+                      .setToast(
+                        err instanceof Error ? err.message : 'Update failed',
+                      );
                   });
-                  await queueWrite('update', rowIdOf(id));
-                }
-                for (const desc of cascadedDescendants) {
-                  await queueWrite('update', desc.rowId);
-                }
-                for (const id of targetIds) {
-                  await backendDataStore.getState().reloadItem(id);
-                }
-                for (const desc of cascadedDescendants) {
-                  if (desc.id) {
-                    await backendDataStore.getState().reloadItem(desc.id);
-                  }
-                }
-                setToast(
-                  targetIds.length === 1
-                    ? 'Iteration updated — press u to undo'
-                    : `${targetIds.length} items updated — press u to undo`,
-                );
-              })().catch((err: unknown) => {
-                uiStore
-                  .getState()
-                  .setToast(
-                    err instanceof Error ? err.message : 'Update failed',
-                  );
-              });
-            }}
-            onCancel={() => closeOverlay()}
-          />
+                }}
+                onCancel={() => closeOverlay()}
+              />
+            );
+          })()
         ) : activeOverlay?.type === 'delete-confirm' ? (
           <OverlayPanel
             title={`Delete ${activeOverlay.targetIds.length} item${activeOverlay.targetIds.length > 1 ? 's' : ''}${activeOverlay.descendantCount > 0 ? ` (+${activeOverlay.descendantCount} children)` : ''}?`}

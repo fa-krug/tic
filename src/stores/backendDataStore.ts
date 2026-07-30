@@ -315,7 +315,11 @@ export const backendDataStore = createStore<BackendDataStoreState>(
           persisted && persisted !== 'default'
             ? persisted
             : (findCurrentIteration(iterations) ?? persisted);
-        const items = await currentBackend.listWorkItems(iter);
+        // Load every item, not just the current iteration's. Search, forms,
+        // relationship lookups and branch links all resolve items through this
+        // pool, so scoping it here would hide anything outside the active
+        // iteration. The list view applies the iteration scope itself.
+        const items = await currentBackend.listWorkItems();
 
         set({
           capabilities: currentBackend.getCapabilities(),
