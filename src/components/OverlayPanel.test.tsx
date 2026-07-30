@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
+import { render } from 'ink-testing-library';
 import {
+  OverlayPanel,
   filterItems,
   groupByCategory,
   type OverlayItem,
@@ -82,5 +84,39 @@ describe('groupByCategory', () => {
     const groups = groupByCategory(items);
     expect(groups[0]!.items[0]!.label).toBe('Zebra');
     expect(groups[0]!.items[1]!.label).toBe('Apple');
+  });
+});
+
+describe('OverlayPanel current marker', () => {
+  const items: OverlayItem[] = [
+    makeItem({ id: 'sprint-1', label: 'sprint-1' }),
+    makeItem({ id: 'sprint-2', label: 'sprint-2' }),
+  ];
+
+  it('marks the current item with a dot', () => {
+    const { lastFrame } = render(
+      <OverlayPanel
+        title="Set Iteration"
+        items={items}
+        currentId="sprint-2"
+        onSelect={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+    const lines = lastFrame()!.split('\n');
+    expect(lines.find((l) => l.includes('sprint-2'))).toContain('●');
+    expect(lines.find((l) => l.includes('sprint-1'))).not.toContain('●');
+  });
+
+  it('marks nothing when no current item is given', () => {
+    const { lastFrame } = render(
+      <OverlayPanel
+        title="Set Iteration"
+        items={items}
+        onSelect={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+    expect(lastFrame()).not.toContain('●');
   });
 });

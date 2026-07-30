@@ -109,6 +109,42 @@ describe('backendDataStore', () => {
     expect(backendDataStore.getState().loading).toBe(false);
   });
 
+  it('loads items from every iteration, not just the current one', async () => {
+    backendDataStore.getState().init(tmpDir);
+    await waitForLoad();
+
+    const backend = backendDataStore.getState().backend!;
+    const base = {
+      type: 'task',
+      status: 'todo',
+      priority: 'medium' as const,
+      assignee: '',
+      labels: [],
+      parent: null,
+      dependsOn: [],
+      description: '',
+    };
+    await backend.createWorkItem({
+      ...base,
+      title: 'In sprint 1',
+      iteration: 'sprint-1',
+    });
+    await backend.createWorkItem({
+      ...base,
+      title: 'In sprint 2',
+      iteration: 'sprint-2',
+    });
+    await backend.setCurrentIteration('sprint-1');
+
+    await backendDataStore.getState().refresh();
+    const state = backendDataStore.getState();
+    expect(state.currentIteration).toBe('sprint-1');
+    expect(state.items.map((i) => i.title).sort()).toEqual([
+      'In sprint 1',
+      'In sprint 2',
+    ]);
+  });
+
   it('destroy resets state', async () => {
     backendDataStore.getState().init(tmpDir);
     await waitForLoad();

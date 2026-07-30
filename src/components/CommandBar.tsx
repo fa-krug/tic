@@ -1,8 +1,5 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import {
-  backendDataStore,
-  useBackendDataStore,
-} from '../stores/backendDataStore.js';
+import { useState, useMemo, useCallback } from 'react';
+import { useBackendDataStore } from '../stores/backendDataStore.js';
 import {
   navigationStore,
   useNavigationStore,
@@ -14,7 +11,6 @@ import {
 } from '../stores/recentCommandsStore.js';
 import { OverlayPanel, type OverlayItem } from './OverlayPanel.js';
 import type { Command } from '../commands.js';
-import type { WorkItem } from '../types.js';
 
 interface CommandBarProps {
   commands: Command[];
@@ -24,7 +20,9 @@ interface CommandBarProps {
 
 export function CommandBar({ commands, onCommand, onCancel }: CommandBarProps) {
   const [query, setQuery] = useState('');
-  const [allSearchItems, setAllSearchItems] = useState<WorkItem[]>([]);
+  // Search deliberately ignores the list's iteration scope, type view and
+  // active filters — the store holds every item, and hits are matched here.
+  const allSearchItems = useBackendDataStore((s) => s.items);
   const recentIds = useRecentCommandsStore((s) => s.recentIds);
   const { pullRequests, branches } = useBackendDataStore(
     useShallow((s) => ({
@@ -34,22 +32,6 @@ export function CommandBar({ commands, onCommand, onCancel }: CommandBarProps) {
   );
   const { navigate } = navigationStore.getState();
   const screen = useNavigationStore((s) => s.screen);
-
-  // Load all work items on mount (may differ from filtered list)
-  useEffect(() => {
-    const backend = backendDataStore.getState().backend;
-    if (!backend) return;
-    let cancelled = false;
-    void backend
-      .listWorkItems()
-      .then((items) => {
-        if (!cancelled) setAllSearchItems(items);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const items: OverlayItem[] = useMemo(() => {
     const q = query.toLowerCase();

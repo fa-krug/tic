@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { getTargetIds, collectDescendants } from './WorkItemList.js';
+import {
+  getTargetIds,
+  collectDescendants,
+  scopeToIteration,
+  commonIteration,
+} from './WorkItemList.js';
 import type { WorkItem } from '../types.js';
 
 function makeItem(rowId: number, id: string | null): WorkItem {
@@ -89,5 +94,66 @@ describe('collectDescendants', () => {
     const result = collectDescendants(new Set([1, 2]), items);
     const ids = result.map((i) => i.rowId).sort();
     expect(ids).toEqual([3, 4]);
+  });
+});
+
+describe('scopeToIteration', () => {
+  function withIteration(rowId: number, iteration: string): WorkItem {
+    return { ...makeItem(rowId, String(rowId)), iteration };
+  }
+
+  const items = [
+    withIteration(1, 'sprint-1'),
+    withIteration(2, 'sprint-2'),
+    withIteration(3, 'sprint-1'),
+    withIteration(4, ''),
+  ];
+
+  it('keeps only items in the given iteration', () => {
+    expect(scopeToIteration(items, 'sprint-1').map((i) => i.rowId)).toEqual([
+      1, 3,
+    ]);
+  });
+
+  it('returns all items when no iteration is active', () => {
+    expect(scopeToIteration(items, '')).toHaveLength(4);
+  });
+
+  it('returns empty when nothing matches', () => {
+    expect(scopeToIteration(items, 'sprint-9')).toEqual([]);
+  });
+});
+
+describe('commonIteration', () => {
+  function withIteration(rowId: number, iteration: string): WorkItem {
+    return { ...makeItem(rowId, String(rowId)), iteration };
+  }
+
+  it('returns the shared iteration', () => {
+    expect(
+      commonIteration([
+        withIteration(1, 'sprint-1'),
+        withIteration(2, 'sprint-1'),
+      ]),
+    ).toBe('sprint-1');
+  });
+
+  it('returns null when items disagree', () => {
+    expect(
+      commonIteration([
+        withIteration(1, 'sprint-1'),
+        withIteration(2, 'sprint-2'),
+      ]),
+    ).toBeNull();
+  });
+
+  it('returns null for an empty selection', () => {
+    expect(commonIteration([])).toBeNull();
+  });
+
+  it('returns empty string when items share no iteration', () => {
+    expect(commonIteration([withIteration(1, ''), withIteration(2, '')])).toBe(
+      '',
+    );
   });
 });

@@ -39,6 +39,8 @@ export interface OverlayPanelProps {
   onQueryChange?: (query: string) => void;
   fieldType?: FieldType;
   initialSelectedId?: string;
+  /** Item id holding the value currently set on the target(s); marked with ●. */
+  currentId?: string;
 }
 
 export function filterItems(
@@ -86,6 +88,7 @@ export function OverlayPanel({
   onQueryChange,
   fieldType,
   initialSelectedId,
+  currentId,
 }: OverlayPanelProps) {
   const [query, setQuery] = useState(initialQuery);
   const [selectedIndex, setSelectedIndex] = useState(() => {
@@ -236,6 +239,7 @@ export function OverlayPanel({
             const idx = selectableIdx++;
             const isSelected = idx === viewport.visibleCursor;
             const isToggled = toggled.has(item.id);
+            const isCurrent = currentId !== undefined && item.id === currentId;
 
             return (
               <Box
@@ -264,9 +268,14 @@ export function OverlayPanel({
                   ) : (
                     <Text
                       color={isSelected ? autoFg(selectionBg) : undefined}
-                      bold={isSelected}
+                      bold={isSelected || isCurrent}
                     >
                       {item.label}
+                    </Text>
+                  )}
+                  {isCurrent && (
+                    <Text color={isSelected ? autoFg(selectionBg) : accent}>
+                      ●
                     </Text>
                   )}
                 </Box>
