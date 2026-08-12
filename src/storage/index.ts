@@ -341,7 +341,7 @@ export class Storage
 
     if (itemRows.length === 0) return [];
 
-    return this.assembleWorkItems(itemRows);
+    return this.assembleWorkItems(itemRows, { includeComments: true });
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await

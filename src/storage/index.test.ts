@@ -1466,11 +1466,11 @@ describe('Storage', () => {
   // ─── comment loading optimization ──────────────────────────────
 
   describe('comment loading', () => {
-    it('listWorkItems omits comments by default', async () => {
+    it('listWorkItems includes comments', async () => {
       const item = await backend.createWorkItem(makeNewWorkItem());
       await backend.addComment(item.id!, { body: 'hello', author: 'me' });
       const items = await backend.listWorkItems();
-      expect(items[0]!.comments).toEqual([]);
+      expect(items[0]!.comments).toHaveLength(1);
     });
 
     it('getWorkItem includes comments', async () => {

@@ -227,6 +227,16 @@ export class AzureDevOpsBackend
     return result.value.map(mapWorkItemToWorkItem);
   }
 
+  private async fetchComments(id: number | string): Promise<Comment[]> {
+    const commentResult = await this.api
+      .rest<{ comments: AdoComment[] }>(
+        'GET',
+        `/${encodeURIComponent(this.project)}/_apis/wit/workItems/${id}/comments?api-version=7.1-preview.4`,
+      )
+      .catch(() => ({ comments: [] as AdoComment[] }));
+    return (commentResult.comments ?? []).map(mapCommentToComment);
+  }
+
   async listWorkItems(iteration?: string): Promise<WorkItem[]> {
     let wiql = `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = '${this.escapeWiql(this.project)}'`;
     if (iteration) {
@@ -241,28 +251,27 @@ export class AzureDevOpsBackend
     if (ids.length === 0) return [];
 
     const items = await this.batchFetchWorkItems(ids);
+    const comments = await Promise.all(
+      items.map((item) => this.fetchComments(item.rowId)),
+    );
+    items.forEach((item, i) => {
+      item.comments = comments[i]!;
+    });
     items.sort((a, b) => b.updated.localeCompare(a.updated));
     return items;
   }
 
   async getWorkItem(id: string): Promise<WorkItem> {
-    const [ado, commentResult] = await Promise.all([
+    const [ado, comments] = await Promise.all([
       this.api.rest<AdoWorkItem>(
         'GET',
         `/${encodeURIComponent(this.project)}/_apis/wit/workitems/${id}?$expand=relations`,
       ),
-      this.api
-        .rest<{
-          comments: AdoComment[];
-        }>(
-          'GET',
-          `/${encodeURIComponent(this.project)}/_apis/wit/workItems/${id}/comments?api-version=7.1-preview.4`,
-        )
-        .catch(() => ({ comments: [] as AdoComment[] })),
+      this.fetchComments(id),
     ]);
 
     const item = mapWorkItemToWorkItem(ado);
-    item.comments = (commentResult.comments ?? []).map(mapCommentToComment);
+    item.comments = comments;
     return item;
   }
 
