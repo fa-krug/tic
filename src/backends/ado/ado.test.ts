@@ -253,6 +253,8 @@ describe('AzureDevOpsBackend', () => {
           },
         ],
       });
+      // Comments fetch per item
+      mockApi.rest.mockResolvedValue({ comments: [] });
 
       const items = await backend.listWorkItems();
       expect(items).toHaveLength(2);
@@ -270,6 +272,7 @@ describe('AzureDevOpsBackend', () => {
       mockApi.batchGetWorkItems.mockResolvedValueOnce({
         value: [sampleWorkItem],
       });
+      mockApi.rest.mockResolvedValue({ comments: [] });
 
       await backend.listWorkItems('WebApp\\Sprint 1');
 

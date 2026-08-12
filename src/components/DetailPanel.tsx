@@ -177,6 +177,19 @@ export function DetailPanel({
           ))}
         </Box>
       )}
+      {showFullDescription && item.comments.length > 0 && (
+        <Box flexDirection="column" marginTop={1}>
+          <Text bold>Comments</Text>
+          {item.comments.map((comment, idx) => (
+            <Box key={idx} flexDirection="column" marginTop={idx > 0 ? 1 : 0}>
+              <Text dimColor={mutedDim}>
+                {comment.author} · {comment.date}
+              </Text>
+              <Text wrap="wrap">{comment.body}</Text>
+            </Box>
+          ))}
+        </Box>
+      )}
     </Box>
   );
 }
