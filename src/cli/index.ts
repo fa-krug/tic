@@ -4,6 +4,7 @@ import { detectBackend, VALID_BACKENDS } from '../backends/factory.js';
 import type { Backend, BackendCapabilities } from '../backends/types.js';
 import { BACKEND_CAPABILITIES } from '../backends/capabilities.js';
 import { readBackendTypeSync } from '../storage/config.js';
+import { resolveProjectRoot } from '../git.js';
 import type { SyncQueueAdapter } from '../sync/types.js';
 import type { SyncManager } from '../sync/SyncManager.js';
 import { formatTsvRow, formatTsvKeyValue, formatJson } from './format.js';
@@ -109,10 +110,20 @@ export function requireTicProject(root: string): void {
   }
 }
 
+/**
+ * Directory holding `.tic/` (the main checkout's root inside git). Git branch
+ * commands deliberately keep using `process.cwd()` so they act on the
+ * current worktree.
+ */
+function projectRoot(): string {
+  return resolveProjectRoot(process.cwd());
+}
+
 async function createBackend(): Promise<Backend> {
-  requireTicProject(process.cwd());
+  const root = projectRoot();
+  requireTicProject(root);
   const { createBackend: create } = await import('../backends/factory.js');
-  return create(process.cwd());
+  return create(root);
 }
 
 async function createBackendAndSync(): Promise<{
@@ -120,18 +131,18 @@ async function createBackendAndSync(): Promise<{
   syncManager: SyncManager | null;
   queue: SyncQueueAdapter | null;
 }> {
-  requireTicProject(process.cwd());
+  const root = projectRoot();
+  requireTicProject(root);
   const { createBackendWithSync } = await import('../backends/factory.js');
-  const { backend, syncManager, queue } = await createBackendWithSync(
-    process.cwd(),
-  );
+  const { backend, syncManager, queue } = await createBackendWithSync(root);
   return { backend, syncManager, queue };
 }
 
 function tryGetCapabilities(): BackendCapabilities | null {
   try {
-    requireTicProject(process.cwd());
-    const backendType = readBackendTypeSync(process.cwd());
+    const root = projectRoot();
+    requireTicProject(root);
+    const backendType = readBackendTypeSync(root);
     return BACKEND_CAPABILITIES[backendType] ?? null;
   } catch {
     return null;
@@ -178,9 +189,10 @@ export function createProgram(): Command {
     .action(async (opts: { backend?: string }) => {
       const parentOpts = program.opts<GlobalOpts>();
       try {
+        const root = projectRoot();
         let backend = opts.backend;
         if (!backend) {
-          const detected = detectBackend(process.cwd());
+          const detected = detectBackend(root);
           if (process.stdin.isTTY) {
             console.log(`Detected backend: ${detected}`);
             console.log(`Available backends: ${VALID_BACKENDS.join(', ')}`);
@@ -194,7 +206,7 @@ export function createProgram(): Command {
           );
         }
         const { runInit } = await import('./commands/init.js');
-        const result = await runInit(process.cwd(), backend);
+        const result = await runInit(root, backend);
         if (result.alreadyExists) {
           console.log('Already initialized in .tic/');
         } else {
@@ -781,9 +793,10 @@ export function createProgram(): Command {
     .action(async (key: string) => {
       const parentOpts = program.opts<GlobalOpts>();
       try {
-        requireTicProject(process.cwd());
+        const root = projectRoot();
+        requireTicProject(root);
         const { runConfigGet } = await import('./commands/config.js');
-        const value = await runConfigGet(process.cwd(), key);
+        const value = await runConfigGet(root, key);
         if (parentOpts.quiet) return;
         if (parentOpts.json) {
           console.log(formatJson({ [key]: value }));
@@ -803,9 +816,10 @@ export function createProgram(): Command {
     .action(async (key: string, value: string) => {
       const parentOpts = program.opts<GlobalOpts>();
       try {
-        requireTicProject(process.cwd());
+        const root = projectRoot();
+        requireTicProject(root);
         const { runConfigSet } = await import('./commands/config.js');
-        await runConfigSet(process.cwd(), key, value);
+        await runConfigSet(root, key, value);
         if (!parentOpts.quiet) {
           if (parentOpts.json) {
             console.log(formatJson({ [key]: value }));

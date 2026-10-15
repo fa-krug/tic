@@ -131,7 +131,7 @@ Deleting an item automatically cleans up references — children have their pare
 
 ## Storage
 
-All data lives in `.tic/` at the root of your project:
+All data lives in `.tic/` at the root of your project. Inside a git repository that is the main checkout's root: running tic from a subdirectory or a linked worktree uses the same `.tic/` (git branch commands still act on the worktree you are in). Outside git, `.tic/` is created in the current directory.
 
 ```
 .tic/

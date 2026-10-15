@@ -38,6 +38,43 @@ export function isGitRepo(root: string): boolean {
 }
 
 /**
+ * Resolve the tic project root — the directory holding `.tic/` — for `cwd`.
+ *
+ * Inside a git repository this is the main checkout's root, so every linked
+ * worktree and every subdirectory shares one `.tic/tic.db`. The git root wins
+ * even if `cwd` has its own `.tic/`: such a directory is a leftover of the old
+ * per-cwd behaviour, not a deliberate second project.
+ *
+ * Falls back to `cwd` outside a git repository, when git is unavailable, and
+ * for layouts whose common dir is not a `.git` directory (bare repos,
+ * submodules, `--separate-git-dir`).
+ *
+ * Only for locating `.tic/`: git operations that act on the checked-out
+ * branch (switch, merge, push, worktree creation) must keep using `cwd`.
+ */
+export function resolveProjectRoot(cwd: string): string {
+  try {
+    const commonDir = execFileSync(
+      'git',
+      ['rev-parse', '--path-format=absolute', '--git-common-dir'],
+      { cwd, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] },
+    ).trim();
+    // Git < 2.31 echoes the unknown `--path-format` flag instead of failing,
+    // so only trust a single absolute path.
+    if (
+      path.isAbsolute(commonDir) &&
+      !commonDir.includes('\n') &&
+      path.basename(commonDir) === '.git'
+    ) {
+      return path.dirname(commonDir);
+    }
+  } catch {
+    // Not a git repository, or git is not installed.
+  }
+  return cwd;
+}
+
+/**
  * Return the name of the currently checked-out branch, or null if detached HEAD.
  */
 export function getCurrentBranch(cwd: string): string | null {

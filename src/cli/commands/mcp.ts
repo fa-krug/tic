@@ -40,7 +40,7 @@ import {
 } from './pr.js';
 import type { PrCreateOptions } from './pr.js';
 import { isPrBackend } from '../../backends/types.js';
-import { isGitRepo } from '../../git.js';
+import { isGitRepo, resolveProjectRoot } from '../../git.js';
 
 export interface ToolResult {
   [key: string]: unknown;
@@ -540,6 +540,8 @@ export function registerTools(
   pendingDeletes: DeleteTracker,
   root: string,
   syncState?: SyncState,
+  /** Checkout that branch tools run in (a linked worktree may differ from `root`). */
+  gitCwd: string = root,
 ): void {
   const caps = backend.getCapabilities();
 
@@ -929,7 +931,7 @@ export function registerTools(
   }
 
   // Branch tools — available if in a git repo
-  if (isGitRepo(root)) {
+  if (isGitRepo(gitCwd)) {
     server.tool(
       'tic-list_branches',
       'List git branches with linked work items and worktree status',
@@ -937,7 +939,7 @@ export function registerTools(
       async () => {
         const items = await backend.listWorkItems();
         const { runBranchList } = await import('./branch.js');
-        const branches = runBranchList(root, items);
+        const branches = runBranchList(gitCwd, items);
         return {
           content: [{ type: 'text', text: JSON.stringify(branches, null, 2) }],
         };
@@ -952,7 +954,7 @@ export function registerTools(
       },
       async (args) => {
         const { runBranchSwitch } = await import('./branch.js');
-        const result = runBranchSwitch(args.name, root);
+        const result = runBranchSwitch(args.name, gitCwd);
         return {
           content: [{ type: 'text', text: JSON.stringify(result) }],
         };
@@ -967,7 +969,7 @@ export function registerTools(
       },
       async (args) => {
         const { runBranchCreate } = await import('./branch.js');
-        const result = runBranchCreate(args.name, root);
+        const result = runBranchCreate(args.name, gitCwd);
         return {
           content: [{ type: 'text', text: JSON.stringify(result) }],
         };
@@ -988,7 +990,7 @@ export function registerTools(
         const { runBranchDelete } = await import('./branch.js');
         const result = await runBranchDelete(
           args.name,
-          root,
+          gitCwd,
           args.force ?? false,
         );
         return {
@@ -1005,7 +1007,7 @@ export function registerTools(
       },
       async (args) => {
         const { runBranchMerge } = await import('./branch.js');
-        const result = await runBranchMerge(args.name, root);
+        const result = await runBranchMerge(args.name, gitCwd);
         return {
           content: [{ type: 'text', text: JSON.stringify(result) }],
         };
@@ -1023,7 +1025,7 @@ export function registerTools(
       },
       async (args) => {
         const { runBranchPush } = await import('./branch.js');
-        const result = await runBranchPush(args.name, root);
+        const result = await runBranchPush(args.name, gitCwd);
         return {
           content: [{ type: 'text', text: JSON.stringify(result) }],
         };
@@ -1037,7 +1039,10 @@ function isTicProject(root: string): boolean {
 }
 
 export async function startMcpServer(): Promise<void> {
-  const root = process.cwd();
+  // `.tic/` lives in the main checkout (shared by all worktrees); branch tools
+  // keep operating on the checkout the server was started in.
+  const cwd = process.cwd();
+  const root = resolveProjectRoot(cwd);
   const server = new McpServer({
     name: 'tic',
     version: VERSION,
@@ -1097,7 +1102,7 @@ export async function startMcpServer(): Promise<void> {
     return result;
   });
 
-  registerTools(server, guardedBackend, pendingDeletes, root, syncState);
+  registerTools(server, guardedBackend, pendingDeletes, root, syncState, cwd);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);

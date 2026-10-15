@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { execFileSync } from 'node:child_process';
 import { backendDataStore } from './backendDataStore.js';
 import { configStore } from './configStore.js';
 import { Storage } from '../storage/index.js';
@@ -302,5 +303,49 @@ describe('backendDataStore', () => {
   it('handles startPatFlow', () => {
     backendDataStore.getState().startPatFlow();
     expect(backendDataStore.getState().authFlow?.state).toBe('entering-pat');
+  });
+
+  describe('branch cwd', () => {
+    let gitDir: string;
+
+    beforeEach(() => {
+      gitDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-bds-git-'));
+      const git = (args: string[]) =>
+        execFileSync('git', args, { cwd: gitDir, stdio: 'pipe' });
+      git(['init']);
+      git(['config', 'user.email', 'test@test.com']);
+      git(['config', 'user.name', 'Test']);
+      fs.writeFileSync(path.join(gitDir, 'file.txt'), 'hello');
+      git(['add', '.']);
+      git(['commit', '-m', 'initial']);
+      git(['branch', 'feature-x']);
+    });
+
+    afterEach(() => {
+      fs.rmSync(gitDir, { recursive: true, force: true });
+    });
+
+    it('lists branches of the git cwd, not the project root', async () => {
+      // Project root (.tic/) and the checkout git commands run in differ when
+      // tic runs in a linked worktree.
+      backendDataStore.getState().init(tmpDir, gitDir);
+      await waitForLoad();
+
+      backendDataStore.getState().loadBranches();
+
+      const names = backendDataStore
+        .getState()
+        .branches.map((r) => r.branch.name);
+      expect(names).toContain('feature-x');
+    });
+
+    it('defaults the git cwd to the project root', async () => {
+      backendDataStore.getState().init(tmpDir);
+      await waitForLoad();
+
+      backendDataStore.getState().loadBranches();
+
+      expect(backendDataStore.getState().branches).toEqual([]);
+    });
   });
 });
