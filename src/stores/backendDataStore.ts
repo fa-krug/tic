@@ -110,7 +110,12 @@ export interface BackendDataStoreState {
   syncManager: SyncManager | null;
   queue: SyncQueueAdapter | null;
 
-  init(cwd: string): void;
+  /**
+   * @param cwd tic project root (where `.tic/` lives)
+   * @param gitCwd checkout that branch operations run in; differs from `cwd`
+   *   in a linked worktree. Defaults to `cwd`.
+   */
+  init(cwd: string, gitCwd?: string): void;
   refresh(): Promise<void>;
   reloadItem(id: string): Promise<void>;
   removeItem(id: string): void;
@@ -152,6 +157,7 @@ export interface BackendDataStoreState {
 let currentBackend: Backend | null = null;
 let currentRemoteBackend: Backend | null = null;
 let currentCwd: string | null = null;
+let currentGitCwd: string | null = null;
 let initGeneration = 0;
 let currentSyncUnsubscribe: (() => void) | null = null;
 
@@ -254,9 +260,10 @@ export const backendDataStore = createStore<BackendDataStoreState>(
     syncManager: null,
     queue: null,
 
-    init(cwd: string) {
+    init(cwd: string, gitCwd: string = cwd) {
       get().destroy();
       const generation = ++initGeneration;
+      currentGitCwd = gitCwd;
       set({ loading: true });
 
       void createBackendAndSync(cwd)
@@ -647,11 +654,11 @@ export const backendDataStore = createStore<BackendDataStoreState>(
 
     // Branch operations
     loadBranches() {
-      if (!currentCwd || !isGitRepo(currentCwd)) {
+      if (!currentGitCwd || !isGitRepo(currentGitCwd)) {
         set({ branches: [], branchesLoading: false });
         return;
       }
-      const cwd = currentCwd;
+      const cwd = currentGitCwd;
       const items = get().items;
       const branches = listBranches(cwd);
       const worktrees = listWorktrees(cwd);
@@ -681,8 +688,8 @@ export const backendDataStore = createStore<BackendDataStoreState>(
     },
 
     refreshBranches() {
-      if (!currentCwd || !isGitRepo(currentCwd)) return;
-      const cwd = currentCwd;
+      if (!currentGitCwd || !isGitRepo(currentGitCwd)) return;
+      const cwd = currentGitCwd;
       const gen = initGeneration;
       get().loadBranches();
       set({ branchesLoading: true });
@@ -826,6 +833,7 @@ export const backendDataStore = createStore<BackendDataStoreState>(
       currentBackend = null;
       currentRemoteBackend = null;
       currentCwd = null;
+      currentGitCwd = null;
       set({
         items: [],
         capabilities: { ...defaultCapabilities },

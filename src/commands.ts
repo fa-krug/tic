@@ -1,5 +1,6 @@
 import type { BackendCapabilities } from './backends/types.js';
 import type { Screen } from './app.js';
+import { canSwitchTypes } from './work-item-types.js';
 
 export type KeyDescriptor = string | { special: string; modifier?: 'shift' };
 
@@ -461,7 +462,7 @@ const commands: Command[] = [
     keys: [{ special: 'tab' }],
     screen: 'list',
     helpGroup: 'Switching',
-    when: (ctx) => ctx.capabilities.customTypes,
+    when: (ctx) => canSwitchTypes(ctx.types),
   },
   {
     id: 'list-toggle-description',
@@ -1026,7 +1027,7 @@ export function getVisibleCommands(ctx: CommandContext): Command[] {
   const visible = commands.filter((cmd) => !cmd.when || cmd.when(ctx));
 
   // Add dynamic switch-type commands
-  if (ctx.screen === 'list' && ctx.capabilities.customTypes) {
+  if (ctx.screen === 'list' && canSwitchTypes(ctx.types)) {
     for (const type of ctx.types) {
       if (type === ctx.activeType) continue;
       const plural = type + 's';

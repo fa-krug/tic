@@ -14,6 +14,7 @@ import {
   worktreeExists,
   listBranches,
   listWorktrees,
+  resolveProjectRoot,
 } from './git.js';
 
 describe('slugify', () => {
@@ -314,5 +315,96 @@ describe('listWorktrees', () => {
     const added = worktrees.find((w) => w.branch === 'wt-branch');
     expect(added).toBeDefined();
     expect(added!.path).toBe(wtPath);
+  });
+});
+
+describe('resolveProjectRoot', () => {
+  let base: string;
+  let repo: string;
+
+  function git(args: string[], cwd: string): void {
+    execFileSync('git', args, { cwd, stdio: 'pipe' });
+  }
+
+  beforeEach(() => {
+    // realpath: on macOS os.tmpdir() is a symlink (/var -> /private/var) and
+    // git reports resolved paths.
+    base = fs.realpathSync(
+      fs.mkdtempSync(path.join(os.tmpdir(), 'tic-root-test-')),
+    );
+    repo = path.join(base, 'repo');
+    fs.mkdirSync(repo);
+    git(['init'], repo);
+    git(['config', 'user.email', 'test@test.com'], repo);
+    git(['config', 'user.name', 'Test'], repo);
+    fs.writeFileSync(path.join(repo, 'file.txt'), 'hello');
+    git(['add', '.'], repo);
+    git(['commit', '-m', 'initial'], repo);
+  });
+
+  afterEach(() => {
+    fs.rmSync(base, { recursive: true, force: true });
+  });
+
+  it('returns the repo root when called from the repo root', () => {
+    expect(resolveProjectRoot(repo)).toBe(repo);
+  });
+
+  it('returns the repo root when called from a subdirectory', () => {
+    const sub = path.join(repo, 'pkg', 'nested');
+    fs.mkdirSync(sub, { recursive: true });
+    expect(resolveProjectRoot(sub)).toBe(repo);
+  });
+
+  it('returns the main checkout root when called from a linked worktree', () => {
+    const wt = path.join(base, 'wt');
+    git(['worktree', 'add', wt, '-b', 'feature'], repo);
+    expect(resolveProjectRoot(wt)).toBe(repo);
+  });
+
+  it('returns the main checkout root from a subdirectory of a linked worktree', () => {
+    const wt = path.join(base, 'wt');
+    git(['worktree', 'add', wt, '-b', 'feature'], repo);
+    const sub = path.join(wt, 'sub');
+    fs.mkdirSync(sub);
+    expect(resolveProjectRoot(sub)).toBe(repo);
+  });
+
+  it('prefers the git root over a stale .tic/ in a subdirectory', () => {
+    const sub = path.join(repo, 'sub');
+    fs.mkdirSync(path.join(sub, '.tic'), { recursive: true });
+    fs.writeFileSync(path.join(sub, '.tic', 'tic.db'), '');
+    expect(resolveProjectRoot(sub)).toBe(repo);
+  });
+
+  describe('outside a git repository', () => {
+    let prevCeiling: string | undefined;
+
+    beforeEach(() => {
+      // Stop git from discovering a repository above the temp dir.
+      prevCeiling = process.env['GIT_CEILING_DIRECTORIES'];
+      process.env['GIT_CEILING_DIRECTORIES'] = base;
+    });
+
+    afterEach(() => {
+      if (prevCeiling === undefined) {
+        delete process.env['GIT_CEILING_DIRECTORIES'];
+      } else {
+        process.env['GIT_CEILING_DIRECTORIES'] = prevCeiling;
+      }
+    });
+
+    it('falls back to cwd for a non-git directory', () => {
+      const plain = path.join(base, 'plain');
+      fs.mkdirSync(plain);
+      expect(resolveProjectRoot(plain)).toBe(plain);
+    });
+
+    it('falls back to cwd for a bare repository', () => {
+      const bare = path.join(base, 'bare.git');
+      fs.mkdirSync(bare);
+      git(['init', '--bare'], bare);
+      expect(resolveProjectRoot(bare)).toBe(bare);
+    });
   });
 });

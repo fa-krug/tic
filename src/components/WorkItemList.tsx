@@ -52,6 +52,11 @@ import {
   type SavedView,
 } from '../filters.js';
 import { formatIterationDates } from '../iteration-utils.js';
+import {
+  pickDefaultType,
+  canSwitchTypes,
+  nextType,
+} from '../work-item-types.js';
 export type { TreeItem } from './buildTree.js';
 
 const EMPTY_VIEWS: SavedView[] = [];
@@ -550,15 +555,10 @@ export function WorkItemList() {
   const gitAvailable = useMemo(() => isGitRepo(process.cwd()), []);
 
   useEffect(() => {
-    if (
-      types.length > 0 &&
-      (activeType === null || !types.includes(activeType))
-    ) {
-      setActiveType(
-        defaultType && types.includes(defaultType) ? defaultType : types[0]!,
-      );
-    }
-  }, [activeType, types, setActiveType, defaultType]);
+    if (activeType !== null && types.includes(activeType)) return;
+    const picked = pickDefaultType(types, defaultType, { items: allItems });
+    if (picked) setActiveType(picked);
+  }, [activeType, types, setActiveType, defaultType, allItems]);
 
   // The store holds every item; the list itself shows one iteration at a time
   const iterationItems = useMemo(
@@ -1199,14 +1199,8 @@ export function WorkItemList() {
         }
       }
 
-      if (
-        matchesCommand('list-tab', input, key) &&
-        capabilities.customTypes &&
-        types.length > 0
-      ) {
-        const currentIdx = types.indexOf(activeType ?? '');
-        const nextType = types[(currentIdx + 1) % types.length]!;
-        setActiveType(nextType);
+      if (matchesCommand('list-tab', input, key) && canSwitchTypes(types)) {
+        setActiveType(nextType(types, activeType)!);
         setCursor(0);
         clearWarning();
       }

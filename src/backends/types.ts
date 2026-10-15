@@ -52,6 +52,12 @@ export interface Backend {
   getClosedStatuses(): Promise<string[]>;
   getIterations(): Promise<Iteration[]>;
   getWorkItemTypes(): Promise<string[]>;
+  /**
+   * The type the backend itself treats as its default backlog item (e.g. the
+   * Azure DevOps requirement category). Optional; resolves to undefined when
+   * unknown and never rejects.
+   */
+  getDefaultWorkItemType?(): Promise<string | undefined>;
   getAssignees(): Promise<string[]>;
   getLabels(): Promise<string[]>;
   getCurrentIteration(): Promise<string>;

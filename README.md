@@ -88,7 +88,7 @@ The main screen shows work items filtered by type and iteration, displayed as a 
 | `a` | Set assignee (single or marked items) |
 | `l` | Set labels (single or marked items) |
 | `t` | Set type (single or marked items) |
-| `Tab` | Cycle work item type filter (epic / issue / task) |
+| `Tab` | Cycle through the work item types (e.g. epic / issue / task, or Azure DevOps' Bug / User Story / …) |
 | `i` | Set iteration (single or marked items) |
 | `I` | Switch iteration (full-screen picker) |
 | `,` | Settings |
@@ -131,7 +131,7 @@ Deleting an item automatically cleans up references — children have their pare
 
 ## Storage
 
-All data lives in `.tic/` at the root of your project:
+All data lives in `.tic/` at the root of your project. Inside a git repository that is the main checkout's root: running tic from a subdirectory or a linked worktree uses the same `.tic/` (git branch commands still act on the worktree you are in). Outside git, `.tic/` is created in the current directory.
 
 ```
 .tic/
@@ -145,6 +145,8 @@ All data lives in `.tic/` at the root of your project:
 The SQLite database (`.tic/tic.db`) is the single source of truth for work items, config, templates, and undo history. When a remote backend is configured, `SyncManager` also writes markdown mirrors to `.tic/items/` via `FilesBackend`.
 
 Configuration (types, statuses, iterations, etc.) is stored in the `project_config` table and managed via the TUI settings screen or `tic config` CLI commands.
+
+With a remote backend, types and statuses come from the remote. If the configured default type isn't one of them (a new project starts with `issue`), the first sync replaces it with the backend's backlog type — for Azure DevOps the process's requirement type (`User Story`, `Product Backlog Item`, `Requirement`, or `Issue`).
 
 If upgrading from a legacy `.tic/config.yml` setup, the database will automatically migrate the YAML config on first open.
 

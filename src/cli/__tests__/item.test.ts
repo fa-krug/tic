@@ -4,6 +4,8 @@ import path from 'node:path';
 import os from 'node:os';
 import { Storage } from '../../storage/index.js';
 import type { Backend } from '../../backends/types.js';
+import { updateConfig } from '../../storage/config.js';
+import { configStore } from '../../stores/configStore.js';
 import {
   runItemList,
   runItemShow,
@@ -58,6 +60,31 @@ describe('item commands', () => {
         description: 'Details here',
       });
       expect(item.description).toBe('Details here');
+    });
+
+    it('defaults to the backlog type when the backend has no "task" type', async () => {
+      updateConfig(backend.getDatabase(), {
+        types: ['Bug', 'Epic', 'Task', 'User Story'],
+        statuses: ['New', 'Active', 'Closed'],
+      });
+      const item = await runItemCreate(backend, 'Story', {});
+      expect(item.type).toBe('User Story');
+    });
+
+    it('defaults to the configured default type when "task" is missing', async () => {
+      updateConfig(backend.getDatabase(), {
+        types: ['Bug', 'Epic', 'Task', 'User Story'],
+        statuses: ['New', 'Active', 'Closed'],
+        defaultType: 'Epic',
+      });
+      configStore.getState().setDatabase(backend.getDatabase());
+      await configStore.getState().init(tmpDir);
+      try {
+        const item = await runItemCreate(backend, 'Big thing', {});
+        expect(item.type).toBe('Epic');
+      } finally {
+        configStore.getState().destroy();
+      }
     });
   });
 

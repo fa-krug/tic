@@ -83,7 +83,7 @@ The app uses screen-based routing via React Context (`AppContext` in `src/app.ts
 
 ### Storage (Local Persistence)
 
-`Storage` (`src/storage/`) is the SQLite-backed local persistence layer. It implements the `Backend` interface but is **not** a remote backend — it replaces `LocalBackend` as the primary local store. All data lives in `.tic/tic.db` (SQLite with WAL mode). Key modules: `schema.ts` (Drizzle ORM table definitions), `db.ts` (database creation and migration), `config.ts` (project config), `syncQueue.ts` (`SyncQueue` for queuing sync actions), `undo.ts` (undo log), and `mappers.ts` (row-to-domain conversions).
+`Storage` (`src/storage/`) is the SQLite-backed local persistence layer. It implements the `Backend` interface but is **not** a remote backend — it replaces `LocalBackend` as the primary local store. All data lives in `.tic/tic.db` (SQLite with WAL mode). The TUI, CLI, and MCP server locate it via `resolveProjectRoot(cwd)` (`src/git.ts`), which returns the main checkout's root inside git — subdirectories and linked worktrees share one database — and `cwd` otherwise. Git branch/worktree operations keep using `process.cwd()`. Key modules: `schema.ts` (Drizzle ORM table definitions), `db.ts` (database creation and migration), `config.ts` (project config), `syncQueue.ts` (`SyncQueue` for queuing sync actions), `undo.ts` (undo log), and `mappers.ts` (row-to-domain conversions).
 
 ### Components
 
@@ -110,7 +110,7 @@ The app uses screen-based routing via React Context (`AppContext` in `src/app.ts
 
 State is managed via Zustand vanilla stores in `src/stores/`:
 
-- **backendDataStore** — single source of truth for backend data (items, statuses, types, assignees, labels, capabilities, sync status). Also manages auth state (`authPrompt`, `authFlow`, `authDismissed`) for in-TUI authentication flows. Initialized with `init(cwd)` which creates backends asynchronously (Storage + optional remote + SyncManager). Components subscribe via `useBackendDataStore(selector)`.
+- **backendDataStore** — single source of truth for backend data (items, statuses, types, assignees, labels, capabilities, sync status). Also manages auth state (`authPrompt`, `authFlow`, `authDismissed`) for in-TUI authentication flows. Initialized with `init(root, gitCwd?)` (project root for `.tic/`, checkout for branch listing; defaults to `root`) which creates backends asynchronously (Storage + optional remote + SyncManager). Components subscribe via `useBackendDataStore(selector)`.
 - **configStore** — single source of truth for project config. Reads/writes exclusively via SQLite (`project_config` table). `startWatching()` is a no-op (DB is the source of truth).
 - **undoStore** — undo action stack (max depth 5). Supports delete (soft-delete via `deleted_at` column), create, and update operations via whole-item snapshots.
 - **formStackStore** — form navigation stack and field state for drill-down into related items.

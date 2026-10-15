@@ -21,23 +21,28 @@ if (process.argv.length > 2) {
   const { isSoftDeleteBackend } = await import('./backends/types.js');
   const { initThemeFromConfig } = await import('./stores/themeStore.js');
 
+  const { resolveProjectRoot } = await import('./git.js');
+
+  // `.tic/` lives in the main checkout, shared by all worktrees and
+  // subdirectories; git branch operations still run in the current checkout.
   const cwd = process.cwd();
+  const root = resolveProjectRoot(cwd);
 
   // Auto-init on first run: detect backend from git remotes
-  const dbPath = path.join(cwd, '.tic', 'tic.db');
+  const dbPath = path.join(root, '.tic', 'tic.db');
   if (!fs.existsSync(dbPath)) {
     const { detectBackend } = await import('./backends/factory.js');
     const { runInit } = await import('./cli/commands/init.js');
-    await runInit(cwd, detectBackend(cwd));
+    await runInit(root, detectBackend(root));
   }
 
-  await configStore.getState().init(cwd);
+  await configStore.getState().init(root);
   initThemeFromConfig();
 
   // Init is non-blocking - UI renders immediately with loading state
-  backendDataStore.getState().init(cwd);
+  backendDataStore.getState().init(root, cwd);
 
-  await recentCommandsStore.getState().init(cwd);
+  await recentCommandsStore.getState().init(root);
 
   console.clear();
   const app = render(
