@@ -60,7 +60,11 @@ const minimalCapabilities: BackendCapabilities = {
 
 describe('getShortcuts', () => {
   it('returns list shortcuts with all capabilities', () => {
-    const groups = getShortcuts('list', fullCapabilities, true, true);
+    const groups = getShortcuts('list', fullCapabilities, true, true, [
+      'epic',
+      'issue',
+      'task',
+    ]);
     const allKeys = groups.flatMap((g) => g.shortcuts.map((s) => s.key));
     expect(allKeys).toContain('p');
     expect(allKeys).toContain('tab');
@@ -76,7 +80,7 @@ describe('getShortcuts', () => {
     const groups = getShortcuts('list', minimalCapabilities, false, false);
     const allKeys = groups.flatMap((g) => g.shortcuts.map((s) => s.key));
     // 'p' (create PR) is always shown regardless of capabilities
-    expect(allKeys).not.toContain('tab'); // type cycling - needs customTypes
+    expect(allKeys).not.toContain('tab'); // type cycling - needs 2+ types
     expect(allKeys).not.toContain('i'); // iteration picker - needs iterations
     expect(allKeys).not.toContain('r'); // sync - needs syncManager
     expect(allKeys).not.toContain('b'); // branch/worktree - needs gitAvailable
@@ -85,6 +89,15 @@ describe('getShortcuts', () => {
     expect(allKeys).toContain('c');
     expect(allKeys).toContain('q');
     expect(allKeys).toContain('x'); // bulk actions menu - always present
+  });
+
+  it('shows tab for backends with several fixed types', () => {
+    const groups = getShortcuts('list', minimalCapabilities, false, false, [
+      'Bug',
+      'User Story',
+    ]);
+    const allKeys = groups.flatMap((g) => g.shortcuts.map((s) => s.key));
+    expect(allKeys).toContain('tab');
   });
 
   it('returns form shortcuts', () => {

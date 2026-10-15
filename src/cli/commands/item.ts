@@ -1,5 +1,7 @@
 import type { Backend } from '../../backends/types.js';
 import type { WorkItem, Comment } from '../../types.js';
+import { configStore } from '../../stores/configStore.js';
+import { pickDefaultType } from '../../work-item-types.js';
 
 export interface ItemCreateOptions {
   type?: string;
@@ -39,6 +41,17 @@ export interface ItemCommentOptions {
 }
 
 const VALID_PRIORITIES = ['low', 'medium', 'high', 'critical'];
+
+/**
+ * Type for a new item when none is given: `task` when the backend has it,
+ * otherwise the configured default or a backlog type (e.g. Azure's
+ * `User Story`) rather than whatever type happens to be listed first.
+ */
+function defaultCreateType(types: string[]): string {
+  if (types.includes('task')) return 'task';
+  const configured = configStore.getState().config.defaultType;
+  return pickDefaultType(types, configured) ?? 'task';
+}
 
 export async function runItemCreate(
   backend: Backend,
@@ -87,7 +100,7 @@ export async function runItemCreate(
 
   return backend.cachedCreateWorkItem({
     title,
-    type: opts.type ?? (types.includes('task') ? 'task' : (types[0] ?? 'task')),
+    type: opts.type ?? defaultCreateType(types),
     status: opts.status ?? statuses[0] ?? 'open',
     priority: (opts.priority as WorkItem['priority']) ?? 'medium',
     assignee: opts.assignee ?? '',

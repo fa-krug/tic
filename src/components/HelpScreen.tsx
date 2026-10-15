@@ -29,6 +29,7 @@ export function getShortcuts(
   capabilities: BackendCapabilities,
   gitAvailable: boolean,
   hasSyncManager: boolean,
+  types: string[] = [],
 ): ShortcutGroup[] {
   // Don't show shortcuts when viewing help screen itself
   if (screen === 'help') {
@@ -40,7 +41,7 @@ export function getShortcuts(
     markedCount: 0,
     hasSelectedItem: true,
     capabilities,
-    types: [],
+    types,
     activeType: null,
     hasSyncManager,
     gitAvailable,
@@ -77,10 +78,11 @@ export function flattenGroups(groups: ShortcutGroup[]): LineEntry[] {
 
 export function HelpScreen({ sourceScreen }: { sourceScreen: Screen }) {
   const { accent, mutedDim } = useThemeStore((s) => s.colors);
-  const { backend, syncManager } = useBackendDataStore(
+  const { backend, syncManager, types } = useBackendDataStore(
     useShallow((s) => ({
       backend: s.backend,
       syncManager: s.syncManager,
+      types: s.types,
     })),
   );
   const { navigateBackFromHelp } = navigationStore.getState();
@@ -119,6 +121,7 @@ export function HelpScreen({ sourceScreen }: { sourceScreen: Screen }) {
     capabilities,
     gitAvailable,
     syncManager !== null,
+    types,
   );
 
   const lines = useMemo(() => flattenGroups(groups), [groups]);

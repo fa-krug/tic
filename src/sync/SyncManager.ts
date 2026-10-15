@@ -10,6 +10,8 @@ import type {
   SyncLogEntry,
 } from './types.js';
 import type { Storage } from '../storage/index.js';
+import type { WorkItem } from '../types.js';
+import { pickDefaultType } from '../work-item-types.js';
 
 /**
  * Data shape sent to remote backends for create/update.
@@ -403,6 +405,34 @@ export class SyncManager {
     return { push, pullCount };
   }
 
+  /**
+   * Replace a default type the remote doesn't have (typically the seed
+   * default `issue` on an Azure DevOps or Jira project) with a sensible one,
+   * so the list, Settings, and CLI/MCP creation start on a real type.
+   */
+  private async correctDefaultType(
+    remoteTypes: string[],
+    remoteItems: WorkItem[],
+  ): Promise<void> {
+    const { configStore } = await import('../stores/configStore.js');
+    const configured = configStore.getState().config.defaultType;
+    if (configured && remoteTypes.includes(configured)) return;
+
+    let backendDefault: string | undefined;
+    try {
+      backendDefault = await this.remote.getDefaultWorkItemType?.();
+    } catch {
+      // Optional hint only — fall back to the name/item-count heuristics
+    }
+    const picked = pickDefaultType(remoteTypes, configured, {
+      backendDefault,
+      items: remoteItems,
+    });
+    if (picked && picked !== configured) {
+      await configStore.getState().update({ defaultType: picked });
+    }
+  }
+
   private async pull(): Promise<number> {
     // Sync config from remote via configStore
     const [
@@ -426,6 +456,7 @@ export class SyncManager {
     });
 
     const remoteItems = await this.remote.listWorkItems();
+    await this.correctDefaultType(remoteTypes, remoteItems);
     // pendingRowIds: rowIds that are pending in the queue
     const pendingRowIds = new Set(
       (await this.queue.read()).pending.map((e) => e.itemRowId),

@@ -9,6 +9,8 @@ import type { Backend } from '../backends/types.js';
 import type { WorkItem } from '../types.js';
 import type { SyncStatus } from './types.js';
 import { createMockRemote } from '../test-helpers.js';
+import { configStore } from '../stores/configStore.js';
+import { readConfig } from '../storage/config.js';
 
 describe('SyncManager push phase', () => {
   let tmpDir: string;
@@ -1023,5 +1025,79 @@ describe('SyncManager progress reporting', () => {
 
     const log = manager.getStatus().syncLog;
     expect(log).toHaveLength(50);
+  });
+});
+
+describe('SyncManager default type correction', () => {
+  let tmpDir: string;
+  let local: Storage;
+  let queueStore: SyncQueue;
+
+  beforeEach(async () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tic-sync-test-'));
+    local = Storage.create(tmpDir);
+    queueStore = new SyncQueue(local.getDatabase());
+    configStore.getState().setDatabase(local.getDatabase());
+    await configStore.getState().init(tmpDir);
+  });
+
+  afterEach(() => {
+    configStore.getState().destroy();
+    local.destroy();
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  function azureRemote(items: WorkItem[] = []): Backend {
+    const remote = createMockRemote(items);
+    // eslint-disable-next-line @typescript-eslint/require-await
+    remote.getWorkItemTypes = async () => ['Bug', 'Epic', 'Task', 'User Story'];
+    return remote;
+  }
+
+  it('replaces the seed default "issue" when the remote has no such type', async () => {
+    expect(readConfig(local.getDatabase()).defaultType).toBe('issue');
+
+    await new SyncManager(local, azureRemote(), queueStore).sync();
+
+    expect(readConfig(local.getDatabase()).defaultType).toBe('User Story');
+    expect(configStore.getState().config.defaultType).toBe('User Story');
+  });
+
+  it("prefers the remote's own default work item type", async () => {
+    const remote = azureRemote();
+    remote.getDefaultWorkItemType = vi.fn().mockResolvedValue('Epic');
+
+    await new SyncManager(local, remote, queueStore).sync();
+
+    expect(readConfig(local.getDatabase()).defaultType).toBe('Epic');
+  });
+
+  it('ignores a failing remote default lookup', async () => {
+    const remote = azureRemote();
+    remote.getDefaultWorkItemType = vi
+      .fn()
+      .mockRejectedValue(new Error('HTTP 500'));
+
+    await new SyncManager(local, remote, queueStore).sync();
+
+    expect(readConfig(local.getDatabase()).defaultType).toBe('User Story');
+  });
+
+  it('keeps a configured default the remote supports', async () => {
+    await configStore.getState().update({ defaultType: 'Bug' });
+    const remote = azureRemote();
+    const getDefault = vi.fn().mockResolvedValue('User Story');
+    remote.getDefaultWorkItemType = getDefault;
+
+    await new SyncManager(local, remote, queueStore).sync();
+
+    expect(readConfig(local.getDatabase()).defaultType).toBe('Bug');
+    expect(getDefault).not.toHaveBeenCalled();
+  });
+
+  it('keeps "issue" when the remote has an issue type', async () => {
+    await new SyncManager(local, createMockRemote(), queueStore).sync();
+
+    expect(readConfig(local.getDatabase()).defaultType).toBe('issue');
   });
 });

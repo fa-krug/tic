@@ -192,6 +192,77 @@ describe('AzureDevOpsBackend', () => {
     });
   });
 
+  describe('getDefaultWorkItemType', () => {
+    it("returns the requirement category's default type", async () => {
+      const backend = await makeBackend();
+      mockApi.rest.mockResolvedValueOnce({
+        value: [
+          {
+            referenceName: 'Microsoft.EpicCategory',
+            defaultWorkItemType: { name: 'Epic' },
+          },
+          {
+            referenceName: 'Microsoft.RequirementCategory',
+            defaultWorkItemType: { name: 'User Story' },
+          },
+        ],
+      });
+      expect(await backend.getDefaultWorkItemType()).toBe('User Story');
+      expect(mockApi.rest).toHaveBeenLastCalledWith(
+        'GET',
+        '/WebApp/_apis/wit/workitemtypecategories',
+      );
+    });
+
+    it('fetches the categories only once', async () => {
+      const backend = await makeBackend();
+      mockApi.rest.mockResolvedValueOnce({
+        value: [
+          {
+            referenceName: 'Microsoft.RequirementCategory',
+            defaultWorkItemType: { name: 'User Story' },
+          },
+        ],
+      });
+      await backend.getDefaultWorkItemType();
+      await backend.getDefaultWorkItemType();
+      // create() + one categories call
+      expect(mockApi.rest).toHaveBeenCalledTimes(2);
+    });
+
+    it('returns undefined when the request fails, and retries later', async () => {
+      const backend = await makeBackend();
+      mockApi.rest.mockRejectedValueOnce(new Error('HTTP 403'));
+      expect(await backend.getDefaultWorkItemType()).toBeUndefined();
+      mockApi.rest.mockResolvedValueOnce({
+        value: [
+          {
+            referenceName: 'Microsoft.RequirementCategory',
+            defaultWorkItemType: { name: 'User Story' },
+          },
+        ],
+      });
+      expect(await backend.getDefaultWorkItemType()).toBe('User Story');
+    });
+
+    it('returns undefined when the category is missing or unknown', async () => {
+      const backend = await makeBackend();
+      mockApi.rest.mockResolvedValueOnce({
+        value: [
+          {
+            referenceName: 'Microsoft.RequirementCategory',
+            defaultWorkItemType: { name: 'Not A Project Type' },
+          },
+        ],
+      });
+      expect(await backend.getDefaultWorkItemType()).toBeUndefined();
+
+      const other = await makeBackend();
+      mockApi.rest.mockResolvedValueOnce({ value: [] });
+      expect(await other.getDefaultWorkItemType()).toBeUndefined();
+    });
+  });
+
   describe('getIterations', () => {
     it('returns iteration paths', async () => {
       const backend = await makeBackend();

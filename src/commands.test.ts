@@ -158,15 +158,28 @@ describe('getVisibleCommands', () => {
     expect(labels).not.toContain('Create branch or worktree for item');
   });
 
-  it('hides switch commands when backend lacks customTypes', () => {
+  it('shows switch commands for fixed backend types (customTypes false)', () => {
     const ctx = makeContext({
       capabilities: { ...ALL_CAPS, customTypes: false },
+      types: ['Bug', 'Task', 'User Story'],
+      activeType: 'Bug',
     });
+    const commands = getVisibleCommands(ctx);
+    const ids = commands.map((c) => c.id);
+    expect(ids).toContain('switch-Task');
+    expect(ids).toContain('switch-User Story');
+    expect(ids).not.toContain('switch-Bug');
+    expect(ids).toContain('list-tab');
+  });
+
+  it('hides switch commands when there is only one type', () => {
+    const ctx = makeContext({ types: ['issue'], activeType: 'issue' });
     const commands = getVisibleCommands(ctx);
     const switchCmds = commands.filter(
       (c) => c.id.startsWith('switch-') && c.id !== 'switch-iteration',
     );
     expect(switchCmds).toHaveLength(0);
+    expect(commands.map((c) => c.id)).not.toContain('list-tab');
   });
 
   it('shows sort command on list screen', () => {

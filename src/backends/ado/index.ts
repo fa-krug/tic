@@ -43,6 +43,7 @@ export class AzureDevOpsBackend
   private org: string;
   private project: string;
   private types: AdoWorkItemType[];
+  private defaultTypeRequest: Promise<string | undefined> | null = null;
 
   private constructor(
     api: AdoApiClient,
@@ -162,6 +163,35 @@ export class AzureDevOpsBackend
   // eslint-disable-next-line @typescript-eslint/require-await
   async getWorkItemTypes(): Promise<string[]> {
     return this.types.map((t) => t.name);
+  }
+
+  /**
+   * The default type of the process's requirement category (User Story,
+   * Product Backlog Item, Requirement, Issue, or a custom one). Fetched once;
+   * a failed request resolves to undefined and is retried on the next call.
+   */
+  getDefaultWorkItemType(): Promise<string | undefined> {
+    this.defaultTypeRequest ??= this.fetchRequirementType().catch(() => {
+      this.defaultTypeRequest = null;
+      return undefined;
+    });
+    return this.defaultTypeRequest;
+  }
+
+  private async fetchRequirementType(): Promise<string | undefined> {
+    const result = await this.api.rest<{
+      value: {
+        referenceName: string;
+        defaultWorkItemType?: { name: string } | null;
+      }[];
+    }>(
+      'GET',
+      `/${encodeURIComponent(this.project)}/_apis/wit/workitemtypecategories`,
+    );
+    const name = result.value.find(
+      (c) => c.referenceName === 'Microsoft.RequirementCategory',
+    )?.defaultWorkItemType?.name;
+    return name && this.types.some((t) => t.name === name) ? name : undefined;
   }
 
   async getAssignees(): Promise<string[]> {
